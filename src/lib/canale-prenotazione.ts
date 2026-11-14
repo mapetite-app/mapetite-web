@@ -44,11 +44,12 @@ export function canaleDaUrl(raw: string): Canale | null {
   return { piattaforma: p.id, nome: p.nome, url: u.toString() };
 }
 
-/** Nella pagina del locale, il modulo di prenotazione di una piattaforma. Prima i moduli incorporati
- *  (iframe, script: sono per forza del locale); poi i link, ma solo se portano tutti allo stesso posto:
- *  con due locali diversi (un "provate anche…") non si sa quale sia il suo, quindi niente. */
+/** Nella pagina del locale, il modulo di prenotazione di una piattaforma: iframe, poi link, poi script,
+ *  ognuno solo se porta sempre allo stesso posto. Con due locali diversi (un "provate anche…") non si
+ *  sa quale sia il suo, quindi niente. */
 export function trovaCanale(html: string, base: string): Canale | null {
-  const incorporati: Canale[] = [];
+  const iframe: Canale[] = [];
+  const script: Canale[] = [];
   const link: Canale[] = [];
   const re = /<(iframe|script|a|link|div|button)\b[^>]*?\b(?:href|src|data-src|data-url)\s*=\s*["']([^"'<>\s]{8,600})["']/gi;
   for (let m = re.exec(html), i = 0; m && i < 5000; m = re.exec(html), i++) {
@@ -56,9 +57,20 @@ export function trovaCanale(html: string, base: string): Canale | null {
     try { abs = new URL(m[2].replace(/&amp;/g, "&"), base).toString(); } catch { continue; }
     const c = canaleDaUrl(abs);
     if (!c) continue;
-    (m[1].toLowerCase() === "iframe" || m[1].toLowerCase() === "script" ? incorporati : link).push(c);
+    const tag = m[1].toLowerCase();
+    (tag === "iframe" ? iframe : tag === "script" ? script : link).push(c);
   }
-  if (incorporati.length) return incorporati[0];
-  const diversi = new Set(link.map((c) => c.url.replace(/[?#].*$/, "").replace(/\/$/, "")));
-  return diversi.size === 1 ? link[0] : null;
+  // In ordine di affidabilità: il modulo incorporato in un iframe (si vede nella pagina), poi il link
+  // ("Prenota" che la persona toccherebbe), poi lo script. Lo script di un altro locale non vince più sul
+  // link giusto (minore del collaudo del 30/10). In ogni gruppo tutti devono portare allo stesso posto.
+  const unico = (lista: Canale[]): Canale | null | undefined => {
+    if (!lista.length) return undefined;
+    const diversi = new Set(lista.map((c) => c.url.replace(/[?#].*$/, "").replace(/\/$/, "").toLowerCase()));
+    return diversi.size === 1 ? lista[0] : null;
+  };
+  for (const gruppo of [iframe, link, script]) {
+    const u = unico(gruppo);
+    if (u !== undefined) return u;
+  }
+  return null;
 }

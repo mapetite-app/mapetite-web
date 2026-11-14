@@ -198,7 +198,7 @@ await ctx.route("**/api/search/synthesis", async (route) => {
 });
 const page = await ctx.newPage();
 // L'intro del primo accesso sulla home ha i suoi controlli (5h0, contesto pulito): qui risulta già vista.
-await page.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+await page.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message + (process.env.E2E_DEBUG ? " STACK " + (e.stack ?? "").slice(0, 600) + " @ " + page.url() : "")));
 page.on("console", async (m) => { if (process.env.E2E_DEBUG && m.type() === "error") console.log("CONSOLE-ERR", m.text().slice(0, 200), JSON.stringify(m.location()), await Promise.all(m.args().map((a) => a.evaluate((v) => (v && v.stack) ? String(v.stack).slice(0, 400) : String(v)).catch(() => "?")))); if (m.type() === "error" && !/Failed to load resource|mapbox|WebGL/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + page.url() : "")); });
@@ -903,7 +903,7 @@ ok((await page.getByTestId("titolo-risposta").textContent())?.includes("aperitiv
   // Nessun lampo: prima che React parta (script dell'app bloccati) decide il CSS, guidato dallo script del layout.
   for (const seen of [false, true]) {
     const nctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
-    if (seen) await nctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    if (seen) await nctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     await nctx.route(/\/_next\/static\/chunks\/.*\.js(\?|$)/, (route) => route.abort()); // il CSS resta
     const np = await nctx.newPage();
     await np.goto(`${BASE}/`, { waitUntil: "load" });
@@ -1854,7 +1854,7 @@ ok(new URL(page.url()).pathname === "/mappa" && new URL(page.url()).searchParams
 // Suggerimento col meteo (piano 2.3): pioggia alle 19:30 → un posto al coperto; caldo → all'aperto.
 for (const [meteo, atteso] of [[{ temperature_2m: 12, precipitation: 2, weather_code: 61 }, "al coperto"], [{ temperature_2m: 24, precipitation: 0, weather_code: 1 }, "all'aperto, stasera 24°"]]) {
   const wctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await wctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await wctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   await wctx.route("**/api.open-meteo.com/**", (r) => r.fulfill({ json: { current: meteo } }));
   const wp = await wctx.newPage();
   await wp.clock.setFixedTime(new Date("2026-10-15T19:30:00"));
@@ -1871,7 +1871,7 @@ for (const [meteo, atteso] of [[{ temperature_2m: 12, precipitation: 2, weather_
   const casi = [["03:00", null], ["05:30", null], ["08:00", null], ["13:00", null], ["16:30", null], ["19:30", null], ["22:00", null], ["23:30", null],
     ["08:00", { temperature_2m: 9, precipitation: 3, weather_code: 63 }], ["13:00", { temperature_2m: 26, precipitation: 0, weather_code: 1 }], ["19:30", { temperature_2m: 6, precipitation: 0, weather_code: 2 }], ["21:30", { temperature_2m: 12, precipitation: 2, weather_code: 61 }]];
   const ictx = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await ictx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await ictx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   await ictx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
   for (const [ora, meteo] of casi) {
     await ictx.unroute("**/api.open-meteo.com/**").catch(() => {});
@@ -2052,7 +2052,7 @@ else {
   const p = await sctx.newPage();
   p.on("pageerror", (e) => errors.push(e.message));
   await p.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
-  ok((await p.getByTestId("suggerimento-per-te").getAttribute("aria-label")) === "✨ Per te: Cena romantica, cucina romana, atmosfera intima", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding");
+  ok((await p.getByTestId("suggerimento-per-te").getAttribute("aria-label")) === "✨ Per te: Cena romantica", "card iniziale: suggerimento 'Per te' dai gusti dell'onboarding, e si cerca solo quello che c'è scritto (Lorenzo 8/11)");
   // Revisore del 2/11: il titolo della terza idea non stava in una riga a 390 px. Ora 1-3 parole, intero.
   { const t = await p.getByTestId("suggerimento-per-te").locator("span.truncate").first().evaluate((el) => ({ t: el.textContent, intero: el.scrollWidth <= el.clientWidth }));
     ok(t.t === "Cena romantica" && t.intero, `Idee: titolo breve della tua idea, intero in una riga ('${t.t}')`); }
@@ -2271,7 +2271,8 @@ else {
     // con voto e prezzo quando ci sono; senza voto né prezzo niente "★" inventata.
     { const meta = async (n) => ((await righe.filter({ hasText: n }).innerText()) ?? "").split("\n").find((r) => r.includes(" · ")) ?? "";
       const [o, t, c] = [await meta("Osteria Due"), await meta("Terrazza Uno"), await meta("Caffè Milano")];
-      ok(o.startsWith("Osteria · ★ 4,5 · €€ · Roma") && t.startsWith("Bar · ★ 4,6 · €€ · Roma") && c.startsWith("Caffè · Milano") && !c.includes("★"), `salvati lista: tipo come nella scheda, voto e prezzo (${o} | ${t} | ${c})`); }
+      // 14/11: il quartiere al posto della città quando si sa (la città sta nelle pillole in alto).
+      ok(o.startsWith("Osteria · ★ 4,5 · €€ · Trastevere") && t.startsWith("Bar · ★ 4,6 · €€ · Monti") && c.startsWith("Caffè · Porta Romana") && !c.includes("★"), `salvati lista: tipo come nella scheda, voto e prezzo (${o} | ${t} | ${c})`); }
     const osteria = righe.filter({ hasText: "Osteria Due" });
     // Revisore 2/11: due stati soli. Senza tag di stato la riga dice "Da provare" (nel database non si scrive niente);
     // "Da provare" ha sempre 📌 (il segnalibro resta per Salva/Salvato).
@@ -2310,7 +2311,7 @@ else {
     ok((await righe.count()) === 3 && (await L.getByLabel("Cerca nei tuoi posti").inputValue()) === "" && (await L.getByTestId("salvati-risultato").count()) === 0, "salvati lista: 'Azzera' svuota la ricerca e toglie il conteggio");
     // Chip del tipo: un tocco filtra, il conteggio lo dice.
     await L.getByTestId("salvati-tipo-pillola").filter({ hasText: "Caffè" }).click();
-    ok((await righe.count()) === 1 && (await righe.first().textContent()).includes("Caffè Milano") && (await L.getByTestId("salvati-risultato").textContent()).trim() === "1 caffè su 3", "salvati lista: il chip 'Caffè' tiene solo il caffè e il conteggio dice quale filtro è acceso ('1 caffè su 3')");
+    ok((await righe.count()) === 1 && (await righe.first().textContent()).includes("Caffè Milano") && (await L.getByTestId("salvati-risultato").textContent()).trim() === "1 di 3 posti" && (await L.getByTestId("salvati-tipo-pillola").filter({ hasText: "Caffè" }).getAttribute("aria-pressed")) === "true", "salvati lista: il chip 'Caffè' tiene solo il caffè, acceso, e il conteggio dice '1 di 3 posti' (8/11: una frase sola anche con più filtri)");
     await L.getByTestId("salvati-tipo-pillola").filter({ hasText: "Caffè" }).click();
     await L.getByLabel("Cerca nei tuoi posti").fill("brunch");
     await p.waitForTimeout(300);
@@ -2732,6 +2733,126 @@ else {
       ok(/👎/.test((await carta.textContent().catch(() => "")) ?? "") && /bg-stone/.test((await carta.getAttribute("class").catch(() => "")) ?? ""), "mappa salvati: sulla card del 👎 la pillola è grigia, non corallo"); }
     await pm.screenshot({ path: `${OUT}/11k-mappa-salvati-no.png` });
     await gctx.close(); }
+
+  // Scaffali (Lorenzo 8/11: "500 salvati su Google Maps e devo cercarli uno per uno"; revisore 8/11): con 120 salvati
+  // generati, sopra la lista un riquadro con tre schede (Zone, Tipi, Raccolte) e una fila di copertine con il conteggio
+  // (solo copertine da 2 posti in su); all'apertura si vedono subito i primi posti, sopra "Sulla mappa". Un tocco filtra;
+  // zona, tipo, raccolta e stato si combinano e ogni filtro acceso si toglie con la sua ✕; niente sbordamenti a 390 e 360 px.
+  { const ZQ = [["Trastevere", 41.8885, 12.4695, "00153"], ["Monti", 41.8945, 12.4930, "00184"], ["Testaccio", 41.8775, 12.4760, "00153"], ["Pigneto", 41.8890, 12.5290, "00176"], ["Prati", 41.9080, 12.4600, "00192"]];
+    const TQ = [["pizza_restaurant", "Pizzeria"], ["restaurant", "Trattoria"], ["wine_bar", "Enoteca"], ["cafe", "Caffè"], ["japanese_restaurant", "Sushi"], ["ice_cream_shop", "Gelato"], ["cocktail_bar", "Cocktail"]];
+    const meta = [];
+    const rowsS = Array.from({ length: 120 }, (_, i) => {
+      const milano = i >= 110; const z = milano || i % 11 === 10 ? null : ZQ[i % ZQ.length]; const t = TQ[(i * 3) % TQ.length];
+      const tags = [i % 3 === 0 ? "Già visitato" : i % 3 === 1 ? "Da provare" : null, i % 9 === 0 ? "Romantico" : null, i % 7 === 0 ? "Con amici" : null].filter(Boolean);
+      meta.push({ zona: z?.[0] ?? null, tipo: t[0], tags });
+      return { created_at: new Date(Date.UTC(2026, 9, 1) + i * 3_600_000).toISOString(), tags, note: null,
+        places: { id: `00000000-0000-4000-8000-${900000000000 + i}`, name: `${t[1]} ${milano ? "Milano" : z ? z[0] : "Fuori"} ${i + 1}`, category: t[0],
+          address: milano ? `Via Vigevano ${i}, 20144 Milano MI, Italy` : `Via di Prova ${i}, ${z ? z[3] : "00199"} Roma RM, Italy`,
+          lat: milano ? 45.452 + (i % 5) * 0.001 : z ? z[1] + ((i % 7) - 3) * 0.0006 : 41.95 + (i % 4) * 0.01,
+          lng: milano ? 9.175 + (i % 3) * 0.001 : z ? z[2] + ((i % 5) - 2) * 0.0006 : 12.55 + (i % 3) * 0.01,
+          google_place_id: `GS${i}`, rating: 4.3, price_level: 2 } };
+    });
+    const conta = (f) => meta.filter(f).length;
+    const visto = (m) => m.tags.includes("Già visitato");
+    for (const width of [390, 360]) {
+      const sc = await browser.newContext({ viewport: { width, height: 844 }, permissions: ["geolocation"], geolocation: { latitude: 41.889, longitude: 12.47 } });
+      await sc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+      await sc.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rowsS.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rowsS }));
+      for (const t of ["place_synthesis", "profiles", "contenuti_locali", "foto_locali"]) await sc.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+      const ps = await sc.newPage();
+      await ps.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" }).catch(() => {});
+      const S = ps.getByTestId("salvati-lista");
+      await S.waitFor({ timeout: 8000 }).catch(() => {});
+      await ps.waitForTimeout(1200);
+      const sborda = async (q) => { const o = await ps.evaluate(() => { const l = document.querySelector("[data-testid=salvati-lista]"); return Math.max(document.documentElement.scrollWidth - innerWidth, l.scrollWidth - l.clientWidth); }); ok(o <= 0, `scaffali ${width}px ${q}: niente sbordamenti (${o})`); };
+      const ris = async () => ((await S.getByTestId("salvati-risultato").textContent().catch(() => "")) ?? "").trim();
+      const scheda = (n) => S.getByTestId("scaffali-scheda").filter({ hasText: n }).click();
+      const nomi = async (id) => S.getByTestId(id).getByTestId("scaffale-nome").allTextContents();
+      const conti = async (id) => S.getByTestId(id).getByTestId("scaffale-copertina").evaluateAll((els) => els.map((e) => Number(e.getAttribute("aria-label").match(/, (\d+) post/)?.[1] ?? 0)));
+      // Apertura: le schede, una fila di copertine, e subito almeno 2 posti interi sopra "Sulla mappa".
+      { const tabs = await S.getByTestId("scaffali-scheda").allTextContents();
+        const nz = await nomi("scaffale-zone");
+        const vis = await ps.evaluate(() => { const b = document.querySelector("[data-testid=salvati-lista-mappa]").getBoundingClientRect().top; return [...document.querySelectorAll("[data-testid=salvato-riga]")].filter((r) => { const x = r.getBoundingClientRect(); return x.top >= 0 && x.bottom <= b; }).length; });
+        ok(tabs.join("|") === "Zone|Tipi|Raccolte" && nz.includes("Trastevere") && !nz.includes("Vicino a te") && (await conti("scaffale-zone")).every((n) => n >= 2) && vis >= 3, `scaffali ${width}px: schede ${tabs.join("/")}, zone (${nz.slice(0, 4).join(", ")}…) da 2 posti in su, senza 'Vicino a te' con l'ordine già Vicino; ${vis} posti interi in vista sopra 'Sulla mappa'`);
+        // Revisore 8/11: le città in alto stanno intere (o, se non entrano, la fila sfuma al bordo e scorre).
+        const cit = await ps.evaluate(() => { const g = document.querySelector("[data-testid=salvati-citta]"); const gr = g.getBoundingClientRect(); return { scorre: g.dataset.scorre === "true", tagliate: [...g.querySelectorAll("[data-testid=salvati-citta-pillola] > span")].filter((e) => { const r = e.getBoundingClientRect(); return r.right > gr.right + 0.5 || r.left < gr.left - 0.5; }).length }; });
+        ok(cit.scorre || cit.tagliate === 0, `scaffali ${width}px: città in alto intere, niente pillole tagliate (${JSON.stringify(cit)})`);
+        ok((await S.getByTestId("salvati-stato-pillola").allTextContents()).every((t) => !/ 0$/.test(t.trim())), "scaffali: nessuna pillola di stato a 0");
+        await scheda("Tipi");
+        const nt = await nomi("scaffale-tipi");
+        ok(nt.includes("Pizzerie") && nt.includes("Trattorie") && nt.includes("Gelaterie") && (await S.getByTestId("scaffale-zone").count()) === 0, `scaffali ${width}px: scheda Tipi al plurale (${nt.join(", ")})`);
+        ok((await S.getByTestId("salvati-comandi").getByTestId("salvati-stato-pillola").allTextContents()).map((t) => t.replace(/[^A-Za-zà-ù ]/g, "").trim()).join("|") === "Da provare|Ci sono stato", "scaffali: in alto solo gli stati, con le parole delle righe (Da provare / Ci sono stato)"); }
+      await sborda("apertura");
+      await ps.screenshot({ path: `${OUT}/11l-salvati-scaffali-${width}.png` });
+      await S.getByTestId("scaffale-tipi").getByRole("button", { name: /^Pizzerie,/ }).click();
+      const nP = conta((m) => m.tipo === "pizza_restaurant");
+      ok((await ris()) === `${nP} di 120 posti` && await S.getByRole("button", { name: "Togli Pizzerie" }).isVisible() && (await S.getByTestId("scaffale-zone").isVisible()) && (await S.getByTestId("salvati-sezione").count()) >= 2, `scaffali ${width}px: 'Pizzerie' filtra (${await ris()}), diventa una pillola con la ✕, resta la scheda Zone e la lista si divide per quartiere`);
+      await S.getByTestId("scaffale-zone").getByRole("button", { name: /^Trastevere,/ }).click();
+      await S.getByTestId("salvati-stato-pillola").filter({ hasText: "Da provare" }).click();
+      const nPTD = conta((m) => m.tipo === "pizza_restaurant" && m.zona === "Trastevere" && !visto(m));
+      ok((await ris()) === `${nPTD} di 120 posti` && (await S.getByTestId("salvato-riga").count()) === nPTD && ((await S.getByTestId("salvati-stato-pillola").filter({ hasText: "Da provare" }).textContent()) ?? "").trim().endsWith(String(nPTD)), `scaffali ${width}px: Pizzerie · Trastevere · Da provare insieme (${await ris()}, attesi ${nPTD})`);
+      await sborda("filtri combinati");
+      await ps.screenshot({ path: `${OUT}/11m-salvati-filtri-combinati-${width}.png` });
+      await S.getByRole("button", { name: "Togli Trastevere" }).click();
+      const nPD = conta((m) => m.tipo === "pizza_restaurant" && !visto(m));
+      ok((await ris()) === `${nPD} di 120 posti` && await S.getByRole("button", { name: "Togli Pizzerie" }).isVisible(), `scaffali ${width}px: tolta solo Trastevere restano Pizzerie e Da provare (${await ris()})`);
+      await S.getByTestId("salvati-azzera").click();
+      ok((await S.getByTestId("salvati-risultato").count()) === 0 && await S.getByTestId("scaffali").isVisible() && (await S.getByTestId("salvato-riga").count()) === 60, `scaffali ${width}px: 'Azzera' riporta scaffali e lista (60 righe disegnate)`);
+      // In qualunque ordine (revisore 8/11): tipo, poi zona, poi raccolta, poi stato; la scheda Raccolte resta con zona e
+      // tipo accesi e conta solo i posti rimasti.
+      await scheda("Tipi");
+      await S.getByTestId("scaffale-tipi").getByRole("button", { name: /^Pizzerie,/ }).click();
+      await S.getByTestId("scaffale-zone").getByRole("button", { name: /^Trastevere,/ }).click();
+      const pt = (m) => m.tipo === "pizza_restaurant" && m.zona === "Trastevere";
+      const tabsPT = await S.getByTestId("scaffali-scheda").allTextContents();
+      await scheda("Raccolte");
+      const nPTA = conta((m) => pt(m) && m.tags.includes("Con amici"));
+      const copA = await S.getByTestId("salvati-raccolte").getByRole("button", { name: /^Con amici,/ }).getAttribute("aria-label");
+      ok(tabsPT.includes("Raccolte") && copA === `Con amici, ${nPTA} ${nPTA === 1 ? "posto" : "posti"}`, `scaffali ${width}px: con Pizzerie e Trastevere resta la scheda Raccolte, con i numeri dei posti rimasti (${copA})`);
+      await S.getByTestId("salvati-raccolte").getByRole("button", { name: /^Con amici,/ }).click();
+      ok((await ris()) === `${nPTA} di 120 posti`, `scaffali ${width}px: Pizzerie · Trastevere · Con amici (${await ris()}, attesi ${nPTA})`);
+      await S.getByTestId("salvati-stato-pillola").filter({ hasText: "Da provare" }).click();
+      const nPTAD = conta((m) => pt(m) && m.tags.includes("Con amici") && !visto(m));
+      const chipsT = await S.getByTestId("salvati-filtro-acceso").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
+      ok((await ris()) === `${nPTAD} di 120 posti` && (await S.getByTestId("salvato-riga").count()) === nPTAD && chipsT.length === 3, `scaffali ${width}px: tutti e quattro insieme (${chipsT.join(", ")} + Da provare → ${await ris()}, attesi ${nPTAD})`);
+      await sborda("quattro filtri");
+      await ps.screenshot({ path: `${OUT}/11o-salvati-quattro-filtri-${width}.png` });
+      await S.getByTestId("salvati-azzera").click();
+      // Raccolta + stato (revisore 8/11): "Con amici" poi "Da provare" = l'intersezione; la raccolta resta accesa.
+      await scheda("Raccolte");
+      await S.getByTestId("salvati-raccolte").getByRole("button", { name: /^Con amici,/ }).click();
+      const nA = conta((m) => m.tags.includes("Con amici"));
+      ok((await ris()) === `${nA} di 120 posti` && await S.getByRole("button", { name: "Togli Con amici" }).isVisible(), `scaffali ${width}px: raccolta 'Con amici' (${await ris()})`);
+      await S.getByTestId("salvati-stato-pillola").filter({ hasText: "Da provare" }).click();
+      const nAD = conta((m) => m.tags.includes("Con amici") && !visto(m));
+      ok((await ris()) === `${nAD} di 120 posti` && (await S.getByTestId("salvato-riga").count()) === nAD && await S.getByRole("button", { name: "Togli Con amici" }).isVisible() && (await S.getByTestId("salvati-stato-pillola").filter({ hasText: "Da provare" }).getAttribute("aria-pressed")) === "true" && ((await S.getByTestId("salvati-stato-pillola").filter({ hasText: "Da provare" }).textContent()) ?? "").trim().endsWith(String(nAD)), `scaffali ${width}px: Con amici + Da provare insieme (${await ris()}, attesi ${nAD}), la raccolta resta accesa`);
+      await ps.screenshot({ path: `${OUT}/11n-salvati-raccolta-stato-${width}.png` });
+      await S.getByRole("button", { name: "Togli Con amici" }).click();
+      const nD = conta((m) => !visto(m));
+      ok((await ris()) === `${nD} di 120 posti` && (await S.getByTestId("salvati-stato-pillola").filter({ hasText: "Da provare" }).getAttribute("aria-pressed")) === "true", `scaffali ${width}px: tolta la raccolta resta 'Da provare' (${await ris()})`);
+      await S.getByTestId("salvati-azzera").click();
+      // "Vicino a te" c'è solo con un ordine diverso da "Vicino".
+      await S.getByTestId("salvati-ordine").selectOption("recenti");
+      await scheda("Zone");
+      ok((await nomi("scaffale-zone"))[0] === "Vicino a te", `scaffali ${width}px: con 'Recenti' la prima zona è 'Vicino a te'`);
+      await S.getByTestId("salvati-ordine").selectOption("vicino");
+      await S.getByLabel("Cerca nei tuoi posti").fill("sushi");
+      await ps.waitForTimeout(300);
+      ok((await S.getByTestId("scaffali").count()) === 0 && (await S.getByTestId("salvato-riga").count()) > 0, `scaffali ${width}px: cercando gli scaffali spariscono (${await ris()})`);
+      await sc.close();
+    }
+    // Con meno di 8 salvati niente scaffali (resta la fila di sempre).
+    { const sc = await browser.newContext({ viewport: { width: 390, height: 844 } });
+      await sc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+      const pochi = rowsS.slice(0, 7);
+      await sc.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: pochi.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: pochi }));
+      for (const t of ["place_synthesis", "profiles", "contenuti_locali", "foto_locali"]) await sc.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+      const ps = await sc.newPage();
+      await ps.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" }).catch(() => {});
+      await ps.getByTestId("salvati-lista").waitFor({ timeout: 8000 }).catch(() => {});
+      await ps.waitForTimeout(800);
+      ok((await ps.getByTestId("scaffali").count()) === 0 && (await ps.getByTestId("salvati-tipo-pillola").count()) > 0, "scaffali: con 7 salvati niente scaffali, la fila dei filtri di sempre");
+      await sc.close(); } }
 
   // Proposta 45 "Ha chiuso?" (4/11): un salvato che Google dà chiuso per sempre va in fondo, con "Ha chiuso",
   // fuori da "aspettano da mesi"; chiuso per ora ha la sua pillola; la scheda lo dice. Mai tolto.
@@ -3594,7 +3715,7 @@ if (fakeUser) {
     mk("E5", "Trattoria Da Teo", 41.8875, 12.4755, { category: "restaurant", types: ["restaurant"], openNow: false }),
   ].map((r) => ({ ...r, priceLevel: 2 }));
   const c3 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, geolocation: { latitude: 41.889, longitude: 12.47 }, permissions: ["geolocation"], locale: "it-IT" });
-  await c3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* */ } });
+  await c3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* */ } });
   await c3.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
   await c3.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
   await c3.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows3.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows3 }));
@@ -4543,15 +4664,23 @@ else {
   { const n = async (id) => (await sp.getByTestId(`numero-${id}`).textContent())?.replace(/\s+/g, " ").trim();
     ok((await n("visitati")) === "1Provati" && (await n("da-provare")) === "2Da provare" && (await n("seguaci")) === "3Seguaci" && (await n("seguiti")) === "2Seguiti", "profilo pubblico: numeri visitati / da provare / seguaci / seguiti"); }
   // Giro 1/11 (D36): uno stato, una parola. Per i posti di un'altra persona "Provati", come il titolo "Già provati".
-  ok(!/visitat[oi]/i.test(await sp.getByTestId("profilo-pubblico").innerText()) && (await sp.getByTestId("posto-persona").filter({ hasText: "✓ Provato" }).count()) >= 1, "profilo pubblico: 'Provato/Provati' ovunque, mai 'Visitato'");
-  { const chips = await sp.getByTestId("profilo-raccolte").innerText(); ok(chips.includes("Romantico") && chips.includes("· 2") && chips.includes("Economico") && !chips.includes("Già visitato") && !chips.includes("Da provare"), "profilo pubblico: raccolte come tag (senza gli stati)"); }
-  ok((await sp.getByRole("heading", { name: "Già provati", exact: true }).isVisible()) && (await sp.getByRole("heading", { name: "Da provare", exact: true }).isVisible()) && (await sp.getByTestId("posto-persona").count()) === 3, "profilo pubblico: 'Già provati' e 'Da provare' con i posti");
+  ok(!/visitat[oi]/i.test(await sp.getByTestId("profilo-pubblico").innerText()) && (await sp.getByTestId("posto-persona").filter({ hasText: "✓ Provato" }).count()) === 0, "profilo pubblico: mai 'Visitato'; sotto 'Di recente' e 'Da provare' niente pillola di stato doppione");
+  { const chips = await sp.getByTestId("profilo-raccolte").innerText(); ok(chips.includes("Romantico") && chips.includes("2 posti") && chips.includes("Economico") && !chips.includes("Già visitato") && !chips.includes("Da provare"), "profilo pubblico: raccolte come copertine (senza gli stati)"); }
+  // Revisore 14/11: le raccolte stanno sopra "Di recente" (prima erano un'etichetta grigia in fondo).
+  { const y = async (id) => (await sp.getByTestId(id).boundingBox())?.y ?? -1;
+    ok((await y("profilo-raccolte-sezione")) > 0 && (await y("profilo-raccolte-sezione")) < (await y("profilo-recenti")), "profilo pubblico: 'Raccolte' sopra 'Di recente'"); }
+  ok((await sp.getByTestId("profilo-indietro").count()) === 0, "profilo pubblico senza account: niente freccia Indietro (c'è il marchio Mapetite)");
+  ok((await sp.getByRole("heading", { name: "Di recente", exact: true }).isVisible()) && (await sp.getByRole("heading", { name: "Da provare", exact: true }).isVisible()) && (await sp.getByTestId("posto-persona").count()) === 3, "profilo pubblico: 'Di recente' e 'Da provare' con i posti");
+  // 8/11: senza account niente "Salva anche tu" né "In comune"; con 3 posti niente ricerca; "Gli è piaciuto" solo con 👍 o classifica.
+  ok((await sp.getByTestId("salva-anche-tu").count()) === 0 && (await sp.getByTestId("profilo-in-comune").count()) === 0 && (await sp.getByTestId("cerca-posti-persona").count()) === 0 && (await sp.getByTestId("profilo-piaciuti").count()) === 0, "profilo pubblico senza account: niente salva, niente 'In comune', niente ricerca con pochi posti");
   ok((await sp.getByTestId("posto-persona-verdetto").allTextContents()).join("|") === "Cucina romana vera, tavoli fuori nel vicolo.", "profilo pubblico: il verdetto Mapetite sotto il posto che ce l'ha");
   ok(await sp.getByTestId("posto-persona").first().getAttribute("href") === `/locali/${LOC_SOC}`, "profilo pubblico: un posto apre la sua pagina pubblica");
-  await sp.getByTestId("mappa-persona").waitFor({ timeout: 8000 }).catch(() => {});
-  ok(await sp.getByTestId("mappa-persona").isVisible(), "profilo pubblico: mappa dei suoi posti");
-  await sp.getByTestId("pin-persona").first().waitFor({ timeout: 8000 }).catch(() => {});
-  ok((await sp.getByTestId("pin-persona").count()) === 3, `profilo pubblico: un pin per ogni posto (${await sp.getByTestId("pin-persona").count()})`);
+  // Revisore 14/11: la mappa è l'immagine del profilo, subito sotto Segui/Condividi (statica, con un puntino per posto).
+  ok(await sp.getByTestId("profilo-mappa").isVisible(), "profilo pubblico: mappa dei suoi posti");
+  { const n = await sp.getByTestId("profilo-mappa-puntino").count(); ok(n === 3, `profilo pubblico: un puntino per ogni posto (${n})`); }
+  { const y = async (id) => (await sp.getByTestId(id).boundingBox())?.y ?? -1; const h = (await sp.getByTestId("apri-mappa-persona").boundingBox())?.height ?? 0;
+    ok((await y("segui")) < (await y("apri-mappa-persona")) && (await y("apri-mappa-persona")) < (await y("profilo-posti")) && h >= 120 && h <= 170 && (await sp.getByTestId("mappa-persona").count()) === 0, `profilo pubblico: mappa sotto Segui e sopra i posti, alta ~140 px, nessuna seconda mappa in fondo (${Math.round(h)})`); }
+  ok(await sp.getByTestId("apri-mappa-persona").getAttribute("href") === "/u/giulia.rm/mappa", "profilo pubblico: tocco sulla mappa → la mappa completa");
   ok(await sp.getByTestId("segui").getAttribute("href") === `/signup?next=${encodeURIComponent("/u/giulia.rm")}`, "profilo pubblico senza account: 'Segui' porta a Crea un account e poi torna qui");
   ok(await sp.getByTestId("invito-crea-mappa").getByText("Crea la tua mappa su Mapetite").isVisible() && await sp.getByTestId("invito-crea-mappa").getByRole("link", { name: "Crea la tua mappa, è gratis" }).getAttribute("href") === `/signup?next=${encodeURIComponent("/u/giulia.rm")}`, "profilo pubblico senza account: invito 'Crea la tua mappa su Mapetite' in fondo");
   await sp.waitForTimeout(500);
@@ -4593,6 +4722,53 @@ else {
   await soctx.route("**/rest/v1/follows**", (r) => { follows.push({ method: r.request().method(), url: decodeURIComponent(r.request().url()), body: r.request().postDataJSON?.() ?? null }); return r.fulfill({ status: r.request().method() === "POST" ? 201 : 204, body: "" }); });
   await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
   ok((await sp.getByTestId("segui").getAttribute("aria-pressed")) === "true" && (await sp.getByTestId("segui").textContent()) === "Segui già" && (await sp.getByTestId("invito-crea-mappa").count()) === 0, "profilo di chi segui: 'Segui già', nessun invito a registrarsi");
+  // Revisore 14/11: chi arriva da Amici ha la freccia Indietro in alto.
+  ok(await sp.getByTestId("profilo-indietro").isVisible() && (await sp.getByTestId("profilo-indietro").getAttribute("href")) === "/amici", "profilo di un amico: freccia Indietro verso Amici");
+  // 8/11: profilo più utile per chi è collegato (dati dal cookie: "miei" = i propri salvati).
+  { // Righe minime e codifica leggera (solo i caratteri vietati nei cookie): 16 posti stanno nei 4 KB del cookie.
+    const many = Array.from({ length: 16 }, (_, i) => ({ user_id: GIULIA, place_id: `g${i}`, name: i % 2 ? `Enoteca ${i}` : `Forno ${i}`, category: i % 2 ? "bar" : "bakery", tags: i % 3 ? ["Già visitato", ...(i === 4 ? ["Mi è piaciuto"] : [])] : ["Da provare"], created_at: `2026-10-${10 + i}` }));
+    const light = (v) => JSON.stringify(v).replace(/[%;, \\\u0080-\uffff]/g, (c) => encodeURIComponent(c));
+    await soctx.addCookies([{ name: "e2e_social", value: light({ profili: [{ ...giulia, visitati: 10, da_provare: 6 }], salvati: many, seguo: [GIULIA], miei: ["g2", "g3", "zz9"] }), url: BASE }]);
+    const saves = [];
+    await soctx.route("**/rest/v1/saved_places**", (r) => { if (r.request().method() === "POST") { saves.push(r.request().postDataJSON()); return r.fulfill({ status: 201, body: "" }); } return r.fulfill({ json: [] }); });
+    await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+    const ordine = await sp.locator("[data-testid=profilo-posti] h2").allTextContents();
+    ok(ordine.join("|") === "I suoi preferiti|Di recente|I suoi tipi|In comune · 2|Da provare", `profilo di un altro: sezioni nell'ordine giusto (${ordine.join(" | ")})`);
+    ok((await sp.getByTestId("piaciuto-card").count()) === 1 && (await sp.getByTestId("piaciuto-card").getAttribute("href")) === `/locali/${many[4].place_id}`, "profilo di un altro: 'I suoi preferiti' con il posto segnato 👍");
+    // Revisore 8/11: nessun numero di classifica inventato (solo 👍 senza classifica); prima card a 16 px dal bordo.
+    { const badge = (await sp.getByTestId("piaciuto-badge").textContent())?.trim(); const x = (await sp.getByTestId("piaciuto-card").first().boundingBox())?.x ?? -1;
+      ok(badge === "👍" && Math.round(x) === 16, `profilo di un altro: 👍 senza numero se non c'è classifica, card a 16 px (${badge}, x=${Math.round(x)})`); }
+    { const tipi = (await sp.getByTestId("tipo-persona").allTextContents()).join("|"); ok(tipi === "Bar8|Forni8", `profilo di un altro: 'I suoi tipi' con i conteggi (${tipi})`); }
+    // Revisore 14/11: stesso linguaggio dei Salvati. Nomi in serif, Salva dentro la riga, tipi e "In comune" su una fila
+    // scorrevole con lo stesso chip bianco, card "Gli è piaciuto" al 70% con l'emoji grande in alto.
+    { const r = sp.getByTestId("profilo-recenti");
+      const font = await r.getByTestId("posto-persona").first().locator("span span").first().evaluate((e) => getComputedStyle(e).fontFamily);
+      const lista = await r.locator("ul").first().boundingBox(); const btn = await r.getByTestId("salva-anche-tu").first().boundingBox();
+      ok(/newsreader/i.test(font) && btn && lista && btn.x + btn.width <= lista.x + lista.width && btn.x > lista.x, `profilo di un altro: nomi in serif e Salva dentro la riga (${font.slice(0, 30)})`); }
+    { const ys = await sp.getByTestId("tipo-persona").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+      const bg = await sp.getByTestId("in-comune-posto").first().evaluate((e) => getComputedStyle(e).backgroundColor);
+      const bgTipo = await sp.getByTestId("tipo-persona").first().evaluate((e) => getComputedStyle(e).backgroundColor);
+      ok(new Set(ys).size === 1 && bg === bgTipo, `profilo di un altro: 'I suoi tipi' su una fila, 'In comune' con lo stesso chip (${bg} / ${bgTipo})`); }
+    { const w = (await sp.getByTestId("piaciuto-card").first().boundingBox())?.width ?? 0; ok(w >= 240 && w <= 280, `profilo di un altro: card 'Gli è piaciuto' al 70% (${Math.round(w)} px)`); }
+    ok((await sp.getByTestId("in-comune-posto").count()) === 2 && (await sp.getByTestId("salvato-anche-tu").count()) >= 1, "profilo di un altro: 'In comune' e i posti già tuoi segnati");
+    ok((await sp.getByTestId("profilo-recenti").getByTestId("posto-persona").count()) === 5 && (await sp.getByTestId("mostra-tutti-recenti").textContent()) === "Mostra tutti (10)", "profilo di un altro: 5 posti e 'Mostra tutti (10)', nessun limite fisso");
+    await sp.getByTestId("mostra-tutti-recenti").click();
+    ok((await sp.getByTestId("profilo-recenti").getByTestId("posto-persona").count()) === 10, "profilo di un altro: 'Mostra tutti' li apre tutti");
+    { const first = await sp.getByTestId("profilo-recenti").getByTestId("posto-persona").first().textContent(); ok(first.includes("Forno 14"), `profilo di un altro: 'Di recente' dal più recente (${first.slice(0, 30)})`); }
+    await sp.getByTestId("profilo-recenti").getByTestId("salva-anche-tu").first().click();
+    await sp.getByTestId("profilo-recenti").getByTestId("salvato-anche-tu").first().waitFor({ timeout: 4000 }).catch(() => {});
+    ok(saves.length === 1 && saves[0].user_id === ME && saves[0].place_id === "g14" && saves[0].tags?.[0] === "Da provare" && saves[0].note === null, "profilo di un altro: un tocco e lo salvi anche tu ('Da provare', senza nota)");
+    await sp.getByTestId("cerca-posti-persona").fill("enoteca 1");
+    ok((await sp.getByTestId("posti-filtrati").getByTestId("posto-persona").count()) === 4, "profilo di un altro: con più di 15 posti la ricerca nei suoi posti");
+    await sp.getByTestId("togli-filtro").click();
+    await sp.getByTestId("tipo-persona").first().click();
+    ok((await sp.getByTestId("posti-filtrati").getByTestId("posto-persona").count()) === 8, "profilo di un altro: un tocco su un tipo mostra solo quei posti");
+    await sp.screenshot({ path: `${OUT}/60c-profilo-altro-filtro.png`, caret: "initial" });
+    const html = await sp.content();
+    ok(!html.includes("Non fa per me") && !html.includes("visited_at") && !html.includes("\"note\":\"") && !html.includes("2026-10-") && !html.includes("created_at") && !html.includes("zz9"), "profilo di un altro: nessun dato privato nella pagina (note, 'Non fa per me', date, salvati di chi guarda non in comune)");
+    await soctx.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [] }));
+    await setSocial(soctx, social);
+    await sp.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" }); }
   await sp.getByTestId("segui").click();
   await sp.getByTestId("segui").getByText("Segui", { exact: true }).waitFor({ timeout: 4000 }).catch(() => {});
   ok(follows.some((f) => f.method === "DELETE" && f.url.includes(`follower_id=eq.${ME}`) && f.url.includes(`followed_id=eq.${GIULIA}`)) && (await sp.getByTestId("segui").getAttribute("aria-pressed")) === "false", "smetti di seguire: cancella solo il proprio follow");
@@ -4636,19 +4812,39 @@ else {
     if (r.request().method() === "PATCH") { profPatch = r.request().postDataJSON(); return profStatus === 204 ? r.fulfill({ status: 204, body: "" }) : r.fulfill({ status: 409, json: { code: "23505", message: "duplicate key", details: null, hint: null } }); }
     return r.fulfill({ json: [] });
   });
+  // Revisore 8/11: "1 salvato · 1 provato" al singolare, tipo preferito al plurale come negli scaffali dei Salvati.
+  await soctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", reviews: [], saved: [{ created_at: "2026-10-01", tags: ["Già visitato"], note: null, places: { id: "00000000-0000-4000-8000-000000000799", name: "Pizzeria Sola", category: "pizza_restaurant", address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469 } }] })), url: BASE }]);
+  await sp.goto(`${BASE}/profilo?singolare=1`, { waitUntil: "networkidle" }); // indirizzo diverso: il "#profilo-pubblico" dopo ricarica davvero
+  { const g = ((await sp.getByTestId("guida-contatori").innerText()) ?? "").replace(/\s+/g, " ");
+    ok(g.includes("1 salvato") && g.includes("1 provato") && (await sp.getByTestId("vedono-tipo").innerText()).includes("Pizzerie"), `profilo: singolare con un posto, tipo al plurale (${g.trim()})`); }
+  await soctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
   // Da Amici "Fatti trovare" porta qui: la riga "Profilo pubblico" di "Altro" si apre da sola.
   await sp.goto(`${BASE}/profilo#profilo-pubblico`, { waitUntil: "networkidle" });
   const ps = sp.getByTestId("profilo-social");
   ok(await ps.isVisible() && (await ps.getByTestId("profilo-stato").textContent())?.includes("Privato") && !(await ps.getByRole("switch").isChecked()), "profilo: 'Profilo pubblico' spento di default");
   ok((await ps.getByTestId("privacy-testo").textContent())?.includes("nessuno vede il tuo profilo"), "profilo: testo chiaro sulla privacy");
+  ok(((await sp.getByTestId("guida-contatori").innerText()) ?? "").replace(/\s+/g, " ").includes("0 provati") && !/ci sono stato/i.test(await sp.getByTestId("guida-contatori").innerText()) && (await sp.getByTestId("vedono-provati").innerText()).includes("Provati"), "profilo: 'Provati' per i numeri, in testa e in 'Come ti vedono'");
+  ok((await sp.getByTestId("come-ti-vedono-stato").textContent())?.includes("Privato") && (await sp.getByTestId("vedono-provati").textContent())?.includes("0") && (await sp.getByTestId("come-ti-vedono-link").getAttribute("href")) === "#profilo-pubblico", "profilo: 'Come ti vedono' dice 'Privato' e porta all'interruttore");
   await ps.locator("input[name=handle]").fill("@Lorenzo Mà!");
   ok((await ps.locator("input[name=handle]").inputValue()) === "lorenzoma", "profilo: il nome pubblico si ripulisce da solo (minuscole, niente spazi né accenti)");
   await ps.locator("input[name=display_name]").fill("Lorenzo");
   await ps.locator("input[name=city]").fill("Roma");
   await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
-  ok((await ps.getByTestId("privacy-testo").textContent())?.includes("Le note private non si vedono mai"), "profilo: acceso, spiega cosa vedranno gli altri (mai le note)");
+  { const f = sp.getByTestId("conferma-pubblico");
+    const vis = await f.getByTestId("conferma-visibile").innerText(); const mai = await f.getByTestId("conferma-mai").innerText();
+    ok(await f.isVisible() && vis.includes("bio") && vis.includes("provati e da provare") && vis.includes("raccolte") && vis.includes("in comune") && vis.includes("Chi ti segue") && (await f.getByTestId("conferma-nota").innerText()).includes("restano solo tuoi") && ["note", "Non fa per me", "prenotazioni", "posizione", "email"].every((x) => mai.includes(x)), "profilo: accendere 'pubblico' apre un foglio con cosa vedranno gli altri e cosa mai");
+    profPatch = null;
+    await f.getByTestId("conferma-pubblico-no").click();
+    ok((await sp.getByTestId("conferma-pubblico").count()) === 0 && !(await ps.getByRole("switch").isChecked()) && profPatch === null, "profilo: 'Annulla' lascia il profilo privato, nessuna scrittura");
+    // Revisore 8/11: il foglio e /privacy dicono le stesse cose (una sola fonte di testo).
+    const voci = vis.split("\n").map((t) => t.trim()).filter(Boolean); // letto prima di "Annulla", a foglio aperto
+    const priv = (await (await sp.request.get(`${BASE}/privacy`)).text()).replace(/&#x27;|&#39;/g, "'").toLowerCase();
+    const mancanti = voci.filter((v) => !priv.includes(v.toLowerCase()));
+    ok(voci.length >= 6 && mancanti.length === 0 && priv.includes("restano solo tuoi"), `foglio di conferma e /privacy con le stesse voci (${mancanti.join(" | ") || "tutte"})`); }
+  await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
   profStatus = 409;
-  await ps.getByRole("button", { name: "Salva" }).click();
+  await sp.getByTestId("conferma-pubblico-si").click();
+  ok((await ps.getByTestId("privacy-testo").textContent())?.includes("Mai: note, il giudizio “Non fa per me”"), "profilo: acceso, spiega cosa vedranno gli altri (mai le note)");
   await ps.getByRole("alert").waitFor({ timeout: 4000 }).catch(() => {});
   ok((await ps.getByRole("alert").textContent())?.includes("è già preso"), "profilo: nome già preso spiegato in italiano");
   profStatus = 204;
@@ -4657,6 +4853,15 @@ else {
   await ps.getByTestId("profilo-condividi").waitFor({ timeout: 4000 }).catch(() => {});
   ok(profPatch?.handle === "lorenzoma" && profPatch?.is_public === true && profPatch?.display_name === "Lorenzo" && profPatch?.city === "Roma" && !("note" in (profPatch ?? {})), "profilo: salva nome pubblico, nome, città e 'pubblico'");
   ok(await ps.getByTestId("profilo-condividi").isVisible() && (await ps.getByTestId("profilo-stato").textContent())?.includes("Pubblico") && await ps.getByTestId("vedi-profilo-pubblico").getAttribute("href") === "/u/lorenzoma", "profilo: dopo il salvataggio, condividi profilo e mappa");
+  // Revoca in un tocco: spento, si salva subito (senza "Salva"), e poi si riaccende con il foglio.
+  profPatch = null;
+  await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
+  await ps.getByTestId("profilo-stato").getByText("Privato").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(profPatch?.is_public === false && (await ps.getByTestId("profilo-stato").textContent())?.includes("Privato"), "profilo: spegnere 'pubblico' vale subito, in un tocco");
+  await ps.locator("label", { hasText: "Rendi pubblico il mio profilo" }).click();
+  await sp.getByTestId("conferma-pubblico-si").click();
+  await ps.getByTestId("profilo-condividi").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(profPatch?.is_public === true && await ps.getByTestId("profilo-condividi").isVisible(), "profilo: riacceso dopo la conferma");
   await ps.scrollIntoViewIfNeeded();
   await ps.screenshot({ path: `${OUT}/64-profilo-impostazioni.png`, caret: "initial" });
   await sp.evaluate(() => { window.__shared = null; navigator.share = async (d) => { window.__shared = d; }; });
@@ -4711,7 +4916,7 @@ else {
   await sctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: sSynth }));
   const s = await sctx.newPage();
   s.on("pageerror", (e) => errors.push(e.message));
-  await s.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await s.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   // I link esterni (Google Maps, tel:) non si aprono davvero: conta solo il segnale registrato.
   await s.addInitScript(() => document.addEventListener("click", (e) => { const a = e.target instanceof Element ? e.target.closest("a[target=_blank], a[href^='tel:']") : null; if (a) e.preventDefault(); }, true));
   await s.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
@@ -4832,6 +5037,51 @@ else {
   await s.getByRole("dialog", { name: /Prenota da/ }).getByRole("button", { name: "Chiudi" }).click();
   await s.evaluate(() => localStorage.removeItem("mapetite.prenotazioni"));
   await s.unroute("**/rest/v1/saved_places**");
+  // Revisore 14/11: con TheFork i dati non si inseriscono due volte. Senza dati detti prima "Prenota su TheFork" è
+  // subito attivo (niente giorno, ora, persone né "Richiesta"); giorno e ora si chiedono dopo, in "L'hai prenotato?".
+  await s.route("**/api/prenota/canale**", (r) => r.fulfill({ json: { canale: { piattaforma: "thefork", nome: "TheFork", url: "https://www.thefork.it/ristorante/trattoria-scheda-r9" } } }));
+  await s.route("https://www.thefork.it/**", (r) => r.fulfill({ contentType: "text/html", body: "<title>TheFork</title>" }));
+  await bar.getByTestId("prenota-scheda").click();
+  { const fp = s.getByTestId("foglio-prenota");
+    await fp.waitFor({ timeout: 3000 });
+    await s.getByTestId("prenota-piattaforma").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await s.getByTestId("prenota-piattaforma").isVisible().catch(() => false) && (await s.getByTestId("prenota-piattaforma").getAttribute("aria-disabled")) == null && (await s.getByTestId("prenota-persone").count()) === 0 && (await s.getByTestId("prenota-manca").count()) === 0 && (await fp.getByText("Richiesta (facoltativa)").count()) === 0 && (await fp.getByRole("button", { name: "Domani" }).count()) === 0, "prenota su TheFork senza dati: pulsante subito attivo, niente giorno, ora, persone né 'Richiesta' (si scelgono su TheFork)");
+    await fp.screenshot({ path: `${OUT}/62e-prenota-thefork-subito.png` }).catch(() => {});
+    { const [pop] = await Promise.all([s.waitForEvent("popup", { timeout: 4000 }).catch(() => null), s.getByTestId("prenota-piattaforma").click()]); if (pop) await pop.close(); }
+    await s.getByTestId("prenota-hai-prenotato").waitFor({ timeout: 3000 }).catch(() => {});
+    { const sv = await s.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
+      ok(sv.length === 1 && sv[0].piattaforma === "TheFork" && sv[0].date === null && sv[0].time === null && sv[0].people === null && ((await s.getByTestId("prenota-si").textContent().catch(() => "")) ?? "").trim() === "Sì, l'ho prenotato" && (await s.getByTestId("prenota-si-altro").count()) === 0, `prenota su TheFork senza dati: salvata senza giorno, ora e persone non scelti; 'L'hai prenotato?' con 'Sì, l'ho prenotato' (${JSON.stringify(sv[0] ?? null).slice(0, 140)})`); }
+    await s.getByTestId("prenota-si").click().catch(() => {});
+    ok(((await s.getByTestId("prenota-passo").textContent().catch(() => "")) ?? "").includes("Quando hai prenotato?") && (await s.getByTestId("prenota-persone").textContent().catch(() => "")) === "2" && await s.getByTestId("prenota-avanti").isDisabled().catch(() => false) && (await fp.getByText("Richiesta (facoltativa)").count()) === 0, "prenota su TheFork: dopo 'Sì' si chiedono giorno e ora (persone già a 2), 'Segna prenotato' spento finché mancano");
+    await fp.screenshot({ path: `${OUT}/62f-prenota-thefork-quando.png` }).catch(() => {});
+    await fp.getByRole("button", { name: "Domani" }).click().catch(() => {});
+    await fp.getByRole("button", { name: "20:30" }).click().catch(() => {});
+    await s.getByTestId("prenota-avanti").click().catch(() => {});
+    await s.getByTestId("prenota-segnata").waitFor({ timeout: 3000 }).catch(() => {});
+    const { sv, domani } = await s.evaluate(() => { const x = new Date(); x.setDate(x.getDate() + 1); return { sv: JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"), domani: `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}` }; });
+    ok(sv.length === 1 && sv[0].confirmed === true && sv[0].date === domani && sv[0].time === "20:30" && sv[0].people === 2 && ((await s.getByTestId("prenota-segnata-quando").textContent().catch(() => "")) ?? "").includes("alle 20:30"), `prenota su TheFork: giorno e ora scelti dopo, la stessa prenotazione è segnata (${sv[0]?.date} ${sv[0]?.time})`);
+    await fp.getByRole("button", { name: "Fatto" }).click().catch(() => {}); }
+  // "Domani… ci vai?" non subito dopo aver prenotato (revisore 14/11): né in home né sulla mappa; da 12 ore dopo sì.
+  { const hp = await sctx.newPage();
+    hp.on("pageerror", (e) => errors.push(e.message));
+    await hp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+    await hp.waitForTimeout(600);
+    const homeSubito = await hp.getByTestId("promemoria-domani").count();
+    await hp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await hp.getByTestId("mappa-prenotazione").waitFor({ timeout: 6000 }).catch(() => {});
+    const mappaTitolo = (await hp.getByTestId("mappa-prenotazione-titolo").textContent().catch(() => "")) ?? "";
+    const mappaCiVado = await hp.getByTestId("mappa-ci-vado").count();
+    ok(homeSubito === 0 && mappaTitolo.startsWith("Domani alle 20:30") && mappaCiVado === 0, `ci vai domani: appena prenotato niente domanda (home ${homeSubito}, mappa 'Sì, ci vado' ${mappaCiVado}), il promemoria della mappa resta (${mappaTitolo})`);
+    await hp.evaluate(() => { const l = JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"); l[0].createdAt = Date.now() - 13 * 3_600_000; localStorage.setItem("mapetite.prenotazioni", JSON.stringify(l)); });
+    await hp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+    const dom = hp.getByTestId("promemoria-domani");
+    await dom.waitFor({ timeout: 5000 }).catch(() => {});
+    const occhiello = ((await dom.locator("p").first().textContent().catch(() => "")) ?? "").trim();
+    ok(await dom.getByTestId("ci-vai-si").isVisible().catch(() => false) && occhiello === "Il tuo tavolo · 2 persone" && ((await dom.getByTestId("ci-vai-titolo").textContent().catch(() => "")) ?? "").startsWith("Domani alle 20:30"), `ci vai domani: da 12 ore dopo la domanda c'è; sopra 'Il tuo tavolo · 2 persone', il giorno solo nel titolo (${occhiello})`);
+    await hp.close(); }
+  await s.evaluate(() => localStorage.removeItem("mapetite.prenotazioni"));
+  await s.unroute("**/api/prenota/canale**");
+  await s.unroute("https://www.thefork.it/**");
   // In fondo alla scheda la barra non copre l'ultimo contenuto.
   await s.getByTestId("scheda-trascinabile").evaluate((el) => el.scrollTo({ top: 99999 }));
   await s.waitForTimeout(300);
@@ -4869,7 +5119,7 @@ else {
 // QA telefono piccolo (Android 360x780, 13/10): niente scorrimento orizzontale, testi interi, niente vuoti sopra la barra.
 {
   const qctx = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
-  await qctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await qctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const qRows = [
     { tags: ["Romantico", "Da provare"], note: null, places: { id: "00000000-0000-4000-8000-000000000301", name: "Terrazza Uno", category: "bar", address: "Via Po 2, 00198 Roma RM, Italy", lat: 41.915, lng: 12.497, google_place_id: "GQ1", rating: 4.6, price_level: 2 } },
     { tags: ["Economico"], note: null, places: { id: "00000000-0000-4000-8000-000000000302", name: "Forno Due", category: "bakery", address: "Via Ostiense 50, Roma", lat: 41.87, lng: 12.48, google_place_id: "GQ2", rating: 4.5, price_level: 1 } },
@@ -5106,7 +5356,7 @@ else {
   await tctx.route("**/api/search", (r) => r.fulfill({ json: SEARCH_FAST }));
   await tctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
   const tp = await tctx.newPage();
-  await tp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await tp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const tErrors = [];
   tp.on("pageerror", (e) => tErrors.push(e.message));
   await tp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -5309,6 +5559,24 @@ else {
     const rem = bk.bookingReminders(list, now);
     ok(rem.tomorrow.map((x) => x.id).join() === "e", "prenota: promemoria anche il giorno prima (nascondibile senza perdere quello del giorno stesso; dopo 'Sì, ci vado' non torna)");
     ok(rem.today.map((x) => x.id).join() === "a" && rem.howWasIt.map((x) => x.id).join() === "b", "prenota: promemoria il giorno stesso, 'Com'è andata?' dal giorno dopo (una volta)");
+    // Promemoria che si vedono (8/11): banner, foglio "Tra 2 ore", Portami lì, dati per prenotare.
+    { const g = (h, m) => new Date(2026, 9, 15, h, m); // giovedì 15/10
+      const L = [
+        { id: "p1", placeId: "ChIJabcdefghijklmnop", placeName: "Da Enzo", lat: 41.88, lng: 12.47, date: "2026-10-15", time: "21:00", people: 2, via: "whatsapp", confirmed: true },
+        { id: "p2", placeId: "P2", placeName: "Disdetto", lat: 41.9, lng: 12.5, date: "2026-10-15", time: "20:00", people: 2, via: "telefono", outcome: "non-andato", dismissed: true, disdetta: 1 },
+        { id: "p3", placeId: "P3", placeName: "Domani", lat: 41.9, lng: 12.5, date: "2026-10-16", time: "13:00", people: 4, via: "sito", confirmed: true },
+      ];
+      ok(bk.quandoTavolo(L[0], g(10, 0)) === "Stasera alle 21:00" && bk.quandoTavolo({ date: "2026-10-15", time: "13:00" }, g(10, 0)) === "Oggi alle 13:00" && bk.quandoTavolo(L[2], g(10, 0)) === "Domani alle 13:00", "promemoria: 'Stasera alle 21:00', 'Oggi alle 13:00', 'Domani alle 13:00'");
+      ok(bk.portamiLiUrl(L[0]) === "https://www.google.com/maps/dir/?api=1&destination=41.88%2C12.47&destination_place_id=ChIJabcdefghijklmnop" && bk.portamiLiUrl({ ...L[0], placeId: "6f1e2d3c-aaaa-bbbb-cccc-123456789abc" }) === "https://www.google.com/maps/dir/?api=1&destination=41.88%2C12.47" && bk.portamiLiUrl({ ...L[0], lat: null, lng: null, placeId: "x" }) === null, "promemoria: 'Portami lì' con destinazione e Place ID Google (mai l'UUID dei salvati)");
+      ok(bk.prenotazioneDaRicordare(L, g(10, 0))?.b.id === "p1" && bk.prenotazioneDaRicordare(L, g(22, 30))?.b.id === "p3" && bk.prenotazioneDaRicordare(L, g(22, 30))?.domani === true, "promemoria: banner della mappa sul tavolo di oggi, poi (passata l'ora) su quello di domani; i disdetti mai");
+      ok(bk.prenotazioneTraPoco(L, g(18, 45))?.b.id === "p1" && bk.prenotazioneTraPoco(L, g(18, 0)) === null && bk.prenotazioneTraPoco(L, g(21, 5)) === null && bk.prenotazioneTraPoco(L, g(19, 0), ["p1"]) === null, "promemoria: foglio 'Tra 2 ore' solo nelle 2 ore e mezza prima, una volta per prenotazione, mai per i disdetti");
+      // Revisore 8/11: senza il sì della persona (un tocco su "Prenota su TheFork") niente banner né foglio, ma la domanda.
+      { const nc = L.map((x) => ({ ...x, confirmed: undefined }));
+        ok(bk.prenotazioneDaRicordare(nc, g(10, 0)) === null && bk.prenotazioneTraPoco(nc, g(18, 45)) === null && bk.daConfermare(nc, g(10, 0)).map((x) => x.id).join() === "p1,p3" && bk.chiConferma({ piattaforma: "TheFork" }) === "la conferma la dà TheFork" && bk.chiConferma({ piattaforma: null }) === "la conferma arriva dal locale", "promemoria: senza il sì della persona niente banner né foglio 'Tra 2 ore', ma 'Hai prenotato?'; chi conferma dipende dal canale"); }
+      ok(bk.traQuanto(120) === "Tra 2 ore" && bk.traQuanto(95) === "Tra un'ora e mezza" && bk.traQuanto(62) === "Tra un'ora" && bk.traQuanto(38) === "Tra 40 minuti" && bk.traQuanto(135) === "Tra 2 ore e 15" && bk.traQuanto(105) === "Tra un'ora e 45", "promemoria: 'Tra 2 ore', 'Tra un'ora e mezza', 'Tra 2 ore e 15', 'Tra 40 minuti'");
+      const m = bk.bookingMessage({ date: "2026-10-17", time: "21:00", people: 2, special: null }, "Lorenzo Rossi", g(18, 0), null, null, { nome: "Lorenzo Rossi", telefono: "333 123 4567" });
+      ok(/vorrei prenotare un tavolo per 2 persone sabato 17\/10 alle 21:00 a nome Lorenzo Rossi\. È disponibile\? Il mio cellulare è 333 123 4567\. Grazie$/.test(m), `dati per prenotare: 'a nome …' e cellulare nel messaggio (${m})`);
+      ok(bk.telefonoValido("+39 333 123 4567") && !bk.telefonoValido("ciao") && bk.datiDaIncollare({ nome: "Lorenzo Rossi", telefono: "333", email: "", consenso: true }) === "Lorenzo Rossi\n333", "dati per prenotare: numero controllato, dati da incollare nel modulo"); }
     // Due tavoli per lo stesso pasto (proposta CEO 19/10).
     const dop = [
       { id: "s1", placeId: "A", date: "2026-10-17", time: "20:30", placeName: "Uno", via: "whatsapp" },
@@ -5341,7 +5609,7 @@ else {
   }
 
   const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["clipboard-read", "clipboard-write"] });
-  await actx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await actx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const aEvents = [];
   const searches = [];
   await actx.route("**/api/events", (route) => { aEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
@@ -5497,6 +5765,9 @@ else {
   const msg = await ap.getByTestId("prenota-messaggio").inputValue();
   ok(/vorrei prenotare un tavolo per 2 persone domani \d\d\/\d\d alle 21:00, in terrazza se possibile\. È disponibile\? Grazie, Giulia$/.test(msg), `prenota: messaggio già scritto con nome (${msg})`);
   ok((await ap.getByTestId("prenota-whatsapp").getAttribute("href")).startsWith("https://wa.me/393471234567?text=") && await ap.getByTestId("prenota-chiama").isVisible() && await ap.getByTestId("prenota-sito").isVisible(), "prenota: WhatsApp (cellulare), chiamata e sito del locale");
+  // Revisore 14/11: una via principale (WhatsApp), Chiama e Sito piccoli sulla stessa riga, niente "Copia il messaggio".
+  { const [w, c, si] = [await ap.getByTestId("prenota-whatsapp").boundingBox(), await ap.getByTestId("prenota-chiama").boundingBox(), await ap.getByTestId("prenota-sito").boundingBox()];
+    ok(!!w && !!c && !!si && Math.abs(c.y - si.y) < 2 && c.y > w.y + w.height - 1 && c.height < w.height && (await ap.getByTestId("prenota-copia").count()) === 0 && ((await ap.getByTestId("prenota-chiama").textContent()) ?? "").trim() === "Chiama" && ((await ap.getByTestId("prenota-sito").textContent()) ?? "").trim() === "Sito", `prenota passo 2: WhatsApp principale, 'Chiama' e 'Sito' sulla stessa riga sotto, niente 'Copia il messaggio' (${Math.round(c?.y ?? 0)}/${Math.round(si?.y ?? 0)})`); }
   ok((await ap.getByTestId("prenota-onesta").textContent()).includes("la conferma arriva dal locale"), "prenota: onestà sulla disponibilità");
   ok((await ap.getByTestId("prenota-riepilogo").textContent()).includes("2 persone") && (await ap.getByTestId("prenota-avanti").count()) === 0,
     "prenota in 2 passi: con i dati già detti in chat si parte dal passo 2 (riepilogo in una riga + messaggio)");
@@ -5513,6 +5784,12 @@ else {
   const [popup] = await Promise.all([ap.waitForEvent("popup"), ap.getByTestId("prenota-whatsapp").click()]);
   ok(decodeURIComponent(popup.url()).includes("per 3 persone"), "prenota: WhatsApp si apre con il messaggio");
   await popup.close();
+  // Tornati da WhatsApp (8/11): "L'hai prenotato?" con giorno, ora e persone; "Non ancora" = richiesta inviata.
+  await ap.getByTestId("prenota-hai-prenotato").waitFor({ timeout: 3000 });
+  { const si = (await ap.getByTestId("prenota-si").textContent()) ?? "";
+    ok(/^Sì, domani \d\d\/\d\d alle 21:00 per 3$/.test(si.trim()) && await ap.getByTestId("prenota-non-ancora").isVisible() && await ap.getByTestId("prenota-si-altro").isVisible() && (await ap.getByTestId("prenota-segnata").count()) === 0, `prenota: tornati da WhatsApp 'L'hai prenotato?' con 'Sì, il giorno alle ora per N', niente 'prenotato' finché non lo dice la persona (${si.trim()})`); }
+  await ashot("52b-prenota-hai-prenotato");
+  await ap.getByTestId("prenota-non-ancora").click();
   await ap.getByTestId("prenota-fatto").waitFor({ timeout: 3000 });
   ok((await ap.getByTestId("prenota-fatto").textContent()).includes("La conferma arriva dal locale"), "prenota: 'Prenotazione richiesta' con la conferma che arriva dal locale");
   const saved = await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
@@ -5525,25 +5802,52 @@ else {
   // "Prenota su TheFork" (Lorenzo, 30/10): il sito del locale usa il modulo di TheFork → un tocco e ci sei.
   await actx.route("**/api/prenota/canale**", (r) => r.fulfill({ json: { canale: { piattaforma: "thefork", nome: "TheFork", url: "https://www.thefork.it/ristorante/terrazza-uno-r123" } } }));
   await actx.route("https://www.thefork.it/**", (r) => r.fulfill({ contentType: "text/html", body: "<title>TheFork</title>" }));
-  await ap.evaluate(() => localStorage.setItem("mapetite.beta.prenota", "1")); // spento per tutti: si prova con ?beta=prenota
+  // Acceso per tutti dall'8/11 (niente più ?beta=prenota).
   await ap.getByRole("button", { name: "Prenota da Terrazza Uno" }).click();
   await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
   await ap.getByTestId("prenota-piattaforma").waitFor({ timeout: 4000 }).catch(() => {});
   { const bottoni = await ap.getByTestId("foglio-prenota").locator("a[data-testid^=prenota-]").evaluateAll((els) => els.map((e) => e.dataset.testid));
-    ok(bottoni.join() === "prenota-whatsapp,prenota-chiama,prenota-piattaforma" && (await ap.getByTestId("prenota-piattaforma").textContent()).includes("Prenota su TheFork") && (await ap.getByTestId("prenota-piattaforma-nota").textContent()).includes("vedi i tavoli liberi"), `prenota su piattaforma: 'Prenota su TheFork' al posto di 'dal sito', nello stesso punto (${bottoni.join(", ")})`); }
+    // Revisore 8/11 e 14/11: con la piattaforma (l'unica che vede i tavoli liberi) una cosa sola: "Prenota su TheFork"
+    // principale e subito attivo, la nota sotto; giorno, ora e persone si scelgono su TheFork (non qui due volte),
+    // niente "Richiesta" che non arriverebbe a nessuno; il messaggio solo con "Oppure scrivi al locale".
+    const nota = await ap.getByTestId("prenota-piattaforma-nota").boundingBox();
+    const pb = await ap.getByTestId("prenota-piattaforma").boundingBox();
+    const sb = await ap.getByTestId("prenota-scrivi-locale").boundingBox();
+    const bg = await ap.getByTestId("prenota-piattaforma").evaluate((e) => getComputedStyle(e).backgroundColor);
+    ok(bottoni.join() === "prenota-piattaforma" && (await ap.getByTestId("prenota-messaggio").count()) === 0 && (await ap.getByTestId("prenota-persone").count()) === 0 && (await ap.getByTestId("foglio-prenota").getByText("Richiesta (facoltativa)").count()) === 0 && (await ap.getByTestId("prenota-piattaforma").getAttribute("aria-disabled")) == null && (await ap.getByTestId("prenota-piattaforma").textContent()).includes("Prenota su TheFork") && ((await ap.getByTestId("prenota-piattaforma-nota").textContent()) ?? "").includes("vedi i tavoli liberi") && !((await ap.getByTestId("prenota-piattaforma-nota").textContent()) ?? "").includes("copiat") && bg === "rgb(255, 107, 74)" && !!nota && !!pb && !!sb && nota.y > pb.y && sb.y > nota.y, `prenota su piattaforma: un passo solo, 'Prenota su TheFork' principale e attivo con la nota sotto, niente persone, 'Richiesta' né messaggio (${bottoni.join(", ")})`); }
   await ashot("53b-prenota-thefork");
+  // "Oppure scrivi al locale": il passo del messaggio, senza TheFork; "Modifica" torna a giorno/ora/persone
+  // (servono al messaggio) e "← Prenota su TheFork" torna al pulsante della piattaforma.
+  await ap.getByTestId("prenota-scrivi-locale").click();
+  ok(await ap.getByTestId("prenota-messaggio").isVisible() && await ap.getByTestId("prenota-whatsapp").isVisible() && (await ap.getByTestId("prenota-piattaforma").count()) === 0 && (await ap.getByTestId("prenota-sito").count()) === 0 && ((await ap.getByTestId("prenota-onesta").textContent()) ?? "").includes("la conferma arriva dal locale"), "prenota su piattaforma: 'Oppure scrivi al locale' apre il messaggio con WhatsApp e Chiama, senza il sito (la conferma la dà il locale)");
+  await ap.getByTestId("prenota-modifica").click();
+  ok(await ap.getByTestId("prenota-avanti").isVisible() && (await ap.getByTestId("prenota-persone").count()) === 1 && (await ap.getByTestId("prenota-piattaforma").count()) === 0, "prenota su piattaforma: per scrivere al locale 'Modifica' torna a giorno, ora e persone");
+  await ap.getByTestId("prenota-torna-piattaforma").click();
+  await ap.getByTestId("prenota-piattaforma").waitFor({ timeout: 3000 });
   { const [pop] = await Promise.all([ap.waitForEvent("popup"), ap.getByTestId("prenota-piattaforma").click()]);
     ok(pop.url().startsWith("https://www.thefork.it/ristorante/terrazza-uno-r123"), `prenota su piattaforma: apre il modulo di TheFork (${pop.url()})`);
     await pop.close(); }
-  await ap.getByTestId("prenota-fatto").waitFor({ timeout: 3000 }).catch(() => {});
+  await ap.getByTestId("prenota-hai-prenotato").waitFor({ timeout: 3000 }).catch(() => {});
   { const sv = await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
     const ultima = sv[sv.length - 1];
-    ok(ultima?.via === "sito" && ultima.piattaforma === "TheFork" && (await ap.getByTestId("prenota-fatto").textContent()).includes("su TheFork"), `prenota su piattaforma: richiesta salvata 'su TheFork' (${JSON.stringify(ultima)})`);
+    ok(ultima?.via === "sito" && ultima.piattaforma === "TheFork" && !ultima.confirmed && (await ap.getByTestId("prenota-hai-prenotato").textContent()).includes("Se hai confermato su TheFork"), `prenota su piattaforma: richiesta salvata 'su TheFork', non ancora prenotata (${JSON.stringify(ultima)})`);
     ok(aEvents.some((e) => e.type === "sito" && e.props?.fonte === "prenota" && e.props?.contesto === "TheFork"), "prenota su piattaforma: segnale 'sito' da prenota con la piattaforma"); }
+  // "Sì, ma un altro giorno o ora": su TheFork ha scelto le 21:30, si corregge e si segna prenotato.
+  await ap.getByTestId("prenota-si-altro").click();
+  await ap.getByRole("button", { name: "21:30" }).click();
+  await ap.getByTestId("prenota-avanti").click();
+  await ap.getByTestId("prenota-segnata").waitFor({ timeout: 3000 });
+  { const sv = await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
+    const ultima = sv[sv.length - 1];
+    ok(ultima?.confirmed === true && ultima.time === "21:30" && sv.filter((x) => x.piattaforma === "TheFork").length === 1 && (await ap.getByTestId("prenota-segnata-quando").textContent()).includes("alle 21:30"), `prenota: 'Sì, ma un altro giorno o ora' corregge la stessa prenotazione e la segna prenotata (${ultima?.time})`); }
+  await ashot("53c-prenota-segnata");
+  { const [dl] = await Promise.all([ap.waitForEvent("download", { timeout: 5000 }), ap.getByTestId("prenota-calendario").click()]);
+    const { readFileSync } = await import("fs");
+    const f = readFileSync(await dl.path(), "utf8").replace(/\r\n /g, "");
+    ok(f.includes("BEGIN:VALARM") && f.includes("TRIGGER:-PT2H") && f.includes("T213000") && f.includes("Prenotato su TheFork (l'hai segnato tu)"), "prenota: subito dopo 'Sì', 'Aggiungi al calendario' scarica il .ics con l'avviso 2 ore prima"); }
   await ap.getByRole("button", { name: "Fatto" }).click();
   await actx.unroute("**/api/prenota/canale**");
   await actx.unroute("https://www.thefork.it/**");
-  await ap.evaluate(() => localStorage.removeItem("mapetite.beta.prenota"));
   // Funzioni pure: riconosce i moduli veri, non le pagine generiche; risolve i link relativi.
   { const cp = await import(new URL("../../src/lib/canale-prenotazione.ts", import.meta.url).href);
     ok(cp.canaleDaUrl("https://www.thefork.it/ristorante/da-enzo-r12345")?.nome === "TheFork" && cp.canaleDaUrl("https://www.thefork.it/")?.nome === undefined && cp.canaleDaUrl("https://bookings.zenchef.com/results?rid=123")?.nome === "Zenchef" && cp.canaleDaUrl("https://www.quandoo.it/place/osteria-1234")?.nome === "Quandoo" && cp.canaleDaUrl("https://www.thefork.it/ristorante/da-enzo-r12345?cc=18980")?.nome === "TheFork" && cp.canaleDaUrl("https://www.quandoo.it/place/osteria-1234?aid=7")?.nome === "Quandoo" && cp.canaleDaUrl("https://evilthefork.it/ristorante/x-r1") === null && cp.canaleDaUrl("javascript:alert(1)") === null && ["https://www.thefork.it/blog/restaurant-week", "https://www.thefork.it/thefork-awards/ristorante-dell-anno", "https://www.thefork.com/restaurants", "https://www.opentable.it/restaurants/rome", "https://www.quandoo.it/places-in-rome"].every((u) => cp.canaleDaUrl(u) === null), "prenota su piattaforma: riconosce i moduli di TheFork, Zenchef, Quandoo e non le home o i domini finti");
@@ -5613,17 +5917,42 @@ else {
   await ap.evaluate(() => {
     const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
     localStorage.setItem("mapetite.prenotazioni", JSON.stringify([
-      { id: "t1", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d(0), time: "21:00", people: 2, special: null, via: "whatsapp", createdAt: Date.now() },
+      { id: "t1", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d(0), time: "21:00", people: 2, special: null, via: "whatsapp", confirmed: true, createdAt: Date.now() },
       { id: "t2", placeId: "P3", placeName: "Rooftop Tre", lat: 41.902, lng: 12.494, date: d(-1), time: "20:30", people: 2, special: null, via: "telefono", createdAt: Date.now() },
     ]));
   });
   await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await ap.getByTestId("promemoria-oggi").waitFor({ timeout: 5000 });
-  ok((await ap.getByTestId("promemoria-oggi").textContent()).includes("Oggi alle 21:00") && (await ap.getByTestId("promemoria-oggi").textContent()).includes("Terrazza Uno"), "home: promemoria della prenotazione di oggi");
+  ok((await ap.getByTestId("promemoria-oggi-titolo").textContent()) === "Stasera alle 21:00 da Terrazza Uno", `home: promemoria 'Stasera alle 21:00 da Terrazza Uno' (${await ap.getByTestId("promemoria-oggi-titolo").textContent()})`);
+  { const occhiello = ((await ap.getByTestId("promemoria-oggi").locator("p").first().textContent()) ?? "").trim();
+    ok(occhiello === "Il tuo tavolo · 2 persone", `home: sopra 'Il tuo tavolo · 2 persone', il giorno solo nel titolo (niente 'Oggi' due volte) (${occhiello})`); }
+  ok((await ap.getByTestId("promemoria-oggi").getByTestId("portami-li").getAttribute("href")) === "https://www.google.com/maps/dir/?api=1&destination=41.9%2C12.49", "home: 'Portami lì' apre le indicazioni con la destinazione già messa");
   ok((await ap.getByTestId("promemoria-com-e-andata").textContent()).includes("Rooftop Tre"), "home: 'Com'è andata?' il giorno dopo");
   await ashot("56-home-promemoria");
   await ap.getByRole("button", { name: "👍 Mi è piaciuto" }).click();
   ok((await ap.getByTestId("promemoria-com-e-andata").count()) === 0 && aEvents.some((e) => e.type === "ci_sono_stato" && e.props?.fonte === "prenota" && e.props?.stato === "bene"), "home: risposta a 'Com'è andata?' registrata, la domanda sparisce");
+  // Revisore 8/11: un tocco su "Prenota su TheFork" senza il sì della persona non è un tavolo. In home
+  // "Hai prenotato da …?" (Sì / No) con il testo giusto per TheFork, niente promemoria né foglio "Tra 2 ore".
+  await ap.evaluate(() => {
+    const x = new Date(); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "tf1", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "sito", piattaforma: "TheFork", createdAt: Date.now() }]));
+  });
+  await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  { const c = ap.getByTestId("promemoria-hai-prenotato");
+    const vis = await c.waitFor({ timeout: 5000 }).then(() => true, () => false);
+    ok(vis && (await c.getByTestId("hai-prenotato-titolo").textContent()) === "Hai prenotato da Terrazza Uno?" && ((await c.getByTestId("hai-prenotato-canale").textContent()) ?? "").includes("Se hai confermato su TheFork") && (await c.getByTestId("hai-prenotato-si").textContent()) === "Sì, stasera alle 21:00" && (await ap.getByTestId("promemoria-oggi").count()) === 0, "home: richiesta su TheFork senza risposta → 'Hai prenotato da Terrazza Uno?' (se hai confermato su TheFork), niente promemoria");
+    await ashot("56a-hai-prenotato");
+    if (vis) await c.getByTestId("hai-prenotato-si").click();
+    await ap.getByTestId("promemoria-oggi").waitFor({ timeout: 3000 }).catch(() => {});
+    ok((await ap.getByTestId("promemoria-hai-prenotato").count()) === 0 && ((await ap.getByTestId("promemoria-oggi").textContent()) ?? "").includes("Prenotato su TheFork"), "home: 'Sì' segna il tavolo e compare il promemoria 'Prenotato su TheFork'");
+    await ap.evaluate(() => { const l = JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"); l[0].confirmed = false; localStorage.setItem("mapetite.prenotazioni", JSON.stringify(l)); });
+    await ap.reload({ waitUntil: "networkidle" });
+    await ap.getByTestId("hai-prenotato-no").click({ timeout: 5000 }).catch(() => {});
+    ok((await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]").length)) === 0 && (await ap.getByTestId("promemoria-prenotazioni").count()) === 0, "home: 'No' toglie la richiesta, nessun promemoria"); }
+  await ap.evaluate(() => {
+    const x = new Date(); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "t1", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "whatsapp", confirmed: true, createdAt: Date.now() }]));
+  });
   await actx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "giulia@example.com", saved: [], reviews: [] })), url: BASE }]);
   await ap.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
   ok((await ap.getByTestId("promemoria-oggi").count()) === 1, "profilo: promemoria anche nel profilo");
@@ -5631,7 +5960,7 @@ else {
   // "Non vado più" (18/10, contro i tavoli vuoti): messaggio di disdetta già scritto e un tocco per mandarlo.
   await ap.evaluate(() => {
     const x = new Date(); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
-    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "t3", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "whatsapp", phone: "+39 333 123 4567", createdAt: Date.now() }]));
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "t3", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "whatsapp", confirmed: true, phone: "+39 333 123 4567", createdAt: Date.now() }]));
   });
   await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await ap.getByTestId("promemoria-non-vado").click();
@@ -5649,7 +5978,7 @@ else {
   // Il giorno prima: "Domani alle 21:00", con "Non vado più" e senza Percorso.
   await ap.evaluate(() => {
     const x = new Date(); x.setDate(x.getDate() + 1); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
-    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "t4", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "telefono", phone: "06 1234 5678", createdAt: Date.now() }]));
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "t4", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "telefono", confirmed: true, phone: "06 1234 5678", createdAt: Date.now() - 86_400_000 }]));
   });
   await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
   { const dom = ap.getByTestId("promemoria-domani");
@@ -5672,8 +6001,8 @@ else {
   await ap.evaluate(() => {
     const x = new Date(); x.setDate(x.getDate() + 1); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
     localStorage.setItem("mapetite.prenotazioni", JSON.stringify([
-      { id: "d1", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "telefono", phone: "06 1234 5678", createdAt: Date.now() },
-      { id: "d2", placeId: "P3", placeName: "Rooftop Tre", lat: 41.902, lng: 12.494, date: d, time: "20:30", people: 2, special: null, via: "whatsapp", phone: "+39 333 123 4567", createdAt: Date.now() },
+      { id: "d1", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "telefono", confirmed: true, phone: "06 1234 5678", createdAt: Date.now() - 86_400_000 },
+      { id: "d2", placeId: "P3", placeName: "Rooftop Tre", lat: 41.902, lng: 12.494, date: d, time: "20:30", people: 2, special: null, via: "whatsapp", confirmed: true, phone: "+39 333 123 4567", createdAt: Date.now() },
     ]));
   });
   await ap.goto(`${BASE}/`, { waitUntil: "networkidle" });
@@ -5721,7 +6050,8 @@ else {
   await ap.getByTestId("prenota-scheda").waitFor({ timeout: 4000 });
   await ap.getByTestId("prenota-scheda").click();
   await ap.getByTestId("foglio-prenota").waitFor({ timeout: 3000 });
-  ok((await ap.getByTestId("prenota-manca").textContent()).includes("quante persone"), "mappa → scheda → Prenota: chiede i dati mancanti prima di scrivere al locale");
+  { const manca = (await ap.getByTestId("prenota-manca").textContent()) ?? "";
+    ok(manca.includes("il giorno") && manca.includes("l'ora") && !manca.includes("quante persone") && (await ap.getByTestId("prenota-persone").textContent()) === "2", `mappa → scheda → Prenota: chiede i dati mancanti prima di scrivere al locale; le persone partono da 2, non da '–' (${manca})`); }
   ok(await ap.getByTestId("prenota-avanti").isDisabled() && (await ap.getByTestId("prenota-messaggio").count()) === 0, "prenota in 2 passi: senza dati si parte dal passo 1 e 'Avanti' resta spento");
   { const f = ap.getByTestId("foglio-prenota");
     await f.getByRole("button", { name: "Oggi", exact: true }).click();
@@ -5742,7 +6072,9 @@ else {
       await alt.getByRole("button", { name: /Rooftop Tre/ }).click();
       const nuovo = ap.getByRole("dialog", { name: /Prenota da Rooftop Tre/ });
       const aperto = await nuovo.waitFor({ timeout: 4000 }).then(() => true, () => false);
-      ok(aperto && (await nuovo.getByRole("button", { name: "21:00", exact: true }).getAttribute("aria-pressed")) === "true", "prenota: 'Prenota lì' apre il foglio Prenota di Rooftop Tre con le 21:00 già scelte");
+      // Con le persone da 2 (revisore 14/11) i dati sono completi: il foglio parte dal riepilogo del passo 2.
+      const riep = (await nuovo.getByTestId("prenota-riepilogo").textContent().catch(() => "")) ?? "";
+      ok(aperto && riep.includes("21:00") && riep.includes("2 persone") && riep.includes("oggi"), `prenota: 'Prenota lì' apre il foglio Prenota di Rooftop Tre con oggi, le 21:00 e 2 persone già scelte (${riep})`);
       await nuovo.getByRole("button", { name: "Chiudi" }).click().catch(() => {});
     } }
   await ap.evaluate((v) => { if (v != null) localStorage.setItem("mapetite.prenotazioni", v); }, prenPrima);
@@ -5753,7 +6085,7 @@ else {
 
   // 360 px: si legge, niente scorrimento orizzontale
   const nctx = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
-  await nctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await nctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   await nctx.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
   await nctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
   await nctx.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
@@ -5809,7 +6141,7 @@ else {
 
     const U = "00000000-0000-0000-0000-000000000001";
     const gctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
-    await gctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await gctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     const gEvents = [], gSearches = [], gSynth = [], gIntents = [], gPatches = [];
     await gctx.route("**/api/events", (route) => { gEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
     await gctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
@@ -5920,7 +6252,7 @@ else {
 
     // 360 px e senza accesso: i gusti restano nel telefono.
     const g3 = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
-    await g3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await g3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     await g3.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
     const g3Patches = [], g3Searches = [];
     await g3.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
@@ -5972,7 +6304,7 @@ else {
     }
 
     const sctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
-    await sctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await sctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     const sEvents = [], sSearches = [], sIntents = [], sAdds = [];
     await sctx.route("**/api/events", (route) => { sEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
     await sctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
@@ -6062,7 +6394,7 @@ else {
 
     // 360 px: si legge, niente scorrimento orizzontale.
     const s3 = await browser.newContext({ viewport: { width: 360, height: 780 }, deviceScaleFactor: 2 });
-    await s3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await s3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     await s3.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
     await s3.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
     await s3.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
@@ -6084,7 +6416,7 @@ else {
   // Server simulato: Google 300 ms; l'AI che capisce la frase 1200 ms, sul server se la ricerca
   // arriva senza intento, oppure in anticipo mentre si scrive (/api/search/intent).
   const pctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
-  await pctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await pctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   await pctx.route("**/api/events", (route) => route.fulfill({ status: 204, body: "" }));
   await pctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"/>' }));
   await pctx.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
@@ -6386,8 +6718,8 @@ else {
     await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
     ok((await g.getByTestId("raccolta-pubblica-link").first().getAttribute("href")) === "/u/giulia.rm/raccolte/Romantico", "profilo pubblico: le raccolte si aprono (link in sola lettura)");
     const orderG = (texts) => texts.map((t) => ["Trattoria Due", "Bar Tre", "Vineria Uno"].findIndex((n) => t.includes(n))).join();
-    ok(orderG(await g.getByTestId("top-voce").allTextContents()) === "0,1,2" && (await g.getByTestId("profilo-top").textContent()).includes("Top Roma"), "profilo pubblico: 'I preferiti di Giulia' con la top di Roma in ordine");
-    await g.getByTestId("profilo-top").evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
+    ok(orderG(await g.getByTestId("piaciuto-card").allTextContents()) === "0,1,2" && (await g.getByTestId("piaciuto-badge").allTextContents()).join("|") === "👍 N.1|👍 N.2|👍 N.3" && (await g.getByTestId("piaciuto-badge").first().getAttribute("title")) === "N.1 nella sua classifica di Roma", "profilo pubblico: 'Gli è piaciuto' apre con la sua classifica di Roma, in ordine (👍 N.1 accanto al nome)");
+    await g.getByTestId("profilo-piaciuti").evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16));
     await g.screenshot({ path: `${OUT}/46-top-pubblica.png`, caret: "initial" });
     await g.goto(`${BASE}/u/giulia.rm/raccolte/Romantico`, { waitUntil: "networkidle" });
     ok(await g.getByTestId("raccolta-pubblica").isVisible() && (await g.getByTestId("posto-persona").count()) === 2 && (await g.title()).startsWith("Romantico · Giulia"), "raccolta condivisa: si apre senza account con i suoi 2 posti");
@@ -6396,9 +6728,15 @@ else {
     await g.screenshot({ path: `${OUT}/47-raccolta-condivisa.png`, caret: "initial" });
     await g.goto(`${BASE}/u/giulia.rm/raccolte/Segreta`, { waitUntil: "networkidle" });
     ok(await g.getByTestId("raccolta-pubblica-non-trovata").isVisible(), "raccolta condivisa: nome inesistente → 'non disponibile'");
+    // Revisore 8/11: con due città ognuna ha il suo N.1 (la posizione è per città, non nella fila delle card).
+    { const mil = { ...sv("44444444-0000-4000-8000-0000000007b5", "Osteria Cinque", "restaurant", ["Già visitato"], 45.46, 9.19, 2), address: "Via Torino 3, 20123 Milano MI, Italy" };
+      await gc.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialG, salvati: [...socialG.salvati, mil] })), url: BASE }]);
+      await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+      const b = (await g.getByTestId("piaciuto-badge").allTextContents()).join("|");
+      ok(b === "👍 N.1|👍 N.2|👍 N.3|👍 N.1" && (await g.getByTestId("piaciuto-card").last().textContent()).includes("Osteria Cinque") && (await g.getByTestId("piaciuto-badge").last().getAttribute("title")) === "N.1 nella sua classifica di Milano", `profilo pubblico: con due città il N.1 di Milano resta N.1 (${b})`); }
     await gc.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialG, classifica: false })), url: BASE }]);
     await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
-    ok((await g.getByTestId("profilo-top").count()) === 0, "profilo pubblico: senza la vista classifica_pubblica la top non compare");
+    ok((await g.getByTestId("profilo-piaciuti").count()) === 0, "profilo pubblico: senza la vista classifica_pubblica (e senza 👍) 'Gli è piaciuto' non compare");
     await gc.close();
   }
 }
@@ -6750,7 +7088,7 @@ else {
   }
 
   const pctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, acceptDownloads: true });
-  await pctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await pctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const pEvents = [];
   await pctx.route("**/api/events", (route) => { pEvents.push(route.request().postDataJSON()); return route.fulfill({ status: 204, body: "" }); });
   await pctx.route("**/api/places/photo**", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
@@ -6791,6 +7129,7 @@ else {
   ok((await past.count()) === 2 && (await past.nth(0).textContent()).includes("Rooftop Tre") && (await past.nth(1).textContent()).includes("Pub Fuori Tema"), "prenotazioni: 'Passate' dalla più recente");
   const u1 = up.nth(1);
   const t1 = await u1.textContent();
+  ok(((await pp.locator("main > p").first().textContent()) ?? "").trim() === "I tuoi tavoli, salvati su questo telefono.", "prenotazioni: sottotitolo 'I tuoi tavoli, salvati su questo telefono.'");
   ok(t1.includes("alle 21:00") && t1.includes("2 persone") && t1.includes("in terrazza") && t1.includes("Inviata su WhatsApp") && /\d\d\/\d\d/.test(t1), `prenotazioni: giorno, ora, persone, richiesta e come è stata inviata (${t1.slice(0, 90)}…)`);
   ok((await u1.getAttribute("data-stato")) === "inviata" && (await up.nth(0).getAttribute("data-stato")) === "confermata" && (await up.nth(0).textContent()).includes("Oggi"), "prenotazioni: stato 'Richiesta inviata' e 'Confermata'");
   ok((await up.nth(0).getByRole("link", { name: "Osteria Pigneto" }).getAttribute("href")) === `/locali/${UUID}` && (await u1.getByRole("link", { name: "Terrazza Uno" }).count()) === 0, "prenotazioni: il nome apre la scheda solo con l'id Mapetite (l'id Google non ha pagina)");
@@ -6805,13 +7144,23 @@ else {
   await pp.waitForTimeout(200);
   const stored = await pp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
   ok((await u1.getAttribute("data-stato")) === "confermata" && stored.find((b) => b.id === "u1")?.confirmed === true, "prenotazioni: 'Il locale ha confermato' → Confermata, salvato nel telefono");
+  { const t = (await u1.textContent()) ?? "";
+    ok(t.includes("Confermata dal locale") && !t.includes("Inviata su WhatsApp") && !t.includes("l'hai segnat") && (await u1.getByRole("button", { name: "Non ancora" }).count()) === 0 && (await u1.getByTestId("prenotazione-annulla-conferma").count()) === 0, `prenotazioni (revisore 14/11): una sola riga di stato, niente 'Non ancora' in vista (${t.slice(0, 120)})`); }
+  // "Annulla conferma" sta in "Altro", con "Togli".
+  await u1.getByTestId("prenotazione-altro").click();
+  ok(await u1.getByTestId("prenotazione-annulla-conferma").isVisible() && await u1.getByRole("button", { name: /Togli la prenotazione/ }).isVisible(), "prenotazioni: 'Altro' apre 'Annulla conferma' e 'Togli'");
+  await u1.getByTestId("prenotazione-annulla-conferma").click();
+  await pp.waitForTimeout(200);
+  ok((await u1.getAttribute("data-stato")) === "inviata" && !(await pp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]").find((b) => b.id === "u1")?.confirmed)) && ((await u1.textContent()) ?? "").includes("Inviata su WhatsApp"), "prenotazioni: 'Annulla conferma' la riporta a richiesta inviata");
+  await u1.getByTestId("prenotazione-conferma").click();
+  await pp.waitForTimeout(200);
   ok(pEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenotazione_confermata" && e.googlePlaceId === "P1"), "prenotazioni: conferma registrata con il locale");
 
   // Aggiungi al calendario: file .ics generato nel browser
   const [dl] = await Promise.all([pp.waitForEvent("download", { timeout: 5000 }), u1.getByTestId("prenotazione-calendario").click()]);
   const { readFileSync } = await import("fs");
   const icsFile = readFileSync(await dl.path(), "utf8").replace(/\r\n /g, "");
-  ok(dl.suggestedFilename() === "prenotazione-terrazza-uno.ics" && icsFile.includes("BEGIN:VEVENT") && icsFile.includes("SUMMARY:Tavolo da Terrazza Uno") && icsFile.includes("T210000") && icsFile.includes("Confermata dal locale"), `prenotazioni: 'Calendario' scarica il file .ics (${dl.suggestedFilename()})`);
+  ok(dl.suggestedFilename() === "prenotazione-terrazza-uno.ics" && icsFile.includes("BEGIN:VEVENT") && icsFile.includes("SUMMARY:Tavolo da Terrazza Uno") && icsFile.includes("T210000") && icsFile.includes("Prenotato (l'hai segnato tu)") && icsFile.includes("TRIGGER:-PT2H") && icsFile.includes("URL:https://www.google.com/maps/dir/?api=1&destination="), `prenotazioni: 'Calendario' scarica il file .ics con avviso 2 ore prima e indicazioni (${dl.suggestedFilename()})`);
   ok(pEvents.some((e) => e.type === "funzione" && e.props?.nome === "prenotazione_calendario"), "prenotazioni: calendario registrato");
 
   // Com'è andata?
@@ -6909,7 +7258,7 @@ else {
   await pp.reload({ waitUntil: "networkidle" });
   await pp.getByTestId("prenotazione-in-arrivo").first().waitFor({ timeout: 5000 });
   { const w = await width(); ok(w <= 360, `prenotazioni a 360 px: niente scorrimento orizzontale (${w}px)`); }
-  { const b = await up.nth(0).getByRole("button", { name: /Togli la prenotazione/ }).boundingBox(); const c = await up.nth(0).boundingBox(); ok(!!b && !!c && b.x + b.width <= c.x + c.width - 8, `prenotazioni a 360 px: i pulsanti stanno dentro la card (${Math.round((b?.x ?? 0) + (b?.width ?? 0))}/${Math.round((c?.x ?? 0) + (c?.width ?? 0))})`); }
+  { const b = await up.nth(0).getByTestId("prenotazione-altro").boundingBox(); const c = await up.nth(0).boundingBox(); ok(!!b && !!c && b.x + b.width <= c.x + c.width - 8, `prenotazioni a 360 px: i pulsanti stanno dentro la card (${Math.round((b?.x ?? 0) + (b?.width ?? 0))}/${Math.round((c?.x ?? 0) + (c?.width ?? 0))})`); }
   await pshot("84-prenotazioni-360");
   await pp.setViewportSize({ width: 390, height: 844 });
 
@@ -6924,7 +7273,85 @@ else {
   await pp.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await pp.getByTestId("promemoria-oggi").waitFor({ timeout: 5000 }).catch(() => {});
   ok((await pp.getByTestId("promemoria-tutte").getAttribute("href")) === "/prenotazioni", "home: dal promemoria di oggi si arriva a 'Le mie prenotazioni'");
+  // Revisore 8/11: in "Le mie prenotazioni" chi conferma dipende dal canale. TheFork: "Sì, ho prenotato" e
+  // "Prenotata su TheFork (l'hai segnata tu)", mai "dal sito del locale" né "Confermata dal locale".
+  await pp.evaluate(() => {
+    const x = new Date(); x.setDate(x.getDate() + 3); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "tf2", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "sito", piattaforma: "TheFork", createdAt: Date.now() }]));
+  });
+  await pp.goto(`${BASE}/prenotazioni`, { waitUntil: "networkidle" });
+  { const c = pp.getByTestId("prenotazione-in-arrivo").first();
+    await c.waitFor({ timeout: 5000 }).catch(() => {});
+    const t = (await c.textContent()) ?? "";
+    ok(t.includes("Richiesta su TheFork") && !t.includes("dal sito del locale") && ((await c.getByTestId("prenotazione-conferma").textContent()) ?? "").includes("Sì, ho prenotato") && !t.includes("Il locale ha confermato"), `prenotazioni: per TheFork 'Aperta su TheFork' e 'Sì, ho prenotato' (${t.slice(0, 120)})`);
+    await c.getByTestId("prenotazione-conferma").click().catch(() => {});
+    const conf = (await c.getByTestId("prenotazione-confermata").textContent().catch(() => "")) ?? "";
+    const fondo = (await pp.getByText(/Mapetite non vede i tavoli liberi/).textContent().catch(() => "")) ?? "";
+    const tutto = (await c.textContent()) ?? "";
+    ok(conf.trim() === "Prenotata su TheFork" && !conf.includes("dal locale") && !fondo.includes("sempre dal locale") && !tutto.includes("Richiesta su TheFork"), `prenotazioni: dopo il sì una sola riga 'Prenotata su TheFork' (non anche 'Richiesta su TheFork'), nessuna conferma attribuita al locale (${conf})`);
+    await pp.screenshot({ path: `${OUT}/56f-prenotazioni-thefork.png`, caret: "initial" }); }
+  // TheFork aperto senza giorno (dal foglio Prenota): "Sì, ho prenotato" chiede giorno e ora, così i promemoria sanno quando.
+  await pp.evaluate(() => {
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "tf3", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: null, time: null, people: null, special: null, via: "sito", piattaforma: "TheFork", createdAt: Date.now() }]));
+  });
+  await pp.goto(`${BASE}/prenotazioni`, { waitUntil: "networkidle" });
+  { const c = pp.getByTestId("prenotazione-in-arrivo").first();
+    await c.waitFor({ timeout: 5000 }).catch(() => {});
+    await c.getByTestId("prenotazione-conferma").click().catch(() => {});
+    const chiede = await c.getByTestId("prenotazione-quando").isVisible().catch(() => false) && await c.getByTestId("prenotazione-quando-salva").isDisabled().catch(() => false);
+    const { domani } = await pp.evaluate(() => { const x = new Date(); x.setDate(x.getDate() + 1); return { domani: `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}` }; });
+    await c.getByLabel("Giorno").fill(domani).catch(() => {});
+    await c.getByLabel("Ora").fill("20:30").catch(() => {});
+    await c.getByTestId("prenotazione-quando-salva").click().catch(() => {});
+    await pp.waitForTimeout(200);
+    const v = await pp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]")[0]);
+    ok(chiede && v?.confirmed === true && v?.date === domani && v?.time === "20:30" && ((await c.getByTestId("prenotazione-confermata").textContent().catch(() => "")) ?? "").includes("Prenotata su TheFork"), `prenotazioni: TheFork senza giorno → 'Sì, ho prenotato' chiede giorno e ora, poi la segna (${v?.date} ${v?.time})`); }
   await pctx.close();
+}
+
+// 14-ter. Promemoria che si vedono (Lorenzo, 8/11): foglio "Tra 2 ore", banner sulla mappa, dati per prenotare.
+{
+  const vctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ["clipboard-read", "clipboard-write"] });
+  await vctx.addInitScript(() => {
+    try {
+      localStorage.setItem("mapetite.intro", "visto");
+      if (!localStorage.getItem("mapetite.prenotazioni")) localStorage.setItem("mapetite.prenotazioni", JSON.stringify([
+        { id: "v1", placeId: "ChIJabcdefghijklmnop", placeName: "Trattoria Vera", lat: 41.889, lng: 12.469, date: "2026-11-08", time: "21:00", people: 2, special: null, via: "whatsapp", phone: "+39 06 1234567", confirmed: true, createdAt: 1_790_000_000_000 },
+      ]));
+    } catch { /* ignorato */ }
+  });
+  const vp = await vctx.newPage();
+  await vp.clock.setFixedTime(new Date("2026-11-08T19:00:00"));
+  await vp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await vp.getByTestId("popup-prenotazione").waitFor({ timeout: 6000 }).catch(() => {});
+  ok(((await vp.getByTestId("popup-prenotazione-titolo").textContent().catch(() => "")) ?? "") === "Tra 2 ore da Trattoria Vera", "promemoria: 2 ore prima, aprendo l'app, foglio 'Tra 2 ore da Trattoria Vera'");
+  ok(await vp.getByTestId("popup-prenotazione").isVisible().catch(() => false) && (await vp.getByTestId("promemoria-oggi").count()) === 0, "promemoria (revisore 14/11): con il foglio 'Tra 2 ore' aperto il banner dello stesso tavolo in home non c'è (niente doppione)");
+  ok((await vp.getByTestId("popup-portami-li").getAttribute("href").catch(() => "")) === "https://www.google.com/maps/dir/?api=1&destination=41.889%2C12.469&destination_place_id=ChIJabcdefghijklmnop" && await vp.getByTestId("popup-ho-disdetto").isVisible().catch(() => false), "promemoria: nel foglio 'Portami lì' (destinazione e locale già messi) e 'Ho disdetto'");
+  await vp.screenshot({ path: `${OUT}/56b-popup-tra-2-ore.png` });
+  await vp.getByTestId("popup-prenotazione").getByRole("button", { name: "Chiudi" }).click().catch(() => {});
+  ok((await vp.getByTestId("promemoria-oggi-titolo").textContent().catch(() => "")) === "Stasera alle 21:00 da Trattoria Vera" && (await vp.getByTestId("promemoria-oggi").getByTestId("promemoria-chiama").getAttribute("href").catch(() => "")) === "tel:+39061234567", "home: banner 'Stasera alle 21:00 da…' con Portami lì e Chiama");
+  await vp.reload({ waitUntil: "networkidle" });
+  await vp.waitForTimeout(600);
+  ok((await vp.getByTestId("popup-prenotazione").count()) === 0, "promemoria: il foglio 'Tra 2 ore' non torna ricaricando (una volta per prenotazione)");
+  await vp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await vp.getByTestId("mappa-prenotazione").waitFor({ timeout: 8000 }).catch(() => {});
+  ok(((await vp.getByTestId("mappa-prenotazione-titolo").textContent().catch(() => "")) ?? "") === "Stasera alle 21:00 da Trattoria Vera" && await vp.getByTestId("mappa-prenotazione").getByTestId("portami-li").isVisible().catch(() => false), "mappa: banner 'Stasera alle 21:00 da…' con Portami lì");
+  { const occhiello = ((await vp.getByTestId("mappa-prenotazione").locator("p").first().textContent().catch(() => "")) ?? "").trim();
+    ok(occhiello === "Il tuo tavolo · 2 persone", `mappa: sopra 'Il tuo tavolo · 2 persone', il giorno solo nel titolo (${occhiello})`); }
+  { const w = await vp.evaluate(() => document.scrollingElement.scrollWidth); ok(w <= 390, `mappa: banner della prenotazione senza scorrimento orizzontale (${w}px)`); }
+  await vp.screenshot({ path: `${OUT}/56c-mappa-prenotazione.png` });
+  await vp.getByTestId("mappa-prenotazione").getByRole("button", { name: "Nascondi il promemoria" }).click().catch(() => {});
+  await vp.reload({ waitUntil: "networkidle" });
+  await vp.waitForTimeout(800);
+  ok((await vp.getByTestId("mappa-prenotazione").count()) === 0, "mappa: banner nascosto con la X resta nascosto");
+  // "Ho disdetto" dal foglio: la prenotazione è chiusa, nessun promemoria.
+  await vp.evaluate(() => { localStorage.removeItem("mapetite.prenota.popup"); });
+  await vp.clock.setFixedTime(new Date("2026-11-08T20:00:00"));
+  await vp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await vp.getByTestId("popup-ho-disdetto").click({ timeout: 6000 }).catch(() => {});
+  { const v = await vp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]")[0]);
+    ok(v?.outcome === "non-andato" && typeof v?.disdetta === "number" && (await vp.getByTestId("promemoria-oggi").count()) === 0, "promemoria: 'Ho disdetto' chiude la prenotazione e il promemoria sparisce"); }
+  await vctx.close();
 }
 
 // 15. Barra in basso ridisegnata (piano 6.4): Esplora, Assistente, Salvati, Amici, Profilo.
@@ -6941,7 +7368,7 @@ else {
     await bctx.addCookies([{ name: "e2e_collegato", value: "1", url: BASE }, { name: "e2e_profilo", value: profiloFinto, url: BASE }]);
     const bp = await bctx.newPage();
     bp.on("pageerror", (e) => errors.push(e.message));
-    await bp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
+    await bp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch {} });
     await bp.goto(`${BASE}/assistente`, { waitUntil: "networkidle" });
     const nav = bp.getByTestId("barra");
     const nomi = (await nav.getByRole("link").allTextContents()).map((t) => t.trim());
@@ -7081,7 +7508,7 @@ else {
   await gctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
   const gp = await gctx.newPage();
   gp.on("pageerror", (e) => errors.push(e.message));
-  await gp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
+  await gp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch {} });
   await gp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
   const gnav = gp.getByTestId("barra");
   const accesa = async () => (await gnav.locator("a[aria-current=page]").allTextContents()).map((t) => t.trim()).join(",");
@@ -7163,7 +7590,7 @@ else {
     await setProfilo(dctx, profilo);
     const d = await dctx.newPage();
     d.on("pageerror", (e) => errors.push(e.message));
-    await d.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
+    await d.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch {} });
 
     // Ingresso dal profilo
     // I posti fissi sono una riga dentro Impostazioni: #posti-fissi apre Impostazioni e la riga (ProfiloSezione).
@@ -7394,7 +7821,7 @@ else {
   await dctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
   const dp = await dctx.newPage();
   dp.on("pageerror", (e) => errors.push(e.message));
-  await dp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await dp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const scrollX = () => dp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   await dp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   const mappa = await dp.locator(".mapboxgl-map").boundingBox();
@@ -7464,7 +7891,7 @@ else {
   const mctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await mctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
   const mp = await mctx.newPage();
-  await mp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await mp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   await mp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   const pos = await mp.getByTestId("pannello-ricerca").evaluate((el) => getComputedStyle(el).position);
   const mm = await mp.locator(".mapboxgl-map").boundingBox();
@@ -7518,7 +7945,7 @@ else {
   sp.on("pageerror", (e) => errors.push(e.message));
   // Ore 20:30: momento "cena" (la sorpresa dipende dall'ora: il controllo deve valere a qualsiasi ora del giro).
   await sp.clock.setFixedTime(new Date("2026-10-16T20:30:00"));
-  await sp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await sp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
 
   // Ingressi: home e mappa.
   await sp.goto(`${BASE}/`, { waitUntil: "networkidle" });
@@ -8204,7 +8631,7 @@ if (!fakeUser) console.log("SKIP  ti è stato utile: dev server senza E2E_FAKE_U
 else {
   const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>';
   const uctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
-  await uctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await uctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const uEv = [];
   await uctx.route("**/api/events", (r) => { uEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
   await uctx.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: SVG }));
@@ -8256,6 +8683,7 @@ else {
   await up.getByLabel("Il tuo nome").fill("Giulia");
   const [wa] = await Promise.all([up.waitForEvent("popup"), up.getByTestId("prenota-whatsapp").click()]);
   await wa.close();
+  await up.getByTestId("prenota-non-ancora").click({ timeout: 3000 });
   await up.getByTestId("prenota-fatto").waitFor({ timeout: 3000 });
   const fu = up.getByTestId("foglio-prenota").getByTestId("utile");
   ok(await fu.isVisible() && await fu.getAttribute("data-contesto") === "prenota", "utile: dopo l'invio della prenotazione, 'Ti è stato utile?' nel foglio");
@@ -8322,7 +8750,7 @@ else {
   const wEv = [];
   await wctx.route("**/api/events", (r) => { wEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
   await wctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
-  await wctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await wctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const wp = await wctx.newPage();
   wp.on("pageerror", (e) => errors.push(e.message));
   wp.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/i.test(m.text())) errors.push(m.text().slice(0, process.env.E2E_DEBUG ? 3000 : 150) + (process.env.E2E_DEBUG ? " @ " + m.location().url : "")); });
@@ -8828,7 +9256,7 @@ else {
   await vctx.route("**/api/search", (r) => { vBodies.push(r.request().postDataJSON()); return r.fulfill({ json: SEARCH_FAST }); });
   await vctx.route("**/api/search/synthesis", (r) => r.fulfill({ json: SYNTH }));
   const vp = await vctx.newPage();
-  await vp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await vp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   vp.on("pageerror", (e) => errors.push(e.message));
   await vp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
   await idee(vp);
@@ -9126,7 +9554,7 @@ else {
   await qctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
   await qctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
   await qctx.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
-  await qctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await qctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const qProfilo = { email: "qa@example.com", saved: [{ created_at: "2026-10-10", tags: ["Da provare", "Romantico"], note: null, places: { id: "00000000-0000-4000-8000-0000000009a1", name: "Trattoria QA", category: "restaurant", address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469 } }], reviews: [] };
   if (fakeUser) await qctx.addCookies([{ name: "e2e_collegato", value: "1", url: BASE }, { name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(qProfilo)), url: BASE }]);
   const qp = await qctx.newPage();
@@ -9311,7 +9739,7 @@ else {
   };
   const fp = await fctx.newPage();
   fp.on("pageerror", (e) => errors.push(e.message));
-  await fp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
+  await fp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch {} });
   // Foto "scattata" col telefono: 4000×3000, generata nel browser (sfumature e dettagli, pesante).
   await fp.goto(`${BASE}/profilo/diario`, { waitUntil: "networkidle" });
   const bigPhoto = Buffer.from(await fp.evaluate(async () => {
@@ -9731,7 +10159,7 @@ else {
   ok(vicino(a8, 45.464, 9.19), `Sorprendimi senza permesso ma con la mappa lasciata a Milano (o Milano scelta al primo accesso): cerca a Milano (${JSON.stringify(a8)})`);
   // Mappa su Milano: "Prova a chiedere" con gli esempi di Milano.
   { const c = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: MILANO });
-    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     const m = await c.newPage();
     m.on("pageerror", (e) => errors.push(e.message));
     await m.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -9760,7 +10188,7 @@ else {
   // Salvati senza account (18/10): cosa sono in una frase e "Crea la tua mappa", niente lucchetto.
   { const c = await browser.newContext({ viewport: { width: 390, height: 844 } });
     await c.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
-    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     const a = await c.newPage();
     a.on("pageerror", (e) => errors.push(e.message));
     await a.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -9772,7 +10200,7 @@ else {
   // Home: idee e classifiche della città dove sei (Milano), senza permesso quelle di Roma.
   for (const [permesso, atteso] of [[true, "Milano"], [false, "Roma"]]) {
     const c = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: permesso ? ["geolocation"] : [], geolocation: MILANO });
-    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     const h = await c.newPage();
     h.on("pageerror", (e) => errors.push(e.message));
     await h.goto(`${BASE}/`, { waitUntil: "networkidle" });
@@ -9785,7 +10213,7 @@ else {
 
 // "Quando ci vai?" (proposta 17): il salvato segnato per oggi va primo in "Stasera dove andiamo?".
 { const c = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await c.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
   const oggi = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date());
   const row = (i, name, tags, piano) => ({ tags, note: null, piano_al: piano, places: { id: `00000000-0000-0000-0000-00000000090${i}`, name, category: "ristorante", address: "Via Po 2, 00198 Roma RM, Italy", lat: 41.91, lng: 12.5, google_place_id: `GS${i}` } });
   const rows = [row(1, "Osteria Uno", ["Da provare"], null), row(2, "Trattoria Due", ["Da provare"], null), row(3, "Pizzeria Tre", ["Da provare"], null), row(4, "Bistrot Quattro", [], oggi), row(5, "Enoteca Cinque", ["Da provare"], "2020-01-04")];
@@ -9825,7 +10253,7 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
     await c.route("**/api/search", (r) => r.fulfill({ json: { risultati: RIS, filtri_usati: { categoria: "restaurant", parole_chiave: ["trattoria"], vicino_a_me: false, zona: "Trastevere" }, sintesi_pendente: { places: [], token: "x" } } }));
     await c.route("**/api/search/synthesis", (r) => r.fulfill({ json: SY }));
     const p = await c.newPage();
-    await p.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+    await p.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
     // Senza "at": con un link condiviso la posizione non si legge (src/app/mappa/map-view.tsx), qui serve quella già permessa.
     await p.goto(`${BASE}/mappa?q=${encodeURIComponent("trattoria a Trastevere")}`, { waitUntil: "networkidle" });
     await p.getByText("I romani ci tornano per la gricia.").first().waitFor({ timeout: 8000 });

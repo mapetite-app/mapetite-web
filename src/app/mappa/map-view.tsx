@@ -21,6 +21,7 @@ import BottomSheet, { applyQuickFilters, PHOTO_CARDS, type QuickFilter } from "@
 import SalvatiLista from "@/components/salvati-lista";
 import PlacePhoto from "@/components/place-photo";
 import InstallHint from "@/components/install-hint";
+import { PrenotazioneMappa } from "@/components/prenotazione-avvisi";
 import VoiceButton from "@/components/voice-button";
 import DragToClose from "@/components/drag-to-close";
 import { Bookmark, ArrowUp, ThumbsDown, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
@@ -3227,6 +3228,8 @@ export default function MapView({
             )}
           </button>
         </div>
+        {/* Il tavolo di oggi o di domani (Lorenzo, 8/11): Portami lì e Chiama anche dalla mappa. */}
+        {view === "all" && overlay.kind === "none" && aiSearch === null && !aiSearching && aiQuery.trim() === "" && <PrenotazioneMappa />}
         {/* Errore della ricerca dalla barra: se la card iniziale è chiusa non si vedrebbe altrove. */}
         {barOn && aiError && !aiSearching && overlay.kind !== "ai" && !(view === "all" && aiSearch === null && overlay.kind === "none" && !welcomeHidden) && (
           <div data-testid="errore-barra" className="pointer-events-auto flex flex-col items-start gap-2 self-start rounded-card bg-surface px-3 py-2 shadow-float">
@@ -3321,7 +3324,9 @@ export default function MapView({
             <IdeaGroup title="Per te" hideTitle>
               {(() => { const mie = [
                 tasteSuggestion ? (
-                  <IdeaRow key="gusti" testId="suggerimento-per-te" label={`✨ Per te: ${tasteSuggestion}`} emoji="✨" title={titoloBreve(tasteSuggestion)} sub="Dai tuoi gusti" onClick={() => { setIdeasOpen(false); setAiQuery(tasteSuggestion); void runAISearch(tasteSuggestion); }} />
+                  // Lorenzo 8/11: "ti ho chiesto solo cena romantica, non cena romantica osteria romana". Si cerca quello che
+                  // c'è scritto; i gusti del profilo cambiano già l'ordine dei risultati, non la frase.
+                  <IdeaRow key="gusti" testId="suggerimento-per-te" label={`✨ Per te: ${titoloBreve(tasteSuggestion)}`} emoji="✨" title={titoloBreve(tasteSuggestion)} sub="Dai tuoi gusti" onClick={() => { const q = titoloBreve(tasteSuggestion); setIdeasOpen(false); setAiQuery(q); void runAISearch(q); }} />
                 ) : null,
                 savedSuggestion ? (
                   <IdeaRow key="salvati" testId="suggerimento-salvati" label={`✨ Dai tuoi salvati: ${savedSuggestion.label}`} emoji="📌" title={titoloBreve(savedSuggestion.label)} sub="Dai tuoi salvati" onClick={() => { setIdeasOpen(false); setAiQuery(savedSuggestion.query); void runAISearch(savedSuggestion.query); }} />

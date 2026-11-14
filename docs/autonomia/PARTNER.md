@@ -2,7 +2,7 @@
 
 Per ogni partner: chi è, quanti locali raggiunge (con fonte), cosa ci darebbe, cosa ci guadagna lui, se ha un'API o un programma partner pubblico, e una bozza di email pronta per Lorenzo o Roberto.
 **Nessuno è stato contattato.** Le email sono bozze: le manda Lorenzo o Roberto, quando vogliono.
-Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornamento: 29/10/2026.
+Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornamento: 14/11/2026.
 
 ## Ordine consigliato
 1. **Zenchef/CoverManager** e **Zucchetti**: risolvono il no-show vero (la prenotazione entra nell'agenda del locale) e non sono concorrenti sul cliente finale.
@@ -40,6 +40,27 @@ Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornament
   > Vorremmo capire se è possibile mostrare nella nostra app le disponibilità della serata dei ristoranti TheFork e far partire la prenotazione verso di voi, e a quali condizioni per noi e per i locali.
   > Grazie,
   > Roberto, Mapetite
+
+## Bozze per Lorenzo: "l'assistente che prenota per te" (8/11) — DA DECIDERE LORENZO
+**Nessun contatto è stato fatto. Non inviare senza decisione di Lorenzo.** Richiesta del founder dell'8/11: un assistente che prenota al posto della persona e propone alternative se non c'è posto. Senza accordi non si automatizzano i siti delle piattaforme (termini d'uso, niente scraping): servono le loro API per partner. Nell'app oggi: "Prenota su TheFork/Quandoo" apre il modulo del locale con i dati della persona già copiati, poi "L'hai prenotato?" salva la prenotazione. Link con giorno/ora/persone già impostati: formato dei parametri non verificato (siti non raggiungibili dalla sessione), quindi oggi link semplice.
+**Domanda per Lorenzo:** "Mandiamo (tu o Roberto) queste due richieste, prima Quandoo e poi TheFork?"
+
+- **Bozza a Quandoo (programma partner / affiliate API):**
+  > Oggetto: Mapetite × Quandoo: prenotazioni da clienti che hanno già scelto, Roma e Milano
+  >
+  > Buongiorno, sono Lorenzo, founder di Mapetite: app italiana dove le persone salvano i locali visti sui social e li ritrovano quando devono scegliere, concentrata su Roma e Milano.
+  > Vorremmo diventare vostro partner di distribuzione: leggere le disponibilità in tempo reale dei ristoranti Quandoo e, con il consenso esplicito dell'utente, inviare la prenotazione a suo nome (nome, cellulare, persone, orario), proponendo un altro locale Quandoo se non c'è posto.
+  > Offriamo domanda qualificata: persone che hanno già salvato quel locale e sono al momento della scelta, con dati anonimi su cosa cercano per zona. Siamo aperti a discutere una commissione per prenotazione onorata.
+  > Avete un programma partner o un'API affiliate? Bastano 20 minuti per mostrarvi l'app dal telefono.
+  > Grazie, Lorenzo, Mapetite
+
+- **Bozza a TheFork (programma affiliati / partner):**
+  > Oggetto: Mapetite: utenti già decisi, pronti a prenotare sui ristoranti TheFork
+  >
+  > Buongiorno, sono Lorenzo, founder di Mapetite, app italiana per salvare e ritrovare bar e ristoranti a Roma e Milano: i nostri utenti arrivano alla prenotazione avendo già scelto il locale.
+  > Vorremmo capire se esiste un programma affiliati o un'API partner per mostrare le disponibilità in tempo reale dei vostri ristoranti e prenotare per conto dell'utente, con il suo consenso esplicito, anche proponendo un'alternativa TheFork quando il locale è pieno.
+  > In cambio portiamo domanda qualificata nelle due città dove siamo concentrati; siamo disponibili a parlare di una commissione per prenotazione.
+  > A chi possiamo rivolgerci? Grazie, Lorenzo, Mapetite
 
 ## Zenchef + CoverManager
 - **Chi è:** gruppo europeo di gestionali per prenotazioni, proprietà del fondo PSG Equity; fusione del luglio 2025.
@@ -171,3 +192,13 @@ Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornament
   > Oggetto: Mapetite × Cassa in Cloud — clienti che tornano
   > Buongiorno, sono Lorenzo di Mapetite, l'app che aiuta le persone a salvare e ritrovare i locali scoperti sui social, a Roma e Milano. Ai ristoratori mostriamo quante persone hanno salvato il locale e quante ci tornano. Vorremmo capire se esiste un modo, con il consenso del cliente, di confermare che una visita c'è stata, per dare ai vostri locali un dato affidabile sui clienti fedeli. Avete un programma partner o API per questo? Grazie, Lorenzo
 
+## Slow Food Editore (guida Osterie d'Italia) — aggiunto il 14/11, DA DECIDERE LORENZO (proposta 57)
+- **Chi è:** l'editore di Slow Food; la guida Osterie d'Italia 2027 (37ª edizione) è stata presentata il 19/10/2026 a Torino ([Dissapore](https://www.dissapore.com/ristoranti/le-migliori-osterie-ditalia-del-2027-secondo-slow-food-regione-per-regione/)).
+- **Quanti locali:** 1.952 indirizzi recensiti, 335 con la Chiocciola (stessa fonte e [GreenMe](https://www.greenme.it/?p=1445458)). Quanti a Roma e Milano: dato non trovato.
+- **Cosa ci darebbe:** un segnale di qualità scritto da persone e non legato alla popolarità, proprio quello della VISIONE; credibilità verso utenti e investitori.
+- **Cosa ci guadagna:** lettori nuovi per la guida e la sua app ([App Store](https://apps.apple.com/app/id6752800992), gratuita con acquisti interni): ogni segno sulla scheda porta all'app loro.
+- **API o programma partner pubblico:** dato non trovato. Niente lettura delle loro pagine senza accordo (stessa regola di Gambero Rosso).
+- **Bozza di email (per Lorenzo, da NON inviare senza decisione):**
+  > Oggetto: Mapetite × Osterie d'Italia — la Chiocciola dove le persone salvano i posti
+  > Buongiorno, sono Lorenzo, founder di Mapetite, app italiana per salvare e ritrovare bar e ristoranti scoperti sui social, a Roma e Milano. Il nostro obiettivo è far emergere i locali buoni e non di massa, lo stesso spirito della vostra guida. Vorremmo mostrare la Chiocciola sulle schede dei locali premiati, con un link alla vostra app, così il premio arriva anche a chi non ha ancora la guida. Avreste 20 minuti per capire se e come è possibile?
+  > Grazie, Lorenzo

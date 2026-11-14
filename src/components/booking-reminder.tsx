@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { CalendarCheck, Copy, MessageCircle, Navigation, Phone, X } from "lucide-react";
-import { bookingReminders, cancelMessage, dateKey, doubleBookings, loadBookings, removeBooking, subscribeBookings, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
+import { appenaPrenotata, bookingReminders, cancelMessage, chiConferma, daConfermare, dateKey, doubleBookings, loadBookings, popupPrenotazione, portamiLiUrl, quandoTavolo, removeBooking, subscribeBookings, subscribePopupPrenotazione, telHref, updateBooking, whatsappNumber, type BookingRequest } from "@/lib/booking";
 import { track, trackFeature } from "@/lib/track";
 import { dataOra } from "@/lib/orari";
 
@@ -16,6 +16,45 @@ const VIA: Record<BookingRequest["via"], string> = {
   sito: "richiesta dal sito",
   copiato: "messaggio copiato",
 };
+
+// "Portami lì" (indicazioni con la destinazione già messa) e "Chiama": le due cose che servono il giorno
+// del tavolo. Le usano il promemoria in home, il banner sulla mappa e il foglio "Tra 2 ore".
+export function AzioniTavolo({ b, fonte, chiaro = false }: { b: BookingRequest; fonte: string; chiaro?: boolean }) {
+  const dir = portamiLiUrl(b);
+  if (!dir && !b.phone) return null;
+  const base = "flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill px-3 text-sm font-display font-semibold active:scale-[0.98]";
+  return (
+    <div className="mt-3 flex gap-2">
+      {dir && (
+        <a
+          href={dir}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="portami-li"
+          onClick={() => track("percorso", { id: b.placeId, ...(b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng } : {}) }, { fonte })}
+          className={`${base} bg-accent text-white`}
+        >
+          <Navigation size={15} /> Portami lì
+        </a>
+      )}
+      {b.phone && (
+        <a
+          href={telHref(b.phone)}
+          data-testid="promemoria-chiama"
+          onClick={() => track("chiama", { id: b.placeId, ...(b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng } : {}) }, { fonte, contesto: "telefono" })}
+          className={`${base} ${chiaro ? "border border-border bg-white text-brand" : "border border-white/30 text-white"}`}
+        >
+          <Phone size={15} /> Chiama
+        </a>
+      )}
+    </div>
+  );
+}
+
+// Il canale in parole: "Richiesta su WhatsApp", "Richiesta per telefono"…
+function viaDi(b: BookingRequest): string {
+  return VIA[b.via].charAt(0).toUpperCase() + VIA[b.via].slice(1);
+}
 
 // "Non vado più" (contro i tavoli vuoti, docs/autonomia/POSIZIONAMENTO.md): il messaggio per il locale
 // è già scritto; un tocco per mandarlo da dove era partita la richiesta. Senza numero si copia.
@@ -124,15 +163,16 @@ function Doppio({ group, domani }: { group: BookingRequest[]; domani: boolean })
 // di disdire. Il giorno prima una sola domanda: "Sì" chiude il promemoria (e l'avviso non parte),
 // "Non più" apre la disdetta già scritta. Chi ha già risposto non vede più niente fino al giorno stesso.
 function CiVaiDomani({ b, open, onNonPiu }: { b: BookingRequest; open: boolean; onNonPiu: () => void }) {
-  const dettagli = [b.time ? `alle ${b.time}` : null, b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"}` : null].filter(Boolean).join(" · ");
+  const dettagli = b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"}` : "";
   return (
     <section data-testid="promemoria-domani" className="rounded-card bg-brand p-4 text-white shadow-card">
       <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
-        <CalendarCheck size={14} /> Domani{dettagli ? ` ${dettagli}` : ""}
+        {/* Il giorno sta già nel titolo ("Domani alle 21:00 da…"): sopra solo "Il tuo tavolo" (revisore 14/11). */}
+        <CalendarCheck size={14} /> Il tuo tavolo{dettagli ? ` · ${dettagli}` : ""}
       </p>
-      <p data-testid="ci-vai-titolo" className="mt-1 flex min-w-0 font-title text-lg font-semibold leading-tight">
-        <span className="truncate">{b.placeName}</span>
-        <span className="shrink-0 whitespace-pre">: ci vai?</span>
+      {/* "Domani alle 21:00 da Nome" (Lorenzo, 8/11), poi la domanda. */}
+      <p data-testid="ci-vai-titolo" className="mt-1 font-title text-lg font-semibold leading-tight">
+        {quandoTavolo(b)} da {b.placeName}<span className="whitespace-pre">: ci vai?</span>
       </p>
       {!open ? (
         <div className="mt-3 flex gap-2">
@@ -169,19 +209,28 @@ function CiVaiDomani({ b, open, onNonPiu }: { b: BookingRequest; open: boolean; 
 export default function BookingReminder() {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const list = useSyncExternalStore(subscribeBookings, loadBookings, () => EMPTY);
-  const { today, tomorrow, howWasIt, risposta } = bookingReminders(list);
-  // Doppioni del giorno stesso o di domani (non nascosti): un solo promemoria al posto di quelli singoli.
+  const popup = useSyncExternalStore(subscribePopupPrenotazione, popupPrenotazione, () => null);
+  const rem = bookingReminders(list);
+  const { howWasIt, risposta } = rem;
+  // Promemoria e doppioni solo per i tavoli con il sì della persona (revisore 8/11): un tocco su
+  // "Prenota su TheFork" o su WhatsApp non è ancora una prenotazione.
+  // Con il foglio "Tra 2 ore" aperto il banner dello stesso tavolo aspetta (revisore 14/11: niente doppioni).
+  const today = rem.today.filter((b) => b.confirmed && b.id !== popup);
+  // "Domani… ci vai?" non subito dopo aver prenotato (revisore 14/11): solo da 12 ore dopo.
   const now = new Date();
+  const tomorrow = rem.tomorrow.filter((b) => b.confirmed && !appenaPrenotata(b, now));
+  // Doppioni del giorno stesso o di domani (non nascosti): un solo promemoria al posto di quelli singoli.
   const todayKey = dateKey(now);
   const tomorrowD = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const tomorrowKey = dateKey(tomorrowD);
-  const doppi = doubleBookings(list, now)
+  const doppi = doubleBookings(list.filter((b) => b.confirmed), now)
     .filter((g) => g[0].date === todayKey || (g[0].date === tomorrowKey && g.some((b) => !b.dismissedEve)))
     .map((g) => ({ group: g, domani: g[0].date === tomorrowKey }));
   const inDoppi = new Set(doppi.flatMap((d) => d.group.map((b) => b.id)));
-  if (today.length === 0 && tomorrow.length === 0 && howWasIt.length === 0 && doppi.length === 0 && risposta.length === 0) return null;
   // La richiesta in attesa di risposta ha già la sua scheda ("Hanno riaperto"): niente doppione.
   const inRisposta = new Set(risposta.filter((b) => !inDoppi.has(b.id)).slice(0, 1).map((b) => b.id));
+  const chiedi = daConfermare(list, now).filter((b) => !inRisposta.has(b.id)).slice(0, 2);
+  if (today.length === 0 && tomorrow.length === 0 && howWasIt.length === 0 && doppi.length === 0 && risposta.length === 0 && chiedi.length === 0) return null;
   const prossime = [...today.map((b) => ({ b, domani: false })), ...tomorrow.map((b) => ({ b, domani: true }))].filter(({ b }) => !inDoppi.has(b.id) && !inRisposta.has(b.id));
   return (
     <div data-testid="promemoria-prenotazioni" className="mb-4 flex flex-col gap-2 text-left">
@@ -201,6 +250,35 @@ export default function BookingReminder() {
           </div>
         </section>
       ))}
+      {/* Richiesta partita, senza risposta della persona: "Hai prenotato da …?" al posto del promemoria. */}
+      {chiedi.map((b) => (
+        <section key={`c-${b.id}`} data-testid="promemoria-hai-prenotato" className="rounded-card border border-border bg-surface p-4 shadow-card">
+          <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
+            <CalendarCheck size={14} /> {quandoTavolo(b, now)}{b.people ? ` · ${b.people} ${b.people === 1 ? "persona" : "persone"}` : ""}
+          </p>
+          <p data-testid="hai-prenotato-titolo" className="mt-1 font-title text-lg font-semibold leading-tight text-text">Hai prenotato da {b.placeName}?</p>
+          <p data-testid="hai-prenotato-canale" className="mt-0.5 text-sm font-sans text-text-muted">{b.piattaforma ? `Se hai confermato su ${b.piattaforma}, segnalo qui.` : `${viaDi(b)}: ${chiConferma(b)}.`}</p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              data-testid="hai-prenotato-si"
+              onClick={() => { updateBooking(b.id, { confirmed: true }); trackFeature("prenotazione_segnata", { contesto: b.piattaforma ?? b.via, fonte: "promemoria" }); }}
+              className="min-h-11 flex-1 rounded-pill bg-brand px-3 text-sm font-display font-semibold text-white active:scale-95"
+            >
+              Sì, {quandoTavolo(b, now).toLowerCase()}
+            </button>
+            <button
+              type="button"
+              data-testid="hai-prenotato-no"
+              onClick={() => { removeBooking(b.id); trackFeature("prenotazione_segnata", { stato: "no", fonte: "promemoria" }); }}
+              className="min-h-11 rounded-pill border border-border bg-white px-5 text-sm font-display font-semibold text-brand active:scale-95"
+            >
+              {/* Revisore 14/11: "No" da solo sembrava "non ancora" e cancellava la richiesta in attesa di risposta. */}
+              No, non prenoto
+            </button>
+          </div>
+        </section>
+      ))}
       {doppi.map(({ group, domani }) => (
         <Doppio key={group.map((b) => b.id).join()} group={group} domani={domani} />
       ))}
@@ -211,42 +289,33 @@ export default function BookingReminder() {
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 text-xs font-display font-semibold uppercase tracking-wide text-accent">
-                <CalendarCheck size={14} /> Oggi{b.time ? ` alle ${b.time}` : ""}
+                <CalendarCheck size={14} /> Il tuo tavolo{b.people ? ` · ${b.people} ${b.people === 1 ? "persona" : "persone"}` : ""}
               </p>
-              <p className="mt-1 truncate font-title text-lg font-semibold leading-tight">{b.placeName}</p>
+              {/* "Stasera alle 21:00 da Nome" (Lorenzo, 8/11): quando e dove in una riga. */}
+              <p data-testid="promemoria-oggi-titolo" className="mt-1 font-title text-lg font-semibold leading-tight">
+                {quandoTavolo(b, now)} da <span className="break-words">{b.placeName}</span>
+              </p>
               <p className="mt-0.5 text-sm font-sans text-white/80">
-                {b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"} · ` : ""}{VIA[b.via]}
+                Prenotato{b.piattaforma ? ` su ${b.piattaforma}` : ""}
               </p>
             </div>
             <button type="button" aria-label="Nascondi il promemoria" onClick={() => updateBooking(b.id, { dismissed: true })} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80">
               <X size={16} />
             </button>
           </div>
-          <p className="mt-2 text-xs font-sans text-white/70">
-            La conferma arriva dal locale: controlla WhatsApp, i messaggi o le chiamate.{" "}
-            <Link href="/prenotazioni" data-testid="promemoria-tutte" className="font-semibold text-white underline underline-offset-2">Le mie prenotazioni</Link>
-          </p>
-          <div className="mt-3 flex gap-2">
-            {b.lat != null && b.lng != null && (
-              <a
-                href={`https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => track("percorso", { id: b.placeId, lat: b.lat!, lng: b.lng! }, { fonte: "promemoria" })}
-                className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-pill bg-accent px-3 text-sm font-display font-semibold text-white"
-              >
-                <Navigation size={15} /> Percorso
-              </a>
-            )}
+          <AzioniTavolo b={b} fonte="promemoria" />
+          {/* Le azioni secondarie in una riga sola: il banner resta basso. */}
+          <div className="mt-1 flex items-center justify-between gap-2">
             <button
               type="button"
               data-testid="promemoria-non-vado"
               aria-expanded={cancelling === b.id}
               onClick={() => setCancelling(cancelling === b.id ? null : b.id)}
-              className="min-h-10 rounded-pill border border-white/30 px-3 text-sm font-display font-semibold text-white"
+              className="min-h-10 text-sm font-display font-semibold text-white/80 underline underline-offset-2"
             >
               Non vado più
             </button>
+            <Link href="/prenotazioni" data-testid="promemoria-tutte" className="flex min-h-10 items-center text-sm font-display font-semibold text-white/80 underline underline-offset-2">Le mie prenotazioni</Link>
           </div>
           {cancelling === b.id && <Disdetta b={b} />}
         </section>

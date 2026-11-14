@@ -58,3 +58,53 @@ export function whenLabel(iso: string, now = new Date()): string {
   if (diff < 7) return `${diff} giorni fa`;
   return d.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
 }
+
+// ── Profilo di un'altra persona (8/11) ───────────────────────────────────────
+// Solo righe già pubbliche (vista salvati_pubblici: niente note, niente "Non fa per me").
+
+export const LIKED = "Mi è piaciuto";
+
+/**
+ * "Gli è piaciuto": prima i posti in cima alla sua classifica (i primi 3 di ogni città, in ordine),
+ * poi quelli segnati "👍 Mi è piaciuto", dal più recente. Mai un posto non provato.
+ */
+export function likedPlaces<T extends { place_id: string; tags: string[] | null; created_at: string }>(
+  rows: T[],
+  tops: string[] = [],
+  max = 10,
+): T[] {
+  const visited = rows.filter(isVisited);
+  const byId = new Map(visited.map((r) => [r.place_id, r]));
+  const out: T[] = tops.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+  const seen = new Set(out.map((r) => r.place_id));
+  const tagged = visited
+    .filter((r) => !seen.has(r.place_id) && !!r.tags?.includes(LIKED))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return [...out, ...tagged].slice(0, max);
+}
+
+/** Posti provati, dal più recente (data in cui l'ha salvato: il giorno della visita resta privato). */
+export function recentVisited<T extends { tags: string[] | null; created_at: string }>(rows: T[]): T[] {
+  return rows.filter(isVisited).sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+/** I tipi di locale che salva di più (etichetta già tradotta), con quanti posti; solo da 2 in su. */
+export function topTypes<T extends { category: string | null }>(rows: T[], label: (c: string | null) => string | null, max = 4, min = 2): { tipo: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const t = label(r.category);
+    if (t) counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .filter(([, n]) => n >= min)
+    .map(([tipo, count]) => ({ tipo, count }))
+    .sort((a, b) => b.count - a.count || a.tipo.localeCompare(b.tipo, "it"))
+    .slice(0, max);
+}
+
+/** Filtro della ricerca nei suoi posti: nome, tipo o città, senza accenti né maiuscole. */
+export function matchesQuery(text: string, query: string): boolean {
+  const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  const q = norm(query.trim());
+  return q === "" || norm(text).includes(q);
+}

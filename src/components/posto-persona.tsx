@@ -19,7 +19,8 @@ function meta(s: Spot): string {
 }
 
 /** Riga compatta per le liste del profilo. */
-export function PostoRiga({ spot, verdict = null }: { spot: Spot; verdict?: string | null }) {
+// showState=false: sotto un titolo che dice già lo stato ("Di recente", "Da provare") la pillola è un doppione.
+export function PostoRiga({ spot, verdict = null, showState = true }: { spot: Spot; verdict?: string | null; showState?: boolean }) {
   const visited = !!spot.tags?.includes("Già visitato");
   const raccolte = (spot.tags ?? []).filter((t) => !isStateTag(t)).slice(0, 2);
   return (
@@ -45,9 +46,11 @@ export function PostoRiga({ spot, verdict = null }: { spot: Spot; verdict?: stri
           </span>
         )}
       </span>
-      <span className={`shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-display font-semibold ${visited ? "bg-accent-light text-accent" : "bg-brand/10 text-brand"}`}>
-        {visited ? "✓ Provato" : "📌 Da provare"}
-      </span>
+      {showState && (
+        <span className={`shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-display font-semibold ${visited ? "bg-accent-light text-accent" : "bg-brand/10 text-brand"}`}>
+          {visited ? "✓ Provato" : "📌 Da provare"}
+        </span>
+      )}
     </Link>
   );
 }

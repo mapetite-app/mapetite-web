@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, ChevronDown, Map as MapIcon, Moon, Plus, Search, Sparkles, SquarePlay, X } from "lucide-react";
 import type { Place } from "@/app/mappa/map-view";
@@ -17,6 +17,8 @@ import { iconeRaccolte, summarizeCollections } from "@/lib/raccolte";
 import { MAX_POSTI, sembraDomanda } from "@/lib/chiedi-salvati";
 import { trackFeature } from "@/lib/track";
 import { fotoUrl } from "@/lib/foto-utenti";
+import { quartiereDi, raggioVicino, tipoPlurale } from "@/lib/scaffali-salvati";
+import { mappaStatica } from "@/lib/mappa-statica";
 
 // Schermata "Salvati" (mockup C "Card bianche" vestito in stile A "Editoriale", scelto da Lorenzo
 // nella PR #87; rifatta dopo il giro del 1/11 come Places/Albo): fondo carta, titolo in serif, filtri
@@ -35,6 +37,8 @@ const [WANT, DONE] = STATE_TAGS;
 const PASSO = 60;
 // Tipi di locale nella fila dei filtri rapidi: i più frequenti, non tutti (con 500 salvati sarebbero decine).
 const MAX_TIPI = 12;
+// Scaffali (revisore 8/11): solo da 8 salvati in su; con meno la fila dei filtri di sempre basta.
+const MIN_SCAFFALI = 8;
 type Ordine = "vicino" | "recenti" | "preferiti" | "attesa";
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 const PAPER = "bg-[#f6f7f7]";
@@ -75,6 +79,97 @@ function Copertina({ name, count, icona, on }: { name: string; count: number; ic
   );
 }
 
+// Scaffali (Lorenzo 8/11, libreria di Places e Albo): una copertina per quartiere, tipo o raccolta, con il
+// conteggio. Copertina = la foto scattata dall'utente se c'è (foto_locali, già nostra; mai foto Google), altrimenti
+// le emoji dei posti su un fondo tenue (una sola emoji se il gruppo è di un tipo solo).
+type Gruppo = { key: string; label: string; n: number; posti: Place[]; icona?: string };
+const FONDI = { zona: "bg-[#e9f0ef]", tipo: "bg-[#f4efe8]", raccolta: "bg-[#f1eef1]" } as const;
+
+function FotoCopertina({ src, children }: { src: string; children: React.ReactNode }) {
+  const [rotta, setRotta] = useState(false);
+  if (rotta) return <>{children}</>;
+  // eslint-disable-next-line @next/next/no-img-element -- foto privata servita da /api/foto-utenti (controllo di chi la vede)
+  return <img src={src} alt="" data-testid="scaffale-foto" loading="lazy" onError={() => setRotta(true)} className="absolute inset-0 h-full w-full object-cover" />;
+}
+
+// Copertina con la mappa (14/11, revisori dell'8/11: "copertine senza foto"): la zona vera dei posti del gruppo,
+// con un puntino per posto e l'emoji del gruppo in un tondo bianco. Se la mappa non arriva (rete, token) torna la
+// copertina di prima: la foto scattata dall'utente o le emoji.
+const COPERTINA_W = 124;
+const COPERTINA_H = 72;
+function MappaCopertina({ posti, badge, fallback }: { posti: Place[]; badge: string | null; fallback: React.ReactNode }) {
+  const [rotta, setRotta] = useState(false);
+  const [pronta, setPronta] = useState(false);
+  const mappa = useMemo(() => mappaStatica(posti, COPERTINA_W, COPERTINA_H, process.env.NEXT_PUBLIC_MAPBOX_TOKEN), [posti]);
+  if (!mappa || rotta) return <>{fallback}</>;
+  return (
+    <>
+      {!pronta && fallback}
+      {/* eslint-disable-next-line @next/next/no-img-element -- immagine statica Mapbox, già alla dimensione giusta */}
+      <img src={mappa.url} alt="" data-testid="scaffale-mappa" loading="lazy" onLoad={() => setPronta(true)} onError={() => setRotta(true)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${pronta ? "opacity-100" : "opacity-0"}`} />
+      {/* Velo teal leggero: la mappa chiara su fondo chiaro spariva (revisore 14/11). */}
+      {pronta && <span className="absolute inset-0 bg-brand/[0.06]" />}
+      {pronta && mappa.punti.filter((pt) => !badge || pt.x < 72 || pt.y < 55).map((pt, i) => (
+        <span key={i} data-testid="scaffale-puntino" className="absolute h-[7px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white bg-accent shadow-[0_0_0_0.5px_rgba(0,0,0,0.15)]" style={{ left: `${pt.x}%`, top: `${pt.y}%` }} />
+      ))}
+      {pronta && badge && (
+        <span className="absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-[13px] leading-none shadow-[0_1px_3px_rgba(0,0,0,0.18)]">{badge}</span>
+      )}
+    </>
+  );
+}
+
+function CopertinaScaffale({ g, fondo, foto, onTap, testId = "scaffale-copertina", cover, mappa = true }: { g: Gruppo; fondo: string; foto: Record<string, string>; onTap: () => void; testId?: string; cover?: string; mappa?: boolean }) {
+  // I posti arrivano dal più vecchio al più nuovo: la copertina mostra i più recenti.
+  const recenti = g.posti.slice(-12).reverse();
+  const conFoto = recenti.find((p) => foto[p.id]);
+  const emoji = g.icona ? [g.icona] : [...new Set(recenti.map((p) => getCategoryEmoji(p.category, p.name)))].slice(0, 4);
+  const emojiVista = emoji.length === 1 ? (
+    <span className="flex h-full w-full items-center justify-center text-[23px] leading-none">{emoji[0]}</span>
+  ) : (
+    <span className="grid h-full w-full grid-cols-4 place-items-center px-1 text-[17px] leading-none">{emoji.map((e) => <span key={e}>{e}</span>)}</span>
+  );
+  const vecchia = conFoto ? <FotoCopertina src={foto[conFoto.id]}>{emojiVista}</FotoCopertina> : emojiVista;
+  return (
+    <li className="shrink-0">
+      <button
+        type="button"
+        data-testid={testId}
+        data-scaffale-key={g.key}
+        aria-label={`${g.label}, ${g.n} ${g.n === 1 ? "posto" : "posti"}`}
+        onClick={onTap}
+        className="block w-[124px] text-left active:scale-[0.97]"
+      >
+        <span data-testid={cover} className="block">
+          <span aria-hidden className={`relative block h-[72px] w-full overflow-hidden rounded-[12px] border border-[#e2e6e6] ${fondo}`}>
+            {/* Tondo con l'emoji solo se il gruppo ne ha una sola (tipo, raccolta, "Vicino a te"): su una zona mista sarebbe a caso. */}
+            {/* Sui tipi la mappa non distingue niente (tutte "Roma" con puntini sparsi, revisore 14/11): lì resta l'emoji. */}
+            {mappa ? <MappaCopertina posti={recenti} badge={emoji.length === 1 ? emoji[0] : null} fallback={vecchia} /> : vecchia}
+          </span>
+          <span className="mt-1 flex items-baseline gap-1 px-0.5">
+            <span data-testid="scaffale-nome" className="min-w-0 truncate text-[13px] font-medium text-[#33373d]">{g.label}</span>
+            <span className="shrink-0 text-[12px] font-semibold text-text-muted">{g.n}</span>
+          </span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
+// Gruppi di una lista per chiave (quartiere, tipo), dal più pieno; i posti restano nell'ordine ricevuto.
+function raggruppa(lista: readonly Place[], chiave: (p: Place) => string | null): Gruppo[] {
+  const m = new globalThis.Map<string, Place[]>();
+  for (const p of lista) {
+    const k = chiave(p);
+    if (!k) continue;
+    const g = m.get(k);
+    if (g) g.push(p);
+    else m.set(k, [p]);
+  }
+  return [...m.entries()].map(([key, posti]) => ({ key, label: key, n: posti.length, posti }))
+    .sort((a, b) => b.n - a.n || a.label.localeCompare(b.label, "it"));
+}
+
 // Tipo di locale (lo stesso della riga) e testo cercato; testi = testo di ogni salvato, calcolato una volta.
 function filtraLista(lista: Place[], tipo: string | null, q: string, testi: ReadonlyMap<string, string>): Place[] {
   const delTipo = tipo === null ? lista : lista.filter((p) => categoryLabel(p.category, p.name) === tipo);
@@ -89,7 +184,8 @@ type RigaProps = { p: Place; primo: boolean; foto?: string; fonte?: string; verd
 const Riga = memo(function Riga({ p, primo, foto, fonte, verdict, origin, daMese, onTap }: RigaProps) {
   // Stessa riga di fatti della card sulla mappa (revisore 2/11: "Ristorante" qui, "Osteria" là):
   // tipo dal nome quando lo dice (categoryLabel con il nome, come scheda e card) · ★ voto · prezzo · città.
-  const meta = cardFacts(p, null, true);
+  // Revisore 14/11: il quartiere (Trastevere, Brera) al posto della città quando si sa: la città sta già nelle pillole in alto.
+  const meta = useMemo(() => { const q = quartiereDi(p); return q ? [cardFacts(p, null, false), q].filter(Boolean).join(" · ") : cardFacts(p, null, true); }, [p]);
   // Revisore 3/11: oltre 50 km la distanza non serve ("474,6 km"); resta la città, intera.
   const dist = origin && distanceMeters(origin, p) < 50_000 ? distanceLabel(origin, p) : null;
   const done = p.tags?.includes(DONE);
@@ -214,12 +310,35 @@ export default function SalvatiLista({
   const cercato = useDeferredValue(testo);
   // Tipo di locale scelto nella fila dei filtri rapidi ("Trattoria"), solo per la lista.
   const [tipo, setTipo] = useState<string | null>(null);
+  // Scaffali (Lorenzo 8/11): quartiere scelto ("Trastevere") o "Vicino a te", solo per la lista, combinabili con
+  // tipo e stato ("Pizzerie · Trastevere · Da provare").
+  const [quartiere, setQuartiere] = useState<string | null>(null);
+  const [vicino, setVicino] = useState(false);
+  const [scheda, setScheda] = useState<"zone" | "tipi" | "raccolte">("zone");
+  // La fila delle città scorre? (misurata, così la sfumatura c'è solo quando serve)
+  const cittaRef = useRef<HTMLDivElement | null>(null);
+  const [cittaScorre, setCittaScorre] = useState(false);
+  useEffect(() => {
+    const el = cittaRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const misura = () => setCittaScorre(el.scrollWidth > el.clientWidth + 1 + (el.dataset.scorre ? 28 : 0));
+    const ro = new ResizeObserver(misura);
+    ro.observe(el);
+    misura();
+    return () => ro.disconnect();
+  }, [all.length]);
   // "Chiedi ai tuoi posti" (PROPOSTE.md 33): una domanda a parole, l'AI sceglie solo tra i salvati.
   // Parte solo al tocco (o Invio): una chiamata Haiku per domanda, nessuna ricerca Google.
   // Proposta 44 (4/11): con una raccolta accesa ("Romantico") si chiede solo a quella raccolta.
   type Risposta = { q: string; raccolta: string | null; stato: "cerco" | "ok" | "errore"; scelti: { id: string; perche: string }[]; msg?: string };
   const [risposta, setRisposta] = useState<Risposta | null>(null);
   const raccolta = activeTag !== null && !isStateTag(activeTag) ? activeTag : null;
+  // Revisore 8/11: stato e raccolta si combinano ("Con amici" + "Da provare" = l'intersezione). La mappa regge un
+  // filtro solo (activeTag): con una raccolta accesa riceve la raccolta e lo stato si applica qui, nella lista.
+  const [statoLista, setStatoLista] = useState<string | null>(null);
+  const statoOn = raccolta !== null ? statoLista : activeTag;
+  const scegliStato = (st: string | null) => { if (raccolta !== null) setStatoLista(st); else { setStatoLista(null); onTag(st); } };
+  const scegliRaccolta = (r: string | null) => { const st = statoOn; setStatoLista(r === null ? null : st); onTag(r ?? st); };
   const chiedi = async () => {
     const q = testo.trim();
     if (!sembraDomanda(q) || (risposta?.q === q && risposta.raccolta === raccolta && risposta.stato !== "errore")) return;
@@ -293,13 +412,37 @@ export default function SalvatiLista({
   }, [all, zonaOn]);
   // Testo di ogni salvato calcolato una volta (non a ogni lettera).
   const testi = useMemo(() => new globalThis.Map(all.map((p) => [p.id, testoSalvato(p)])), [all]);
-  const count = (tag: string) => base.filter((p) => hasStateOrTag(p.tags, tag)).length;
-  const perStato = useMemo(() => (activeTag === null ? base : base.filter((p) => hasStateOrTag(p.tags, activeTag))), [base, activeTag]);
+  const perStato = useMemo(() => base.filter((p) => (raccolta === null || !!p.tags?.includes(raccolta)) && (statoOn === null || hasStateOrTag(p.tags, statoOn))), [base, raccolta, statoOn]);
+  // Quartiere e tipo di ogni salvato, calcolati una volta (non a ogni lettera né a ogni filtro).
+  const quartieri = useMemo(() => new globalThis.Map(all.map((p) => [p.id, quartiereDi(p)])), [all]);
+  const tipoDi = useMemo(() => new globalThis.Map(all.map((p) => [p.id, categoryLabel(p.category, p.name)])), [all]);
+  // "Vicino a te": il raggio più stretto con almeno 3 salvati (1, 2 o 5 km), solo se la posizione è già nota.
+  const raggio = useMemo(() => (origin ? raggioVicino(origin, base) : null), [origin, base]);
+  const vicinoOn = vicino && origin !== null && raggio !== null;
+  const perZona = useMemo(() => {
+    if (quartiere !== null) return perStato.filter((p) => quartieri.get(p.id) === quartiere);
+    if (vicinoOn && origin && raggio) return perStato.filter((p) => distanceMeters(origin, p) <= raggio);
+    return perStato;
+  }, [perStato, quartiere, quartieri, vicinoOn, origin, raggio]);
+  const perZonaIds = useMemo(() => new Set(perZona.map((p) => p.id)), [perZona]);
+  // Con un tipo acceso, gli scaffali per zona contano solo quel tipo (e viceversa).
+  const perTipo = useMemo(() => (tipo === null ? perStato : perStato.filter((p) => tipoDi.get(p.id) === tipo)), [perStato, tipo, tipoDi]);
+  // Zona e tipo accesi, senza lo stato: per i conteggi delle pillole "Da provare" e "Visti".
+  const senzaStato = useMemo(() => {
+    const qui = vicinoOn && origin && raggio ? { origin, raggio } : null;
+    return base.filter((p) =>
+      (raccolta === null || !!p.tags?.includes(raccolta))
+      && (quartiere === null || quartieri.get(p.id) === quartiere)
+      && (qui === null || distanceMeters(qui.origin, p) <= qui.raggio)
+      && (tipo === null || tipoDi.get(p.id) === tipo));
+  }, [base, raccolta, quartiere, quartieri, vicinoOn, origin, raggio, tipo, tipoDi]);
+  // Conteggi degli stati: contano i posti di raccolta, zona e tipo accesi ("Da provare 2" tra le pizzerie di Trastevere).
+  const count = (tag: string) => senzaStato.filter((p) => hasStateOrTag(p.tags, tag)).length;
   // Tipi di locale presenti (con stato o raccolta accesi, quelli che restano), i più frequenti prima, con l'emoji
   // e il conteggio. Lo stesso tipo che si legge sulla riga (categoryLabel con il nome).
   const tipi = useMemo(() => {
     const m = new globalThis.Map<string, { label: string; emoji: string; n: number }>();
-    for (const p of perStato) {
+    for (const p of perZona) {
       const label = categoryLabel(p.category, p.name);
       if (!label) continue;
       const t = m.get(label);
@@ -307,19 +450,27 @@ export default function SalvatiLista({
       else m.set(label, { label, emoji: getCategoryEmoji(p.category, p.name), n: 1 });
     }
     return [...m.values()].sort((a, b) => b.n - a.n || a.label.localeCompare(b.label, "it"));
-  }, [perStato]);
+  }, [perZona]);
   // Un tipo solo non filtra niente: la fila dei tipi compare con almeno due tipi (o con quello acceso, anche a 0).
   const primiTipi = tipi.slice(0, MAX_TIPI);
   const tipiInVista = tipi.length < 2 && tipo === null ? [] : tipo !== null && !primiTipi.some((t) => t.label === tipo)
     ? [...primiTipi, tipi.find((t) => t.label === tipo) ?? { label: tipo, emoji: "🍽️", n: 0 }]
     : primiTipi;
-  const shown = useMemo(() => filtraLista(perStato, tipo, cercato, testi), [perStato, tipo, cercato, testi]);
+  const shown = useMemo(() => filtraLista(perZona, tipo, cercato, testi), [perZona, tipo, cercato, testi]);
+  // Scaffali: quartieri (con il tipo acceso, solo i suoi posti), tipi (con la zona accesa, solo quelli lì).
+  // Solo copertine con almeno 2 posti (revisore 8/11: niente "Monti 1").
+  const scaffaleZone = useMemo(() => raggruppa(perTipo, (p) => quartieri.get(p.id) ?? null).filter((g) => g.n >= 2).slice(0, 20), [perTipo, quartieri]);
+  const scaffaleVicino = useMemo(() => (origin && raggio ? perTipo.filter((p) => distanceMeters(origin, p) <= raggio) : []), [perTipo, origin, raggio]);
+  const scaffaleTipi = useMemo(() => raggruppa(perZona, (p) => tipoDi.get(p.id) ?? null).filter((g) => g.n >= 2).slice(0, 20).map((g) => ({ ...g, label: tipoPlurale(g.key) })), [perZona, tipoDi]);
   // Copertine: i posti più recenti di ogni raccolta (la lista arriva dal più vecchio al più nuovo).
   // Con una città scelta, le raccolte di quella città (la raccolta accesa resta, anche se lì è vuota).
+  // Revisore 8/11: le copertine contano solo i posti rimasti con stato, zona e tipo accesi (i numeri dicono il vero),
+  // così la raccolta si aggiunge in qualunque ordine.
+  const perAltri = useMemo(() => (raccolta === null ? perTipo.filter((p) => perZonaIds.has(p.id)) : senzaStato.filter((p) => statoOn === null || hasStateOrTag(p.tags, statoOn))), [raccolta, perTipo, perZonaIds, senzaStato, statoOn]);
   const collections = useMemo(() => {
-    const cs = summarizeCollections([...base].reverse(), 4);
+    const cs = summarizeCollections([...perAltri].reverse(), 4);
     return activeTag !== null && !isStateTag(activeTag) && !cs.some((c) => c.name === activeTag) ? [...cs, { name: activeTag, count: 0, preview: [] }] : cs;
-  }, [base, activeTag]);
+  }, [perAltri, activeTag]);
   const icone = useMemo(() => iconeRaccolte(collections.map((c) => c.name)), [collections]);
   // "5 posti · Roma e Milano": le città vere dei salvati, le più frequenti per prime.
   const kicker = useMemo(() => {
@@ -347,7 +498,7 @@ export default function SalvatiLista({
     const mese = d.toLocaleDateString("it-IT", { month: "long" });
     return new Date(adesso).getFullYear() === d.getFullYear() ? mese : `${mese} ${d.getFullYear()}`;
   };
-  const list = useMemo(() => {
+  const ordinata = useMemo(() => {
     // Proposta 45: chi ha chiuso per sempre (secondo Google) va in fondo con qualsiasi ordine. Mai tolto.
     const chiuso = (p: Place) => (p.businessStatus === "CLOSED_PERMANENTLY" ? 1 : 0);
     // Revisore 3/11 (sesto): anche con "Vicino" i 👎 vanno in fondo (mai primo un posto che non fa per te).
@@ -368,13 +519,37 @@ export default function SalvatiLista({
     const ordinati = sort === "recenti" ? [...shown].reverse() : [...shown];
     return ordinati.sort((a, b) => chiuso(a) - chiuso(b));
   }, [shown, origin, sort]);
+  // Sezioni (Lorenzo 8/11): con un tipo acceso la lista si divide per quartiere ("Trastevere", "Monti"…), con una
+  // zona accesa per tipo. Solo se aiuta: almeno 6 posti e 2 sezioni vere; i gruppi seguono l'ordine scelto (il
+  // primo posto della lista apre la prima sezione), "Altre zone" / "Altro" in fondo. Mai mentre si cerca.
+  const zonaAccesa = quartiere !== null || vicinoOn;
+  const modoSezioni: "zona" | "tipo" | null = all.length < MIN_SCAFFALI || cercato.trim() !== "" ? null : tipo !== null && !zonaAccesa ? "zona" : zonaAccesa && tipo === null ? "tipo" : null;
+  const { list, sezioneDi } = useMemo(() => {
+    if (modoSezioni === null || ordinata.length < 6) return { list: ordinata, sezioneDi: null };
+    const resto = modoSezioni === "zona" ? "Altre zone" : "Altro";
+    const chiave = (p: Place) => (modoSezioni === "zona" ? quartieri.get(p.id) : tipoDi.get(p.id) && tipoPlurale(tipoDi.get(p.id)!)) || resto;
+    const gruppi = new globalThis.Map<string, Place[]>();
+    for (const p of ordinata) {
+      const k = chiave(p);
+      const g = gruppi.get(k);
+      if (g) g.push(p);
+      else gruppi.set(k, [p]);
+    }
+    const veri = [...gruppi.keys()].filter((k) => k !== resto);
+    if (veri.length < 2 && !(veri.length === 1 && gruppi.has(resto))) return { list: ordinata, sezioneDi: null };
+    const ordine = [...veri, ...(gruppi.has(resto) ? [resto] : [])];
+    const sez = new globalThis.Map<string, { titolo: string; n: number }>();
+    const flat: Place[] = [];
+    for (const k of ordine) for (const p of gruppi.get(k)!) { flat.push(p); sez.set(p.id, { titolo: k, n: gruppi.get(k)!.length }); }
+    return { list: flat, sezioneDi: sez };
+  }, [ordinata, modoSezioni, quartieri, tipoDi]);
   // Un tocco su una riga apre la scheda con l'ordine della lista. Funzione stabile (le righe sono memo).
   const apri = useRef({ onOpen, ids: [] as string[] });
   useEffect(() => { apri.current = { onOpen, ids: list.map((x) => x.id) }; });
   const apriRiga = useCallback((p: Place) => apri.current.onOpen(p, apri.current.ids), []);
   // Righe disegnate: le prime PASSO, poi altre scorrendo (onScroll). Si riparte da capo a ogni filtro nuovo.
   const [quanti, setQuanti] = useState(PASSO);
-  const chiaveFiltri = `${zonaOn?.nome ?? ""}|${activeTag ?? ""}|${tipo ?? ""}|${cercato}|${sort}`;
+  const chiaveFiltri = `${zonaOn?.nome ?? ""}|${activeTag ?? ""}|${statoOn ?? ""}|${tipo ?? ""}|${quartiere ?? ""}|${vicinoOn}|${cercato}|${sort}`;
   const [chiaveVista, setChiaveVista] = useState(chiaveFiltri);
   if (chiaveFiltri !== chiaveVista) { setChiaveVista(chiaveFiltri); setQuanti(PASSO); }
   const onScroll = (e: React.UIEvent<HTMLElement>) => {
@@ -397,7 +572,7 @@ export default function SalvatiLista({
   // Con un filtro acceso pillole e raccolte restano: chi cerca deve vedere che il filtro c'è.
   // Revisore 4/11 sera (terzo): solo quando la risposta c'è; prima (o dopo aver spento la raccolta) restano le
   // raccolte, così si può scegliere a chi chiedere senza cancellare la domanda.
-  const soloRisposta = domanda && list.length === 0 && activeTag === null && tipo === null && attuale !== null;
+  const soloRisposta = domanda && list.length === 0 && raccolta === null && statoOn === null && tipo === null && quartiere === null && !vicino && attuale !== null;
   // Revisore 4/11: con una domanda e nessun posto per nome conta solo la risposta dell'AI (anche con una raccolta
   // accesa): niente "Nessun posto qui" sotto la risposta né "0 di 14 posti" in testa.
   const rispostaAI = domanda && list.length === 0;
@@ -407,19 +582,66 @@ export default function SalvatiLista({
   // Revisore 3/11 (quinto): pillole compatte ("📌 8", "✓ 6", le stesse icone dello stato sulle righe);
   // l'etichetta intera resta per lo screen reader e come suggerimento.
   const pills: { label: string; short: string; n: number | null; on: boolean; tag: string | null }[] = [
-    { label: "Da provare", short: "Da provare", n: count(WANT), on: activeTag === WANT, tag: WANT },
-    { label: "Ci sono stato", short: "Visti", n: count(DONE), on: activeTag === DONE, tag: DONE },
+    { label: "Da provare", short: "Da provare", n: count(WANT), on: statoOn === WANT, tag: WANT },
+    // Revisore 8/11: la stessa parola della riga ("Ci sono stato"), non "Visti".
+    { label: "Ci sono stato", short: "Ci sono stato", n: count(DONE), on: statoOn === DONE, tag: DONE },
     // Revisore 1/11: "Ci sono stato 0" è un filtro morto; torna appena c'è un posto (o se è acceso).
-  ].filter((p) => p.tag !== DONE || (p.n ?? 0) > 0 || p.on);
+  ].filter((p) => (p.n ?? 0) > 0 || p.on); // Revisore 8/11: niente "Da provare 0" né "Ci sono stato 0" (filtri morti).
   // Filtri accesi oltre alla città: sotto la fila compaiono "23 di 500" e "Azzera".
-  const filtrando = searching || activeTag !== null || tipo !== null;
-  const azzera = () => { onTag(null); scrivi(""); setTipo(null); };
+  const filtrando = searching || raccolta !== null || statoOn !== null || tipo !== null || zonaAccesa;
+  const azzera = () => { onTag(null); setStatoLista(null); scrivi(""); setTipo(null); setQuartiere(null); setVicino(false); };
   // Nessun posto in questa città ma qualcuno nelle altre: si propone di cercare dappertutto.
   const altrove = list.length === 0 && zonaOn && filtrando
-    ? filtraLista(activeTag === null ? all : all.filter((p) => hasStateOrTag(p.tags, activeTag)), tipo, cercato, testi).length
+    ? filtraLista(all.filter((p) => (raccolta === null || !!p.tags?.includes(raccolta)) && (statoOn === null || hasStateOrTag(p.tags, statoOn))), tipo, cercato, testi).length
     : 0;
   const citta = zone.length > 1 ? [{ nome: null as string | null, label: "Tutte", n: all.length }, ...zone.map((z) => ({ nome: z.nome as string | null, label: z.nome, n: z.posti.length }))] : [];
   const iconBtn = "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d6dcdc] text-text active:scale-95";
+  // Scaffali (Lorenzo 8/11): da 8 salvati, quando non si cerca. Ogni scaffale c'è solo se filtra davvero
+  // (una copertina con almeno 2 posti ma non tutti); quello del filtro già acceso sparisce (la sua pillola resta in
+  // alto), gli altri contano solo i posti rimasti: così "Pizzerie" poi "Trastevere" restringe a ogni tocco.
+  const scaffaliOn = all.length >= MIN_SCAFFALI;
+  const scaffali = scaffaliOn && !searching;
+  const filtraDavvero = (n: number, su: number) => n >= 2 && n < su;
+  // "Vicino a te" solo se l'ordine non è già "Vicino" (revisore 8/11: tre filtri di luogo che si sovrappongono).
+  const nVicino = sort !== "vicino" && scaffaleVicino.length >= 2 ? scaffaleVicino.length : 0;
+  const vediZone = scaffali && !zonaAccesa && [nVicino, ...scaffaleZone.map((g) => g.n)].some((n) => filtraDavvero(n, perTipo.length));
+  const vediTipi = scaffali && tipo === null && scaffaleTipi.some((g) => filtraDavvero(g.n, perZona.length));
+  // Con una domanda scritta restano (revisore 4/11 sera): si sceglie a quale raccolta chiedere senza cancellarla.
+  // Raccolte: restano con zona, tipo e stato accesi finché qualcuna ha posti tra quelli rimasti.
+  const vediRaccolte = scaffaliOn && (!searching || domanda) && raccolta === null && (collections.length > 0 || (!zonaAccesa && tipo === null && statoOn === null));
+  // Revisore 8/11: gli scaffali stanno in un riquadro solo con tre schede (Zone, Tipi, Raccolte) e una fila di
+  // copertine basse, così all'apertura si vedono subito i primi posti della lista.
+  const schede = ([vediZone && { key: "zone", label: "Zone" }, vediTipi && { key: "tipi", label: "Tipi" }, vediRaccolte && { key: "raccolte", label: "Raccolte" }] as const)
+    .filter((x): x is { key: "zone" | "tipi" | "raccolte"; label: string } => !!x);
+  const schedaOn = schede.find((x) => x.key === scheda)?.key ?? schede[0]?.key ?? null;
+  const tipoAcceso = tipo === null ? null : { label: tipoPlurale(tipo), emoji: tipi.find((t) => t.label === tipo)?.emoji ?? "🍽️" };
+  // Pillole dei filtri accesi, ognuna si toglie da sola (la ✕): zona, tipo, raccolta. Lo stato ha le sue due pillole.
+  const attivi = [
+    quartiere !== null && { key: "zona", label: quartiere, icona: "📍", togli: () => setQuartiere(null) },
+    vicinoOn && { key: "vicino", label: "Vicino a te", icona: "📍", togli: () => setVicino(false) },
+    tipoAcceso && { key: "tipo", label: tipoAcceso.label, icona: tipoAcceso.emoji, togli: () => setTipo(null) },
+    raccolta !== null && { key: "raccolta", label: tagDisplay(raccolta), icona: icone[collections.findIndex((c) => c.name === raccolta)] ?? "🔖", togli: () => scegliRaccolta(null) },
+  ].filter((a): a is { key: string; label: string; icona: string; togli: () => void } => !!a);
+  const statoPills = (
+  <div role="group" aria-label="Stato" data-testid="salvati-stato" className="flex shrink-0 gap-1.5">
+    {pills.map((p) => (
+      <button
+        key={p.label}
+        type="button"
+        data-testid="salvati-stato-pillola"
+        aria-pressed={p.on}
+        aria-label={p.n === null ? p.label : `${p.label}, ${p.n}`}
+        title={p.label}
+        onClick={() => scegliStato(p.on && p.tag !== null ? null : p.tag)}
+        className={`flex min-h-11 shrink-0 items-center gap-1 rounded-pill px-3 text-[14px] font-medium transition-colors active:scale-95 ${p.on ? "bg-brand font-semibold text-white" : "border border-[#e1e5e5] bg-white text-[#33373d]"}`}
+      >
+        {p.tag === DONE ? <Check size={14} strokeWidth={3} aria-hidden className={p.on ? "" : "text-brand"} /> : <span aria-hidden className="text-[13px] leading-none">📌</span>}
+        {p.short} {p.n}
+      </button>
+    ))}
+  </div>
+  );
+  const scegli = (cosa: string, n: number, fai: () => void) => { fai(); trackFeature("salvati_scaffale", { contesto: cosa, risultati: n }); };
 
   return (
     <section
@@ -434,9 +656,11 @@ export default function SalvatiLista({
             in basso, la ricerca la lente nella fila dei filtri. */}
         {/* Lorenzo 5/11: con salvati in più città, in alto le città ("Tutte 14 · Roma 12 · Milano 2") al posto del
             conteggio. Scelta una città la lista è solo di quella; la stessa scelta vale sulla mappa (e ritorno). */}
-        <div className={`flex items-center justify-between gap-3 ${citta.length > 0 ? "h-11" : "h-5"}`}>
+        <div className={`flex items-center justify-between ${citta.length > 0 ? "h-11 gap-1" : "h-5 gap-3"}`}>
           {citta.length > 0 ? (
-            <div role="group" aria-label="Città" data-testid="salvati-citta" className="-ml-3 flex min-w-0 flex-1 items-center overflow-x-auto pl-3 [scrollbar-width:none]">
+            // Revisore 8/11: niente pillole tagliate di netto. Se la fila non entra, sfuma al bordo e ha il margine per
+            // arrivare intera all'ultima città scorrendo.
+            <div ref={cittaRef} role="group" aria-label="Città" data-testid="salvati-citta" data-scorre={cittaScorre ? "true" : undefined} className={`-ml-2.5 flex min-w-0 flex-1 items-center overflow-x-auto pl-2.5 [scrollbar-width:none] ${cittaScorre ? "pr-7 [mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]" : ""}`}>
               {citta.map((c) => {
                 const on = (zonaOn?.nome ?? null) === c.nome;
                 return (
@@ -449,7 +673,7 @@ export default function SalvatiLista({
                     onClick={() => { onZona(on && c.nome !== null ? null : c.nome); if (c.nome !== null && !on) trackFeature("salvati_citta", { n: c.n }); }}
                     className="flex min-h-11 shrink-0 items-center active:scale-95"
                   >
-                    <span className={`flex h-8 items-center gap-1 rounded-pill px-3 text-[14px] ${on ? "bg-brand font-semibold text-white" : "font-medium text-[#33373d]"}`}>
+                    <span className={`flex h-8 items-center gap-[3px] rounded-pill px-[7px] text-[13.5px] ${on ? "bg-brand font-semibold text-white" : "font-medium text-[#33373d]"}`}>
                       {c.label} <span className={`text-[12px] font-semibold ${on ? "text-white/75" : "text-text-muted"}`}>{c.n}</span>
                     </span>
                   </button>
@@ -468,7 +692,7 @@ export default function SalvatiLista({
               aria-label="Ordina"
               value={sort}
               onChange={(e) => { const k = e.target.value as Ordine; setOrdine(k); if (k === "vicino" && !origin && !locating) onLocate(); }}
-              className="min-h-11 appearance-none bg-transparent pl-2 pr-5 text-right focus:outline-none"
+              className="min-h-11 appearance-none bg-transparent pl-1 pr-5 text-right focus:outline-none"
             >
               <option value="vicino">{locating && !origin ? "Cerco…" : "Vicino"}</option>
               <option value="recenti">Recenti</option>
@@ -570,12 +794,13 @@ export default function SalvatiLista({
         {/* Revisore 2/11: una sola fila, scorrevole. Lorenzo 5/11: è la fila dei filtri rapidi: raccolte, stato
             (senza "Ci sono stato" quando è 0), tipi di locale presenti (i più frequenti) e "Nuova" in fondo.
             Il pulsante "Filtri" non c'è più: il suo foglio ripeteva stato, città e raccolte. */}
+        {!scaffaliOn ? (
         <div data-testid="salvati-comandi" className="-mx-4 mt-2.5 flex items-center gap-1.5 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]">
           {/* Le raccolte nella stessa fila (Places 07, Albo 12): un tocco filtra la lista. "Nuova" è l'ultima;
               senza raccolte resta solo lei, con l'invito scritto. */}
           <ul data-testid="salvati-raccolte" aria-label="Raccolte" className="flex shrink-0 gap-1.5">
             {collections.map((c, i) => {
-              const on = activeTag === c.name;
+              const on = raccolta === c.name;
               return (
                 <li key={c.name} className="max-w-[200px] shrink-0">
                   <button
@@ -583,7 +808,7 @@ export default function SalvatiLista({
                     data-testid="raccolta-cerchio"
                     aria-pressed={on}
                     aria-label={`${tagDisplay(c.name)}, ${c.count} ${c.count === 1 ? "posto" : "posti"}`}
-                    onClick={() => onTag(on ? null : c.name)}
+                    onClick={() => scegliRaccolta(on ? null : c.name)}
                     className="block w-full text-left active:scale-[0.97]"
                   >
                     <Copertina name={c.name} count={c.count} icona={icone[i]} on={on} />
@@ -594,23 +819,7 @@ export default function SalvatiLista({
           </ul>
           {/* Revisore 3/11 (sesto): gli stati dopo le raccolte, con la parola ("📌 Da provare 8"): le raccolte
               entrano per prime nello schermo e lo stato si capisce senza indovinare il simbolo. */}
-          <div role="group" aria-label="Stato" data-testid="salvati-stato" className="flex shrink-0 gap-1.5">
-            {pills.map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                data-testid="salvati-stato-pillola"
-                aria-pressed={p.on}
-                aria-label={p.n === null ? p.label : `${p.label}, ${p.n}`}
-                title={p.label}
-                onClick={() => onTag(p.on && p.tag !== null ? null : p.tag)}
-                className={`flex min-h-11 shrink-0 items-center gap-1 rounded-pill px-3 text-[14px] font-medium transition-colors active:scale-95 ${p.on ? "bg-brand font-semibold text-white" : "border border-[#e1e5e5] bg-white text-[#33373d]"}`}
-              >
-                {p.tag === DONE ? <Check size={14} strokeWidth={3} aria-hidden className={p.on ? "" : "text-brand"} /> : <span aria-hidden className="text-[13px] leading-none">📌</span>}
-                {p.short} {p.n}
-              </button>
-            ))}
-          </div>
+          {statoPills}
           {/* Tipi di locale dei tuoi salvati, con emoji e conteggio: "🍣 Giapponese 3". Un tocco filtra, un altro spegne. */}
           {tipiInVista.length > 0 && (
             <div role="group" aria-label="Tipo di locale" data-testid="salvati-tipi" className="flex shrink-0 gap-1.5">
@@ -646,6 +855,102 @@ export default function SalvatiLista({
             </Link>
           </div>
         </div>
+        ) : (
+          // Lorenzo 8/11: in alto solo gli stati e i filtri accesi (ognuno con la sua ✕); quartieri, tipi e raccolte
+          // stanno negli scaffali sotto. Niente doppioni: la stessa scelta in un posto solo.
+          // Revisore 14/11: una fila sola che scorre (con una zona accesa la sua pillola restava da sola su una riga).
+          <div data-testid="salvati-comandi" className="-mx-4 mt-1.5 flex items-center gap-1.5 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]">
+            {attivi.length > 0 && (
+              <div role="group" aria-label="Filtri accesi" data-testid="salvati-filtri-accesi" className="contents">
+                {attivi.map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    data-testid="salvati-filtro-acceso"
+                    aria-label={`Togli ${f.label}`}
+                    onClick={f.togli}
+                    className="flex min-h-11 shrink-0 items-center gap-1 rounded-pill bg-brand pl-3 pr-2.5 text-[14px] font-semibold text-white active:scale-95"
+                  >
+                    <span aria-hidden className="text-[13px] leading-none">{f.icona}</span>
+                    {f.label}
+                    <X size={14} strokeWidth={2.5} aria-hidden className="ml-0.5 text-white/80" />
+                  </button>
+                ))}
+              </div>
+            )}
+            {statoPills}
+          </div>
+        )}
+
+        {/* Scaffali (Lorenzo 8/11, libreria di Places e Albo): con 500 salvati il posto giusto in due tocchi.
+            Revisore 8/11: un riquadro solo, tre schede e una fila di copertine; sotto, subito la lista. */}
+        {schedaOn && (
+          <section data-testid="scaffali" aria-label="Scaffali" className="mt-1">
+            <div className="flex items-center">
+            <div role="tablist" aria-label="Scaffali" className="flex gap-5">
+              {schede.map((x) => (
+                <button
+                  key={x.key}
+                  type="button"
+                  role="tab"
+                  data-testid="scaffali-scheda"
+                  aria-selected={schedaOn === x.key}
+                  onClick={() => setScheda(x.key)}
+                  className={`min-h-9 border-b-2 font-display text-[14px] font-semibold ${schedaOn === x.key ? "border-brand text-text" : "border-transparent text-text-muted"}`}
+                >
+                  {x.label}
+                </button>
+              ))}
+            </div>
+            {/* Attribuzione delle copertine a mappa (termini Mapbox/OpenStreetMap), fuori dalle immagini. */}
+            {process.env.NEXT_PUBLIC_MAPBOX_TOKEN && schedaOn !== "tipi" && <span data-testid="scaffali-attribuzione" className="ml-auto text-[10px] text-text-muted/80">© Mapbox © OpenStreetMap</span>}
+            </div>
+            <ul role="tabpanel" data-testid={schedaOn === "zone" ? "scaffale-zone" : schedaOn === "tipi" ? "scaffale-tipi" : "salvati-raccolte"} aria-label={schede.find((x) => x.key === schedaOn)?.label} className="-mx-4 mt-1.5 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+              {schedaOn === "zone" && (<>
+                {nVicino > 0 && (
+                  <CopertinaScaffale
+                    g={{ key: "vicino", label: "Vicino a te", n: nVicino, posti: scaffaleVicino, icona: "📍" }}
+                    fondo={FONDI.zona}
+                    foto={fotoMie}
+                    onTap={() => scegli("vicino", nVicino, () => { setVicino(true); setQuartiere(null); })}
+                  />
+                )}
+                {scaffaleZone.map((g) => (
+                  <CopertinaScaffale key={g.key} g={g} fondo={FONDI.zona} foto={fotoMie} onTap={() => scegli("zona", g.n, () => { setQuartiere(g.key); setVicino(false); })} />
+                ))}
+              </>)}
+              {schedaOn === "tipi" && scaffaleTipi.map((g) => (
+                <CopertinaScaffale key={g.key} g={g} fondo={FONDI.tipo} foto={fotoMie} mappa={false} onTap={() => scegli("tipo", g.n, () => setTipo(g.key))} />
+              ))}
+              {schedaOn === "raccolte" && (<>
+                {collections.map((c, i) => (
+                  <CopertinaScaffale
+                    key={c.name}
+                    g={{ key: c.name, label: tagDisplay(c.name), n: c.count, posti: [...c.preview].reverse(), icona: icone[i] }}
+                    fondo={FONDI.raccolta}
+                    foto={fotoMie}
+                    testId="raccolta-cerchio"
+                    cover="raccolta-copertina"
+                    onTap={() => scegli("raccolta", c.count, () => scegliRaccolta(c.name))}
+                  />
+                ))}
+                <li className="shrink-0">
+                  <Link
+                    href="/profilo?raccolta=nuova"
+                    aria-label="Nuova raccolta"
+                    data-testid={collections.length === 0 ? "raccolte-vuote" : "raccolta-nuova"}
+                    className="block w-[124px] active:scale-[0.97]"
+                  >
+                    <span aria-hidden className="flex h-[72px] w-full items-center justify-center rounded-[12px] border-[1.5px] border-dashed border-[#c3cbcb]">
+                      <Plus size={20} className="text-text-muted" />
+                    </span>
+                    <span className="mt-1 block truncate px-0.5 text-[13px] font-medium text-[#33373d]">Nuova</span>
+                  </Link>
+                </li>
+              </>)}
+            </ul>
+          </section>
+        )}
 
         {/* Quanti ne restano su quanti (della città scelta) e "Azzera", solo con un filtro acceso. */}
         {filtrando && !rispostaAI && (
@@ -653,7 +958,8 @@ export default function SalvatiLista({
           // sotto la ricerca: scorrendo si capisce sempre che la lista è filtrata.
           <div data-testid="salvati-risultato-riga" className="sticky top-[calc(max(0.5rem,env(safe-area-inset-top))+3rem)] z-10 -mx-4 mt-1 flex min-h-9 items-center justify-between gap-3 bg-[#f6f7f7] px-5">
             <p data-testid="salvati-risultato" aria-live="polite" className="min-w-0 truncate text-[13px] font-medium text-text-muted">
-              {tipo ? `${list.length} ${tipo.toLowerCase()} su ${base.length}${zonaOn ? ` a ${zonaOn.nome}` : ""}` : `${list.length} di ${base.length} ${base.length === 1 ? "posto" : "posti"}${zonaOn ? ` a ${zonaOn.nome}` : ""}`}
+              {/* Lorenzo 8/11: con più filtri insieme una frase sola, "23 di 500 posti" (quali filtri lo dicono le pillole). */}
+              {`${list.length} di ${base.length} ${base.length === 1 ? "posto" : "posti"}${zonaOn ? ` a ${zonaOn.nome}` : ""}`}
             </p>
             <button type="button" data-testid="salvati-azzera" onClick={azzera} className="-my-1 flex min-h-11 shrink-0 items-center px-1 text-[13px] font-semibold text-brand active:scale-95">
               Azzera
@@ -685,11 +991,25 @@ export default function SalvatiLista({
             )}
           </div>
         ) : (
-          <ul data-testid="salvati-lista-posti" className={`mt-2 overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
-            {list.slice(0, quanti).map((p, i) => (
-              <Riga key={p.id} p={p} primo={i === 0} foto={fotoMie[p.id]} fonte={reels[p.id]} verdict={verdicts[p.id]?.verdict ?? null} origin={origin} daMese={daQuando(p)} onTap={apriRiga} />
-            ))}
+          <>
+          <ul data-testid="salvati-lista-posti" className={`${schedaOn ? "mt-1.5" : "mt-2"} overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>
+            {list.slice(0, quanti).map((p, i, vis) => {
+              const sez = sezioneDi?.get(p.id);
+              const nuova = !!sez && (i === 0 || sezioneDi?.get(vis[i - 1].id)?.titolo !== sez.titolo);
+              return (
+                <Fragment key={p.id}>
+                  {nuova && (
+                    <li data-testid="salvati-sezione" className={`flex items-baseline justify-between gap-2 bg-[#f9fafa] px-3 pb-1.5 pt-2.5 ${i === 0 ? "" : `border-t ${LINE}`}`}>
+                      <span className="min-w-0 truncate font-display text-[11.5px] font-semibold uppercase tracking-[0.12em] text-[#4a4f55]">{sez.titolo}</span>
+                      <span className="shrink-0 text-[12px] font-semibold text-text-muted">{sez.n}</span>
+                    </li>
+                  )}
+                  <Riga p={p} primo={i === 0 || nuova} foto={fotoMie[p.id]} fonte={reels[p.id]} verdict={verdicts[p.id]?.verdict ?? null} origin={origin} daMese={daQuando(p)} onTap={apriRiga} />
+                </Fragment>
+              );
+            })}
           </ul>
+          </>
         )}
         {/* Riserva se lo scorrimento non le ha già portate (tastiera, schermi molto alti): le righe successive. */}
         {list.length > quanti && !rispostaAI && (

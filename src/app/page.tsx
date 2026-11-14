@@ -100,6 +100,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
           )}
         </header>
 
+        {/* Prenotazioni (Lorenzo, 8/11: "gli ricordi con un banner"): in cima alla home, prima di tutto il
+            resto, il tavolo di oggi o di domani; poi "Com'è andata?". Senza prenotazioni non occupa spazio. */}
+        <div className="mt-4 empty:hidden">
+          <BookingReminder />
+        </div>
+
         <p data-testid="home-momento" className="mt-7 text-xs font-display font-semibold uppercase tracking-[0.16em] text-text-muted">
           {ora.etichetta}{cittaProfilo ? ` · ${cittaProfilo}` : ""}
         </p>
@@ -124,9 +130,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
         </Form>
         <HomePillole momento={ora.momento} weekend={ora.weekend} cittaProfilo={cittaProfilo} gusto={prof.gusto} />
 
-        {/* Prenotazioni richieste dall'assistente: promemoria oggi, "Com'è andata?" dopo. */}
         <div className="mt-4 empty:hidden">
-          <BookingReminder />
           {/* Domanda settimanale (piano 7.6): una volta ogni 7 giorni, a chi è tornato almeno una volta. */}
           <DomandaSettimanale />
         </div>
