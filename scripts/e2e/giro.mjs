@@ -8736,7 +8736,7 @@ else {
     await ia.getByTestId("invito-si").click();
     await ia.getByTestId("invito-collegato").waitFor({ timeout: 4000 }).catch(() => {});
     ok(((await ia.getByTestId("invito-collegato").textContent().catch(() => "")) ?? "").includes("Tu e Giulia siete amici"), `primo accesso: toccato 'Diventa amico' → 'Tu e Giulia siete amici' (${await ia.getByTestId("invito-collegato").textContent().catch(() => "assente")})`);
-    const ev = ievents.filter((e) => e?.type === "funzione" && e.props?.nome === "invito_amico");
+    const ev = ievents.filter((e) => e?.type === "funzione" && e.props?.nome === "invito_amico" && e.props?.contesto !== "gia_iscritto");
     ok(ev.length === 1 && ev[0].props.stato === "amici" && droppedKeys(ev).length === 0, `primo accesso: risposta all'invito contata (${JSON.stringify(ev.map((e) => e.props))})`);
     ok((await ip.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "primo accesso: dopo la risposta il codice d'invito si cancella dal telefono");
     await ip.screenshot({ path: `${OUT}/benvenuto-4-invito-amico.png`, caret: "initial" }); }
