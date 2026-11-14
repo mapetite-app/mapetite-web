@@ -5,7 +5,8 @@ import InvitoArrivo from "@/components/invito-arrivo";
 import { loadProfilePage, viewerId, type PublicProfile } from "@/lib/social";
 import { isValidHandle, personName } from "@/lib/handle";
 import { cleanInviteCode, isFriendCode } from "@/lib/invito";
-import { anteprimaInvito } from "@/lib/social";
+import { anteprimaInvito, loadMySocial } from "@/lib/social";
+import InvitoAccetta from "@/components/invito-accetta";
 
 // Pagina d'arrivo del link d'invito (piano 9.1): chi la apre capisce in una frase cos'è Mapetite
 // e ha un solo pulsante, "Inizia". Se il codice è il nome di una persona con profilo pubblico
@@ -23,7 +24,8 @@ const GENERICI: Record<string, string> = {
 // Link personale di un amico (codice "i-…", 14/11): il nome che si è scelto chi invita.
 async function amico(codice: string | null): Promise<string | null> {
   if (!isFriendCode(codice)) return null;
-  return (await anteprimaInvito(codice))?.nome ?? null;
+  const a = await anteprimaInvito(codice);
+  return a && a !== "errore" ? a.nome : null;
 }
 
 async function inviter(codice: string | null): Promise<PublicProfile | null> {
@@ -57,6 +59,9 @@ export default async function InvitoPage({ params }: Props) {
   const loggedIn = !!viewer;
   const name = p ? personName(p) : nomeAmico;
   const perAmico = isFriendCode(codice);
+  // Già iscritto e link di un amico: "Diventa amico" qui, con il nome se ancora non ce l'ha.
+  const mio = loggedIn && perAmico && viewer ? await loadMySocial(viewer) : null;
+  const chiediNome = !!mio && ("stato" in mio || !mio.display_name?.trim());
   const posti = p ? p.visitati + p.da_provare : 0;
   const titolo = name ? `${name} ti ha invitato su Mapetite` : (codice && GENERICI[codice]) || "Ti hanno invitato su Mapetite";
 
@@ -106,11 +111,15 @@ export default async function InvitoPage({ params }: Props) {
       <div className="mt-auto px-6 pb-6 pt-8">
         {loggedIn ? (
           <>
-            <p className="mb-3 text-center text-sm font-sans text-text-muted">Hai già un account: sei dentro.</p>
+            {perAmico && codice ? (
+              <InvitoAccetta codice={codice} nome={name} chiediNome={chiediNome} />
+            ) : (
+              <p className="mb-3 text-center text-sm font-sans text-text-muted">Hai già un account: sei dentro.</p>
+            )}
             <Link
               href="/mappa"
               data-testid="invito-apri"
-              className="flex min-h-13 w-full items-center justify-center rounded-pill bg-accent px-6 py-3.5 font-display text-base font-semibold text-white shadow-float active:scale-[0.98]"
+              className={perAmico ? "flex min-h-11 w-full items-center justify-center font-display text-sm font-semibold text-brand" : "flex min-h-13 w-full items-center justify-center rounded-pill bg-accent px-6 py-3.5 font-display text-base font-semibold text-white shadow-float active:scale-[0.98]"}
             >
               Apri la tua mappa
             </Link>

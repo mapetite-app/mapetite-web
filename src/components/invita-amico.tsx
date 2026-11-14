@@ -1,5 +1,6 @@
 import { Link2 } from "lucide-react";
 import CondividiLink from "@/components/condividi-link";
+import NomePerInvito from "@/components/nome-per-invito";
 import { invitePath, myInviteCode } from "@/lib/invito";
 
 // "Invita un amico" nel profilo e in Amici (piano 9.1): il proprio link /invito/<nome> da mandare su
@@ -13,7 +14,7 @@ import { invitePath, myInviteCode } from "@/lib/invito";
 // Lorenzo 14/11: chi si registra dal link diventa tuo amico (collega_invito); se il tuo profilo è privato
 // però non ti vede: una riga lo dice e porta a "Fatti trovare".
 // Revisore 14/11: il link che rende amici usa il codice casuale "i-…" (mio_invito); senza, quello vecchio.
-export default function InvitaAmico({ userId, handle, codice = null, vuoto = false, privato = false }: { userId: string; handle: string | null; codice?: string | null; vuoto?: boolean; privato?: boolean }) {
+export default function InvitaAmico({ userId, handle, codice = null, vuoto = false, privato = false, senzaNome = false }: { userId: string; handle: string | null; codice?: string | null; vuoto?: boolean; privato?: boolean; senzaNome?: boolean }) {
   const path = invitePath(codice ?? myInviteCode({ handle, id: userId }));
   const condividi = (cls: string, label: string) => (
     <CondividiLink
@@ -41,10 +42,10 @@ export default function InvitaAmico({ userId, handle, codice = null, vuoto = fal
         <p className="relative mx-auto mt-1 max-w-[290px] text-sm font-sans leading-relaxed text-white/80">
           Nessun amico qui, per ora. Mandagli il tuo link: in un minuto ha la sua mappa dei locali, e vi passate i posti con un tocco.
         </p>
-        <div className="relative mt-4">
+        {senzaNome ? <NomePerInvito /> : <div className="relative mt-4">
           {condividi("w-full min-h-12 border-0 bg-accent! text-[15px] text-white!", "Manda il tuo link")}
           <p data-testid="invita-amico-link" data-path={path} className="mt-2 text-xs font-sans text-white/65">Il tuo link d&apos;invito si apre anche senza l&apos;app.</p>
-        </div>
+        </div>}
         {privato && (
         <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="relative mt-3 justify-center text-center flex min-h-11 items-center text-[13px] font-sans leading-snug text-white/85 underline underline-offset-2">
           Chi entra dal link può diventare tuo amico e vedere il tuo nome. I tuoi posti, solo con “Profilo pubblico”.
@@ -64,13 +65,13 @@ export default function InvitaAmico({ userId, handle, codice = null, vuoto = fal
           <p className="text-sm font-sans text-white/80">Mandagli il tuo link: in un minuto ha la sua mappa dei locali.</p>
         </div>
       </div>
-      <div className="relative mt-3 flex items-center gap-2">
+      {senzaNome ? <NomePerInvito /> : <div className="relative mt-3 flex items-center gap-2">
         <p data-testid="invita-amico-link" data-path={path} title={path} className="flex min-w-0 flex-1 items-center gap-2 truncate rounded-pill bg-white/10 px-3 py-2.5 text-sm font-sans text-white/85">
           <Link2 size={15} aria-hidden className="shrink-0 text-white/70" />
           <span className="truncate">Il tuo link d&apos;invito</span>
         </p>
         {condividi("shrink-0 border-0", "Condividi")}
-      </div>
+      </div>}
       {privato && (
         <a href="/profilo#profilo-pubblico" data-testid="invita-amico-privato" className="relative mt-3 flex min-h-11 items-center text-[13px] font-sans leading-snug text-white/85 underline underline-offset-2">
           Chi entra dal link può diventare tuo amico e vedere il tuo nome. I tuoi posti, solo con “Profilo pubblico”.

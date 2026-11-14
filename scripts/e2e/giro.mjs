@@ -4895,7 +4895,13 @@ else {
   await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
   ok(await sp.getByTestId("seguiti").getByText("Giulia").isVisible(), "amici: riga di chi segui");
   { const pr = sp.getByTestId("seguiti").getByTestId("amico-privato");
-    ok((await pr.count()) === 1 && ((await pr.textContent()) ?? "").includes("Pietro") && ((await pr.textContent()) ?? "").includes("Privato") && (await pr.locator("a").count()) === 0, "amici: l'amico con il profilo privato si vede per nome, senza link ai suoi posti; Giulia non è ripetuta"); }
+    ok((await pr.count()) === 1 && ((await pr.textContent()) ?? "").includes("Pietro") && ((await pr.textContent()) ?? "").includes("Privato") && (await pr.locator("a").count()) === 0, "amici: l'amico con il profilo privato si vede per nome, senza link ai suoi posti; Giulia non è ripetuta");
+    // Revisore 14/11 (secondo): l'amicizia si toglie da tutti e due i lati.
+    await pr.locator("button").first().click();
+    ok(await pr.getByTestId("togli-amico").isVisible(), "amici: toccando l'amico privato compare 'Togli dagli amici'");
+    await pr.getByTestId("togli-amico").click();
+    await sp.waitForTimeout(800);
+    ok((await sp.getByTestId("seguiti").getByTestId("amico-privato").count()) === 0, "amici: 'Togli dagli amici' lo toglie dalla riga"); }
   { const att = sp.getByTestId("attivita");
     const first = (await att.first().innerText()).replace(/\s+/g, " ");
     ok((await att.count()) === 1 && first.includes("Giulia ha provato Trattoria del Vicolo e altri 2 posti") && first.includes("oggi"), `amici: attività raggruppata per persona (${first.slice(0, 70)})`);
@@ -8565,6 +8571,17 @@ else {
   await ip.goto(`${BASE}/invito/${COD_AMICO}`, { waitUntil: "networkidle" });
   ok((await ip.getByTestId("invito-titolo").textContent()) === "Giulia ti ha invitato su Mapetite" && ((await ip.getByTestId("invito-amicizia").textContent()) ?? "").includes("se vuoi, diventi amico di Giulia"), `invito da amico (codice casuale): nome di chi invita e amicizia proposta, non imposta (${await ip.getByTestId("invito-amicizia").textContent()})`);
   { const fs = await ip.getByTestId("invito-amicizia").evaluate((e) => parseFloat(getComputedStyle(e).fontSize)); ok(fs >= 13, `invito: la riga sull'amicizia si legge (${fs}px)`); }
+  // Già iscritto (revisore 14/11, secondo): dal link dell'amico "Diventa amico di Giulia", con il nome se manca.
+  await ictx.clearCookies({ name: "e2e_anonimo" });
+  await ip.goto(`${BASE}/invito/${COD_AMICO}`, { waitUntil: "networkidle" });
+  { const acc = ip.getByTestId("invito-accetta");
+    ok(await acc.isVisible() && ((await acc.getByTestId("invito-si").textContent()) ?? "").includes("Diventa amico di Giulia") && (await ip.getByText("Hai già un account: sei dentro").count()) === 0, "invito da già iscritto: 'Diventa amico di Giulia' al posto di 'sei dentro'");
+    if (await acc.getByTestId("invito-mio-nome").count()) await acc.getByTestId("invito-mio-nome").fill("Luca");
+    await acc.getByTestId("invito-si").click();
+    await ip.getByTestId("invito-accettato").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(((await ip.getByTestId("invito-accettato").textContent().catch(() => "")) ?? "").includes("Tu e Giulia siete amici"), "invito da già iscritto: un tocco e siete amici"); }
+  await ictx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await ip.evaluate((c) => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: c, t: Date.now() })), COD_AMICO);
   await ip.goto(`${BASE}/invito/i-0000000000bb`, { waitUntil: "networkidle" });
   ok((await ip.getByTestId("invito-titolo").textContent()) === "Ti hanno invitato su Mapetite", "invito: codice casuale sconosciuto → testo neutro, nessun nome");
   await ip.screenshot({ path: `${OUT}/invito-tester.png`, caret: "initial" });
@@ -8713,6 +8730,9 @@ else {
     const top = await ia.boundingBox().catch(() => null);
     ok(((await ia.getByTestId("invito-domanda").textContent().catch(() => "")) ?? "").includes("Giulia ti ha invitato") && await ia.getByTestId("invito-si").isVisible() && await ia.getByTestId("invito-no").isVisible() && !!top && top.y + top.height < 600, `primo accesso da invito: in cima 'Giulia ti ha invitato' con 'Diventa amico' e 'Non ora' (${Math.round(top?.y ?? -1)})`);
     ok((await ip.getByTestId("invito-collegato").count()) === 0, "primo accesso da invito: nessuna amicizia prima del sì");
+    // Revisore 14/11 (secondo): chi accetta scrive il suo nome (l'amico vedeva "Qualcuno").
+    ok(await ia.getByTestId("invito-si").isDisabled() && await ia.getByTestId("invito-mio-nome").isVisible(), "primo accesso da invito: 'Diventa amico' spento finché non scrivi il tuo nome");
+    await ia.getByTestId("invito-mio-nome").fill("Luca");
     await ia.getByTestId("invito-si").click();
     await ia.getByTestId("invito-collegato").waitFor({ timeout: 4000 }).catch(() => {});
     ok(((await ia.getByTestId("invito-collegato").textContent().catch(() => "")) ?? "").includes("Tu e Giulia siete amici"), `primo accesso: toccato 'Diventa amico' → 'Tu e Giulia siete amici' (${await ia.getByTestId("invito-collegato").textContent().catch(() => "assente")})`);

@@ -141,6 +141,7 @@ export async function completeOnboarding({
 }
 
 type Client = Awaited<ReturnType<typeof createClient>>;
+const RISERVATI = ["mapetite", "admin", "tester", "amici", "supporto", "support", "staff", "ufficiale"];
 
 // Nome pubblico libero a partire dal nome: "Giulia Rossi" → giuliarossi, poi giuliarossi2, 3… se è preso.
 // Chi ha già un nome pubblico lo tiene. Ritorna un messaggio d'errore, o null se è andata.
@@ -148,7 +149,9 @@ async function rendiTrovabile(supabase: Client, userId: string, nome: string): P
   const { data: prof } = await supabase.from("profiles").select("handle").eq("id", userId).maybeSingle();
   const attuale = isValidHandle(prof?.handle) ? prof!.handle : null;
   let base = cleanHandle(nome).replace(/^[._]+|[._]+$/g, "").slice(0, 16);
-  if (base.length < 3) base = `${base}${base ? "." : ""}mapetite`.slice(0, 16);
+  // Mai un @nome che sembri ufficiale (revisore 14/11): niente "mapetite", "admin", "tester"…
+  if (base.length < 3) base = `persona${Math.floor(100 + Math.random() * 900)}`;
+  if (RISERVATI.some((r) => base.startsWith(r))) base = `persona${Math.floor(100 + Math.random() * 900)}`;
   const candidati = attuale ? [attuale] : [base, ...Array.from({ length: 6 }, (_, i) => `${base}${i + 2}`), `${base}${Math.floor(1000 + Math.random() * 9000)}`];
   for (const handle of candidati) {
     const { data, error } = await supabase
@@ -164,7 +167,7 @@ async function rendiTrovabile(supabase: Client, userId: string, nome: string): P
 
 // Inviti tra amici (14/11, rifatti dopo la revisione): il primo accesso mostra chi ti ha invitato e chiede
 // "Diventa amico" o "Non ora". Solo i codici casuali "i-…" (migrazione 20261114c_inviti_sicuri).
-export type ChiInvita = { nome: string | null } | null;
+export type ChiInvita = { nome: string | null } | null | "rete";
 export type EsitoInvito = { stato: "ok"; nome: string | null } | { stato: "no"; motivo: string } | { stato: "rete" };
 
 const fakeE2E = async () => process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER && !(await cookies()).get("e2e_anonimo");
@@ -175,14 +178,26 @@ export async function chiInvita(raw: unknown): Promise<ChiInvita> {
   if (!isFriendCode(codice)) return null;
   if (await fakeE2E()) return codice.endsWith("ffffffffffff") ? null : { nome: nomeFinto(codice) };
   const p = await anteprimaInvito(codice);
+  // Errore del database o rete: "rete", così il telefono tiene il codice e riprova (revisore 14/11).
+  if (p === "errore") return "rete";
   return p ? { nome: p.nome } : null;
 }
 
-export async function accettaInvito(raw: unknown): Promise<EsitoInvito> {
+// "nome": chi accetta e non ha ancora un nome lo sceglie qui (lo vedrà l'amico: revisore 14/11, prima
+// si vedeva "Qualcuno"). Si scrive solo se il profilo non ne ha già uno.
+export async function accettaInvito(raw: unknown, nomeRaw?: unknown): Promise<EsitoInvito> {
   const codice = cleanInviteCode(raw);
   if (!isFriendCode(codice)) return { stato: "no", motivo: "codice" };
+  const nome = typeof nomeRaw === "string" ? nomeRaw.trim().slice(0, 40) : "";
   if (await fakeE2E()) return { stato: "ok", nome: nomeFinto(codice) };
   const supabase = await createClient();
+  if (nome) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { error: nErr } = await supabase.from("profiles").update({ display_name: nome }).eq("id", user.id).is("display_name", null);
+      if (nErr) console.error("[invito] nome:", nErr.message);
+    }
+  }
   const { data, error } = await supabase.rpc("accetta_invito", { p_codice: codice });
   if (error) {
     console.error("[invito] accetta:", error.code, error.message);

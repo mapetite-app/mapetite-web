@@ -15,7 +15,7 @@ import { cityArea } from "@/lib/named-city";
 import { saveLastView } from "@/lib/last-view";
 import { clearStoredInvite, isFriendCode, readStoredInvite } from "@/lib/invito";
 import { cleanHandle } from "@/lib/handle";
-import { elenco, PUBBLICO_CHI, PUBBLICO_MAI, PUBBLICO_REVOCA, PUBBLICO_VEDONO } from "@/lib/privacy-profilo";
+import { PUBBLICO_CHI, PUBBLICO_MAI, PUBBLICO_REVOCA, PUBBLICO_VEDONO } from "@/lib/privacy-profilo";
 
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 // Anteprima del @nome che nasce dal nome (stessa regola di rendiTrovabile in actions.ts, senza il numero).
@@ -239,7 +239,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [submitting, setSubmitting] = useState<"importa" | "mappa" | null>(null);
   // Invito che collega da solo e "Fatti trovare dagli amici" (Lorenzo 14/11: "non riesco a trovare nessuno").
   // Invito di un amico: chi invita (codice + nome) e a che punto è la risposta.
-  const [invito, setInvito] = useState<{ codice: string; nome: string | null; stato: "chiedi" | "salvo" | "amici" | "errore" } | null>(null);
+  const [invito, setInvito] = useState<{ codice: string; nome: string | null; stato: "chiedi" | "salvo" | "amici" | "errore" | "scaduto" } | null>(null);
+  const [mioNome, setMioNome] = useState("");
   const [trova, setTrova] = useState(false);
   const [trovaNome, setTrovaNome] = useState("");
   const nomeRef = useRef<HTMLInputElement>(null);
@@ -298,7 +299,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
     let vivo = true;
     chiInvita(codice)
       .then((r) => {
-        if (!vivo) return;
+        if (!vivo || r === "rete") return; // rete o database giù: il codice resta e si riprova alla prossima apertura
         if (r) setInvito({ codice, nome: r.nome, stato: "chiedi" });
         else clearStoredInvite();
       })
@@ -315,12 +316,14 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
       return;
     }
     setInvito({ ...invito, stato: "salvo" });
-    const r = await accettaInvito(invito.codice).catch(() => ({ stato: "rete" as const }));
+    const nomeScelto = (trova && trovaNome.trim()) || mioNome.trim();
+    const r = await accettaInvito(invito.codice, nomeScelto).catch(() => ({ stato: "rete" as const }));
     trackFeature("invito_amico", { stato: r.stato === "ok" ? "amici" : r.stato });
     if (r.stato === "rete") { setInvito({ ...invito, stato: "errore" }); return; }
     clearStoredInvite();
+    // Revisore 14/11: niente sparizioni silenziose: si dice che l'invito non vale più.
     if (r.stato === "ok") setInvito({ ...invito, nome: r.nome ?? invito.nome, stato: "amici" });
-    else setInvito(null);
+    else setInvito({ ...invito, stato: "scaduto" });
   };
 
   // Stessi numeri del contatore (revisore 5/11): saltato il passo dei 10 tipi, la barra conta su un passo in meno.
@@ -773,12 +776,27 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   <p data-testid="invito-collegato" className="min-w-0 flex-1 text-[15px] font-sans leading-snug">
                     {invito.nome ? <>Tu e <span className="font-semibold">{invito.nome}</span> siete amici</> : "Siete amici"}: vi trovate in Amici.
                   </p>
+                ) : invito.stato === "scaduto" ? (
+                  <p data-testid="invito-scaduto" className="min-w-0 flex-1 text-[15px] font-sans leading-snug">Questo invito non vale più. Chiedi a {invito.nome ?? "chi te l'ha mandato"} un link nuovo.</p>
                 ) : (
                   <div className="min-w-0 flex-1">
                     <p data-testid="invito-domanda" className="text-[15px] font-sans font-medium leading-snug">{invito.nome ?? "Un amico"} ti ha invitato</p>
-                    <p className="text-[13px] font-sans text-white/80">{invito.stato === "errore" ? "Non ci sono riuscito: riprova." : "Da amici vi vedete per nome in Amici."}</p>
+                    <p className="text-[13px] font-sans text-white/80">{invito.stato === "errore" ? "Non ci sono riuscito: riprova." : `Da amici vi vedete per nome in Amici${invito.nome ? `: ${invito.nome} vedrà il tuo` : ""}.`}</p>
+                    {/* Il proprio nome, perché l'amico sappia chi ha accettato (prima vedeva "Qualcuno"). */}
+                    {!(trova && trovaNome.trim()) && (
+                      <input
+                        data-testid="invito-mio-nome"
+                        value={mioNome}
+                        onChange={(e) => setMioNome(e.target.value)}
+                        maxLength={40}
+                        autoComplete="name"
+                        placeholder="Il tuo nome"
+                        aria-label="Il tuo nome, lo vedrà chi ti ha invitato"
+                        className="mt-2.5 block min-h-11 w-full rounded-btn border-0 bg-white px-3 text-[16px] font-sans text-text outline-none placeholder:text-text-muted"
+                      />
+                    )}
                     <div className="mt-2.5 flex gap-2">
-                      <button type="button" data-testid="invito-si" onClick={() => rispondiInvito(true)} disabled={invito.stato === "salvo"} className="inline-flex min-h-11 items-center rounded-pill bg-accent px-4 font-display text-sm font-semibold text-white active:scale-95 disabled:opacity-60">
+                      <button type="button" data-testid="invito-si" onClick={() => rispondiInvito(true)} disabled={invito.stato === "salvo" || !((trova && trovaNome.trim()) || mioNome.trim())} className="inline-flex min-h-11 items-center rounded-pill bg-accent px-4 font-display text-sm font-semibold text-white active:scale-95 disabled:opacity-60">
                         {invito.stato === "salvo" ? "Un attimo…" : "Diventa amico"}
                       </button>
                       <button type="button" data-testid="invito-no" onClick={() => rispondiInvito(false)} disabled={invito.stato === "salvo"} className="inline-flex min-h-11 items-center rounded-pill px-3 font-display text-sm font-semibold text-white/85">
@@ -854,7 +872,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
               <label className="flex cursor-pointer items-center justify-between gap-3">
                 <span className="min-w-0">
                   <span className="block font-display text-[15px] font-semibold text-text">Profilo pubblico</span>
-                  <span className="block text-[13px] font-sans text-text-muted">Gli amici ti trovano per nome. Lo vede chiunque su Mapetite.</span>
+                  <span className="block text-[13px] font-sans text-text-muted">Gli amici ti trovano per nome. Lo vede chiunque abbia il link o ti cerchi.</span>
                 </span>
                 <input
                   type="checkbox"
@@ -896,7 +914,9 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                   {/* Stesso testo del profilo e di /privacy (src/lib/privacy-profilo.ts): consenso informato, una sola fonte. */}
                   <details data-testid="fatti-trovare-privacy" className="mt-1 text-xs font-sans leading-relaxed text-text-muted">
                     <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-brand">Cosa vedono gli altri</summary>
-                    <p>{PUBBLICO_CHI}: {elenco(PUBBLICO_VEDONO)} Mai: {PUBBLICO_MAI.join(", ")}. {PUBBLICO_REVOCA}{" "}
+                    <p>{PUBBLICO_CHI}:</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">{PUBBLICO_VEDONO.map((v) => <li key={v}>{v}</li>)}</ul>
+                    <p className="mt-1.5">Mai: {PUBBLICO_MAI.join(", ")}. {PUBBLICO_REVOCA}{" "}
                       <Link href="/privacy#profilo-pubblico" target="_blank" className="font-semibold text-brand underline underline-offset-2">Privacy</Link>
                     </p>
                   </details>

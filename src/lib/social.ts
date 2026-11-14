@@ -405,13 +405,13 @@ export async function mioInvito(): Promise<string | null> {
 }
 
 // Chi invita, per la pagina d'arrivo: il nome che si è scelto (ha mandato lui il link), il @nome solo se pubblico.
-export async function anteprimaInvito(codice: string): Promise<{ nome: string | null; handle: string | null } | null> {
+export async function anteprimaInvito(codice: string): Promise<{ nome: string | null; handle: string | null } | null | "errore"> {
   const f = await fake();
   if (f && f !== "in-arrivo") return f.anteprime?.[codice] ?? null;
   if (f === "in-arrivo" && dev()) return null;
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("anteprima_invito", { p_codice: codice });
-  if (error) { console.error(`[social] anteprima_invito: ${error.code ?? ""} ${error.message}`); return null; }
+  if (error) { console.error(`[social] anteprima_invito: ${error.code ?? ""} ${error.message}`); return "errore"; }
   const r = data as { nome?: string | null; handle?: string | null } | null;
   return r ? { nome: r.nome ?? null, handle: r.handle ?? null } : null;
 }

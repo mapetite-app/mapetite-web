@@ -10,6 +10,7 @@ import ScopritoriAmici from "./scopritori-amici";
 import { personName, profilePath } from "@/lib/handle";
 import { groupActivity, isVisited, whenLabel } from "@/lib/social-view";
 import CercaPersone from "./cerca-persone";
+import AmicoPrivato from "./amico-privato";
 import CreatorListe from "./creator-liste";
 
 // Amici (piano 5.2): chi segui, cosa ha salvato o dove è stato, e la ricerca delle persone.
@@ -104,15 +105,7 @@ export default async function AmiciPage() {
                     </Link>
                   </li>
                 ))}
-                {amiciPrivati.map((a) => (
-                  <li key={a.id} data-testid="amico-privato" className="shrink-0">
-                    <span title="Profilo privato: vedi il suo nome, non i suoi posti" className="flex w-16 flex-col items-center gap-1 text-center">
-                      <Avatar person={a} size={52} />
-                      <span className="w-full truncate text-[11px] font-display text-text">{personName(a)}</span>
-                      <span className="text-[10px] font-sans text-text-muted">Privato</span>
-                    </span>
-                  </li>
-                ))}
+                {amiciPrivati.map((a) => <AmicoPrivato key={a.id} amico={a} />)}
               </ul>
             </section>
           )}
@@ -121,7 +114,7 @@ export default async function AmiciPage() {
 
           <section className="mt-6" aria-labelledby="attivita-titolo">
             <h2 id="attivita-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Attività</h2>
-            {feed.seguiti.length === 0 ? (
+            {feed.seguiti.length === 0 && amiciPrivati.length === 0 ? (
               <div data-testid="amici-vuoto" className="mt-2 rounded-card border border-[#e3e7e7] bg-white p-5 text-center">
                 <p className="font-display text-base font-semibold text-brand">Non segui ancora nessuno</p>
                 <p className="mx-auto mt-1 max-w-xs text-sm font-sans text-text-muted">
@@ -130,7 +123,7 @@ export default async function AmiciPage() {
               </div>
             ) : feed.attivita.length === 0 ? (
               <p data-testid="amici-nessuna-attivita" className="mt-2 rounded-card border border-[#e3e7e7] bg-white p-5 text-center text-sm font-sans text-text-muted">
-                Chi segui non ha ancora salvato posti. Torna più tardi.
+                {feed.seguiti.length === 0 ? "I tuoi amici hanno il profilo privato: i loro posti non si vedono." : "Chi segui non ha ancora salvato posti. Torna più tardi."}
               </p>
             ) : (
               <ul className="mt-2 divide-y divide-border">
