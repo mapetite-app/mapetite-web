@@ -19,6 +19,7 @@ export type VoceAltro = { label: string; testid: string; onClick: () => void };
 export function DomandaPrenotato({
   b,
   scuro = false,
+  compatto = false,
   conNome = true,
   sopra,
   onSi,
@@ -30,6 +31,7 @@ export function DomandaPrenotato({
 }: {
   b: BookingRequest;
   scuro?: boolean;
+  compatto?: boolean;
   conNome?: boolean;
   sopra?: string;
   onSi: () => void;
@@ -41,8 +43,9 @@ export function DomandaPrenotato({
 }) {
   const [aperto, setAperto] = useState(false);
   const quando = quandoTavolo(b, now);
-  const persone = b.people ? `${b.people} ${b.people === 1 ? "persona" : "persone"}` : null;
-  const riga = [conNome ? b.placeName : null, quando || null, persone].filter(Boolean).join(" · ");
+  // Compatto (banner sulla mappa, revisore 14/11): "Stasera 21:30 · 2", in una riga, senza spiegazione.
+  const persone = b.people ? (compatto ? `${b.people}` : `${b.people} ${b.people === 1 ? "persona" : "persone"}`) : null;
+  const riga = [conNome ? b.placeName : null, (compatto ? quando.replace(" alle ", " ") : quando) || null, persone].filter(Boolean).join(" · ");
   const muted = scuro ? "text-white/80" : "text-text-muted";
   return (
     <div data-testid="domanda-prenotato">
@@ -51,11 +54,11 @@ export function DomandaPrenotato({
           <CalendarCheck size={14} /> {sopra}
         </p>
       )}
-      <p data-testid="domanda-prenotato-titolo" className={`font-title text-xl font-semibold leading-tight ${scuro ? "text-white" : "text-text"}`}>{DOMANDA_PRENOTATO}</p>
-      {riga && <p data-testid="domanda-prenotato-riga" className={`mt-0.5 text-sm font-sans font-semibold ${scuro ? "text-white" : "text-brand"}`}>{riga}</p>}
-      <p className={`mt-0.5 text-sm font-sans ${muted}`}>{rigaPrenotato(b)}</p>
+      <p data-testid="domanda-prenotato-titolo" className={`font-title ${compatto ? "text-lg" : "text-xl"} font-semibold leading-tight ${scuro ? "text-white" : "text-text"}`}>{DOMANDA_PRENOTATO}</p>
+      {riga && <p data-testid="domanda-prenotato-riga" className={`mt-0.5 text-sm font-sans font-semibold ${compatto ? "truncate" : ""} ${scuro ? "text-white" : "text-brand"}`}>{riga}</p>}
+      {!compatto && <p className={`mt-0.5 text-sm font-sans ${muted}`}>{rigaPrenotato(b)}</p>}
       {children}
-      <div className="mt-3 flex gap-2">
+      <div className={`${compatto ? "mt-2" : "mt-3"} flex gap-2`}>
         <button
           type="button"
           data-testid={ids.si}

@@ -147,13 +147,15 @@ function ConfermaConGiorno({ b, onFatto }: { b: BookingRequest; onFatto: () => v
         data-testid="prenotazione-quando-salva"
         disabled={!date || !time}
         onClick={() => { updateBooking(b.id, { date, time, confirmed: true }); signal("prenotazione_confermata", b); onFatto(); }}
-        className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white disabled:bg-border disabled:text-text-muted"
+        className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill bg-accent px-4 text-sm font-display font-semibold text-white disabled:bg-border disabled:text-text-muted"
       >
         <Check size={16} /> Segna prenotato
       </button>
     </div>
   );
 }
+
+const VOCE = "flex min-h-11 w-full items-center gap-2 border-b border-border px-3 text-left text-sm font-display font-semibold text-text";
 
 function UpcomingCard({ b }: { b: BookingRequest }) {
   const status = bookingStatus(b);
@@ -165,6 +167,41 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
   // Il giorno è già nel riquadro della data (revisore 14/11: niente data ripetuta): qui solo l'ora.
   const when = b.date ? (b.time ? `Alle ${b.time}` : "Ora da definire") : "Giorno da definire";
   const confermata = status !== "inviata";
+  const percorso = b.lat != null && b.lng != null ? (
+    <a
+      href={`https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      data-testid="prenotazione-percorso"
+      onClick={() => track("percorso", placeOf(b), { fonte: "prenotazioni" })}
+      className={confermata ? "flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-2 text-sm font-display font-semibold text-brand" : VOCE}
+    >
+      <Navigation size={15} className={confermata ? "shrink-0" : "shrink-0 text-text-muted"} /> Percorso
+    </a>
+  ) : null;
+  const calendario = (
+    <button
+      type="button"
+      data-testid="prenotazione-calendario"
+      disabled={!b.date}
+      onClick={() => downloadIcs(b)}
+      className={confermata ? "flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-2 text-sm font-display font-semibold text-brand disabled:opacity-40" : `${VOCE} disabled:opacity-40`}
+    >
+      <CalendarPlus size={15} className={confermata ? "shrink-0" : "shrink-0 text-text-muted"} /> Calendario
+    </button>
+  );
+  const altroBtn = (
+    <button
+      type="button"
+      data-testid="prenotazione-altro"
+      aria-expanded={altro}
+      aria-label={`Altro per ${b.placeName}`}
+      onClick={() => setAltro(!altro)}
+      className="flex min-h-10 min-w-10 items-center justify-center gap-1 rounded-pill px-1.5 text-sm font-display font-semibold text-text-muted"
+    >
+      <MoreHorizontal size={18} className="shrink-0" /> Altro
+    </button>
+  );
   return (
     <li data-testid="prenotazione-in-arrivo" data-stato={status} className="rounded-card border border-border bg-white p-4 shadow-card">
       <div className="flex gap-3">
@@ -176,7 +213,7 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
           </p>
           {/* Una sola riga di stato (revisore 14/11): com'è partita la richiesta, oppure che è prenotata. */}
           {confermata ? (
-            <p data-testid="prenotazione-confermata" className="mt-1.5 inline-flex items-center gap-1 rounded-pill bg-brand px-2.5 py-1 text-xs font-display font-semibold text-white">
+            <p data-testid="prenotazione-confermata" className="mt-1.5 inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-1 text-xs font-display font-semibold text-brand">
               <Check size={12} aria-hidden /> {pf ? `Prenotata su ${pf}` : "Prenotata"}
             </p>
           ) : (
@@ -186,10 +223,11 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
           )}
         </div>
       </div>
-      {!confermata && (quando ? (
-        <ConfermaConGiorno b={b} onFatto={() => setQuando(false)} />
-      ) : (
-        <div className="mt-3">
+      {/* Finché non è confermata (revisore 14/11): in vista solo "Sì, l'ho prenotato" e "Altro";
+          Percorso e Calendario servono a tavolo fissato, quindi stanno in "Altro". */}
+      {!confermata && quando && <ConfermaConGiorno b={b} onFatto={() => setQuando(false)} />}
+      {!confermata && !quando && (
+        <div className="mt-3 flex gap-2">
           <button
             type="button"
             data-testid="prenotazione-conferma"
@@ -197,48 +235,25 @@ function UpcomingCard({ b }: { b: BookingRequest }) {
               if (!b.date || !b.time) { setQuando(true); return; }
               updateBooking(b.id, { confirmed: true }); signal("prenotazione_confermata", b);
             }}
-            className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill bg-brand px-4 text-sm font-display font-semibold text-white active:scale-[0.98]"
+            className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill bg-accent px-4 text-sm font-display font-semibold text-white active:scale-[0.98]"
           >
             <Check size={16} /> Sì, l&apos;ho prenotato
           </button>
+          {altroBtn}
         </div>
-      ))}
-      <div className="mt-3 grid grid-cols-[1fr_1fr_auto] gap-2">
-        {b.lat != null && b.lng != null ? (
-          <a
-            href={`https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-testid="prenotazione-percorso"
-            onClick={() => track("percorso", placeOf(b), { fonte: "prenotazioni" })}
-            className="flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-2 text-sm font-display font-semibold text-brand"
-          >
-            <Navigation size={15} className="shrink-0" /> Percorso
-          </a>
-        ) : <span />}
-        <button
-          type="button"
-          data-testid="prenotazione-calendario"
-          disabled={!b.date}
-          onClick={() => downloadIcs(b)}
-          className="flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-2 text-sm font-display font-semibold text-brand disabled:opacity-40"
-        >
-          <CalendarPlus size={15} className="shrink-0" /> Calendario
-        </button>
-        <button
-          type="button"
-          data-testid="prenotazione-altro"
-          aria-expanded={altro}
-          aria-label={`Altro per ${b.placeName}`}
-          onClick={() => setAltro(!altro)}
-          className="flex min-h-10 min-w-10 items-center justify-center gap-1 rounded-pill px-1.5 text-sm font-display font-semibold text-text-muted"
-        >
-          <MoreHorizontal size={18} className="shrink-0" /> Altro
-        </button>
-      </div>
+      )}
+      {confermata && (
+        <div className="mt-3 grid grid-cols-[1fr_1fr_auto] gap-2">
+          {percorso ?? <span />}
+          {calendario}
+          {altroBtn}
+        </div>
+      )}
       {/* "Altro" (revisore 14/11): le azioni rare fuori dalla vista, un tocco più in là. */}
       {altro && (
         <div data-testid="prenotazione-altro-menu" className="mt-2 overflow-hidden rounded-btn border border-border bg-white">
+          {!confermata && percorso}
+          {!confermata && calendario}
           {confermata && (
             <button
               type="button"

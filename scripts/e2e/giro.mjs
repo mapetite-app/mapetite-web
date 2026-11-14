@@ -5985,6 +5985,17 @@ else {
     await ap.getByTestId("domanda-prenotato-altro").click({ timeout: 5000 }).catch(() => {});
     await ap.getByTestId("hai-prenotato-no").click({ timeout: 5000 }).catch(() => {});
     ok((await ap.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]").length)) === 0 && (await ap.getByTestId("promemoria-prenotazioni").count()) === 0, "home: 'No' toglie la richiesta, nessun promemoria"); }
+  // Revisore 14/11 (2): con due richieste senza risposta, in home una sola domanda e "+1 da confermare".
+  await ap.evaluate(() => {
+    const x = new Date(); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    const r = (id, n) => ({ id, placeId: id, placeName: n, lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "sito", piattaforma: "TheFork", createdAt: Date.now() });
+    localStorage.setItem("mapetite.prenotazioni", JSON.stringify([r("tf1", "Terrazza Uno"), r("tf2", "Osteria Due")]));
+  });
+  await ap.reload({ waitUntil: "networkidle" });
+  { const altre = ap.getByTestId("promemoria-altre-da-confermare");
+    const vis = await altre.waitFor({ timeout: 5000 }).then(() => true, () => false);
+    ok(vis && (await ap.getByTestId("promemoria-hai-prenotato").count()) === 1 && ((await altre.textContent()) ?? "").trim() === "+1 da confermare" && (await altre.getAttribute("href")) === "/prenotazioni", "home (revisore 14/11): una sola 'L'hai prenotato?' e '+1 da confermare' verso /prenotazioni"); }
+  await ap.evaluate(() => localStorage.removeItem("mapetite.prenotazioni"));
   await ap.evaluate(() => {
     const x = new Date(); const d = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
     localStorage.setItem("mapetite.prenotazioni", JSON.stringify([{ id: "t1", placeId: "P1", placeName: "Terrazza Uno", lat: 41.9, lng: 12.49, date: d, time: "21:00", people: 2, special: null, via: "whatsapp", confirmed: true, createdAt: Date.now() }]));
@@ -7169,7 +7180,13 @@ else {
   ok(t1.includes("Alle 21:00") && t1.includes("2 persone") && t1.includes("in terrazza") && t1.includes("Inviata su WhatsApp") && !/\d\d\/\d\d/.test(t1), `prenotazioni: giorno nel riquadro (non ripetuto, revisore 14/11), ora, persone, richiesta e come è stata inviata (${t1.slice(0, 90)}…)`);
   ok((await u1.getAttribute("data-stato")) === "inviata" && (await up.nth(0).getAttribute("data-stato")) === "confermata" && ((await up.nth(0).getByTestId("prenotazione-quando-riga").textContent()) ?? "").startsWith("Alle 13:00"), "prenotazioni: stato 'Richiesta inviata' e 'Confermata'");
   ok((await up.nth(0).getByRole("link", { name: "Osteria Pigneto" }).getAttribute("href")) === `/locali/${UUID}` && (await u1.getByRole("link", { name: "Terrazza Uno" }).count()) === 0, "prenotazioni: il nome apre la scheda solo con l'id Mapetite (l'id Google non ha pagina)");
-  ok((await u1.getByTestId("prenotazione-percorso").getAttribute("href")).includes("destination=41.9,12.49"), "prenotazioni: Percorso verso il locale");
+  // Revisore 14/11 (2): finché non è confermata, in vista solo "Sì" e "Altro"; Percorso e Calendario in "Altro".
+  ok((await u1.getByTestId("prenotazione-percorso").count()) === 0 && (await u1.getByTestId("prenotazione-calendario").count()) === 0 && await u1.getByTestId("prenotazione-conferma").isVisible() && await u1.getByTestId("prenotazione-altro").isVisible(), "prenotazioni: richiesta non confermata → in vista solo 'Sì, l'ho prenotato' e 'Altro'");
+  await u1.getByTestId("prenotazione-altro").click();
+  ok((await u1.getByTestId("prenotazione-percorso").getAttribute("href")).includes("destination=41.9,12.49") && await u1.getByTestId("prenotazione-calendario").isVisible(), "prenotazioni: Percorso verso il locale (e Calendario) dentro 'Altro'");
+  await u1.getByTestId("prenotazione-altro").click();
+  { const cls = (await u1.getByTestId("prenotazione-conferma").getAttribute("class")) ?? "";
+    ok(cls.includes("bg-accent"), "prenotazioni (revisore 14/11): 'Sì, l'ho prenotato' corallo come in home, mappa e foglio"); }
   ok((await past.nth(1).getByTestId("prenotazione-esito").textContent()).includes("Ti è piaciuto") && (await past.nth(0).getByTestId("prenotazione-com-e-andata").count()) === 1, "prenotazioni: passate con esito o con 'Com'è andata?'");
   { const w = await width(); ok(w <= 390, `prenotazioni: niente scorrimento orizzontale (${w}px)`); }
   await pshot("81-prenotazioni");
@@ -7181,6 +7198,7 @@ else {
   const stored = await pp.evaluate(() => JSON.parse(localStorage.getItem("mapetite.prenotazioni") ?? "[]"));
   ok((await u1.getAttribute("data-stato")) === "confermata" && stored.find((b) => b.id === "u1")?.confirmed === true, "prenotazioni: 'Il locale ha confermato' → Confermata, salvato nel telefono");
   { const t = (await u1.textContent()) ?? "";
+    ok(!((await u1.getByTestId("prenotazione-confermata").getAttribute("class")) ?? "").includes("text-white"), "prenotazioni (revisore 14/11): il bollino 'Prenotata' è leggero, non sembra un pulsante");
     ok(((await u1.getByTestId("prenotazione-confermata").textContent()) ?? "").trim() === "Prenotata" && !t.includes("Inviata su WhatsApp") && !t.includes("l'hai segnat") && (await u1.getByRole("button", { name: "Non ancora" }).count()) === 0 && (await u1.getByTestId("prenotazione-annulla-conferma").count()) === 0, `prenotazioni (revisore 14/11): una sola riga di stato, niente 'Non ancora' in vista (${t.slice(0, 120)})`); }
   // "Annulla conferma" sta in "Altro", con "Togli".
   await u1.getByTestId("prenotazione-altro").click();
@@ -7385,7 +7403,7 @@ else {
   await vp.reload({ waitUntil: "networkidle" });
   { const m = vp.getByTestId("mappa-prenotazione");
     await m.waitFor({ timeout: 8000 }).catch(() => {});
-    ok((await m.getAttribute("data-tipo").catch(() => null)) === "chiedi" && (await m.getByTestId("domanda-prenotato-titolo").textContent().catch(() => "")) === "L'hai prenotato?" && ((await m.getByTestId("domanda-prenotato-riga").textContent().catch(() => "")) ?? "").startsWith("Osteria Quieta · Stasera alle 21:30") && await m.getByTestId("mappa-hai-prenotato-si").isVisible().catch(() => false) && await m.getByTestId("mappa-hai-prenotato-non-ancora").isVisible().catch(() => false), "mappa: richiesta senza risposta → 'L'hai prenotato?' con Sì / Non ancora, come in home e nel foglio");
+    ok((await m.getAttribute("data-tipo").catch(() => null)) === "chiedi" && (await m.getByTestId("domanda-prenotato-titolo").textContent().catch(() => "")) === "L'hai prenotato?" && ((await m.getByTestId("domanda-prenotato-riga").textContent().catch(() => "")) ?? "").trim() === "Osteria Quieta · Stasera 21:30 · 2" && (await m.getByRole("button", { name: "Nascondi il promemoria" }).count()) === 0 && !((await m.textContent()) ?? "").includes("te lo ricordo io") && await m.getByTestId("mappa-hai-prenotato-si").isVisible().catch(() => false) && await m.getByTestId("mappa-hai-prenotato-non-ancora").isVisible().catch(() => false), "mappa: richiesta senza risposta → 'L'hai prenotato?' compatta ('Stasera 21:30 · 2', niente ✕ né spiegazione) con Sì / Non ancora");
     await vp.screenshot({ path: `${OUT}/56c2-mappa-hai-prenotato.png` });
     await m.getByTestId("mappa-hai-prenotato-non-ancora").click().catch(() => {});
     await vp.waitForTimeout(200);
