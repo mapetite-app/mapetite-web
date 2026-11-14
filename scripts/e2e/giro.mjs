@@ -4860,7 +4860,7 @@ else {
   searchUrl = null;
   await sp.getByLabel("Cerca persone per nome").fill("Giulia Rossi");
   await sp.waitForTimeout(700);
-  ok(!!searchUrl && searchUrl.includes('display_name.ilike."%Giulia Rossi%"'), `amici: 'Giulia Rossi' cerca il nome con lo spazio (${searchUrl?.split("or=")[1]?.slice(0, 90)})`);
+  ok(!!searchUrl && searchUrl.replace(/\+/g, " ").includes('display_name.ilike."%Giulia Rossi%"'), `amici: 'Giulia Rossi' cerca il nome con lo spazio (${searchUrl?.split("or=")[1]?.slice(0, 90)})`);
   await soctx.unroute("**/rest/v1/profili_pubblici**");
   await soctx.route("**/rest/v1/profili_pubblici**", (r) => r.fulfill({ json: [] }));
   await sp.getByLabel("Cerca persone per nome").fill("Nessuno Qui");
