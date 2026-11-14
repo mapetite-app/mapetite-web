@@ -12,6 +12,8 @@ const ZOOM_MIN = 11;
 const ZOOM_MAX = 14.5; // più vicino si vedono due strade e nessun nome: la copertina non dice dove siamo
 const RAGGIO_GRUPPO_M = 1_200; // revisori 14/11: con 6 e 2,5 km i posti lontani finivano fuori dal riquadro (copertine vuote)
 
+const SENZA_CITTA = encodeURIComponent('["==",["get","class"],"nessuna"]');
+
 const mx = (lng: number) => (lng + 180) / 360;
 const my = (lat: number) => {
   const s = Math.sin((Math.max(-85, Math.min(85, lat)) * Math.PI) / 180);
@@ -63,7 +65,9 @@ export function mappaStatica(punti: readonly Punto[], w: number, h: number, toke
   const scala = TILE * 2 ** z;
   const at = `${lngDi(cx).toFixed(5)},${latDi(cy).toFixed(5)},${z}`;
   // Logo e attribuzione nel riquadro coprirebbero metà copertina: l'attribuzione è scritta sotto gli scaffali.
-  const url = `https://api.mapbox.com/styles/v1/mapbox/light-v11/static/${at},0/${w}x${h}@2x?attribution=false&logo=false&access_token=${token}`;
+  // Revisore 14/11: "Rome" in inglese sulla mappa. Le immagini statiche non accettano la lingua (provato:
+  // language=it è ignorato), quindi l'etichetta delle grandi città si spegne; i quartieri restano.
+  const url = `https://api.mapbox.com/styles/v1/mapbox/light-v11/static/${at},0/${w}x${h}@2x?attribution=false&logo=false&setfilter=${SENZA_CITTA}&layer_id=settlement-major-label&access_token=${token}`;
   const dentro = vista.map((p, i) => ({
     i,
     x: Math.round(((mx(p.lng) - cx) * scala + w / 2) / w * 1000) / 10,

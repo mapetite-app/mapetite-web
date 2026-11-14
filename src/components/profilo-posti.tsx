@@ -36,9 +36,10 @@ const CERCA_DA = 15; // la ricerca compare solo con più di 15 posti
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 const PAPER = "bg-[#f6f7f7]";
 const LINE = "border-[#e3e7e7]";
-const CHIP = "inline-flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill bg-white px-3.5 text-[14px] font-sans font-medium text-text shadow-card active:scale-95";
-const FILA = "-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]";
-const CHIP_ON = "inline-flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill bg-brand px-3.5 text-[14px] font-sans font-medium text-white shadow-card active:scale-95";
+const CHIP = "inline-flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill bg-white px-3 text-[14px] font-sans font-medium text-text shadow-card active:scale-95";
+// Revisore 14/11: le 4 pillole senza numeri stanno in 360 px; niente scorrimento che le taglia ai bordi.
+const FILA = "flex flex-wrap gap-2";
+const CHIP_ON = "inline-flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill bg-brand px-3 text-[14px] font-sans font-medium text-white shadow-card active:scale-95";
 
 type Filtro = "tutti" | "provati" | "da-provare" | "in-comune";
 
@@ -215,7 +216,8 @@ export default function ProfiloPosti({
         <section className="mt-6" aria-labelledby="piaciuti-titolo" data-testid="profilo-piaciuti">
           <div className="px-4"><Titolo id="piaciuti-titolo">{isMe ? "I tuoi preferiti" : "I suoi preferiti"}</Titolo></div>
           {/* scroll-px-4: con snap-start la prima card resta a 16 px dal bordo, come il resto della pagina. */}
-          <ul className="flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
+          {/* Revisore 14/11: con 1 o 2 preferiti niente card a metà con il vuoto accanto: riempiono la riga. */}
+          <ul className={liked.length <= 2 ? "flex gap-3 px-4 pb-2" : "flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]"}>
             {liked.map((p) => {
               const verdict = verdetti[p.place_id];
               const meta = metaDi(p);
@@ -223,7 +225,7 @@ export default function ProfiloPosti({
               const pos = posizioni[p.place_id];
               const citta = cityFromAddress(p.address);
               return (
-                <li key={p.place_id} className="relative flex w-[70%] max-w-[260px] shrink-0 snap-start">
+                <li key={p.place_id} data-testid="piaciuto-item" className={`relative flex shrink-0 ${liked.length <= 2 ? "min-w-0 flex-1" : "w-[70%] max-w-[260px] snap-start"}`}>
                   <Link
                     href={`/locali/${p.place_id}`}
                     data-testid="piaciuto-card"
@@ -312,7 +314,6 @@ export default function ProfiloPosti({
                     className={on ? CHIP_ON : CHIP}
                   >
                     {f.label}
-                    <span className={`font-display font-semibold ${on ? "text-white/80" : "text-accent"}`}>{gruppi[f.id].length}</span>
                   </button>
                 );
               })}

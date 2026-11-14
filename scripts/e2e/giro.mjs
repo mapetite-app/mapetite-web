@@ -4693,7 +4693,7 @@ else {
     ok((await y("profilo-raccolte-sezione")) > 0 && (await y("profilo-raccolte-sezione")) < (await y("profilo-lista")), "profilo pubblico: 'Raccolte' sopra 'I suoi posti'"); }
   ok((await sp.getByTestId("profilo-indietro").count()) === 0, "profilo pubblico senza account: niente freccia Indietro (c'è il marchio Mapetite)");
   ok((await sp.getByRole("heading", { name: "I suoi posti", exact: true }).isVisible()) && (await sp.getByTestId("posto-persona").count()) === 3 && (await sp.locator("[data-testid=profilo-posti] h2").count()) <= 3, "profilo pubblico: una lista unica 'I suoi posti' con i posti (al massimo 3 sezioni)");
-  ok((await sp.locator("[data-testid^=filtro-]").allTextContents()).join("|") === "Tutti3|Provati1|Da provare2" && (await sp.getByTestId("posto-persona-stato").count()) === 3, `profilo pubblico: pillole Tutti / Provati / Da provare, stato sulla riga in 'Tutti' (${(await sp.locator("[data-testid^=filtro-]").allTextContents()).join("|")})`);
+  ok((await sp.locator("[data-testid^=filtro-]").allTextContents()).join("|") === "Tutti|Provati|Da provare" && (await sp.getByTestId("posto-persona-stato").count()) === 3, `profilo pubblico: pillole Tutti / Provati / Da provare, stato sulla riga in 'Tutti' (${(await sp.locator("[data-testid^=filtro-]").allTextContents()).join("|")})`);
   await sp.getByTestId("filtro-da-provare").click();
   ok((await sp.getByTestId("posto-persona").count()) === 2 && (await sp.getByTestId("posto-persona-stato").count()) === 0 && (await sp.getByTestId("filtro-da-provare").getAttribute("aria-pressed")) === "true", "profilo pubblico: 'Da provare' mostra solo quelli, senza lo stato doppione");
   await sp.getByTestId("filtro-tutti").click();
@@ -4773,8 +4773,9 @@ else {
       ok(/newsreader/i.test(font) && btn && lista && btn.x + btn.width <= lista.x + lista.width && btn.x > lista.x, `profilo di un altro: nomi in serif e Salva dentro la riga (${font.slice(0, 30)})`); }
     { const ys = await sp.locator("[data-testid^=filtro-]").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
       const pill = (await sp.locator("[data-testid^=filtro-]").allTextContents()).join("|");
-      ok(new Set(ys).size === 1 && pill === "Tutti15|Provati9|Da provare6|In comune2", `profilo di un altro: pillole su una fila, il preferito non si ripete nella lista (${pill})`); }
-    { const w = (await sp.getByTestId("piaciuto-card").first().boundingBox())?.width ?? 0; ok(w >= 240 && w <= 280, `profilo di un altro: card 'Gli è piaciuto' al 70% (${Math.round(w)} px)`); }
+      const fuori = await sp.locator("[data-testid^=filtro-]").evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.left < 16 || r.right > window.innerWidth - 16; }).length);
+      ok(new Set(ys).size === 1 && fuori === 0 && pill === "Tutti|Provati|Da provare|In comune", `profilo di un altro: pillole senza numeri, su una fila e tutte dentro lo schermo (${pill}, fuori ${fuori})`); }
+    { const w = (await sp.getByTestId("piaciuto-card").first().boundingBox())?.width ?? 0; ok(w >= 340, `profilo di un altro: un solo preferito riempie la riga, niente vuoto accanto (${Math.round(w)} px)`); }
     { const L = sp.getByTestId("profilo-lista");
       ok((await L.getByTestId("posto-persona").count()) === 6 && (await sp.getByTestId("mostra-tutti-lista").textContent()) === "Mostra tutti (15)" && (await L.getByTestId("posto-persona").filter({ hasText: "Forno 4" }).count()) === 0, "profilo di un altro: 6 posti e 'Mostra tutti (15)', il preferito non ripetuto");
       await sp.getByTestId("mostra-tutti-lista").click();
