@@ -10,6 +10,7 @@ import { cityFromAddress } from "@/lib/city";
 import { matchesQuery } from "@/lib/social-view";
 import { quartiereDi } from "@/lib/scaffali-salvati";
 import { MappaPunti } from "@/components/profilo-mappa";
+import { StatoPillola } from "@/components/posto-persona";
 
 // I posti di una persona sul suo profilo pubblico. Revisore 14/11 (secondo giro): tre sezioni sole,
 // "I suoi preferiti", "Raccolte" e una lista unica "I suoi posti" con le pillole Tutti / Provati /
@@ -36,10 +37,11 @@ const CERCA_DA = 15; // la ricerca compare solo con più di 15 posti
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 const PAPER = "bg-[#f6f7f7]";
 const LINE = "border-[#e3e7e7]";
-const CHIP = "inline-flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill bg-white px-3 text-[14px] font-sans font-medium text-text shadow-card active:scale-95";
-// Revisore 14/11: le 4 pillole senza numeri stanno in 360 px; niente scorrimento che le taglia ai bordi.
-const FILA = "flex flex-wrap gap-2";
-const CHIP_ON = "inline-flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill bg-brand px-3 text-[14px] font-sans font-medium text-white shadow-card active:scale-95";
+// Revisore 14/11 (secondo giro): a 360 px "In comune" andava a capo da sola. Pillole più strette (13 px, gap 6)
+// su una sola fila: 4 etichette ≈ 305 px in 328 utili; se un telefono è più stretto la fila scorre, con il margine.
+const CHIP = "inline-flex min-h-10 shrink-0 items-center whitespace-nowrap rounded-pill bg-white px-2.5 text-[13px] font-sans font-medium text-text shadow-card active:scale-95";
+const FILA = "-mx-4 flex gap-1.5 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]";
+const CHIP_ON = "inline-flex min-h-10 shrink-0 items-center whitespace-nowrap rounded-pill bg-brand px-2.5 text-[13px] font-sans font-medium text-white shadow-card active:scale-95";
 
 type Filtro = "tutti" | "provati" | "da-provare" | "in-comune";
 
@@ -152,7 +154,7 @@ export default function ProfiloPosti({
   }
 
   // Riga come nei Salvati: miniatura, nome in serif, tipo · quartiere, verdetto Mapetite; Salva dentro la riga.
-  const riga = (p: PostoPersona, primo: boolean, showState = false) => {
+  const riga = (p: PostoPersona, primo: boolean, showState = false, badge: React.ReactNode = null, testId = "posto-persona") => {
     const meta = metaDi(p);
     const verdict = verdetti[p.place_id];
     const provato = !!p.tags?.includes("Già visitato");
@@ -160,7 +162,7 @@ export default function ProfiloPosti({
       <li key={p.place_id} className={`flex items-center gap-1 pr-2 ${primo ? "" : `border-t ${LINE}`}`}>
         <Link
           href={`/locali/${p.place_id}`}
-          data-testid="posto-persona"
+          data-testid={testId}
           className="flex min-h-[76px] min-w-0 flex-1 items-start gap-3 py-3 pl-3 text-left transition-colors active:bg-black/[0.03]"
         >
           <span aria-hidden className={`mt-0.5 flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[14px] ${PAPER} text-[26px] leading-none`}>
@@ -168,17 +170,33 @@ export default function ProfiloPosti({
           </span>
           <span className="min-w-0 flex-1">
             <span className={`${SERIF} block truncate text-[19px] font-medium leading-tight tracking-[-0.01em] text-text`}>{p.name}</span>
-            {(meta || showState) && (
-              <span className="mt-0.5 block truncate text-[13px] text-text-muted">
-                {meta}
-                {showState && <span data-testid="posto-persona-stato">{meta ? " · " : ""}{provato ? "Provato" : "Da provare"}</span>}
+            {meta && <span className="mt-0.5 block truncate text-[13px] text-text-muted">{meta}</span>}
+            {verdict && <span data-testid="posto-persona-verdetto" className={`${SERIF} mt-1 line-clamp-2 text-[15px] italic leading-snug text-[#4a4f55]`}>{verdict}</span>}
+            {(showState || badge) && (
+              <span className="mt-1 flex flex-wrap gap-1.5">
+                {badge}
+                {showState && <StatoPillola provato={provato} />}
               </span>
             )}
-            {verdict && <span data-testid="posto-persona-verdetto" className={`${SERIF} mt-1 line-clamp-2 text-[15px] italic leading-snug text-[#4a4f55]`}>{verdict}</span>}
           </span>
         </Link>
         {salvaBtn(p)}
       </li>
+    );
+  };
+
+  // Il 👍 dei preferiti (con il numero se viene dalla sua classifica di quella città).
+  const badgeDi = (p: PostoPersona) => {
+    const pos = posizioni[p.place_id];
+    const citta = cityFromAddress(p.address);
+    return (
+      <span
+        data-testid="piaciuto-badge"
+        title={pos ? `N.${pos} nella sua classifica${citta ? ` di ${citta}` : ""}` : "Tra i suoi preferiti"}
+        className="mt-0.5 inline-flex shrink-0 items-center rounded-pill bg-accent-light px-2 py-0.5 text-[12px] font-display font-semibold text-accent"
+      >
+        {pos ? `👍 N.${pos}` : "👍"}
+      </span>
     );
   };
 
@@ -215,17 +233,19 @@ export default function ProfiloPosti({
       {liked.length > 0 && (
         <section className="mt-6" aria-labelledby="piaciuti-titolo" data-testid="profilo-piaciuti">
           <div className="px-4"><Titolo id="piaciuti-titolo">{isMe ? "I tuoi preferiti" : "I suoi preferiti"}</Titolo></div>
-          {/* scroll-px-4: con snap-start la prima card resta a 16 px dal bordo, come il resto della pagina. */}
-          {/* Revisore 14/11: con 1 o 2 preferiti niente card a metà con il vuoto accanto: riempiono la riga. */}
-          <ul className={liked.length <= 2 ? "flex gap-3 px-4 pb-2" : "flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]"}>
+          {/* Revisore 14/11 (secondo giro): un solo preferito senza foto non vale una card larga con il fondo grigio vuoto:
+              riga compatta come nella lista, con il 👍. Da 2 in su, le card. */}
+          {liked.length === 1 ? (
+            <div className="px-4" data-testid="piaciuto-item">
+              <ul className={`overflow-hidden rounded-card border ${LINE} bg-white shadow-card`}>{riga(liked[0], true, false, badgeDi(liked[0]), "piaciuto-card")}</ul>
+            </div>
+          ) : (
+          <ul className={liked.length === 2 ? "flex gap-3 px-4 pb-2" : "flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]"}>
             {liked.map((p) => {
               const verdict = verdetti[p.place_id];
               const meta = metaDi(p);
-              // Numero solo se viene dalla sua classifica (posizione nella città di quel posto).
-              const pos = posizioni[p.place_id];
-              const citta = cityFromAddress(p.address);
               return (
-                <li key={p.place_id} data-testid="piaciuto-item" className={`relative flex shrink-0 ${liked.length <= 2 ? "min-w-0 flex-1" : "w-[70%] max-w-[260px] snap-start"}`}>
+                <li key={p.place_id} data-testid="piaciuto-item" className={`relative flex shrink-0 ${liked.length === 2 ? "min-w-0 flex-1" : "w-[70%] max-w-[260px] snap-start"}`}>
                   <Link
                     href={`/locali/${p.place_id}`}
                     data-testid="piaciuto-card"
@@ -235,13 +255,7 @@ export default function ProfiloPosti({
                     <span className="flex flex-1 flex-col p-3">
                       <span className="flex items-start gap-2">
                         <span className={`${SERIF} line-clamp-2 min-w-0 flex-1 text-[19px] font-medium leading-tight tracking-[-0.01em] text-text`}>{p.name}</span>
-                        <span
-                          data-testid="piaciuto-badge"
-                          title={pos ? `N.${pos} nella sua classifica${citta ? ` di ${citta}` : ""}` : "Tra i suoi preferiti"}
-                          className="mt-0.5 inline-flex shrink-0 items-center rounded-pill bg-accent-light px-2 py-0.5 text-[12px] font-display font-semibold text-accent"
-                        >
-                          {pos ? `👍 N.${pos}` : "👍"}
-                        </span>
+                        {badgeDi(p)}
                       </span>
                       {meta && <span className="mt-0.5 block truncate text-[13px] text-text-muted">{meta}</span>}
                       {verdict && <span data-testid="piaciuto-verdetto" className={`${SERIF} mt-1 line-clamp-2 text-[15px] italic leading-snug text-[#4a4f55]`}>{verdict}</span>}
@@ -252,6 +266,7 @@ export default function ProfiloPosti({
               );
             })}
           </ul>
+          )}
         </section>
       )}
 

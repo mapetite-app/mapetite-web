@@ -4724,6 +4724,11 @@ else {
   await sp.waitForURL(/\/u\/giulia\.rm\/mappa$/, { timeout: 5000 });
   await sp.getByTestId("mappa-persona-pagina").waitFor({ timeout: 5000 });
   ok(await sp.getByTestId("mappa-persona-pagina").getByText("La mappa di Giulia").isVisible() && await sp.getByTestId("invito-crea-mappa").isVisible(), "mappa di una persona: si apre senza account, con l'invito in fondo");
+  // Revisore 14/11 (secondo giro): stessi numeri del profilo (1 provati · 2 da provare) e lo stato nella forma dei Salvati (teal, non corallo).
+  { const M = sp.getByTestId("mappa-persona-pagina");
+    const st = M.getByTestId("posto-persona-stato");
+    const bg = await st.first().evaluate((e) => getComputedStyle(e).backgroundColor).catch(() => "");
+    ok(await M.getByText("1 provato · 2 da provare").isVisible() && (await st.count()) === 3 && (bg === "rgb(227, 237, 237)" || bg === "rgb(240, 242, 242)"), `mappa di una persona: stessi numeri del profilo e stato come nei Salvati (${await st.count()}, ${bg})`); }
   await sp.getByTestId("pin-persona").first().waitFor({ timeout: 8000 }).catch(() => {});
   await sp.waitForTimeout(500);
   await sp.screenshot({ path: `${OUT}/61-mappa-persona.png`, caret: "initial" });
@@ -4775,7 +4780,15 @@ else {
       const pill = (await sp.locator("[data-testid^=filtro-]").allTextContents()).join("|");
       const fuori = await sp.locator("[data-testid^=filtro-]").evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.left < 16 || r.right > window.innerWidth - 16; }).length);
       ok(new Set(ys).size === 1 && fuori === 0 && pill === "Tutti|Provati|Da provare|In comune", `profilo di un altro: pillole senza numeri, su una fila e tutte dentro lo schermo (${pill}, fuori ${fuori})`); }
-    { const w = (await sp.getByTestId("piaciuto-card").first().boundingBox())?.width ?? 0; ok(w >= 340, `profilo di un altro: un solo preferito riempie la riga, niente vuoto accanto (${Math.round(w)} px)`); }
+    // Revisore 14/11 (secondo giro): un solo preferito è una riga compatta a tutta larghezza con il 👍, non una card con il fondo grigio vuoto.
+    { const b = await sp.getByTestId("piaciuto-item").first().boundingBox(); const w = b?.width ?? 0; const h = b?.height ?? 999;
+      ok(w >= 340 && h <= 140, `profilo di un altro: un solo preferito è una riga a tutta larghezza (${Math.round(w)}×${Math.round(h)} px)`); }
+    // A 360 px le 4 pillole stanno ancora su una fila (prima "In comune" andava a capo da sola).
+    { await sp.setViewportSize({ width: 360, height: 780 });
+      const ys = await sp.locator("[data-testid^=filtro-]").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+      const fuori = await sp.locator("[data-testid^=filtro-]").evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.left < 16 || r.right > window.innerWidth - 16; }).length);
+      ok(new Set(ys).size === 1 && fuori === 0, `profilo di un altro a 360 px: le 4 pillole su una fila, tutte dentro lo schermo (fuori ${fuori})`);
+      await sp.setViewportSize({ width: 390, height: 844 }); }
     { const L = sp.getByTestId("profilo-lista");
       ok((await L.getByTestId("posto-persona").count()) === 6 && (await sp.getByTestId("mostra-tutti-lista").textContent()) === "Mostra tutti (15)" && (await L.getByTestId("posto-persona").filter({ hasText: "Forno 4" }).count()) === 0, "profilo di un altro: 6 posti e 'Mostra tutti (15)', il preferito non ripetuto");
       await sp.getByTestId("mostra-tutti-lista").click();

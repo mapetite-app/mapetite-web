@@ -16,6 +16,19 @@ export const WANT = "Da provare";
 
 export const isVisited = (s: { tags: string[] | null }) => !!s.tags?.includes(VISITED);
 
+// Revisore 14/11: profilo e "La mappa di…" contano i posti dalla stessa fonte, le righe pubbliche che si vedono
+// sotto (così "10 provati" in alto non diventa "2 provati" sulla mappa). Solo se le righe sono state tagliate
+// al massimo letto (limite) valgono i contatori del profilo.
+export function contaStati(
+  rows: { tags: string[] | null }[],
+  contatori: { visitati: number; da_provare: number },
+  limite: number,
+): { provati: number; daProvare: number } {
+  if (rows.length >= limite) return { provati: contatori.visitati, daProvare: contatori.da_provare };
+  const provati = rows.filter(isVisited).length;
+  return { provati, daProvare: rows.length - provati };
+}
+
 export function mapSpots(rows: SavedLike[]): MapSpot[] {
   return rows.flatMap((r) =>
     r.lat != null && r.lng != null && Number.isFinite(r.lat) && Number.isFinite(r.lng)

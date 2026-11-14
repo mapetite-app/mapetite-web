@@ -23,6 +23,18 @@ function meta(s: Spot): string {
   return [categoryLabel(s.category), q ?? cityFromAddress(s.address)].filter(Boolean).join(" · ");
 }
 
+// Revisore 14/11 (secondo giro): lo stato era detto in tre modi (testo "· Provato", pillola corallo, pillola teal
+// dei Salvati). Ora una sola forma, quella dei Salvati: teal per chi c'è stato, grigio per da provare.
+const STATO = "inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-pill px-2 text-[11.5px] font-semibold";
+export function StatoPillola({ provato }: { provato: boolean }) {
+  return (
+    <span data-testid="posto-persona-stato" className={`${STATO} ${provato ? "bg-[#e3eded] text-brand" : "bg-[#f0f2f2] font-medium text-[#6b7075]"}`}>
+      <span aria-hidden className="text-[10px] leading-none">{provato ? "✓" : "📌"}</span>
+      {provato ? "Provato" : "Da provare"}
+    </span>
+  );
+}
+
 /** Riga compatta per le liste del profilo. */
 // showState=false: sotto un titolo che dice già lo stato ("Di recente", "Da provare") la pillola è un doppione.
 export function PostoRiga({ spot, verdict = null, showState = true }: { spot: Spot; verdict?: string | null; showState?: boolean }) {
@@ -42,21 +54,17 @@ export function PostoRiga({ spot, verdict = null, showState = true }: { spot: Sp
         <span className="block truncate font-[family-name:var(--font-newsreader)] text-[19px] font-medium leading-tight tracking-[-0.01em] text-text">{spot.name}</span>
         {meta(spot) && <span className="mt-0.5 block truncate text-[13px] font-sans text-text-muted">{meta(spot)}</span>}
         {verdict && <span data-testid="posto-persona-verdetto" className="mt-1 line-clamp-2 font-[family-name:var(--font-newsreader)] text-[15px] italic leading-snug text-[#4a4f55]">{verdict}</span>}
-        {raccolte.length > 0 && (
-          <span className="mt-1 flex flex-wrap gap-1">
+        {(showState || raccolte.length > 0) && (
+          <span className="mt-1 flex flex-wrap gap-1.5">
+            {showState && <StatoPillola provato={visited} />}
             {raccolte.map((t) => (
-              <span key={t} className="max-w-full truncate rounded-pill bg-surface px-2 py-0.5 text-[11px] font-display font-medium text-brand">
+              <span key={t} className="inline-flex h-[22px] max-w-full items-center truncate rounded-pill bg-surface px-2 text-[11.5px] font-medium text-brand">
                 {t}
               </span>
             ))}
           </span>
         )}
       </span>
-      {showState && (
-        <span className={`shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-display font-semibold ${visited ? "bg-accent-light text-accent" : "bg-brand/10 text-brand"}`}>
-          {visited ? "✓ Provato" : "📌 Da provare"}
-        </span>
-      )}
     </Link>
   );
 }
