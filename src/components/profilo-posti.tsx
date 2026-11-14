@@ -255,8 +255,11 @@ export default function ProfiloPosti({
                   >
                     <span aria-hidden className={`flex h-[92px] items-center justify-center ${PAPER} text-[46px] leading-none`}>{getCategoryEmoji(p.category, p.name)}</span>
                     <span className="flex flex-1 flex-col p-3">
-                      <span className="flex items-start gap-2">
-                        <span className={`${SERIF} line-clamp-2 min-w-0 flex-1 text-[19px] font-medium leading-tight tracking-[-0.01em] text-text`}>{p.name}</span>
+                      {/* Revisore 14/11 (sesto giro): a 360 px con due card "Fatamorgana" diventava "Fatamorgar" (tagliato
+                          dal 👍 accanto). Il nome prende la larghezza che gli serve e il 👍 va sotto se non ci sta;
+                          una parola più larga della card va a capo invece di essere tagliata. */}
+                      <span className="flex flex-wrap items-start gap-x-2 gap-y-1">
+                        <span data-testid="piaciuto-nome" className={`${SERIF} line-clamp-2 min-w-0 max-w-full flex-[1_1_auto] text-[19px] font-medium leading-tight tracking-[-0.01em] text-text [overflow-wrap:anywhere]`}>{p.name}</span>
                         {badgeDi(p)}
                       </span>
                       {meta && <span className="mt-0.5 block truncate text-[13px] text-text-muted">{meta}</span>}

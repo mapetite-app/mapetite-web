@@ -6893,6 +6893,15 @@ else {
       await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
       const b = (await g.getByTestId("piaciuto-badge").allTextContents()).join("|");
       ok(b === "👍 N.1|👍 N.2|👍 N.3|👍 N.1" && (await g.getByTestId("piaciuto-card").last().textContent()).includes("Osteria Cinque") && (await g.getByTestId("piaciuto-badge").last().getAttribute("title")) === "N.1 nella sua classifica di Milano", `profilo pubblico: con due città il N.1 di Milano resta N.1 (${b})`); }
+    // Revisore 14/11 (sesto giro): a 360 px con due preferiti "Fatamorgana" era tagliato senza puntini ("Fatamorgar").
+    { const due = socialG.salvati.map((x) => (x.name === "Vineria Uno" ? { ...x, name: "Fatamorgana", rank_score: null, tags: ["Già visitato"] } : x.name === "Trattoria Due" ? { ...x, name: "Gelateriapasticceriaitaliana" } : x));
+      await gc.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialG, salvati: due })), url: BASE }]);
+      await g.setViewportSize({ width: 360, height: 780 });
+      await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
+      const nomi = await g.getByTestId("piaciuto-nome").evaluateAll((els) => els.map((e) => ({ t: e.textContent, tagliato: e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1 })));
+      ok(nomi.length === 2 && nomi.every((n) => !n.tagliato) && nomi.some((n) => n.t === "Gelateriapasticceriaitaliana"), `profilo pubblico a 360 px: due preferiti, nomi interi (anche una parola lunga va a capo), mai tagliati (${JSON.stringify(nomi)})`);
+      await g.screenshot({ path: `${OUT}/46b-preferiti-360.png`, caret: "initial" });
+      await g.setViewportSize({ width: 390, height: 844 }); }
     await gc.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialG, classifica: false })), url: BASE }]);
     await g.goto(`${BASE}/u/giulia.rm`, { waitUntil: "networkidle" });
     ok((await g.getByTestId("profilo-piaciuti").count()) === 0, "profilo pubblico: senza la vista classifica_pubblica (e senza 👍) 'Gli è piaciuto' non compare");
