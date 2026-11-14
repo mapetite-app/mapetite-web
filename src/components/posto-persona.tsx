@@ -3,6 +3,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
 import { isStateTag } from "@/lib/tags";
+import { quartiereDi } from "@/lib/scaffali-salvati";
 
 // Un posto di un'altra persona (profilo pubblico, feed degli amici). Solo dati pubblici:
 // nome, tipo, città, stato e raccolte. Mai la nota privata (non arriva nemmeno dal database).
@@ -12,10 +13,14 @@ type Spot = {
   category: string | null;
   address: string | null;
   tags: string[] | null;
+  lat?: number | null;
+  lng?: number | null;
 };
 
+// Revisore 14/11: come nei Salvati, il quartiere (Roma e Milano) prima della città.
 function meta(s: Spot): string {
-  return [categoryLabel(s.category), cityFromAddress(s.address)].filter(Boolean).join(" · ");
+  const q = s.lat != null && s.lng != null ? quartiereDi({ lat: Number(s.lat), lng: Number(s.lng) }) : null;
+  return [categoryLabel(s.category), q ?? cityFromAddress(s.address)].filter(Boolean).join(" · ");
 }
 
 /** Riga compatta per le liste del profilo. */
