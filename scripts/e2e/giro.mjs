@@ -666,6 +666,48 @@ await page.unroute("**/api/search");
   const dett = ((await page.getByTestId("frase-dettaglio").innerText().catch(() => "")) ?? "").replace(/\u00a0/g, " ");
   ok(/Tutti poco conosciuti/.test(dett) && (await page.locator("ul.snap-x").getByTestId("gemma").count()) === 0, `gemme: tutti poco conosciuti → detto una volta sopra le card, nessun 💎 sulle card ('${dett}')`); }
 await page.unroute("**/api/search");
+// Proposta 55 "Scegli tra 3" (sessione 14/11 sera): con 5 posti o più, primo tasto della riga sotto la pillola.
+// Restano tre posti diversi tra loro, ognuno col suo perché; "Tutti i N" torna alla lista intera. Nessuna chiamata in più.
+{ const sei = [
+    mk("T1", "Trattoria Prima", 41.9, 12.49, { category: "trattoria", rating: 4.6, userRatingCount: 900 }),
+    mk("T2", "Trattoria Seconda", 41.9005, 12.491, { category: "trattoria", rating: 4.5, userRatingCount: 2400 }),
+    mk("T3", "Osteria Piccola", 41.903, 12.495, { category: "osteria", rating: 4.7, userRatingCount: 110 }),
+    mk("T4", "Pizzeria Quarta", 41.897, 12.486, { category: "pizzeria", rating: 4.4, userRatingCount: 700 }),
+    mk("T5", "Bar Quinto", 41.905, 12.5, { category: "bar", rating: 4.3, userRatingCount: 300 }),
+    mk("T6", "Trattoria Sesta", 41.899, 12.488, { category: "trattoria", rating: 4.5, userRatingCount: 1500, businessStatus: "CLOSED_PERMANENTLY" }),
+  ];
+  let chiamate = 0;
+  await page.route("**/api/search", (r) => { chiamate++; return r.fulfill({ json: { ...SEARCH_FAST, risultati: sei, sintesi_pendente: null } }); });
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id=T1]").waitFor({ timeout: 5000 });
+  const tre = page.getByTestId("filtri-mappa").getByTestId("scegli-tre");
+  const primoTasto = await page.getByTestId("filtri-mappa").locator("button").first().getAttribute("data-testid");
+  ok(await tre.isVisible() && primoTasto === "scegli-tre" && (await tre.innerText()).trim() === "Scegli tra 3", `scegli tra 3: primo tasto sotto la pillola con 6 posti ('${(await tre.innerText().catch(() => "")).trim()}')`);
+  await tre.click();
+  await page.waitForTimeout(300);
+  const ids = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((els) => els.map((e) => e.dataset.id));
+  const motivi = await page.locator("ul.snap-x").getByTestId("tre-motivo").allInnerTexts();
+  ok(ids.length === 3 && ids[0] === "T1" && ids.includes("T3") && !ids.includes("T6"), `scegli tra 3: tre card, prima la più in tema, dentro il poco conosciuto, mai un posto chiuso (${ids.join(", ")})`);
+  ok(motivi.length === 3 && motivi[0] === "Il più in tema" && motivi.includes("💎 Poco conosciuto") && new Set(motivi).size === 3, `scegli tra 3: ogni card dice perché, tre perché diversi (${motivi.join(" / ")})`);
+  const tipi = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((els) => els.map((e) => e.dataset.id));
+  ok(new Set(tipi.map((id) => sei.find((x) => x.id === id)?.category)).size === 3, "scegli tra 3: tre tipi diversi (non tre trattorie)");
+  const titolo = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
+  const det = (await page.getByTestId("frase-dettaglio").innerText().catch(() => "")).trim();
+  ok(titolo === "Tre, diversi tra loro" && /^Su 6: il più in tema, uno poco conosciuto e /.test(det), `scegli tra 3: la frase sopra le card dice come sono scelti ('${titolo}' · '${det}')`);
+  ok((await page.getByTestId("conteggio-risultati").innerText()).trim() === "3 posti" && (await page.locator("[data-testid=pin]").count()) === 3, "scegli tra 3: pillola '3 posti' e tre segnalini sulla mappa");
+  ok((await page.getByTestId("filtri-mappa").getByRole("button", { name: "Aperto ora" }).count()) === 0, "scegli tra 3: accesa, gli altri filtri si nascondono (una cosa per volta)");
+  await shot("05c-scegli-tra-3");
+  await tre.click();
+  await page.waitForTimeout(300);
+  ok((await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count()) === 6 && (await page.locator("ul.snap-x").getByTestId("tre-motivo").count()) === 0 && (await tre.innerText()).trim() === "Scegli tra 3", "scegli tra 3: 'Tutti i 6' torna alla lista intera");
+  ok(chiamate === 1, `scegli tra 3: nessuna ricerca in più (${chiamate} chiamata)`);
+  await page.unroute("**/api/search");
+  // Con meno di 5 posti il tasto non c'è: si vedono già tutti.
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id=P1]").waitFor({ timeout: 5000 });
+  ok((await page.getByTestId("scegli-tre").count()) === 0, "scegli tra 3: con 3 posti il tasto non c'è"); }
 // Le gemme sono accese per tutti dal 14/10: ?beta=off le spegne nella visita in cui compare.
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();

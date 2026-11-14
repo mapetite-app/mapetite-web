@@ -1963,13 +1963,16 @@ export default function MapView({
 
   // Pin visibili: con una ricerca AI seguono i filtri rapidi della lista.
   const quickOn = useBeta("filtri-lista");
-  const mapPlaces =
-    aiSearch !== null && quickOn ? applyQuickFilters(displayedPlaces, quickFilters, venueDetails) : displayedPlaces;
+  // "Scegli tra 3" (proposta 55): sulla mappa restano i tre segnalini delle tre card.
+  const [treIds, setTreIds] = useState<string[] | null>(null);
+  const mapPlaces = aiSearch !== null && treIds
+    ? displayedPlaces.filter((p) => treIds.includes(p.id))
+    : aiSearch !== null && quickOn ? applyQuickFilters(displayedPlaces, quickFilters, venueDetails) : displayedPlaces;
   // Revisore 4/11: accesi o spenti i filtri rapidi, la mappa si riadatta ai posti rimasti (prima con tre
   // filtri restava in vista un solo segnalino su 4). Solo al cambio dei filtri, non a ogni disegno.
   // Secondo revisore 4/11: si inquadra quando il carosello ha già il nuovo ordine (con "Più vicini" la prima card
   // non è la prima della ricerca), tenendo sempre dentro la prima card.
-  const filtriChiave = [...quickFilters].sort().join(",");
+  const filtriChiave = [...quickFilters].sort().join(",") + (treIds ? `|tre:${treIds.join(",")}` : "");
   const filtriVisti = useRef(filtriChiave);
   const ordineChiave = carouselOrder.join(",");
   const daInquadrare = useRef(false);
@@ -4393,6 +4396,7 @@ export default function MapView({
           removed={clusterPlaces === null ? aiSearch?.tolti : undefined}
           frase={frase}
           onOrder={setCarouselOrder}
+          onTre={setTreIds}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
           showSearchFeedback={clusterPlaces === null}
           onShareList={shareOn && view === "saved" && aiSearch === null ? async (list) => {

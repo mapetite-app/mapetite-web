@@ -18,6 +18,7 @@ import { searchFeedbackMailto } from "@/lib/feedback";
 import { trackFeature } from "@/lib/track";
 import UtileFeedback from "@/components/utile-feedback";
 import { cityFromAddress } from "@/lib/city";
+import { MOTIVO_LABEL, scegliTre, type Motivo } from "@/lib/scegli-tre";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 export const PHOTO_CARDS = 6;
@@ -111,6 +112,8 @@ export interface BottomSheetProps {
   consiglioInArrivo?: boolean;
   // Un consiglio è stato chiesto per questa ricerca: anche se non arriva, la frase resta alta come il consiglio.
   consiglioChiesto?: boolean;
+  // "Scegli tra 3" acceso (gli id dei tre) o spento (null): la mappa mostra solo i loro segnalini.
+  onTre?: (ids: string[] | null) => void;
 }
 
 // "Dai tuoi salvati" sopra i risultati (semplice prima di tutto): con un solo salvato il tocco apre la
@@ -349,7 +352,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null, consiglio = null, consiglioInArrivo = false, consiglioChiesto = false }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null, consiglio = null, consiglioInArrivo = false, consiglioChiesto = false, onTre }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -386,13 +389,30 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   const [nearestLocal, setNearestFirst] = useState(false);
   const nearestFirst = nearest ?? nearestLocal;
   const [shared, setShared] = useState(false);
+  // Proposta 55 "Scegli tra 3": restano tre posti diversi tra loro, ognuno con il suo perché (src/lib/scegli-tre.ts).
+  // Si accende per questa lista: con una ricerca nuova (altri posti) torna spenta da sola.
+  const allKey = allPlaces.map((p) => p.id).join(",");
+  const [treDi, setTreDi] = useState<string | null>(null);
+  const treLista = useMemo(() => {
+    const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
+    return scegliTre(list, { recensioni: (id) => details?.[id]?.userRatingCount, origine: distanceOrigin === undefined ? origin : distanceOrigin, fuoriTema: offTopic, gemme: gemsOn });
+  }, [allPlaces, quick, quickFiltersOn, details, origin, distanceOrigin, offTopic, gemsOn]);
+  const treAttivabile = variant === "b" && pillSlot != null && title != null && !savedMode && !loadingVerdicts && treLista.length === 3;
+  const treOn = treAttivabile && treDi === allKey;
+  const motivi = useMemo(() => new Map<string, Motivo>(treOn ? treLista.map((t) => [t.posto.id, t.motivo]) : []), [treOn, treLista]);
   const places = useMemo(() => {
+    if (treOn) return treLista.map((t) => t.posto);
     const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
     if (!nearestFirst || !origin) return list;
     // I posti chiusi per sempre restano in fondo anche con "Più vicini" (revisore 5/11: "Ha chiuso" era la prima card).
     const chiuso = (p: Place) => (p.businessStatus === "CLOSED_PERMANENTLY" ? 1 : 0);
     return [...list].sort((a, b) => chiuso(a) - chiuso(b) || distanceMeters(origin, a) - distanceMeters(origin, b));
-  }, [allPlaces, quick, quickFiltersOn, details, nearestFirst, origin]);
+  }, [allPlaces, quick, quickFiltersOn, details, nearestFirst, origin, treOn, treLista]);
+  const treChiave = treOn ? treLista.map((t) => t.posto.id).join(",") : "";
+  useEffect(() => {
+    onTre?.(treChiave ? treChiave.split(",") : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [treChiave]);
   const orderKey = places.map((p) => p.id).join(",");
   useEffect(() => {
     onOrder?.(orderKey ? orderKey.split(",") : []);
@@ -620,9 +640,21 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // Area 4c del piano (4/11, come i filtri sotto la barra di Google Maps e Places): nella lista nuova i filtri
   // rapidi stanno in vista, in una riga sotto la pillola "N posti", non più dietro la pillola. Un tocco filtra
   // card e segnalini insieme; la pillola tiene solo "Ho capito", Affina e Condividi.
-  const filtriInVista = (quickFiltersOn || nearestOn) && (
+  const filtriInVista = (quickFiltersOn || nearestOn || treAttivabile) && (
     <div data-testid="filtri-mappa" className="pointer-events-auto -ml-3 -mr-[4.25rem] flex basis-[calc(100%+5rem)] gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&>button]:shrink-0 lg:hidden">
-      {quickFiltersOn && ([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
+      {/* Proposta 55: primo della riga, perché è una scelta (non un filtro): accesa diventa "Tutti i N" per tornare. */}
+      {treAttivabile && (
+        <button
+          type="button"
+          data-testid="scegli-tre"
+          aria-pressed={treOn}
+          onClick={() => { if (!treOn) trackFeature("scegli_tre", { tra: allPlaces.length }); setTreDi(treOn ? null : allKey); }}
+          className={`inline-flex min-h-9 items-center gap-1 rounded-pill px-3.5 text-[13px] font-sans font-semibold shadow-card active:scale-95 ${treOn ? "bg-brand text-white" : "bg-surface text-brand"}`}
+        >
+          {treOn ? <>Tutti i {allPlaces.length}</> : <><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>Scegli tra 3</>}
+        </button>
+      )}
+      {!treOn && quickFiltersOn && ([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
         <button
           key={k}
           type="button"
@@ -633,7 +665,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {label}
         </button>
       ))}
-      {nearestOn && (
+      {!treOn && nearestOn && (
         <button
           type="button"
           aria-pressed={nearestFirst}
@@ -740,7 +772,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // Variante B (stile Places): carosello orizzontale di card scure sopra la barra di navigazione.
   if (variant === "b") {
     const nuova = pillSlot != null && title != null;
-    const fraseOggi = nuova && frase ? fraseRisultati({
+    // Con "Scegli tra 3" la frase dice come sono stati scelti, solo con i perché davvero usati.
+    const perche = treLista.map((t) => ({ tema: "il più in tema", gemma: "uno poco conosciuto", vicino: "il più vicino", diverso: "uno di un altro tipo" })[t.motivo]);
+    const fraseOggi = nuova && treOn ? { titolo: "Tre, diversi tra loro", dettaglio: `Su ${allPlaces.length}: ${perche.slice(0, -1).join(", ")} e ${perche[perche.length - 1]}` } : nuova && frase ? fraseRisultati({
       n: places.length,
       posti: places,
       ...frase,
@@ -867,7 +901,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         {onOpenSaved && <DaiTuoiSalvati items={fromSaved} onOpen={onOpenSaved} aligned={nuova} />}
         {/* Frase sopra le card (revisore del 1/11, come "Rome essentials" di Places): cosa c'è in questa
             lista, detto solo con dati veri (src/lib/frase-risultati.ts). A destra la card a cui sei. */}
-        {nuova && consiglio && places.some((p) => p.id === consiglio.place.id) ? (
+        {nuova && !treOn && consiglio && places.some((p) => p.id === consiglio.place.id) ? (
           // Il consiglio sostituisce la frase (una cosa sola sopra le card). Un tocco porta alla sua card.
           <button
             type="button"
@@ -923,6 +957,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             const parere = savedMode ? (place.tags?.includes("Non fa per me") ? " · 👎" : place.tags?.includes("Mi è piaciuto") ? " · 👍" : "") : "";
             const poco = !stato && !saved && (offTopic?.includes(place.id) ?? false);
             const gem = !stato && !saved && !poco && !gemmeInTesta && gemsOn && isGem(place.rating, d?.userRatingCount, place.name);
+            const motivo = motivi.get(place.id);
             if (nuova) {
               const i = places.indexOf(place);
               const cat = prettyCategory(place.category, place.name);
@@ -980,7 +1015,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         la foto non arriva e resta se non arriva. Accanto, l'eventuale etichetta (stato, 💎). */}
                     <span className="absolute left-3 top-2.5 flex items-center gap-2">
                       <span aria-hidden data-testid="copertina" className={`h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-base leading-none shadow-card ${conFoto[place.id] ? "hidden" : "flex"}`}>{getCategoryEmoji(place.category, place.name, place.types)}</span>
-                      {(stato || saved || gem || poco) && (
+                      {motivo ? (
+                        // "Scegli tra 3": il perché di questo posto prende il posto dell'etichetta (una sola sulla card).
+                        <span data-testid="tre-motivo" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{MOTIVO_LABEL[motivo]}</span>
+                      ) : (stato || saved || gem || poco) && (
                       <span className="flex">
                         {stato ? (
                           (place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY") ? (
