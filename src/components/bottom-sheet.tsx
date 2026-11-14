@@ -651,7 +651,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           onClick={() => { if (!treOn) trackFeature("scegli_tre", { tra: allPlaces.length }); setTreDi(treOn ? null : allKey); }}
           className={`inline-flex min-h-9 items-center gap-1 rounded-pill px-3.5 text-[13px] font-sans font-semibold shadow-card active:scale-95 ${treOn ? "bg-brand text-white" : "bg-surface text-brand"}`}
         >
-          {treOn ? <>Tutti i {allPlaces.length}</> : <><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>Scegli tra 3</>}
+          {treOn ? <><svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg>Tutti i {allPlaces.length}</> : <><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>Scegli tra 3</>}
         </button>
       )}
       {!treOn && quickFiltersOn && ([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
