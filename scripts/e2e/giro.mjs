@@ -700,9 +700,8 @@ await page.unroute("**/api/search");
   ok((await page.getByTestId("filtri-mappa").getByRole("button", { name: "Aperto ora" }).count()) === 1 && (await tre.getAttribute("aria-pressed")) === "true", "scegli tra 3: accesa, i filtri restano in vista e il tasto è premuto");
   // Revisore 15/11: aprire la scheda di uno dei tre e chiuderla torna ai tre, non a tutta la lista.
   await page.locator("ul.snap-x li[data-id=T1]").click();
-  await page.waitForTimeout(500);
-  if (!(await page.getByTestId("barra-azioni").first().isVisible().catch(() => false))) { await page.locator("ul.snap-x li[data-id=T1]").click().catch(() => {}); await page.waitForTimeout(800); }
-  const schedaAperta = await page.getByTestId("barra-azioni").first().isVisible().catch(() => false);
+  if (!(await page.getByTestId("barra-azioni").first().waitFor({ timeout: 1500 }).then(() => true, () => false))) await page.locator("ul.snap-x li[data-id=T1]").click().catch(() => {});
+  const schedaAperta = await page.getByTestId("barra-azioni").first().waitFor({ timeout: 3000 }).then(() => true, () => false);
   await page.getByRole("button", { name: /^Chiudi/ }).first().click().catch(() => {});
   await page.waitForTimeout(900);
   ok(schedaAperta && (await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count()) === 3 && (await page.locator("ul.snap-x").getByTestId("tre-motivo").count()) === 3, `scegli tra 3: dopo la scheda di uno dei tre si torna ai tre (scheda aperta: ${schedaAperta})`);

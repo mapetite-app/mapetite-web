@@ -2548,7 +2548,7 @@ export default function MapView({
         // La ricerca resta nell'indirizzo (/mappa?q=…&at=…): ricaricare o tornare indietro la ritrova.
         if (mondo && !opts.simile) { scriviRicercaInIndirizzo(q, at); ricercaInIndirizzo.current = ticket; }
         type RawPlace = {
-          id: string; name: string; category: string | null; lat: number | null; lng: number | null;
+          id: string; name: string; businessStatus?: string | null; category: string | null; lat: number | null; lng: number | null;
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
@@ -2570,6 +2570,8 @@ export default function MapView({
           rating: p.rating ?? null,
           priceLevel: p.priceLevel ?? null,
           types: p.types ?? null,
+          // Revisore 15/11: lo stato Google arriva anche alle card dei risultati ("Chiuso per ora"; "Scegli tra 3" non li sceglie).
+          businessStatus: p.businessStatus ?? null,
         }));
         const details: Record<string, VenueDetails> = {};
         for (const p of raw) {
