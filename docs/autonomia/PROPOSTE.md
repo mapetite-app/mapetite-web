@@ -16,6 +16,32 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 15/11/2026 (domenica, CEO che chiude — tema amici, fiducia e privacy)
+
+### 58. "Te l'ha consigliato Giulia": il consiglio dell'amico resta attaccato al posto
+- **Problema:** `PROBLEMI.md` 25: il consiglio degli amici è quello di cui ci si fida di più (66% per Doxa), ma arriva su WhatsApp e si perde.
+- **Cosa fa:** quando un amico manda un posto con "Condividi", il link porta il suo nome (solo se l'ha scelto lui, e solo se siete amici su Mapetite o se mette il nome a mano). Chi salva da quel link vede sul salvato una riga "Te l'ha consigliato Giulia". Dopo "Ci sono stato", un tocco su "Dillo a Giulia" prepara il messaggio per WhatsApp ("Sono stato da Mario, avevi ragione"). In Salvati, un filtro "Dagli amici".
+- **Da dove nasce:** TheFork mette amici e influencer nello stesso feed ([ItaliaOggi](https://www.italiaoggi.it/marketing-e-media/marketing/thefork-da-app-a-vero-e-proprio-social-network-g99oik87)); Corner e Beli mostrano dove vanno gli amici, ma un posto salvato non ricorda chi te l'ha detto. Noi teniamo il "devi andarci" di una persona precisa, e chiudiamo il giro con lei.
+- **Valore per l'utente:** ritrova i consigli delle persone di cui si fida, al momento della scelta. **Per l'app:** ogni consiglio che torna indietro porta l'amico a riaprire Mapetite. **Per il ristoratore:** nel pannello, in forma aggregata, "N posti salvati su consiglio di un amico" (mai chi): il passaparola diventa visibile.
+- **Sforzo:** M (parametro nel link di condivisione, una colonna sul salvato, riga in card e scheda, filtro, messaggio pronto; testo nella pagina `/privacy`). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA (dopo il merge di "trovare le persone", da cui riusa amici e nomi).
+
+### 59. Lucchetto sul singolo posto: "Solo per me"
+- **Problema:** `PROBLEMI.md` 25 e richiesta di Lorenzo dell'8/11 (profilo e social nel rispetto della privacy): oggi il profilo pubblico è tutto o niente; chi ti segue vede ogni posto che salvi e quando, anche sulla pagina del locale (`src/lib/privacy-profilo.ts`). Chi vuole gli amici ma non vuole mostrare la cena romantica o il posto sotto casa deve spegnere tutto.
+- **Cosa fa:** nel foglio Salva e nella scheda di un salvato, un lucchetto "Solo per me": quel posto sparisce dal profilo pubblico, dalla mappa vista dagli amici e da "chi l'ha salvato" sul locale. Lo stesso su una raccolta intera. Nessun interruttore nuovo in vista: il lucchetto sta nel foglio che si apre già.
+- **Da dove nasce:** Mapstr lo fa per la mappa e per ogni singolo posto ([App Store FR](https://apps.apple.com/fr/app/mapstr/id917288465)); Corner, Beli e TheFork mostrano i tuoi posti agli amici senza questa scelta in vista. Noi lo mettiamo nel gesto del salvataggio, dove serve.
+- **Valore per l'utente:** accende gli amici senza paura. **Per l'app:** più profili pubblici, quindi più amici e più consigli (proposta 58). **Per il ristoratore:** nessuno diretto; i dati aggregati restano (contano tutti i salvati, senza nomi).
+- **Sforzo:** S/M (una colonna su `saved_places` e un filtro nelle viste pubbliche `salvati_pubblici` e simili: migrazione, prima sul progetto di prova; testi di `privacy-profilo.ts` e `/privacy` aggiornati insieme). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA (con controllo di sicurezza del revisore: nessuna vista pubblica deve far uscire i posti col lucchetto).
+
+### 60. "Il reel è segnato come pubblicità": detto in chiaro quando lo dice il reel stesso
+- **Problema:** `PROBLEMI.md` 25: dal reel non si capisce se il consiglio è sincero o una cena offerta; per AGCOM (FAQ del 16/3/2026) anche un vantaggio non in denaro è promozione e va segnato con "ADV" o "Pubblicità" ([EcNews](https://www.ecnews.it/fiscale/societa-e-bilancio/bilancio/agcom-stringe-la-rete-sugli-influencer-le-nuove-faq-cambiano-le-regole-del-gioco/)).
+- **Cosa fa:** quando salvi da un reel e la didascalia che leggiamo già contiene una dicitura esplicita ("#adv", "#ad", "pubblicità", "sponsorizzato", "in collaborazione con", "advertising"), sotto il posto appena salvato una riga neutra: "Il reel è segnato come pubblicità · il verdetto viene dalle recensioni". Senza dicitura la riga non c'è: mai indovinare, mai un giudizio sul locale o sul creator (stessa regola di `dont_expect`).
+- **Da dove nasce:** nessuna delle app che salvano dai social (Corner, Albo, Mapstr) lo dice; TheFork mette i creator nel feed accanto agli amici. Noi siamo gli unici con il verdetto dalle recensioni, quindi possiamo dire "fidati delle recensioni, non solo del reel" con una prova.
+- **Valore per l'utente:** sa da dove arriva il consiglio, senza dover leggere i tag. **Per il ristoratore:** chi non paga i creator non viene confuso con chi lo fa; per tutti, il verdetto resta lo stesso.
+- **Sforzo:** S (controllo di testo sulla didascalia in `reel-save.tsx` / `src/lib/reel.ts`, una riga nell'interfaccia, un controllo nel giro automatico). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
 ## 14/11/2026 (sabato, CEO che chiude — tema scelta in gruppo e posti non di massa)
 
 ### 55. "Tre, non trenta": la scelta ristretta a 3 posti diversi tra loro
