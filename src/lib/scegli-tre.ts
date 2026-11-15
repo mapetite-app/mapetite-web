@@ -1,6 +1,6 @@
 import { isGem } from "@/lib/gem";
 import { distanceMeters } from "@/lib/distance";
-import { categoryLabel } from "@/lib/category-label";
+import { getCategoryEmoji } from "@/lib/emoji";
 
 // Proposta 55 "Tre, non trenta" (PROBLEMI.md 24: davanti a dodici posti non si decide). Dai risultati già arrivati
 // restano tre posti che non si somigliano, ognuno con il suo perché in due parole:
@@ -18,6 +18,7 @@ export type PostoTre = {
   lng: number;
   rating: number | null;
   businessStatus?: string | null;
+  types?: readonly string[] | null;
 };
 
 export type Motivo = "tema" | "gemma" | "vicino" | "diverso" | "altro";
@@ -35,8 +36,10 @@ export const MIN_POSTI_TRE = 5;
 const VICINO_MAX_M = 3_000;
 
 // Il tipo come lo legge la persona sulla card.
-export function tipoMostrato(p: { category: string | null; name: string }): string {
-  return (categoryLabel(p.category, p.name) ?? p.category ?? "").toLowerCase();
+// Revisore 15/11 (secondo): per famiglia, non per parola ("Ristorante", "Ristorante italiano" e "Ristorante
+// mediterraneo" sono la stessa cosa per chi sceglie): la famiglia è l'emoji della card, che la persona vede.
+export function tipoMostrato(p: { category: string | null; name: string; types?: readonly string[] | null }): string {
+  return getCategoryEmoji(p.category, p.name, p.types ?? null);
 }
 
 // Su quanti posti si sceglie davvero: senza i chiusi e i fuori tema (revisore 15/11: "Su 6" contava un chiuso).
@@ -67,7 +70,9 @@ export function scegliTre<T extends PostoTre>(
 
   scelti.push({ posto: buoni[0], motivo: "tema" });
   if (opz.gemme !== false && opz.recensioni) {
-    const g = primo(buoni.filter((p) => isGem(p.rating, opz.recensioni!(p.id), p.name)));
+    // Revisore 15/11: il 💎 è il primo nell'ordine della lista (il più in tema tra i poco conosciuti), non il primo
+    // di un tipo nuovo, che spingeva verso i posti più lontani dalla richiesta (una pasticceria per una cena).
+    const g = buoni.find((p) => !preso(p) && isGem(p.rating, opz.recensioni!(p.id), p.name));
     if (g) scelti.push({ posto: g, motivo: "gemma" });
   }
   const o = opz.origine;

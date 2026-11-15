@@ -18,7 +18,7 @@ import { searchFeedbackMailto } from "@/lib/feedback";
 import { trackFeature } from "@/lib/track";
 import UtileFeedback from "@/components/utile-feedback";
 import { cityFromAddress } from "@/lib/city";
-import { MOTIVO_LABEL, candidatiTre, scegliTre, tipoMostrato, type Motivo } from "@/lib/scegli-tre";
+import { MIN_POSTI_TRE, MOTIVO_LABEL, candidatiTre, scegliTre, tipoMostrato, type Motivo } from "@/lib/scegli-tre";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 export const PHOTO_CARDS = 6;
@@ -407,9 +407,16 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
     return scegliTre(list, { recensioni: (id) => details?.[id]?.userRatingCount, origine: distanceOrigin === undefined ? origin : distanceOrigin, fuoriTema: offTopic, gemme: gemsOn });
   }, [allPlaces, quick, quickFiltersOn, details, origin, distanceOrigin, offTopic, gemsOn]);
-  const treAttivabile = variant === "b" && pillSlot != null && title != null && !savedMode && treLista.length === 3;
-  // Revisore 15/11: il tasto c'è subito (spento mentre arrivano i verdetti), così la riga dei filtri non slitta.
-  const treOn = treAttivabile && !loadingVerdicts && treDi === allKey;
+  // Revisori 15/11: il tasto c'è appena ci sono abbastanza risultati e non sparisce più (spento mentre arrivano i
+  // verdetti o se, con i filtri, restano meno di 5 posti adatti), così la riga dei filtri non slitta.
+  const treAttivabile = variant === "b" && pillSlot != null && title != null && !savedMode && allPlaces.length >= MIN_POSTI_TRE;
+  const treScelta = treLista.length === 3 && !loadingVerdicts;
+  const treOn = treAttivabile && treScelta && treDi === allKey;
+  // Se la scelta non è più possibile (filtri) si spegne davvero: non si riaccende da sola togliendo un filtro.
+  useEffect(() => {
+    if (treDi !== null && treDi === allKey && !loadingVerdicts && treLista.length !== 3) setTreDi(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [treDi, allKey, loadingVerdicts, treLista.length]);
   const motivi = useMemo(() => new Map<string, Motivo>(treOn ? treLista.map((t) => [t.posto.id, t.motivo]) : []), [treOn, treLista]);
   const places = useMemo(() => {
     if (treOn) return treLista.map((t) => t.posto);
@@ -659,8 +666,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           type="button"
           data-testid="scegli-tre"
           aria-pressed={treOn}
-          disabled={loadingVerdicts}
-          aria-label={treOn ? `Torna a tutti i ${treTutti} posti` : `Scegli tra 3 dei ${treTra} posti`}
+          disabled={!treOn && !treScelta}
+          aria-label={treOn ? "Scegli tra 3, accesa: tocca per tornare a tutti i posti" : loadingVerdicts ? "Scegli tra 3: attendi i verdetti" : treScelta ? `Scegli tra 3 dei ${treTra} posti` : "Scegli tra 3: servono almeno 5 posti adatti"}
           onClick={() => { if (!treOn) trackFeature("scegli_tre", { tra: treTra }); setTreDi(treOn ? null : allKey); }}
           className={`inline-flex min-h-9 items-center gap-1 rounded-pill px-3.5 text-[13px] font-sans font-semibold shadow-card active:scale-95 disabled:opacity-50 ${treOn ? "bg-brand text-white" : "bg-surface text-brand"}`}
         >
@@ -1031,7 +1038,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         la foto non arriva e resta se non arriva. Accanto, l'eventuale etichetta (stato, 💎). */}
                     <span className="absolute left-3 top-2.5 flex items-center gap-2">
                       <span aria-hidden data-testid="copertina" className={`h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-base leading-none shadow-card ${conFoto[place.id] ? "hidden" : "flex"}`}>{getCategoryEmoji(place.category, place.name, place.types)}</span>
-                      {motivo ? (
+                      {!stato && place.businessStatus === "CLOSED_TEMPORARILY" ? (
+                        // Revisore 15/11: lo stato Google si vede anche nei risultati, prima di ogni altra etichetta.
+                        <span data-testid="stato-card" data-chiuso="true" className="rounded-pill bg-[#33373d] px-2 py-0.5 text-[10px] font-display font-semibold">Chiuso per ora</span>
+                      ) : motivo ? (
                         // "Scegli tra 3": il perché di questo posto prende il posto dell'etichetta (una sola sulla card).
                         // Revisore 15/11: il tipo è già scritto sotto ("PIZZERIA"), l'etichetta non lo ripete; il salvato
                         // si riconosce dal segnalibro pieno in alto a destra, come in tutta l'app.

@@ -692,15 +692,17 @@ await page.unroute("**/api/search");
   ok(motivi.length === 3 && motivi[0] === "Il più in tema" && motivi.includes("💎 Poco conosciuto") && new Set(motivi).size === 3, `scegli tra 3: ogni card dice perché, tre perché diversi (${motivi.join(" / ")})`);
   const tipi = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((els) => els.map((e) => e.dataset.id));
   ok(new Set(tipi.map((id) => sei.find((x) => x.id === id)?.category)).size === 3, "scegli tra 3: tre tipi diversi (non tre trattorie)");
+  // Trattoria e osteria sono la stessa famiglia (stessa emoji 🍝 sulla card): la frase non dice "diversi tra loro".
   const titolo = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
   const det = (await page.getByTestId("frase-dettaglio").innerText().catch(() => "")).trim();
-  ok(titolo === "Tre, diversi tra loro" && det === "Scelti tra 5 posti", `scegli tra 3: la frase dice su quanti si sceglie, senza il posto chiuso ('${titolo}' · '${det}')`);
+  ok(titolo === "Tre da scegliere" && det === "Scelti tra 5 posti", `scegli tra 3: la frase dice su quanti si sceglie, senza il posto chiuso ('${titolo}' · '${det}')`);
   ok((await page.getByTestId("conteggio-risultati").innerText()).trim() === "3 posti" && (await page.locator("[data-testid=pin]").count()) === 3, "scegli tra 3: pillola '3 posti' e tre segnalini sulla mappa");
   // Revisore 15/11: accesa, i filtri restano in vista (prima sparivano e spegnerne uno cambiava i tre senza dirlo).
   ok((await page.getByTestId("filtri-mappa").getByRole("button", { name: "Aperto ora" }).count()) === 1 && (await tre.getAttribute("aria-pressed")) === "true", "scegli tra 3: accesa, i filtri restano in vista e il tasto è premuto");
   // Revisore 15/11: aprire la scheda di uno dei tre e chiuderla torna ai tre, non a tutta la lista.
   await apriCard(page, "Trattoria Prima");
   const schedaAperta = await page.getByTestId("barra-azioni").first().waitFor({ timeout: 3000 }).then(() => true, () => false);
+  if (!schedaAperta) await shot("05c-tre-scheda-non-aperta");
   await page.getByRole("button", { name: /^Chiudi/ }).first().click().catch(() => {});
   await page.waitForTimeout(900);
   ok(schedaAperta && (await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count()) === 3 && (await page.locator("ul.snap-x").getByTestId("tre-motivo").count()) === 3, `scegli tra 3: dopo la scheda di uno dei tre si torna ai tre (scheda aperta: ${schedaAperta})`);
