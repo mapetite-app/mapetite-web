@@ -10,7 +10,7 @@ import { ZONE } from "@/lib/gusti";
 import { amatiValidi, oraDiRoma, ordinePerOra, tipoLocale } from "@/lib/tipi-locale";
 import { safeNext, withNext } from "@/lib/next-path";
 import { cleanInviteCode, isFriendCode } from "@/lib/invito";
-import { anteprimaInvito } from "@/lib/social";
+import { anteprimaInvito, loadAmici } from "@/lib/social";
 
 interface OnboardingData {
   cuisines: string[];
@@ -136,7 +136,16 @@ const nomeFinto = (codice: string) => (codice.endsWith("0000000000aa") ? "Giulia
 export async function chiInvita(raw: unknown): Promise<ChiInvita> {
   const codice = cleanInviteCode(raw);
   if (!isFriendCode(codice)) return null;
-  if (await fakeE2E()) return codice.endsWith("ffffffffffff") ? null : { nome: nomeFinto(codice), amico: codice.endsWith("00000000a1a1") };
+  if (await fakeE2E()) {
+    // Giro automatico: come anteprima_invito, "amico" vale anche quando chi invita è già tra gli amici del dato finto
+    // (revisore 15/11: Giulia era tra gli amici e insieme l'invito in sospeso "Diventa amico di Giulia").
+    if (codice.endsWith("ffffffffffff")) return null;
+    const a = await anteprimaInvito(codice);
+    if (a && a !== "errore") return { nome: a.nome, amico: a.amico };
+    const nome = nomeFinto(codice);
+    const amici = await loadAmici();
+    return { nome, amico: codice.endsWith("00000000a1a1") || (!!nome && amici.some((x) => x.display_name === nome)) };
+  }
   const p = await anteprimaInvito(codice);
   // Errore del database o rete: "rete", così il telefono tiene il codice e riprova (revisore 14/11).
   if (p === "errore") return "rete";

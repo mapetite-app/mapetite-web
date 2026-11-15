@@ -4951,6 +4951,13 @@ else {
   await sp.screenshot({ path: `${OUT}/62-amici.png`, caret: "initial" });
   // Revisore 14/11 (terzo giro): l'invito lasciato senza risposta nel primo accesso torna in Amici, mai accettato da solo.
   ok((await sp.getByTestId("invito-sospeso").count()) === 0, "amici: senza un invito in sospeso nessun riquadro d'invito");
+  // Revisore 15/11: dato finto coerente. Giulia è tra gli amici: il suo invito in sospeso dice "già amici", niente "Diventa amico".
+  await sp.evaluate(() => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: "i-0000000000aa", t: Date.now() })));
+  await sp.reload({ waitUntil: "networkidle" });
+  await sp.getByTestId("invito-gia-amici").waitFor({ timeout: 4000 }).catch(() => {});
+  ok((await sp.getByTestId("invito-sospeso").count()) === 0 && ((await sp.getByTestId("invito-gia-amici").textContent().catch(() => "")) ?? "").includes("Tu e Giulia siete già amici"), "amici: l'invito in sospeso di chi è già tra gli amici non propone 'Diventa amico'");
+  // Da qui Giulia è solo seguita (non amica): l'invito in sospeso si propone.
+  await setSocial(soctx, { ...social, amici: social.amici.filter((a) => a.id !== GIULIA) });
   await sp.evaluate(() => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: "i-0000000000aa", t: Date.now() })));
   await sp.reload({ waitUntil: "networkidle" });
   { const s = sp.getByTestId("invito-sospeso");

@@ -409,7 +409,8 @@ export async function mioInvito(): Promise<string | null> {
 export type AnteprimaInvito = { nome: string | null; handle: string | null; amico: boolean };
 export async function anteprimaInvito(codice: string): Promise<AnteprimaInvito | null | "errore"> {
   const f = await fake();
-  if (f && f !== "in-arrivo") { const a = f.anteprime?.[codice]; return a ? { ...a, amico: a.amico === true } : null; }
+  // Dato finto coerente: chi invita è "già amico" anche se sta tra gli amici del cookie (per nome).
+  if (f && f !== "in-arrivo") { const a = f.anteprime?.[codice]; return a ? { ...a, amico: a.amico === true || (!!a.nome && (f.amici ?? []).some((x) => x.display_name === a.nome)) } : null; }
   if (f === "in-arrivo" && dev()) return null;
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("anteprima_invito", { p_codice: codice });
