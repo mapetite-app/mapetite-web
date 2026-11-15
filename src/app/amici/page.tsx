@@ -70,7 +70,8 @@ export default async function AmiciPage() {
     <div className="min-h-[calc(100dvh-4rem)] bg-[#f6f7f7] md:min-h-[calc(100dvh-3.5rem)]">
     <div className="mx-auto max-w-2xl px-4 pb-10 pt-6" data-testid="amici">
       <h1 className="font-title text-3xl font-semibold text-text">Amici</h1>
-      <p className="mt-1 text-sm font-sans text-text-muted">I posti di chi ha gusti come i tuoi, non quelli di tutti.</p>
+      {/* Revisori 15/11: il sottotitolo dice quello che la pagina fa davvero (prima prometteva "chi ha gusti come i tuoi"). */}
+      <p data-testid="amici-sottotitolo" className="mt-1 text-sm font-sans text-text-muted">Dove sono stati e dove vogliono andare i tuoi amici.</p>
       <InvitoSospeso senzaNome={senzaNome} />
 
       {feed.stato === "in-arrivo" ? (
