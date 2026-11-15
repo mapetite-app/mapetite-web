@@ -18,7 +18,7 @@ import { searchFeedbackMailto } from "@/lib/feedback";
 import { trackFeature } from "@/lib/track";
 import UtileFeedback from "@/components/utile-feedback";
 import { cityFromAddress } from "@/lib/city";
-import { MIN_POSTI_TRE, MOTIVO_LABEL, candidatiTre, scegliTre, tuttiDiversi, type Motivo } from "@/lib/scegli-tre";
+import { MIN_POSTI_TRE, MIN_SCELTI, candidatiTre, etichettaMotivo, scegliTre, tuttiDiversi, type Motivo } from "@/lib/scegli-tre";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 export const PHOTO_CARDS = 6;
@@ -412,7 +412,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // Revisore 15/11 (terzo giro): niente tasto morto: finiti i verdetti serve almeno 5 posti adatti nella lista intera
   // (senza chiusi e fuori tema); grigio solo mentre i verdetti arrivano.
   const treAttivabile = variant === "b" && pillSlot != null && title != null && !savedMode && (loadingVerdicts ? allPlaces.length : candidatiTre(allPlaces, offTopic).length) >= MIN_POSTI_TRE;
-  const treScelta = treLista.length === 3 && !loadingVerdicts;
+  // Revisori 15/11: senza abbastanza tipi diversi i posti scelti sono due (meglio due veri che tre con un doppione).
+  const treScelta = treLista.length >= MIN_SCELTI && !loadingVerdicts;
+  const treN = treLista.length >= MIN_SCELTI ? treLista.length : 3;
+  const treNome = treN === 2 ? "Due" : "Tre";
   const treOn = treAttivabile && treScelta && treDi === allKey;
   const motivi = useMemo(() => new Map<string, Motivo>(treOn ? treLista.map((t) => [t.posto.id, t.motivo]) : []), [treOn, treLista]);
   const places = useMemo(() => {
@@ -441,7 +444,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
       if (next.has(f)) next.delete(f);
       else next.add(f);
       const resta = scegliTre(applyQuickFilters(allPlaces, next, details), { recensioni: (id) => details?.[id]?.userRatingCount, origine: distanceOrigin === undefined ? origin : distanceOrigin, fuoriTema: offTopic, gemme: gemsOn });
-      if (resta.length !== 3) setTreDi(null);
+      if (resta.length < MIN_SCELTI) setTreDi(null);
     }
     if (onToggleQuick) return onToggleQuick(f);
     setQuickLocal((prev) => {
@@ -677,12 +680,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           data-testid="scegli-tre"
           aria-pressed={treOn}
           disabled={!treOn && !treScelta}
-          aria-label={treOn ? "Scegli tra 3, accesa: tocca per tornare a tutti i posti" : loadingVerdicts ? "Scegli tra 3: attendi i verdetti" : treScelta ? `Scegli tra 3 dei ${treTra} posti` : "Scegli tra 3: servono almeno 5 posti adatti"}
+          aria-label={treOn ? `Scegli tra ${treN}, accesa: tocca per tornare a tutti i posti` : loadingVerdicts ? "Scegli tra 3: attendi i verdetti" : treScelta ? `Scegli tra ${treN} dei ${treTra} posti` : "Scegli tra 3: servono almeno 5 posti adatti"}
           onClick={() => { if (!treOn) trackFeature("scegli_tre", { tra: treTra }); setTreDi(treOn ? null : allKey); }}
           className={`${TOCCO} disabled:opacity-50`}
         >
           <span data-testid="pillola-filtro" className={`${PILLOLA} gap-1 font-semibold ${treOn ? "bg-brand text-white" : "bg-surface text-brand"}`}>
-          {treOn ? <><svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg>Tutti i {treTutti}</> : <><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>Scegli tra 3</>}
+          {treOn ? <><svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg>Tutti i {treTutti}</> : <><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>Scegli tra {treN}</>}
           </span>
         </button>
       )}
@@ -809,7 +812,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     // Con "Scegli tra 3" la frase dice solo su quanti si è scelto (revisore 15/11: i perché sono già sulle card).
     // "Diversi tra loro" solo se i tipi, come scritti sulle card, lo sono davvero.
     const tipiDiversi = tuttiDiversi(treLista.map((t) => t.posto));
-    const fraseOggi = nuova && treOn ? { titolo: tipiDiversi ? "Tre, diversi tra loro" : "Tre da scegliere", dettaglio: treTra === treTutti ? `Scelti tra ${treTra} posti` : `Scelti tra ${treTra} dei ${treTutti} posti` } : nuova && frase ? fraseRisultati({
+    const fraseOggi = nuova && treOn ? { titolo: tipiDiversi ? `${treNome}, diversi tra loro` : `${treNome} da scegliere`, dettaglio: treTra === treTutti ? `Scelti tra ${treTra} posti` : `Scelti tra ${treTra} dei ${treTutti} posti` } : nuova && frase ? fraseRisultati({
       n: places.length,
       posti: places,
       ...frase,
@@ -1057,7 +1060,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         // "Scegli tra 3": il perché di questo posto prende il posto dell'etichetta (una sola sulla card).
                         // Revisore 15/11: il tipo è già scritto sotto ("PIZZERIA"), l'etichetta non lo ripete; il salvato
                         // si riconosce dal segnalibro pieno in alto a destra, come in tutta l'app.
-                        <span data-testid="tre-motivo" className="rounded-pill bg-accent px-2 py-0.5 text-[11px] font-display font-semibold">{MOTIVO_LABEL[motivo]}</span>
+                        <span data-testid="tre-motivo" className="max-w-[13rem] truncate rounded-pill bg-accent px-2 py-0.5 text-[11px] font-display font-semibold">{etichettaMotivo(motivo, place)}</span>
                       ) : (stato || saved || gem || poco) && (
                       <span className="flex">
                         {stato ? (
