@@ -24,7 +24,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** TheFork mette amici e influencer nello stesso feed ([ItaliaOggi](https://www.italiaoggi.it/marketing-e-media/marketing/thefork-da-app-a-vero-e-proprio-social-network-g99oik87)); Corner e Beli mostrano dove vanno gli amici, ma un posto salvato non ricorda chi te l'ha detto. Noi teniamo il "devi andarci" di una persona precisa, e chiudiamo il giro con lei.
 - **Valore per l'utente:** ritrova i consigli delle persone di cui si fida, al momento della scelta. **Per l'app:** ogni consiglio che torna indietro porta l'amico a riaprire Mapetite. **Per il ristoratore:** nel pannello, in forma aggregata, "N posti salvati su consiglio di un amico" (mai chi): il passaparola diventa visibile.
 - **Sforzo:** M (parametro nel link di condivisione, una colonna sul salvato, riga in card e scheda, filtro, messaggio pronto; testo nella pagina `/privacy`). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA (dopo il merge di "trovare le persone", da cui riusa amici e nomi).
+- **Stato proposto:** PRONTA (dopo il merge di "trovare le persone", da cui riusa amici e nomi). **15/11 pomeriggio: costruita, IN PR** (bocciata due volte, 7,5 e 8,3, corretta; serve un revisore nuovo).
 
 ### 59. Lucchetto sul singolo posto: "Solo per me"
 - **Problema:** `PROBLEMI.md` 25 e richiesta di Lorenzo dell'8/11 (profilo e social nel rispetto della privacy): oggi il profilo pubblico è tutto o niente; chi ti segue vede ogni posto che salvi e quando, anche sulla pagina del locale (`src/lib/privacy-profilo.ts`). Chi vuole gli amici ma non vuole mostrare la cena romantica o il posto sotto casa deve spegnere tutto.
