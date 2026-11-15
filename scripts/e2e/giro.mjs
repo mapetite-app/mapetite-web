@@ -4776,6 +4776,148 @@ else {
   await pctx.close();
 }
 
+// 13b. "Te l'ha consigliato Giulia" (proposta 58): il nome nel link (?da=), sulla pagina del locale, sul salvato,
+//      "Dillo a Giulia" dopo la visita e il filtro "Dagli amici". Supabase simulato, niente Google.
+{
+  let cd = null;
+  try { cd = await import(new URL("../../src/lib/consigliato-da.ts", import.meta.url).href); } catch (e) { ok(false, `consigliato da: modulo src/lib/consigliato-da.ts importabile (${e.message})`); }
+  if (cd) {
+    const { pulisciConsigliatoDa: pul, primoNome, messaggioGrazie } = cd;
+    ok(pul("Giulia") === "Giulia" && pul("  Maria   Rosa ") === "Maria Rosa" && pul("D'Angelo") === "D'Angelo" && pul("Anna-Lisa") === "Anna-Lisa" && pul("Nicolò") === "Nicolò", "consigliato da: nomi veri accettati (spazi, apostrofo, trattino, accenti)");
+    ok([null, undefined, "", "   ", "<b>x</b>", "http://evil.it", "Giulia2", "a".repeat(41), "Giulia!", ["Giulia"]].every((v) => pul(v) === null), "consigliato da: parametro sporco, troppo lungo o non testuale ignorato");
+    ok(primoNome("Giulia Rossi") === "Giulia" && primoNome("  ") === null && primoNome(null) === null && primoNome("R2D2 Rossi") === null, "consigliato da: dal profilo solo il primo nome");
+    ok(messaggioGrazie("Da Enzo", true) === "Sono stato da Da Enzo: avevi ragione, grazie del consiglio!" && messaggioGrazie("Da Enzo", false) === "Sono stato da Da Enzo, grazie del consiglio!", "consigliato da: messaggio di ringraziamento con e senza 👍");
+  }
+}
+if (!fakeUser) console.log("SKIP  consigliato da: dev server senza E2E_FAKE_USER");
+else {
+  const LOC_CD = "44444444-0000-4000-8000-000000000058";
+  const localeCd = { place: { id: LOC_CD, name: "Trattoria del Vicolo", address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469, category: "restaurant", rating: 4.6, price_level: 2, google_place_id: "GVICOLO58" }, synthesis: null };
+  const dctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await dctx.addCookies([{ name: "e2e_locale", value: encodeURIComponent(JSON.stringify(localeCd)), url: BASE }, { name: "e2e_anonimo", value: "1", url: BASE }]);
+  await dctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  const inserts = [];
+  let patches = [];
+  let dup = false;
+  await dctx.route("**/rest/v1/saved_places**", (r) => {
+    const m = r.request().method();
+    if (m === "POST") { inserts.push(r.request().postDataJSON()); return dup ? r.fulfill({ status: 409, json: { code: "23505", message: "duplicate key" } }) : r.fulfill({ status: 201, body: "" }); }
+    if (m === "PATCH") { patches.push({ body: r.request().postDataJSON(), url: decodeURIComponent(r.request().url()) }); return r.fulfill({ status: 204, body: "" }); }
+    return r.fulfill({ json: [] });
+  });
+  const dp = await dctx.newPage();
+  dp.on("pageerror", (e) => errors.push(e.message));
+  // Da disconnessi: l'invito dice chi l'ha consigliato e il ritorno dopo la registrazione tiene il nome.
+  await dp.goto(`${BASE}/locali/${LOC_CD}?da=Giulia`, { waitUntil: "networkidle" });
+  ok(((await dp.getByTestId("invito-titolo").textContent().catch(() => "")) ?? "").trim() === "Giulia ti ha consigliato Trattoria del Vicolo", `consigliato da: link con ?da=Giulia → "Giulia ti ha consigliato…" (${await dp.getByTestId("invito-titolo").textContent().catch(() => "assente")})`);
+  ok(await dp.getByRole("link", { name: "📌 Salva in Mapetite" }).getAttribute("href") === `/signup?next=${encodeURIComponent(`/locali/${LOC_CD}?salva=1&da=Giulia`)}` && await dp.getByTestId("invito-accedi").getByRole("link", { name: "Hai già un account? Accedi" }).getAttribute("href") === `/login?next=${encodeURIComponent(`/locali/${LOC_CD}?salva=1&da=Giulia`)}`, "consigliato da: login e registrazione riportano al locale con il nome");
+  await dp.screenshot({ path: `${OUT}/52-consigliato-invito.png`, caret: "initial" });
+  for (const sporco of ["%3Cscript%3Ealert(1)%3C%2Fscript%3E", "http%3A%2F%2Fevil.it", "Giulia2", "a".repeat(50)]) {
+    await dp.goto(`${BASE}/locali/${LOC_CD}?da=${sporco}`, { waitUntil: "networkidle" });
+    ok(((await dp.getByTestId("invito-titolo").textContent().catch(() => "")) ?? "").trim() === "Ti hanno consigliato Trattoria del Vicolo?" && !((await dp.getByRole("link", { name: "📌 Salva in Mapetite" }).getAttribute("href")) ?? "").includes("da%3D"), `consigliato da: parametro sporco ignorato (${sporco.slice(0, 24)})`);
+  }
+  // Da collegati: la riga "Te l'ha consigliato Giulia" sopra Salva; salvando il nome va sul salvato.
+  await dctx.clearCookies({ name: "e2e_anonimo" });
+  await dp.goto(`${BASE}/locali/${LOC_CD}?salva=1&da=Giulia`, { waitUntil: "networkidle" });
+  ok(((await dp.getByTestId("consigliato-riga").textContent().catch(() => "")) ?? "").includes("Te l'ha consigliato Giulia") && (await dp.getByTestId("invito-mapetite").count()) === 0, "consigliato da: da collegati la riga 'Te l'ha consigliato Giulia' sopra Salva");
+  await dp.screenshot({ path: `${OUT}/53-consigliato-salva.png`, caret: "initial" });
+  await dp.getByRole("button", { name: "📌 Salva in Mapetite" }).click();
+  await dp.getByTestId("salvato-pubblico").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(inserts.at(-1)?.consigliato_da === "Giulia" && inserts.at(-1)?.place_id === LOC_CD && JSON.stringify(inserts.at(-1)?.tags) === '["Da provare"]', `consigliato da: salvando, consigliato_da = Giulia (${JSON.stringify(inserts.at(-1))})`);
+  // "Cambia": lo decide chi salva.
+  await dp.goto(`${BASE}/locali/${LOC_CD}?da=Giulia`, { waitUntil: "networkidle" });
+  await dp.getByTestId("consigliato-cambia").click().catch(() => {});
+  await dp.getByTestId("consigliato-campo").locator("input").fill("Marco").catch(() => {});
+  await dp.getByTestId("consigliato-campo").locator("input").press("Enter").catch(() => {});
+  ok(((await dp.getByTestId("consigliato-riga").textContent().catch(() => "")) ?? "").includes("Marco"), "consigliato da: 'Cambia' mette un altro nome");
+  await dp.getByRole("button", { name: "📌 Salva in Mapetite" }).click();
+  await dp.getByTestId("salvato-pubblico").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(inserts.at(-1)?.consigliato_da === "Marco", "consigliato da: salvando dopo 'Cambia' resta il nome scelto");
+  // ✕: si salva senza nome.
+  await dp.goto(`${BASE}/locali/${LOC_CD}?da=Giulia`, { waitUntil: "networkidle" });
+  await dp.getByTestId("consigliato-togli").click().catch(() => {});
+  ok((await dp.getByTestId("consigliato-riga").count()) === 0, "consigliato da: la ✕ toglie la riga");
+  await dp.getByRole("button", { name: "📌 Salva in Mapetite" }).click();
+  await dp.getByTestId("salvato-pubblico").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(inserts.at(-1) != null && !("consigliato_da" in inserts.at(-1)), "consigliato da: tolto il nome, si salva senza");
+  // Già salvato (23505): il nome si aggiunge solo se il campo era vuoto.
+  dup = true; patches = [];
+  await dp.goto(`${BASE}/locali/${LOC_CD}?da=Giulia`, { waitUntil: "networkidle" });
+  await dp.getByRole("button", { name: "📌 Salva in Mapetite" }).click();
+  await dp.getByTestId("salvato-pubblico").waitFor({ timeout: 4000 }).catch(() => {});
+  await dp.waitForTimeout(300);
+  ok(((await dp.getByTestId("salvato-pubblico").textContent().catch(() => "")) ?? "").includes("È già tra i tuoi salvati") && patches.length === 1 && patches[0].body?.consigliato_da === "Giulia" && patches[0].url.includes("consigliato_da=is.null"), `consigliato da: già salvato, il nome si scrive solo se mancava (${JSON.stringify(patches)})`);
+  await dctx.close();
+
+  // Salvati: riga nella scheda, "Dillo a Giulia" dopo "Ci sono stato", filtro "Dagli amici".
+  const pz = (n, name) => ({ id: `00000000-0000-4000-8000-0000000058${n}`, name, category: "restaurant", address: "Via di Prova 1, 00153 Roma RM, Italy", lat: 41.889 + Number(n) * 0.001, lng: 12.469, google_place_id: `GCD${n}`, rating: 4.4, price_level: 2 });
+  let rowsD = [
+    { created_at: "2026-11-01T10:00:00Z", tags: ["Da provare"], note: null, consigliato_da: "Giulia", places: pz("01", "Da Enzo al 29") },
+    { created_at: "2026-11-02T10:00:00Z", tags: ["Da provare"], note: null, consigliato_da: null, places: pz("02", "Osteria Mia") },
+    { created_at: "2026-11-03T10:00:00Z", tags: ["Già visitato"], note: null, consigliato_da: null, places: pz("03", "Bar Sotto") },
+  ];
+  const sctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const evD = [];
+  await sctx2.route("**/api/events", (r) => { evD.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  for (const t of ["place_synthesis", "profiles", "contenuti_locali", "foto_locali"]) await sctx2.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+  await sctx2.route("**/rest/v1/saved_places**", (r) => {
+    const m = r.request().method();
+    if (m !== "GET") return r.fulfill({ status: 204, body: "" });
+    const u = decodeURIComponent(r.request().url());
+    if (u.includes("select=place_id")) return r.fulfill({ json: rowsD.map((x) => ({ place_id: x.places.id })) });
+    if (u.includes("places(")) return r.fulfill({ json: rowsD });
+    return r.fulfill({ json: [] });
+  });
+  const sd = await sctx2.newPage();
+  sd.on("pageerror", (e) => errors.push(e.message));
+  await sd.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" }).catch(() => {});
+  const Ld = sd.getByTestId("salvati-lista");
+  await Ld.waitFor({ timeout: 8000 }).catch(() => {});
+  await sd.waitForTimeout(800);
+  const amiciBtn = Ld.getByTestId("salvati-amici");
+  ok(await amiciBtn.isVisible().catch(() => false) && ((await amiciBtn.textContent()) ?? "").trim() === "Dagli amici 1", `dagli amici: pillola 'Dagli amici 1' con un salvato consigliato (${await amiciBtn.textContent().catch(() => "assente")})`);
+  await amiciBtn.click().catch(() => {});
+  await sd.waitForTimeout(300);
+  const nomiD = await Ld.getByTestId("salvato-riga").locator("span.block.truncate").allTextContents();
+  ok(nomiD.length === 1 && nomiD[0] === "Da Enzo al 29" && (await amiciBtn.getAttribute("aria-pressed").catch(() => null)) === "true", `dagli amici: acceso, solo i posti consigliati (${nomiD.join(", ")})`);
+  await sd.screenshot({ path: `${OUT}/54-salvati-dagli-amici.png`, caret: "initial" });
+  await Ld.getByTestId("salvato-riga").filter({ hasText: "Da Enzo al 29" }).click().catch(() => {});
+  await sd.getByTestId("tue-note").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(((await sd.getByTestId("consigliato-scheda").textContent().catch(() => "")) ?? "").includes("Te l'ha consigliato Giulia") && (await sd.getByTestId("dillo-amico").count()) === 0, "consigliato da: nella scheda del salvato 'Te l'ha consigliato Giulia', 'Dillo a' solo dopo la visita");
+  await sd.getByTestId("consigliato-scheda").scrollIntoViewIfNeeded().catch(() => {});
+  await sd.screenshot({ path: `${OUT}/55-scheda-consigliato.png`, caret: "initial" });
+  await sd.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click().catch(() => {});
+  await sd.getByTestId("diario-foglio").waitFor({ timeout: 4000 }).then(() => sd.getByTestId("diario-salta").click(), () => {});
+  await sd.getByTestId("com-era").waitFor({ timeout: 4000 }).catch(() => {});
+  const dillo = sd.getByTestId("dillo-amico");
+  ok(await dillo.isVisible().catch(() => false) && ((await dillo.textContent()) ?? "").trim() === "Dillo a Giulia", "consigliato da: dopo 'Ci sono stato', in 'Com'era?' il tasto 'Dillo a Giulia'");
+  await sd.getByTestId("com-era").getByRole("button", { name: "👍 Mi è piaciuto" }).click().catch(() => {});
+  await sd.waitForTimeout(400);
+  await sd.evaluate(() => { window.__grazie = null; navigator.share = async (d) => { window.__grazie = d; }; });
+  await dillo.scrollIntoViewIfNeeded().catch(() => {});
+  await sd.screenshot({ path: `${OUT}/56-dillo-a-giulia.png`, caret: "initial" });
+  await dillo.click().catch(() => {});
+  await sd.waitForFunction(() => window.__grazie != null, null, { timeout: 3000 }).catch(() => {});
+  const grazie = await sd.evaluate(() => window.__grazie);
+  ok(grazie?.text === "Sono stato da Da Enzo al 29: avevi ragione, grazie del consiglio!", `consigliato da: 'Dillo a Giulia' con 👍 prepara "avevi ragione" (${grazie?.text ?? "nessuno"})`);
+  await sd.waitForTimeout(300);
+  ok(evD.some((e) => e?.type === "funzione" && e.props?.nome === "dillo_amico" && e.props?.voto === "su") && droppedKeys(evD.filter((e) => e?.props?.nome === "dillo_amico" || e?.props?.nome === "salvati_amici")).length === 0, "consigliato da: segnali 'dillo_amico' e 'salvati_amici' con chiavi accettate dal server");
+  // Senza foglio di condivisione: WhatsApp con il messaggio (qui senza 👍: solo il grazie).
+  await sd.getByTestId("com-era").getByRole("button", { name: "👍 Mi è piaciuto" }).click().catch(() => {});
+  await sd.waitForTimeout(400);
+  await sd.evaluate(() => { navigator.share = undefined; window.__aperto = null; window.open = (u) => { window.__aperto = u; return null; }; });
+  await dillo.click().catch(() => {});
+  const aperto = await sd.evaluate(() => window.__aperto);
+  ok((aperto ?? "").startsWith("https://wa.me/?text=") && decodeURIComponent(aperto.split("text=")[1] ?? "") === "Sono stato da Da Enzo al 29, grazie del consiglio!", `consigliato da: senza foglio di condivisione si apre WhatsApp, senza 👍 solo il grazie (${aperto ?? "nessuno"})`);
+  // Nessun salvato consigliato: niente pillola.
+  rowsD = rowsD.map((x) => ({ ...x, consigliato_da: null }));
+  await sd.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" }).catch(() => {});
+  await Ld.waitFor({ timeout: 8000 }).catch(() => {});
+  await sd.waitForTimeout(800);
+  ok((await Ld.getByTestId("salvato-riga").count()) === 3 && (await Ld.getByTestId("salvati-amici").count()) === 0, "dagli amici: senza consigli niente pillola");
+  await sctx2.close();
+}
+
 // 14. Social (piano 5.1–5.4): profilo pubblico, mappa di una persona, Amici, "N amici ci sono stati".
 //     Il server legge i dati finti dal cookie "e2e_social"; senza cookie la parte social è "in arrivo"
 //     (come in produzione finché la migrazione 20261015_social non è applicata).
