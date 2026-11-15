@@ -1,5 +1,6 @@
 import { isGem } from "@/lib/gem";
 import { distanceMeters } from "@/lib/distance";
+import { categoryLabel } from "@/lib/category-label";
 
 // Proposta 55 "Tre, non trenta" (PROBLEMI.md 24: davanti a dodici posti non si decide). Dai risultati già arrivati
 // restano tre posti che non si somigliano, ognuno con il suo perché in due parole:
@@ -33,6 +34,16 @@ export const MOTIVO_LABEL: Record<Motivo, string> = {
 export const MIN_POSTI_TRE = 5;
 const VICINO_MAX_M = 3_000;
 
+// Il tipo come lo legge la persona sulla card.
+export function tipoMostrato(p: { category: string | null; name: string }): string {
+  return (categoryLabel(p.category, p.name) ?? p.category ?? "").toLowerCase();
+}
+
+// Su quanti posti si sceglie davvero: senza i chiusi e i fuori tema (revisore 15/11: "Su 6" contava un chiuso).
+export function candidatiTre<T extends PostoTre>(posti: readonly T[], fuoriTema?: readonly string[]): T[] {
+  return posti.filter((p) => !p.businessStatus?.startsWith("CLOSED") && !(fuoriTema?.includes(p.id) ?? false));
+}
+
 export function scegliTre<T extends PostoTre>(
   posti: readonly T[],
   opz: {
@@ -43,13 +54,16 @@ export function scegliTre<T extends PostoTre>(
   } = {},
 ): { posto: T; motivo: Motivo }[] {
   // Fuori i chiusi e quelli che l'AI giudica fuori tema: la scelta stretta deve essere sicura.
-  const buoni = posti.filter((p) => !p.businessStatus?.startsWith("CLOSED") && !(opz.fuoriTema?.includes(p.id) ?? false));
+  const buoni = candidatiTre(posti, opz.fuoriTema);
   if (buoni.length < MIN_POSTI_TRE) return [];
   const scelti: { posto: T; motivo: Motivo }[] = [];
   const preso = (p: T) => scelti.some((s) => s.posto.id === p.id);
-  const tipi = () => new Set(scelti.map((s) => s.posto.category ?? ""));
+  // Revisore 15/11: il tipo si confronta com'è scritto sulla card ("Trattoria" anche con italian_restaurant e
+  // seafood_restaurant; pastry_shop e cake_shop sono entrambe "Pasticceria"), non col tipo Google grezzo.
+  const tipo = (p: T) => tipoMostrato(p);
+  const tipi = () => new Set(scelti.map((s) => tipo(s.posto)));
   // A parità, un tipo nuovo prima di uno già scelto: tre pizzerie non sono una scelta.
-  const primo = (lista: readonly T[]) => lista.find((p) => !preso(p) && !tipi().has(p.category ?? "")) ?? lista.find((p) => !preso(p));
+  const primo = (lista: readonly T[]) => lista.find((p) => !preso(p) && !tipi().has(tipo(p))) ?? lista.find((p) => !preso(p));
 
   scelti.push({ posto: buoni[0], motivo: "tema" });
   if (opz.gemme !== false && opz.recensioni) {
@@ -67,7 +81,7 @@ export function scegliTre<T extends PostoTre>(
   while (scelti.length < 3) {
     const d = primo(buoni);
     if (!d) break;
-    scelti.push({ posto: d, motivo: tipi().has(d.category ?? "") ? "altro" : "diverso" });
+    scelti.push({ posto: d, motivo: tipi().has(tipo(d)) ? "altro" : "diverso" });
   }
   return scelti.slice(0, 3);
 }

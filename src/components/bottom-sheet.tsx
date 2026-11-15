@@ -18,7 +18,7 @@ import { searchFeedbackMailto } from "@/lib/feedback";
 import { trackFeature } from "@/lib/track";
 import UtileFeedback from "@/components/utile-feedback";
 import { cityFromAddress } from "@/lib/city";
-import { MOTIVO_LABEL, scegliTre, type Motivo } from "@/lib/scegli-tre";
+import { MOTIVO_LABEL, candidatiTre, scegliTre, tipoMostrato, type Motivo } from "@/lib/scegli-tre";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 export const PHOTO_CARDS = 6;
@@ -114,6 +114,9 @@ export interface BottomSheetProps {
   consiglioChiesto?: boolean;
   // "Scegli tra 3" acceso (gli id dei tre) o spento (null): la mappa mostra solo i loro segnalini.
   onTre?: (ids: string[] | null) => void;
+  // Revisore 15/11: la scelta vive in MapView, così aprire e chiudere la scheda di uno dei tre non la spegne.
+  treDi?: string | null;
+  onTreDi?: (chiave: string | null) => void;
 }
 
 // "Dai tuoi salvati" sopra i risultati (semplice prima di tutto): con un solo salvato il tocco apre la
@@ -352,7 +355,7 @@ export function applyQuickFilters(
   );
 }
 
-export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null, consiglio = null, consiglioInArrivo = false, consiglioChiesto = false, onTre }: BottomSheetProps) {
+export default function BottomSheet({ places: allPlaces, onSelect, onClose, details, loadingVerdicts = false, variant = "a", origin = null, distanceOrigin, quick: quickProp, onToggleQuick, onNearestToggle, title = null, focusedId = null, onFocus, onHover, onOrder, offTopic, onRefine, isSaved, savedLabel, similarTo, simileA = null, onSave, onOpenArticle, onShareList, showSearchFeedback = true, heading = null, shareAt = null, shareQuery = null, understood = [], setAside = null, savedMode = false, showCity = false, nearest, pillSlot = null, capito = [], fromSaved = [], onOpenSaved, removed = [], frase = null, consiglio = null, consiglioInArrivo = false, consiglioChiesto = false, onTre, treDi: treDiProp, onTreDi }: BottomSheetProps) {
   // Intestazione dei risultati compatta (QA 13/10: a 360px lasciava ~150px di mappa): una riga per
   // titolo, "Ho capito" e "🧭"; un tocco su una di queste righe le mostra intere.
   const [headerOpen, setHeaderOpen] = useState(false);
@@ -392,15 +395,21 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // Proposta 55 "Scegli tra 3": restano tre posti diversi tra loro, ognuno con il suo perché (src/lib/scegli-tre.ts).
   // Si accende per questa lista: con una ricerca nuova (altri posti) torna spenta da sola.
   const allKey = allPlaces.map((p) => p.id).join(",");
-  const [treDi, setTreDi] = useState<string | null>(null);
-  // Su quanti posti si sceglie: quelli della lista com'è (con un filtro rapido acceso, solo i rimasti).
-  const treTra = (quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces).length;
+  const [treDiLocale, setTreDiLocale] = useState<string | null>(null);
+  const treDi = treDiProp !== undefined ? treDiProp : treDiLocale;
+  const setTreDi = (k: string | null) => { if (onTreDi) onTreDi(k); else setTreDiLocale(k); };
+  // Su quanti posti si sceglie: quelli della lista com'è (con un filtro rapido acceso, solo i rimasti), senza i
+  // chiusi e i fuori tema (revisore 15/11). "Tutti i N" conta invece la lista a cui si torna.
+  const treListaBase = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
+  const treTutti = treListaBase.length;
+  const treTra = candidatiTre(treListaBase, offTopic).length;
   const treLista = useMemo(() => {
     const list = quickFiltersOn ? applyQuickFilters(allPlaces, quick, details) : allPlaces;
     return scegliTre(list, { recensioni: (id) => details?.[id]?.userRatingCount, origine: distanceOrigin === undefined ? origin : distanceOrigin, fuoriTema: offTopic, gemme: gemsOn });
   }, [allPlaces, quick, quickFiltersOn, details, origin, distanceOrigin, offTopic, gemsOn]);
-  const treAttivabile = variant === "b" && pillSlot != null && title != null && !savedMode && !loadingVerdicts && treLista.length === 3;
-  const treOn = treAttivabile && treDi === allKey;
+  const treAttivabile = variant === "b" && pillSlot != null && title != null && !savedMode && treLista.length === 3;
+  // Revisore 15/11: il tasto c'è subito (spento mentre arrivano i verdetti), così la riga dei filtri non slitta.
+  const treOn = treAttivabile && !loadingVerdicts && treDi === allKey;
   const motivi = useMemo(() => new Map<string, Motivo>(treOn ? treLista.map((t) => [t.posto.id, t.motivo]) : []), [treOn, treLista]);
   const places = useMemo(() => {
     if (treOn) return treLista.map((t) => t.posto);
@@ -649,15 +658,18 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
         <button
           type="button"
           data-testid="scegli-tre"
-          aria-label={treOn ? `Torna a tutti i ${treTra} posti` : "Scegli tra 3: tre posti diversi tra loro"}
+          aria-pressed={treOn}
+          disabled={loadingVerdicts}
+          aria-label={treOn ? `Torna a tutti i ${treTutti} posti` : `Scegli tra 3 dei ${treTra} posti`}
           onClick={() => { if (!treOn) trackFeature("scegli_tre", { tra: treTra }); setTreDi(treOn ? null : allKey); }}
-          className={`inline-flex min-h-9 items-center gap-1 rounded-pill px-3.5 text-[13px] font-sans font-semibold shadow-card active:scale-95 ${treOn ? "bg-brand text-white" : "bg-surface text-brand"}`}
+          className={`inline-flex min-h-9 items-center gap-1 rounded-pill px-3.5 text-[13px] font-sans font-semibold shadow-card active:scale-95 disabled:opacity-50 ${treOn ? "bg-brand text-white" : "bg-surface text-brand"}`}
         >
-          {treOn ? <><svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg>Tutti i {treTra}</> : <><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>Scegli tra 3</>}
+          {treOn ? <><svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg>Tutti i {treTutti}</> : <><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>Scegli tra 3</>}
         </button>
       )}
-      {/* Revisore 14/11: con la scelta accesa restano in vista i filtri accesi (la scelta è fatta tra i rimasti). */}
-      {quickFiltersOn && ([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).filter(([k]) => !treOn || quick.has(k)).map(([k, label]) => (
+      {/* Revisori 14 e 15/11: con la scelta accesa i filtri restano tutti in vista: toccarne uno cambia i tre davanti
+          ai tuoi occhi (la scelta è fatta tra i rimasti), invece di sparire. */}
+      {quickFiltersOn && ([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
         <button
           key={k}
           type="button"
@@ -775,15 +787,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // Variante B (stile Places): carosello orizzontale di card scure sopra la barra di navigazione.
   if (variant === "b") {
     const nuova = pillSlot != null && title != null;
-    // Con "Scegli tra 3" la frase dice come sono stati scelti, solo con i perché davvero usati.
-    // Breve, motivi uguali raggruppati ("e due di altri tipi"); "diversi tra loro" solo se i tipi lo sono davvero.
-    const contaMotivi = treLista.reduce<Record<string, number>>((m, t) => ({ ...m, [t.motivo]: (m[t.motivo] ?? 0) + 1 }), {});
-    const perche = (["tema", "gemma", "vicino", "diverso", "altro"] as const).filter((k) => contaMotivi[k]).map((k) => {
-      const n = contaMotivi[k];
-      return { tema: "il più in tema", gemma: n > 1 ? "due 💎" : "un 💎", vicino: "il più vicino", diverso: n > 1 ? "due di altri tipi" : "un altro tipo", altro: n > 1 ? "altri due in tema" : "un altro in tema" }[k];
-    });
-    const tipiDiversi = new Set(treLista.map((t) => t.posto.category ?? "")).size === treLista.length;
-    const fraseOggi = nuova && treOn ? { titolo: tipiDiversi ? "Tre, diversi tra loro" : "Tre da scegliere", dettaglio: `Su ${treTra}: ${perche.length > 1 ? `${perche.slice(0, -1).join(", ")} e ${perche[perche.length - 1]}` : perche[0]}` } : nuova && frase ? fraseRisultati({
+    // Con "Scegli tra 3" la frase dice solo su quanti si è scelto (revisore 15/11: i perché sono già sulle card).
+    // "Diversi tra loro" solo se i tipi, come scritti sulle card, lo sono davvero.
+    const tipiDiversi = new Set(treLista.map((t) => tipoMostrato(t.posto))).size === treLista.length;
+    const fraseOggi = nuova && treOn ? { titolo: tipiDiversi ? "Tre, diversi tra loro" : "Tre da scegliere", dettaglio: `Scelti tra ${treTra} posti` } : nuova && frase ? fraseRisultati({
       n: places.length,
       posti: places,
       ...frase,
@@ -1026,12 +1033,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span aria-hidden data-testid="copertina" className={`h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-base leading-none shadow-card ${conFoto[place.id] ? "hidden" : "flex"}`}>{getCategoryEmoji(place.category, place.name, place.types)}</span>
                       {motivo ? (
                         // "Scegli tra 3": il perché di questo posto prende il posto dell'etichetta (una sola sulla card).
-                        // Revisore 14/11: "Salvato" non sparisce sotto il perché: resta un cuore accanto. "Un altro tipo"
-                        // dice il tipo vero ("Altro tipo: enoteca"), se lo conosciamo.
-                        <span className="flex items-center gap-1">
-                          <span data-testid="tre-motivo" className="max-w-[12rem] truncate rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{motivo === "diverso" && cat ? `Altro tipo: ${cat.toLowerCase()}` : MOTIVO_LABEL[motivo]}</span>
-                          {saved && <span data-testid="tre-salvato" aria-label={saved} title={saved} className="flex h-5 w-5 items-center justify-center rounded-full bg-white/95 text-accent shadow-card"><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3.3 5 6.8 5c2 0 3.6 1.1 4.2 2.6h2C13.6 6.1 15.2 5 17.2 5c3.5 0 5.6 3.6 4.3 6.8C19.5 16.4 12 21 12 21z" /></svg></span>}
-                        </span>
+                        // Revisore 15/11: il tipo è già scritto sotto ("PIZZERIA"), l'etichetta non lo ripete; il salvato
+                        // si riconosce dal segnalibro pieno in alto a destra, come in tutta l'app.
+                        <span data-testid="tre-motivo" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{MOTIVO_LABEL[motivo]}</span>
                       ) : (stato || saved || gem || poco) && (
                       <span className="flex">
                         {stato ? (

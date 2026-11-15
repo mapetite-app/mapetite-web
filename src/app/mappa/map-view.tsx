@@ -1965,6 +1965,9 @@ export default function MapView({
   const quickOn = useBeta("filtri-lista");
   // "Scegli tra 3" (proposta 55): sulla mappa restano i tre segnalini delle tre card.
   const [treIds, setTreIds] = useState<string[] | null>(null);
+  // Revisore 15/11: la scelta accesa (chiave della lista) resta qui, non nel foglio: aprire la scheda di uno dei tre
+  // smonta il foglio, e chiudendola si torna ai tre invece che a tutta la lista.
+  const [treDi, setTreDi] = useState<string | null>(null);
   const mapPlaces = aiSearch !== null && treIds
     ? displayedPlaces.filter((p) => treIds.includes(p.id))
     : aiSearch !== null && quickOn ? applyQuickFilters(displayedPlaces, quickFilters, venueDetails) : displayedPlaces;
@@ -4403,6 +4406,8 @@ export default function MapView({
           frase={frase}
           onOrder={setCarouselOrder}
           onTre={setTreIds}
+          treDi={treDi}
+          onTreDi={setTreDi}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
           showSearchFeedback={clusterPlaces === null}
           onShareList={shareOn && view === "saved" && aiSearch === null ? async (list) => {

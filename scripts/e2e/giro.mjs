@@ -694,11 +694,18 @@ await page.unroute("**/api/search");
   ok(new Set(tipi.map((id) => sei.find((x) => x.id === id)?.category)).size === 3, "scegli tra 3: tre tipi diversi (non tre trattorie)");
   const titolo = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
   const det = (await page.getByTestId("frase-dettaglio").innerText().catch(() => "")).trim();
-  ok(titolo === "Tre, diversi tra loro" && /^Su 6: il più in tema, un 💎 e (il più vicino|un altro tipo)$/.test(det), `scegli tra 3: la frase sopra le card dice come sono scelti ('${titolo}' · '${det}')`);
+  ok(titolo === "Tre, diversi tra loro" && det === "Scelti tra 5 posti", `scegli tra 3: la frase dice su quanti si sceglie, senza il posto chiuso ('${titolo}' · '${det}')`);
   ok((await page.getByTestId("conteggio-risultati").innerText()).trim() === "3 posti" && (await page.locator("[data-testid=pin]").count()) === 3, "scegli tra 3: pillola '3 posti' e tre segnalini sulla mappa");
-  ok((await page.getByTestId("filtri-mappa").getByRole("button", { name: "Aperto ora" }).count()) === 0, "scegli tra 3: accesa, gli altri filtri si nascondono (una cosa per volta)");
-  // Revisore 14/11: "Un altro tipo" dice il tipo vero, e un posto salvato resta riconoscibile accanto al perché.
-  ok(!motivi.includes("Un altro tipo") && motivi.every((x) => !/^Altro tipo/.test(x) || /^Altro tipo: \S/.test(x)), `scegli tra 3: il perché "altro tipo" dice quale (${motivi.join(" / ")})`);
+  // Revisore 15/11: accesa, i filtri restano in vista (prima sparivano e spegnerne uno cambiava i tre senza dirlo).
+  ok((await page.getByTestId("filtri-mappa").getByRole("button", { name: "Aperto ora" }).count()) === 1 && (await tre.getAttribute("aria-pressed")) === "true", "scegli tra 3: accesa, i filtri restano in vista e il tasto è premuto");
+  // Revisore 15/11: aprire la scheda di uno dei tre e chiuderla torna ai tre, non a tutta la lista.
+  await page.locator("ul.snap-x li[data-id=T1]").click();
+  await page.waitForTimeout(500);
+  if (!(await page.getByTestId("barra-azioni").first().isVisible().catch(() => false))) { await page.locator("ul.snap-x li[data-id=T1]").click().catch(() => {}); await page.waitForTimeout(800); }
+  const schedaAperta = await page.getByTestId("barra-azioni").first().isVisible().catch(() => false);
+  await page.getByRole("button", { name: /^Chiudi/ }).first().click().catch(() => {});
+  await page.waitForTimeout(900);
+  ok(schedaAperta && (await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count()) === 3 && (await page.locator("ul.snap-x").getByTestId("tre-motivo").count()) === 3, `scegli tra 3: dopo la scheda di uno dei tre si torna ai tre (scheda aperta: ${schedaAperta})`);
   await shot("05c-scegli-tra-3");
   await tre.click();
   await page.waitForTimeout(300);
@@ -717,6 +724,28 @@ await page.unroute("**/api/search");
     const t = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
     const dd = (await page.getByTestId("frase-dettaglio").innerText().catch(() => "")).trim();
     ok(m.length === 3 && !m.some((x) => /altro tipo/i.test(x)) && t === "Tre da scegliere" && !/altro tipo|diversi/.test(dd), `scegli tra 3: tutti dello stesso tipo → niente "diverso" né "un altro tipo" (${m.join(" / ")} · '${t}' · '${dd}')`);
+    await page.unroute("**/api/search"); }
+  // Revisore 15/11: i tipi si confrontano come scritti sulle card. Due "Trattoria …" con tipi Google diversi
+  // (italian_restaurant, seafood_restaurant) e due pasticcerie (pastry_shop, cake_shop) non sono "altri tipi".
+  { const misti = [
+      mk("M1", "Trattoria da Lucia", 41.9, 12.49, { category: "italian_restaurant", rating: 4.6, userRatingCount: 900 }),
+      mk("M2", "Trattoria Il Moro", 41.9005, 12.491, { category: "seafood_restaurant", rating: 4.5, userRatingCount: 2000 }),
+      mk("M3", "Pasticceria Uno", 41.903, 12.495, { category: "pastry_shop", rating: 4.5, userRatingCount: 800 }),
+      mk("M4", "Pasticceria Due", 41.897, 12.486, { category: "cake_shop", rating: 4.4, userRatingCount: 700 }),
+      mk("M5", "Trattoria Terza", 41.905, 12.5, { category: "restaurant", rating: 4.3, userRatingCount: 600 }),
+    ];
+    await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: misti, sintesi_pendente: null } }));
+    await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await (await esempio(page)).click();
+    await page.locator("ul.snap-x li[data-id=M1]").waitFor({ timeout: 5000 });
+    await page.getByTestId("filtri-mappa").getByTestId("scegli-tre").click();
+    await page.waitForTimeout(300);
+    const ids = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((els) => els.map((e) => e.dataset.id));
+    const m = await page.locator("ul.snap-x").getByTestId("tre-motivo").allInnerTexts();
+    const t = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
+    const pasticcerie = ids.filter((id) => id === "M3" || id === "M4").length;
+    const diverso = m.filter((x) => x === "Un altro tipo").length;
+    ok(pasticcerie === 1 && diverso <= 1 && (t === "Tre, diversi tra loro") === (new Set(ids.map((id) => (id === "M3" || id === "M4" ? "p" : "t"))).size === 3), `scegli tra 3: tipi confrontati come sulle card (${ids.join(", ")} · ${m.join(" / ")} · '${t}')`);
     await page.unroute("**/api/search"); }
   // Con meno di 5 posti il tasto non c'è: si vedono già tutti.
   await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
