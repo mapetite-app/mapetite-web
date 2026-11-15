@@ -30,9 +30,10 @@ export default function InvitoAccetta({ codice, nome, chiediNome, contesto = "gi
     return (
       <div className={className}>
         <p data-testid="invito-scaduto" data-motivo={motivo} className="text-center text-sm font-sans text-text-muted">{testoInvitoNo(motivo, nome)}</p>
-        {uscita && (motivo === "tolto-da-te"
+        {/* "L'avevi tolto tu": il link nuovo si crea qui ovunque (pagina d'invito, Amici, primo accesso). */}
+        {motivo === "tolto-da-te"
           ? <MandaLinkNuovo nome={nome} className={tasto} />
-          : <a href={uscita.href} data-testid="invito-apri" className={`${tasto} mt-4`}>{uscita.label}</a>)}
+          : uscita && <a href={uscita.href} data-testid="invito-apri" className={`${tasto} mt-4`}>{uscita.label}</a>}
       </div>
     );
   }
