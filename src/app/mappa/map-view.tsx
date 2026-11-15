@@ -28,6 +28,7 @@ import { Bookmark, ArrowUp, ThumbsDown, ChevronRight, Lightbulb, List as ListIco
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { hasStateOrTag, isStateTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
+import { CONSIGLIATO_MAX, pulisciConsigliatoDa } from "@/lib/consigliato-da";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, tipoGoogleSconosciuto } from "@/lib/category-label";
@@ -113,6 +114,7 @@ function SaveModal({
   mode = "save",
   initialTags = [],
   initialNote = "",
+  initialConsigliatoDa = null,
   onSaved,
   onCancel,
   photoRef = null,
@@ -124,7 +126,9 @@ function SaveModal({
   mode?: "save" | "edit";
   initialTags?: string[];
   initialNote?: string;
-  onSaved: (tags: string[] | null, note: string | null, uuid?: string) => void;
+  // Proposta 58: "Chi te l'ha consigliato?" (solo in modifica di un salvato).
+  initialConsigliatoDa?: string | null;
+  onSaved: (tags: string[] | null, note: string | null, uuid?: string, consigliatoDa?: string | null) => void;
   onCancel: () => void;
   photoRef?: string | null;
   // Numero di recensioni Google già arrivato: solo per "poco conosciuto" (Scopritori), non si salva.
@@ -139,6 +143,7 @@ function SaveModal({
     sheetOn && mode === "save" && initialTags.length === 0 ? [VISIT_WANT] : initialTags,
   );
   const [note, setNote] = useState(initialNote);
+  const [consigliato, setConsigliato] = useState(initialConsigliatoDa ?? "");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState(false);
 
@@ -192,6 +197,22 @@ function SaveModal({
       />
     );
 
+  // Proposta 58: chi te l'ha consigliato, a mano (o corretto se è arrivato dal link). Solo modificando un salvato.
+  const consigliatoField = (cls: string) => mode === "edit" ? (
+    <label className="block">
+      <span className="sr-only">Chi te l&apos;ha consigliato?</span>
+      <input
+        data-testid="consigliato-modifica"
+        value={consigliato}
+        onChange={(e) => setConsigliato(e.target.value)}
+        maxLength={CONSIGLIATO_MAX}
+        enterKeyHint="done"
+        placeholder="Chi te l'ha consigliato?"
+        className={cls}
+      />
+    </label>
+  ) : null;
+
   // Mentre salva, Esc non chiude la finestra (l'eventuale errore resterebbe invisibile).
   useEffect(() => {
     if (!isPending) return;
@@ -211,11 +232,14 @@ function SaveModal({
       const noteValue = note.trim() || null;
 
       let savedUuid: string | undefined;
+      // Nome ripulito (solo lettere, max 40); si scrive solo se cambiato, così senza la colonna il resto si salva.
+      const consigliatoValue = pulisciConsigliatoDa(consigliato);
+      const daCambiato = mode === "edit" && consigliatoValue !== (initialConsigliatoDa ?? null);
 
       if (mode === "edit") {
         const { error } = await supabase
           .from("saved_places")
-          .update({ tags, note: noteValue })
+          .update(daCambiato ? { tags, note: noteValue, consigliato_da: consigliatoValue } : { tags, note: noteValue })
           .eq("user_id", userId)
           // place.id qui e' gia' l'UUID (vista saved)
           .eq("place_id", place.id);
@@ -259,7 +283,7 @@ function SaveModal({
         } else if (error) { setError(true); return; }
       }
 
-      onSaved(tags, noteValue, savedUuid);
+      onSaved(tags, noteValue, savedUuid, mode === "edit" ? consigliatoValue : undefined);
     });
   };
 
@@ -314,6 +338,7 @@ function SaveModal({
               className="w-full resize-none rounded-card border border-border bg-white px-4 py-3 text-base font-sans text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand"
             />
           </label>
+          {consigliatoField("mt-2 min-h-11 w-full rounded-pill border border-border bg-white px-4 text-base font-sans text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand")}
 
           <p className="mb-2 mt-3 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">I tuoi tag</p>
           <div className="flex flex-wrap gap-2">
@@ -384,6 +409,7 @@ function SaveModal({
           rows={3}
           className="w-full resize-none rounded-btn border border-border px-3 py-2 text-base font-sans focus:outline-none focus:ring-2 focus:ring-brand"
         />
+        {consigliatoField("mt-2 min-h-11 w-full rounded-btn border border-border px-3 text-base font-sans focus:outline-none focus:ring-2 focus:ring-brand")}
 
         {error && (
           <p className="mt-1 text-sm text-error">
@@ -585,6 +611,8 @@ export type Place = {
   types?: string[] | null;
   // Solo nei salvati (proposta 45): stato letto da Google quando il locale è passato da una ricerca o dalla scheda.
   businessStatus?: string | null;
+  // Solo nei salvati (proposta 58): chi te l'ha consigliato (saved_places.consigliato_da), privato.
+  consigliatoDa?: string | null;
 };
 
 function SaveButton({
@@ -1331,7 +1359,7 @@ export default function MapView({
     // Giro del 1/11: l'elenco generale (page.tsx) non ha voto né prezzo; quelli del salvato sì. Prima la scheda
     // di Hostaria Del Moro (4,5 in archivio) mostrava solo "250 m".
     return savedVersion
-      ? { ...base, tags: savedVersion.tags, note: savedVersion.note, rating: base.rating ?? savedVersion.rating, priceLevel: base.priceLevel ?? savedVersion.priceLevel }
+      ? { ...base, tags: savedVersion.tags, note: savedVersion.note, consigliatoDa: savedVersion.consigliatoDa ?? null, rating: base.rating ?? savedVersion.rating, priceLevel: base.priceLevel ?? savedVersion.priceLevel }
       : base;
   }, [overlay, places, displayedPlaces, savedPlaces, placeUuids]);
   // Scheda aperta: la barra dell'app si nasconde (globals.css, html[data-scheda-aperta]).
@@ -1599,12 +1627,16 @@ export default function MapView({
 
     (async () => {
       const supabase = await browserClient();
-      const { data, error } = await supabase
+      const COLS = "tags, note, created_at, places(id, name, category, address, lat, lng, google_place_id, rating, price_level, business_status)";
+      const leggi = (conDa: boolean) => supabase
         .from("saved_places")
-        .select("tags, note, created_at, places(id, name, category, address, lat, lng, google_place_id, rating, price_level, business_status)")
+        .select((conDa ? `consigliato_da, ${COLS}` : COLS) as typeof COLS)
         .eq("user_id", userId)
         // Dal più vecchio al più nuovo, come i salvataggi nuovi (in coda): nei Salvati "Recenti" la rovescia.
         .order("created_at", { ascending: true });
+      // consigliato_da (proposta 58) arriva con la migrazione 20261115e: senza la colonna (42703) si rilegge senza.
+      let { data, error } = await leggi(true);
+      if (error?.code === "42703") ({ data, error } = await leggi(false));
 
       setLoadingSaved(false);
       setSavedLoaded(true);
@@ -1622,7 +1654,8 @@ export default function MapView({
           const { google_place_id, price_level, business_status, ...place } = raw;
           if (google_place_id) uuidMap[google_place_id] = place.id;
           // voto e prezzo salvati al momento del salvataggio: le card dei salvati li mostrano
-          return { ...place, rating: place.rating ?? null, priceLevel: price_level ?? null, businessStatus: business_status ?? null, tags: row.tags as string[] | null, note: row.note as string | null, savedAt: (row as { created_at?: string | null }).created_at as Place["savedAt"] };
+          const consigliatoDa = (row as { consigliato_da?: string | null }).consigliato_da?.trim() || null;
+          return { ...place, rating: place.rating ?? null, priceLevel: price_level ?? null, businessStatus: business_status ?? null, tags: row.tags as string[] | null, note: row.note as string | null, savedAt: (row as { created_at?: string | null }).created_at as Place["savedAt"], consigliatoDa };
         })
         .filter((p): p is Place => p !== null);
 
@@ -4148,6 +4181,7 @@ export default function MapView({
                 priceLevel: selected.priceLevel, lat: selected.lat, lng: selected.lng,
                 personalTags: selected.tags,
                 personalNote: selected.note,
+                consigliatoDa: selected.consigliatoDa ?? null,
                 businessStatus: selected.businessStatus ?? null,
                 ...(venueDetails[selected.id] ?? {
                   userRatingCount: null, openNow: null, websiteUri: null, phone: null,
@@ -4257,8 +4291,9 @@ export default function MapView({
           mode="edit"
           initialTags={pendingEditPlace.tags ?? []}
           initialNote={pendingEditPlace.note ?? ""}
-          onSaved={(tags, note) => {
-            const updated = { ...pendingEditPlace, tags, note };
+          initialConsigliatoDa={savedPlaces.find((p) => p.id === pendingEditPlace.id)?.consigliatoDa ?? null}
+          onSaved={(tags, note, _uuid, consigliatoDa) => {
+            const updated = { ...pendingEditPlace, tags, note, consigliatoDa: consigliatoDa ?? null };
             setSavedPlaces((prev) =>
               prev.map((p) => (p.id === pendingEditPlace.id ? updated : p))
             );

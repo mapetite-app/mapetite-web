@@ -2,7 +2,7 @@
 
 import { Fragment, memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, Map as MapIcon, Moon, Plus, Search, Sparkles, SquarePlay, X } from "lucide-react";
+import { Check, ChevronDown, Map as MapIcon, Moon, Plus, Search, Sparkles, SquarePlay, UsersRound, X } from "lucide-react";
 import type { Place } from "@/app/mappa/map-view";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -347,6 +347,10 @@ export default function SalvatiLista({
   // tipo e stato ("Pizzerie · Trastevere · Da provare").
   const [quartiere, setQuartiere] = useState<string | null>(null);
   const [vicino, setVicino] = useState(false);
+  // "Dagli amici" (proposta 58): solo i posti con "Te l'ha consigliato…". La pillola c'è solo se ne esiste almeno uno.
+  const [amici, setAmici] = useState(false);
+  const conAmici = useMemo(() => all.some((p) => !!p.consigliatoDa), [all]);
+  const amiciOn = amici && conAmici;
   const [scheda, setScheda] = useState<"zone" | "tipi" | "raccolte">("zone");
   // La fila delle città scorre? (misurata, così la sfumatura c'è solo quando serve)
   const cittaRef = useRef<HTMLDivElement | null>(null);
@@ -438,11 +442,13 @@ export default function SalvatiLista({
   // città, lista, conteggi e filtri rapidi sono solo di quella.
   const zone = useMemo(() => zoneDeiSalvati(all), [all]);
   const zonaOn = zone.length > 1 ? zone.find((z) => z.nome === zona) ?? null : null;
-  const base = useMemo(() => {
+  const baseZona = useMemo(() => {
     if (!zonaOn) return all;
     const ids = new Set(zonaOn.posti.map((p) => p.id));
     return all.filter((p) => ids.has(p.id));
   }, [all, zonaOn]);
+  const base = useMemo(() => (amiciOn ? baseZona.filter((p) => !!p.consigliatoDa) : baseZona), [baseZona, amiciOn]);
+  const nAmici = useMemo(() => baseZona.filter((p) => !!p.consigliatoDa).length, [baseZona]);
   // Testo di ogni salvato calcolato una volta (non a ogni lettera).
   const testi = useMemo(() => new globalThis.Map(all.map((p) => [p.id, testoSalvato(p)])), [all]);
   const perStato = useMemo(() => base.filter((p) => (raccolta === null || !!p.tags?.includes(raccolta)) && (statoOn === null || hasStateOrTag(p.tags, statoOn))), [base, raccolta, statoOn]);
@@ -607,7 +613,7 @@ export default function SalvatiLista({
   const apriRiga = useCallback((p: Place) => apri.current.onOpen(p, apri.current.ids), []);
   // Righe disegnate: le prime PASSO, poi altre scorrendo (onScroll). Si riparte da capo a ogni filtro nuovo.
   const [quanti, setQuanti] = useState(PASSO);
-  const chiaveFiltri = `${zonaOn?.nome ?? ""}|${activeTag ?? ""}|${statoOn ?? ""}|${tipo ?? ""}|${quartiere ?? ""}|${vicinoOn}|${cercato}|${sort}`;
+  const chiaveFiltri = `${zonaOn?.nome ?? ""}|${activeTag ?? ""}|${statoOn ?? ""}|${tipo ?? ""}|${quartiere ?? ""}|${vicinoOn}|${amiciOn}|${cercato}|${sort}`;
   const [chiaveVista, setChiaveVista] = useState(chiaveFiltri);
   if (chiaveFiltri !== chiaveVista) { setChiaveVista(chiaveFiltri); setQuanti(PASSO); }
   const onScroll = (e: React.UIEvent<HTMLElement>) => {
@@ -630,7 +636,7 @@ export default function SalvatiLista({
   // Con un filtro acceso pillole e raccolte restano: chi cerca deve vedere che il filtro c'è.
   // Revisore 4/11 sera (terzo): solo quando la risposta c'è; prima (o dopo aver spento la raccolta) restano le
   // raccolte, così si può scegliere a chi chiedere senza cancellare la domanda.
-  const soloRisposta = domanda && list.length === 0 && raccolta === null && statoOn === null && tipo === null && quartiere === null && !vicino && attuale !== null;
+  const soloRisposta = domanda && list.length === 0 && raccolta === null && statoOn === null && tipo === null && quartiere === null && !vicino && !amiciOn && attuale !== null;
   // Revisore 4/11: con una domanda e nessun posto per nome conta solo la risposta dell'AI (anche con una raccolta
   // accesa): niente "Nessun posto qui" sotto la risposta né "0 di 14 posti" in testa.
   const rispostaAI = domanda && list.length === 0;
@@ -646,11 +652,11 @@ export default function SalvatiLista({
     // Revisore 1/11: "Ci sono stato 0" è un filtro morto; torna appena c'è un posto (o se è acceso).
   ].filter((p) => (p.n ?? 0) > 0 || p.on); // Revisore 8/11: niente "Da provare 0" né "Ci sono stato 0" (filtri morti).
   // Filtri accesi oltre alla città: sotto la fila compaiono "23 di 500" e "Azzera".
-  const filtrando = searching || raccolta !== null || statoOn !== null || tipo !== null || zonaAccesa;
-  const azzera = () => { onTag(null); setStatoLista(null); scrivi(""); setTipo(null); setQuartiere(null); setVicino(false); };
+  const filtrando = searching || raccolta !== null || statoOn !== null || tipo !== null || zonaAccesa || amiciOn;
+  const azzera = () => { onTag(null); setStatoLista(null); scrivi(""); setTipo(null); setQuartiere(null); setVicino(false); setAmici(false); };
   // Nessun posto in questa città ma qualcuno nelle altre: si propone di cercare dappertutto.
   const altrove = list.length === 0 && zonaOn && filtrando
-    ? filtraLista(all.filter((p) => (raccolta === null || !!p.tags?.includes(raccolta)) && (statoOn === null || hasStateOrTag(p.tags, statoOn))), tipo, cercato, testi).length
+    ? filtraLista(all.filter((p) => (!amiciOn || !!p.consigliatoDa) && (raccolta === null || !!p.tags?.includes(raccolta)) && (statoOn === null || hasStateOrTag(p.tags, statoOn))), tipo, cercato, testi).length
     : 0;
   const citta = zone.length > 1 ? [{ nome: null as string | null, label: "Tutte", n: all.length }, ...zone.map((z) => ({ nome: z.nome as string | null, label: z.nome, n: z.posti.length }))] : [];
   const iconBtn = "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d6dcdc] text-text active:scale-95";
@@ -690,7 +696,7 @@ export default function SalvatiLista({
     el.addEventListener("scroll", misura, { passive: true });
     misura();
     return () => { ro.disconnect(); el.removeEventListener("scroll", misura); };
-  }, [quartiere, tipo, vicinoOn, raccolta, statoOn, all.length]);
+  }, [quartiere, tipo, vicinoOn, raccolta, statoOn, amiciOn, all.length]);
   const tipoAcceso = tipo === null ? null : { label: tipoPlurale(tipo), emoji: tipi.find((t) => t.label === tipo)?.emoji ?? "🍽️" };
   // Pillole dei filtri accesi, ognuna si toglie da sola (la ✕): zona, tipo, raccolta. Lo stato ha le sue due pillole.
   const attivi = [
@@ -716,6 +722,19 @@ export default function SalvatiLista({
         {p.short} {p.n}
       </button>
     ))}
+    {(conAmici && nAmici > 0) || amiciOn ? (
+      <button
+        type="button"
+        data-testid="salvati-amici"
+        aria-pressed={amiciOn}
+        aria-label={`Dagli amici, ${nAmici}`}
+        onClick={() => { setAmici(!amiciOn); if (!amiciOn) trackFeature("salvati_amici", { risultati: nAmici }); }}
+        className={`flex min-h-11 shrink-0 items-center gap-1 rounded-pill px-3 text-[14px] font-medium transition-colors active:scale-95 ${amiciOn ? "bg-brand font-semibold text-white" : "border border-[#e1e5e5] bg-white text-[#33373d]"}`}
+      >
+        <UsersRound size={14} strokeWidth={2.5} aria-hidden className={amiciOn ? "" : "text-brand"} />
+        Dagli amici {nAmici}
+      </button>
+    ) : null}
   </div>
   );
   const scegli = (cosa: string, n: number, fai: () => void) => { fai(); trackFeature("salvati_scaffale", { contesto: cosa, risultati: n }); };

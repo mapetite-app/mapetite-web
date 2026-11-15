@@ -10,7 +10,8 @@ import { isUuid } from "@/lib/gruppi";
 import { bookingMakesSense } from "@/lib/bookable";
 import SchedaCarosello from "@/components/scheda-carosello";
 import AmiciQuiBox, { type FriendPerson } from "@/components/amici-qui-box";
-import { mapetiteShareUrl } from "@/lib/share-place";
+import { conConsigliatoDa, mapetiteShareUrl, mioPrimoNome } from "@/lib/share-place";
+import { messaggioGrazie } from "@/lib/consigliato-da";
 import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -66,6 +67,8 @@ export type Venue = {
   matchReason: string | null;
   personalTags: string[] | null;
   personalNote: string | null;
+  // Proposta 58: chi te l'ha consigliato (solo sui salvati, privato).
+  consigliatoDa?: string | null;
   photoRef?: string | null;
   orari?: Orari | null;
   photoAuthor?: string | null;
@@ -187,6 +190,7 @@ export default function VenueSheet({
     personalTags,
     personalNote,
   } = venue;
+  const consigliatoDa = isSaved ? venue.consigliatoDa?.trim() || null : null;
   // Segnali di comportamento (percorso, chiama, sito, condividi): vedi src/lib/track.ts.
   // `da` distingue i tocchi della barra azioni in basso da quelli nel resto della scheda.
   const signal = (type: "percorso" | "chiama" | "sito" | "condividi", da?: string) =>
@@ -267,8 +271,9 @@ export default function VenueSheet({
   const share = async () => {
     signal("condividi");
     // Link Mapetite (pagina pubblica con il verdetto); se non si può creare, Google Maps.
-    const mapetiteUrl = await mapetiteShareUrl({ ...venue, lat, lng });
-    const url = mapetiteUrl ?? mapsUrl;
+    // Proposta 58: con il nome del proprio profilo ("da=Giulia"), letto insieme al link e mai oltre 0,7 s.
+    const [mapetiteUrl, da] = await Promise.all([mapetiteShareUrl({ ...venue, lat, lng }), mioPrimoNome()]);
+    const url = mapetiteUrl ? conConsigliatoDa(mapetiteUrl, da) : mapsUrl;
     const base = verdict?.trim() ? `${name} — ${verdict.trim()}` : name;
     const text = mapetiteUrl ? `${base} · su Mapetite` : base;
     try {
@@ -287,6 +292,24 @@ export default function VenueSheet({
         setTimeout(() => setShareNote(null), 4000);
       }
     }
+  };
+
+  // "Dillo a Giulia" (proposta 58): il messaggio pronto per chi te l'ha consigliato, dal foglio di condivisione
+  // del telefono o, senza, da WhatsApp. Nessun dato passa da noi: solo il segnale d'uso, senza nome né testo.
+  const dilloA = async (chi: string) => {
+    const piaciuto = personalTags?.includes("Mi è piaciuto") ?? false;
+    trackFeature("dillo_amico", { voto: piaciuto ? "su" : "altro" });
+    const text = messaggioGrazie(name, piaciuto);
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: `Per ${chi}`, text });
+        return;
+      } catch (err) {
+        // Chiuso il foglio: niente. Altri errori (es. il telefono non accetta più il tocco): si passa a WhatsApp.
+        if (err instanceof DOMException && err.name === "AbortError") return;
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   };
 
   const hasReviews = selectedReviews != null && selectedReviews.length > 0;
@@ -450,6 +473,13 @@ export default function VenueSheet({
         <p className={`font-display font-semibold uppercase text-accent ${editorial ? "text-[10.5px] tracking-[0.14em]" : "text-xs tracking-wide"}`}>
           Le tue note
         </p>
+        {/* Proposta 58: chi te l'ha consigliato (dal link condiviso o scritto a mano in Modifica). */}
+        {consigliatoDa && (
+          <p data-testid="consigliato-scheda" className="mt-1.5 flex items-center gap-1.5 text-sm font-sans text-text-muted">
+            <UsersRound size={14} className="shrink-0 text-brand" aria-hidden />
+            <span className="min-w-0 truncate">Te l&apos;ha consigliato <span className="font-display font-semibold text-brand">{consigliatoDa}</span></span>
+          </p>
+        )}
         {withStatus && onVisitStatus && (
           <div className="mt-2 flex gap-2" data-testid="stato-salvato">
             {([["Da provare", "📌 Da provare"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => {
@@ -492,6 +522,18 @@ export default function VenueSheet({
                 );
               })}
             </div>
+            {/* Proposta 58: chiudi il giro con chi te l'ha consigliato (messaggio pronto, lo mandi tu). */}
+            {consigliatoDa && (
+              <button
+                type="button"
+                data-testid="dillo-amico"
+                onClick={() => void dilloA(consigliatoDa)}
+                className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand active:scale-[0.98]"
+              >
+                <Share2 size={15} className="shrink-0" aria-hidden />
+                <span className="truncate">Dillo a {consigliatoDa}</span>
+              </button>
+            )}
             {/* Proposta 27: dal posto che ti è piaciuto, una ricerca con i suoi tratti (vedi altriCome in map-view). */}
             {onAltriCome && !personalTags?.includes("Non fa per me") && (
               <button
