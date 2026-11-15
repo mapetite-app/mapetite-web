@@ -170,8 +170,9 @@ export default async function AmiciPage() {
           </section>
 
           {/* "Fatti trovare" (revisore 14/11, quarto giro): uscito dal primo accesso, qui un riquadro discreto. Il
-              profilo si rende pubblico da /profilo, dove si vede prima cosa vedranno gli altri. */}
-          {privato && (
+              profilo si rende pubblico da /profilo, dove si vede prima cosa vedranno gli altri.
+              Revisore 15/11: nello stato vuoto una cosa sola, "Manda il tuo link"; "Fatti trovare" quando c'è qualcuno. */}
+          {privato && !vuota && (
             <section data-testid="amici-fatti-trovare" className="mt-6 flex items-center gap-3 rounded-card border border-[#e3e7e7] bg-white px-4 py-3">
               <span aria-hidden className="text-xl">🙋</span>
               <p className="min-w-0 flex-1 text-[13px] font-sans leading-snug text-text-muted">

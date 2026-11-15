@@ -4987,6 +4987,7 @@ else {
   { const v = sp.getByTestId("amici-vuoto");
     ok((await v.getByTestId("invita-amico").getAttribute("data-vuoto")) === "1" && await v.getByTestId("nome-per-invito").isVisible() && !((await v.textContent()) ?? "").includes("Non segui ancora nessuno") && (await sp.getByTestId("amici-invita").count()) === 0, "amici vuoto: riquadro 'Invita un amico' con il nome da scrivere, niente chip doppione");
     ok((await sp.getByTestId("attivita-titolo").count()) === 0 && (await sp.getByText("Attività", { exact: true }).count()) === 0, "amici vuoto: niente intestazione 'Attività' sopra il solo invito");
+    ok((await sp.getByTestId("amici-fatti-trovare").count()) === 0 && (await sp.getByTestId("amici-rendi-pubblico").count()) === 0, "amici vuoto: una cosa sola (l'invito), niente 'Fatti trovare / Rendi pubblico'");
     await sp.screenshot({ path: `${OUT}/62-amici-vuoto.png`, caret: "initial", fullPage: true }); }
   await setSocial(soctx, { ...social, seguo: [], amici: [], invito: "i-00000000c0de", mio: { ...social.mio, display_name: "Luca" } });
   await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
