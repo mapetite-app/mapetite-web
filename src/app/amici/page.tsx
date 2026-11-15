@@ -71,7 +71,7 @@ export default async function AmiciPage() {
     <div className="mx-auto max-w-2xl px-4 pb-10 pt-6" data-testid="amici">
       <h1 className="font-title text-3xl font-semibold text-text">Amici</h1>
       {/* Revisori 15/11: il sottotitolo dice quello che la pagina fa davvero (prima prometteva "chi ha gusti come i tuoi"). */}
-      <p data-testid="amici-sottotitolo" className="mt-1 text-sm font-sans text-text-muted">Dove sono stati e dove vogliono andare i tuoi amici.</p>
+      <p data-testid="amici-sottotitolo" className="mt-1 text-balance text-sm font-sans text-text-muted">Dove sono stati e dove vogliono andare i tuoi amici.</p>
       <InvitoSospeso senzaNome={senzaNome} />
 
       {feed.stato === "in-arrivo" ? (

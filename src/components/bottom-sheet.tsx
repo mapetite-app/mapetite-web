@@ -1058,7 +1058,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         <span data-testid="stato-card" data-chiuso="true" className="rounded-pill bg-[#33373d] px-2 py-0.5 text-[10px] font-display font-semibold">Chiuso per ora</span>
                       ) : motivo ? (
                         // "Scegli tra 3": il perché di questo posto prende il posto dell'etichetta (una sola sulla card).
-                        // Revisore 15/11: il tipo è già scritto sotto ("PIZZERIA"), l'etichetta non lo ripete; il salvato
+                        // Revisori 15/11: il tipo è già scritto sotto ("PIZZERIA"), l'etichetta dice solo la sua emoji; il salvato
                         // si riconosce dal segnalibro pieno in alto a destra, come in tutta l'app.
                         <span data-testid="tre-motivo" className="max-w-[13rem] truncate rounded-pill bg-accent px-2 py-0.5 text-[11px] font-display font-semibold">{etichettaMotivo(motivo, place)}</span>
                       ) : (stato || saved || gem || poco) && (

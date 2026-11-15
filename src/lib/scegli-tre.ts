@@ -62,12 +62,12 @@ export function candidatiTre<T extends PostoTre>(posti: readonly T[], fuoriTema?
   return posti.filter((p) => !p.businessStatus?.startsWith("CLOSED") && !(fuoriTema?.includes(p.id) ?? false));
 }
 
-// L'etichetta del perché sulla card: "Un altro tipo · Pizzeria" dice il tipo vero (due "Un altro tipo" uguali
-// non aiutavano a scegliere).
-export function etichettaMotivo(motivo: Motivo, p: { category: string | null; name: string }): string {
+// L'etichetta del perché sulla card: "Un altro tipo · 🍕" (due "Un altro tipo" uguali non aiutavano a scegliere).
+// Revisore 15/11 pomeriggio: l'emoji e non la parola, che è già scritta sotto ("PIZZERIA") e con nomi lunghi
+// si tagliava; due card "altro tipo" hanno sempre emoji diverse (stessoTipo confronta le emoji).
+export function etichettaMotivo(motivo: Motivo, p: { category: string | null; name: string; types?: readonly string[] | null }): string {
   if (motivo !== "diverso") return MOTIVO_LABEL[motivo];
-  const tipo = categoryLabel(p.category, p.name);
-  return tipo ? `${MOTIVO_LABEL.diverso} · ${tipo}` : MOTIVO_LABEL.diverso;
+  return `${MOTIVO_LABEL.diverso} · ${getCategoryEmoji(p.category, p.name, p.types)}`;
 }
 
 // Quanti posti servono almeno alla scelta: con uno solo non c'è niente da scegliere.

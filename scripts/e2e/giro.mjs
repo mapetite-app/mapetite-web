@@ -756,7 +756,7 @@ await page.unroute("**/api/search");
     const pasticcerie = ids.filter((id) => id === "M3" || id === "M4").length;
     const diverso = m.filter((x) => x.startsWith("Un altro tipo")).length;
     // Revisori 15/11: un solo tipo nuovo (le pasticcerie) → due card, non una terza "Anche in tema" che ripete il primo.
-    ok(pasticcerie === 1 && diverso === 1 && ids.length === 2 && m[1] === "Un altro tipo · Pasticceria" && t === "Due, diversi tra loro", `scegli tra 3: tipi confrontati come sulle card (${ids.join(", ")} · ${m.join(" / ")} · '${t}')`);
+    ok(pasticcerie === 1 && diverso === 1 && ids.length === 2 && /^Un altro tipo · \S+$/u.test(m[1]) && !/Pasticceria/.test(m[1]) && t === "Due, diversi tra loro", `scegli tra 3: tipi confrontati come sulle card (${ids.join(", ")} · ${m.join(" / ")} · '${t}')`);
     await page.unroute("**/api/search"); }
   // Revisori 15/11: senza un 💎 né la posizione uscivano due card "Un altro tipo" uguali. Ora ognuna dice il suo
   // tipo vero, diverso dal primo e dall'altra.
