@@ -181,7 +181,8 @@ const noSubscribe = () => () => {};
 // Risposte già salvate nel profilo (per "Rifalla"): servono da punto di partenza, mai come bozza.
 export type DalProfilo = { city: string | null; occasions: string[]; priceRange: string | null; zone: string[]; su: string[]; giu: string[]; scoperta: Scoperta | null; diete: string[]; cuisines?: string[]; atmospheres?: string[]; amati?: string[] };
 
-export default function OnboardingView({ next = null, dalProfilo = null }: { next?: string | null; dalProfilo?: DalProfilo | null }) {
+// "nomeNoto": il nome già nel profilo (per esempio dall'accesso con Google): il passo dell'invito non lo richiede.
+export default function OnboardingView({ next = null, dalProfilo = null, nomeNoto = null }: { next?: string | null; dalProfilo?: DalProfilo | null; nomeNoto?: string | null }) {
   const raw = useSyncExternalStore(noSubscribe, readDraftRaw, () => null);
   // La bozza si legge una volta sola, all'apertura: le risposte salvate mentre si risponde non devono
   // far ripartire la schermata con "Ho ritrovato le risposte" (collaudo 23/10: lo vedeva chi entrava la prima volta).
@@ -202,10 +203,10 @@ export default function OnboardingView({ next = null, dalProfilo = null }: { nex
         scoperta: dalProfilo.scoperta, diete: dalProfilo.diete, amati: amatiValidi(dalProfilo.amati),
       }
     : null;
-  return <Benvenuto key={draft ? "ripreso" : "nuovo"} next={next} initial={draft ?? base} ripreso={draft != null} />;
+  return <Benvenuto key={draft ? "ripreso" : "nuovo"} next={next} initial={draft ?? base} ripreso={draft != null} nomeNoto={nomeNoto?.trim() || null} />;
 }
 
-function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: Draft | null; ripreso: boolean }) {
+function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; initial: Draft | null; ripreso: boolean; nomeNoto: string | null }) {
   const router = useRouter();
   const [step, setStep] = useState(initial?.step ?? 0);
   const cuisines = initial?.cuisines ?? [];
@@ -242,7 +243,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [invito, setInvito] = useState<{ codice: string; nome: string | null; stato: "chiedi" | "salvo" | "amici" | "errore" | "scaduto" | "nome" | "no"; motivo?: string } | null>(null);
   // Un solo campo "Il tuo nome", nel passo dell'invito. "Profilo pubblico" non sta più nel primo accesso
   // (revisore 14/11, quarto giro: l'ultima schermata era troppo carica): è in Amici, un riquadro discreto.
-  const [mioNome, setMioNome] = useState("");
+  // Revisore 15/11: chi ha già un nome non lo riscrive (il server lo scartava): si parte da quello.
+  const [mioNome, setMioNome] = useState(nomeNoto ?? "");
   const nomeRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -844,9 +846,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             ) : (
               <>
                 <p data-testid="invito-domanda" className="text-[15px] font-sans text-text-muted">
-                  {invito.stato === "errore" ? <span role="alert" className="text-error">Non ci sono riuscito: riprova.</span> : invito.stato === "nome" ? <span role="alert" className="text-error">Prima scrivi il tuo nome.</span> : `Da amici vi vedete per nome in Amici${invito.nome ? `: ${invito.nome} vedrà il tuo` : ""}.`}
+                  {invito.stato === "errore" ? <span role="alert" className="text-error">Non ci sono riuscito: riprova.</span> : invito.stato === "nome" ? <span role="alert" className="text-error">Prima scrivi il tuo nome.</span> : nomeNoto ? `Da amici vi vedete per nome in Amici: ${invito.nome ?? "il tuo amico"} ti vedrà come ${nomeNoto}.` : `Da amici vi vedete per nome in Amici${invito.nome ? `: ${invito.nome} vedrà il tuo` : ""}.`}
                 </p>
-                <label className="block text-sm font-display font-semibold text-text">
+                {/* Il nome c'è già: niente campo (torna solo se il server lo chiede comunque). */}
+                {(!nomeNoto || invito.stato === "nome") && <label className="block text-sm font-display font-semibold text-text">
                   Il tuo nome
                   <input
                     ref={nomeRef}
@@ -859,7 +862,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     aria-invalid={invito.stato === "nome"}
                     className="mt-1.5 block min-h-12 w-full rounded-btn border border-border bg-white px-3 text-[16px] font-sans font-normal text-text outline-none focus:border-brand aria-[invalid=true]:border-error"
                   />
-                </label>
+                </label>}
               </>
             )}
           </section>

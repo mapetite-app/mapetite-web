@@ -9051,6 +9051,24 @@ else {
   // Senza nome pubblico (parte social non ancora attiva): codice dall'id, funziona lo stesso.
   await ictx.clearCookies({ name: "e2e_social" });
   await pp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  // Revisore 15/11: chi ha già un nome (profilo o accesso Google) non lo riscrive nel passo dell'invito del primo accesso.
+  { const np = await ictx.newPage();
+    np.on("pageerror", (e) => errors.push(e.message));
+    await ictx.clearCookies({ name: "e2e_anonimo" });
+    await ictx.addCookies([{ name: "e2e_gusto", value: encodeURIComponent(JSON.stringify({ zone: [], occasions: [], su: [], giu: [], diete: [], nome: "Luca" })), url: BASE }]);
+    await np.goto(`${BASE}/privacy`, { waitUntil: "domcontentloaded" });
+    await np.evaluate((c) => { localStorage.setItem("mapetite.invito", JSON.stringify({ codice: c, t: Date.now() })); localStorage.setItem("mapetite.benvenuto", JSON.stringify({ step: 7, city: "Roma", amati: ["pizzeria"], ts: Date.now() })); }, COD_AMICO);
+    await np.goto(`${BASE}/onboarding?primo=a`, { waitUntil: "networkidle" });
+    await np.getByTestId("capito-avanti").waitFor({ timeout: 5000 }).catch(() => {});
+    await np.getByTestId("capito-avanti").click().catch(() => {});
+    const ia = np.getByTestId("invito-amico");
+    await ia.waitFor({ timeout: 4000 }).catch(() => {});
+    const dom = (await ia.getByTestId("invito-domanda").textContent().catch(() => "")) ?? "";
+    ok((await ia.getByTestId("invito-mio-nome").count()) === 0 && !(await np.getByTestId("invito-si").isDisabled().catch(() => true)) && dom.includes("Giulia ti vedrà come Luca"), `primo accesso da invito con il nome già nel profilo: niente campo, 'Diventa amico' acceso (${dom})`);
+    await np.screenshot({ path: `${OUT}/benvenuto-5-invito-con-nome.png`, caret: "initial" });
+    await np.evaluate(() => { localStorage.removeItem("mapetite.invito"); localStorage.removeItem("mapetite.benvenuto"); });
+    await ictx.clearCookies({ name: "e2e_gusto" });
+    await np.close(); }
   ok((await pp.getByTestId("invita-amico-link").getAttribute("data-path")) === "/invito/u-00000000", `profilo: senza nome pubblico il link usa un codice breve (${await pp.getByTestId("invita-amico-link").getAttribute("data-path")})`);
   await ictx.close();
 
