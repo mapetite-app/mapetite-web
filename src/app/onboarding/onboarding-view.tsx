@@ -121,7 +121,8 @@ const PASSO_OCCASIONI = 5;
 const PASSO_SPESA = 6;
 const PASSO_CAPITO = 7;
 // L'invito di un amico (revisore 14/11, quarto giro): un passo a sé dopo "Ecco cosa ho capito", solo se c'è un
-// invito. Fuori da STEPS: non entra nel contatore "N di 7" (è una domanda in più solo per chi arriva da un link).
+// invito. Fuori da STEPS, ma conta nel contatore: chi arriva da un link vede "N di 8" e l'invito è "8 di 8"
+// (revisore 15/11: prima frase e invito dicevano tutti e due "7 di 7").
 const PASSO_INVITO = TOTAL;
 
 const CITIES = [
@@ -333,10 +334,12 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // Collaudo 7/11: il contatore passava da "2 di 8" a "3 di 7" appena si sceglievano i gusti (il passo dei 10 tipi
   // spariva). "Cosa ti piace?" e "Ci andresti?" sono la stessa domanda (i tuoi gusti): contano come un passo solo,
   // così il totale resta sempre 7 e il numero non salta mai.
-  const passoMostrato = step <= PASSO_AMATI ? step + 1 : Math.min(step, TOTAL - 1);
+  const passoMostrato = step <= PASSO_AMATI ? step + 1 : step;
+  // Con un invito c'è un passo in più (l'ultimo).
+  const totale = invito ? TOTAL : TOTAL - 1;
   // Revisore 7/11 (8,3): da "Cosa ti piace?" a "Ci andresti?" il numero resta "2 di 7" e la barra sembrava ferma:
   // la barra avanza di mezzo passo, così il tocco si vede.
-  const progress = ((step === PASSO_TIPI ? passoMostrato + 0.5 : passoMostrato) / (TOTAL - 1)) * 100;
+  const progress = ((step === PASSO_TIPI ? passoMostrato + 0.5 : passoMostrato) / totale) * 100;
   const config = STEPS[Math.min(step, TOTAL - 1)];
   const chosenCity = otherOpen ? otherCity.trim() || null : city;
   const zoneCitta = !otherOpen && city ? ZONE.filter((z) => z.citta === city) : [];
@@ -480,7 +483,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             className="h-1.5 flex-1 overflow-hidden rounded-pill bg-[#e3e7e7]"
             role="progressbar"
             aria-valuemin={1}
-            aria-valuemax={TOTAL - 1}
+            aria-valuemax={totale}
             aria-valuenow={passoMostrato}
             aria-label="Avanzamento"
           >
@@ -488,7 +491,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
           </div>
           <span className="shrink-0 text-[13px] font-sans tabular-nums text-text-muted" data-testid="benvenuto-passo">
             {/* Revisore 5/11: non salta da 2 a 4; collaudo 7/11: nemmeno da "di 8" a "di 7". */}
-            {passoMostrato} di {TOTAL - 1}
+            {passoMostrato} di {totale}
           </span>
           {/* Solo nella prima schermata e solo prima di aver risposto: "Salta" salta tutto (i gusti si danno
               dopo in "I tuoi gusti"). Tornando qui dalla frase o con la freccia cancellava tutte le risposte
