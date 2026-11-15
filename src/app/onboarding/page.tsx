@@ -27,13 +27,16 @@ export default async function OnboardingPage({
   // "Rifalla" (da I tuoi gusti): si riparte dalle risposte già date, così non si perde niente
   // (prima le diete non ritoccate si cancellavano). Senza colonne o senza profilo, si parte vuoti.
   let dalProfilo: DalProfilo | null = null;
+  // Il nome già scelto (o arrivato con l'accesso Google): il passo dell'invito non lo chiede di nuovo.
+  let nomeNoto: string | null = null;
   if (!e2eUser) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) redirect(withNext("/signup", next));
-    const { data: p, error } = await supabase.from("profiles").select("city, occasions, price_range, cuisines, atmospheres, gusto, gusti_ricordati").eq("id", user.id).maybeSingle();
+    const { data: p, error } = await supabase.from("profiles").select("city, occasions, price_range, cuisines, atmospheres, gusto, gusti_ricordati, display_name").eq("id", user.id).maybeSingle();
     if (!error && p) {
-      const r = p as { city?: string | null; occasions?: string[] | null; price_range?: string | null; cuisines?: string[] | null; atmospheres?: string[] | null; gusto?: unknown; gusti_ricordati?: unknown };
+      const r = p as { city?: string | null; occasions?: string[] | null; price_range?: string | null; cuisines?: string[] | null; atmospheres?: string[] | null; gusto?: unknown; gusti_ricordati?: unknown; display_name?: string | null };
+      nomeNoto = r.display_name?.trim() || null;
       const m = pulisciMappa(r.gusto, () => true);
       dalProfilo = { city: r.city ?? null, occasions: r.occasions ?? [], priceRange: r.price_range ?? null, zone: m.zone, su: m.su, giu: m.giu, scoperta: m.scoperta, amati: m.amati, diete: dieteValide(r.gusti_ricordati), cuisines: r.cuisines ?? [], atmospheres: r.atmospheres ?? [] };
     }
@@ -42,10 +45,14 @@ export default async function OnboardingPage({
   if (e2eUser) {
     try {
       const raw = (await cookies()).get("e2e_gusto")?.value;
-      if (raw) dalProfilo = JSON.parse(decodeURIComponent(raw)) as DalProfilo;
+      if (raw) {
+        dalProfilo = JSON.parse(decodeURIComponent(raw)) as DalProfilo;
+        const n = (dalProfilo as { nome?: unknown }).nome;
+        nomeNoto = typeof n === "string" ? n.trim() || null : null;
+      }
     } catch { /* cookie non valido: si parte vuoti */ }
   }
   const primo = Array.isArray(params.primo) ? params.primo[0] : params.primo;
   const nuovo = primo === "vecchio" ? false : PRIMO_ACCESSO_NUOVO || primo === "a";
-  return nuovo ? <OnboardingView next={next} dalProfilo={dalProfilo} /> : <OnboardingVecchio next={next} dalProfilo={dalProfilo} />;
+  return nuovo ? <OnboardingView next={next} dalProfilo={dalProfilo} nomeNoto={nomeNoto} /> : <OnboardingVecchio next={next} dalProfilo={dalProfilo} />;
 }

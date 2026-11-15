@@ -13,6 +13,7 @@ import { trackFeature } from "@/lib/track";
 import { cityArea } from "@/lib/named-city";
 import { saveLastView } from "@/lib/last-view";
 import { clearStoredInvite, isFriendCode, readStoredInvite, testoInvitoNo } from "@/lib/invito";
+import Avatar from "@/components/avatar";
 
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 
@@ -121,7 +122,8 @@ const PASSO_OCCASIONI = 5;
 const PASSO_SPESA = 6;
 const PASSO_CAPITO = 7;
 // L'invito di un amico (revisore 14/11, quarto giro): un passo a sé dopo "Ecco cosa ho capito", solo se c'è un
-// invito. Fuori da STEPS: non entra nel contatore "N di 7" (è una domanda in più solo per chi arriva da un link).
+// invito. Fuori da STEPS, ma conta nel contatore: chi arriva da un link vede "N di 8" e l'invito è "8 di 8"
+// (revisore 15/11: prima frase e invito dicevano tutti e due "7 di 7").
 const PASSO_INVITO = TOTAL;
 
 const CITIES = [
@@ -180,7 +182,8 @@ const noSubscribe = () => () => {};
 // Risposte già salvate nel profilo (per "Rifalla"): servono da punto di partenza, mai come bozza.
 export type DalProfilo = { city: string | null; occasions: string[]; priceRange: string | null; zone: string[]; su: string[]; giu: string[]; scoperta: Scoperta | null; diete: string[]; cuisines?: string[]; atmospheres?: string[]; amati?: string[] };
 
-export default function OnboardingView({ next = null, dalProfilo = null }: { next?: string | null; dalProfilo?: DalProfilo | null }) {
+// "nomeNoto": il nome già nel profilo (per esempio dall'accesso con Google): il passo dell'invito non lo richiede.
+export default function OnboardingView({ next = null, dalProfilo = null, nomeNoto = null }: { next?: string | null; dalProfilo?: DalProfilo | null; nomeNoto?: string | null }) {
   const raw = useSyncExternalStore(noSubscribe, readDraftRaw, () => null);
   // La bozza si legge una volta sola, all'apertura: le risposte salvate mentre si risponde non devono
   // far ripartire la schermata con "Ho ritrovato le risposte" (collaudo 23/10: lo vedeva chi entrava la prima volta).
@@ -201,10 +204,10 @@ export default function OnboardingView({ next = null, dalProfilo = null }: { nex
         scoperta: dalProfilo.scoperta, diete: dalProfilo.diete, amati: amatiValidi(dalProfilo.amati),
       }
     : null;
-  return <Benvenuto key={draft ? "ripreso" : "nuovo"} next={next} initial={draft ?? base} ripreso={draft != null} />;
+  return <Benvenuto key={draft ? "ripreso" : "nuovo"} next={next} initial={draft ?? base} ripreso={draft != null} nomeNoto={nomeNoto?.trim() || null} />;
 }
 
-function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: Draft | null; ripreso: boolean }) {
+function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; initial: Draft | null; ripreso: boolean; nomeNoto: string | null }) {
   const router = useRouter();
   const [step, setStep] = useState(initial?.step ?? 0);
   const cuisines = initial?.cuisines ?? [];
@@ -241,7 +244,8 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   const [invito, setInvito] = useState<{ codice: string; nome: string | null; stato: "chiedi" | "salvo" | "amici" | "errore" | "scaduto" | "nome" | "no"; motivo?: string } | null>(null);
   // Un solo campo "Il tuo nome", nel passo dell'invito. "Profilo pubblico" non sta più nel primo accesso
   // (revisore 14/11, quarto giro: l'ultima schermata era troppo carica): è in Amici, un riquadro discreto.
-  const [mioNome, setMioNome] = useState("");
+  // Revisore 15/11: chi ha già un nome non lo riscrive (il server lo scartava): si parte da quello.
+  const [mioNome, setMioNome] = useState(nomeNoto ?? "");
   const nomeRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -333,10 +337,12 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
   // Collaudo 7/11: il contatore passava da "2 di 8" a "3 di 7" appena si sceglievano i gusti (il passo dei 10 tipi
   // spariva). "Cosa ti piace?" e "Ci andresti?" sono la stessa domanda (i tuoi gusti): contano come un passo solo,
   // così il totale resta sempre 7 e il numero non salta mai.
-  const passoMostrato = step <= PASSO_AMATI ? step + 1 : Math.min(step, TOTAL - 1);
+  const passoMostrato = step <= PASSO_AMATI ? step + 1 : step;
+  // Con un invito c'è un passo in più (l'ultimo).
+  const totale = invito ? TOTAL : TOTAL - 1;
   // Revisore 7/11 (8,3): da "Cosa ti piace?" a "Ci andresti?" il numero resta "2 di 7" e la barra sembrava ferma:
   // la barra avanza di mezzo passo, così il tocco si vede.
-  const progress = ((step === PASSO_TIPI ? passoMostrato + 0.5 : passoMostrato) / (TOTAL - 1)) * 100;
+  const progress = ((step === PASSO_TIPI ? passoMostrato + 0.5 : passoMostrato) / totale) * 100;
   const config = STEPS[Math.min(step, TOTAL - 1)];
   const chosenCity = otherOpen ? otherCity.trim() || null : city;
   const zoneCitta = !otherOpen && city ? ZONE.filter((z) => z.citta === city) : [];
@@ -480,7 +486,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             className="h-1.5 flex-1 overflow-hidden rounded-pill bg-[#e3e7e7]"
             role="progressbar"
             aria-valuemin={1}
-            aria-valuemax={TOTAL - 1}
+            aria-valuemax={totale}
             aria-valuenow={passoMostrato}
             aria-label="Avanzamento"
           >
@@ -488,7 +494,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
           </div>
           <span className="shrink-0 text-[13px] font-sans tabular-nums text-text-muted" data-testid="benvenuto-passo">
             {/* Revisore 5/11: non salta da 2 a 4; collaudo 7/11: nemmeno da "di 8" a "di 7". */}
-            {passoMostrato} di {TOTAL - 1}
+            {passoMostrato} di {totale}
           </span>
           {/* Solo nella prima schermata e solo prima di aver risposto: "Salta" salta tutto (i gusti si danno
               dopo in "I tuoi gusti"). Tornando qui dalla frase o con la freccia cancellava tutte le risposte
@@ -507,6 +513,16 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
       {/* Contenuto */}
       {/* Revisore 7/11: nella frase, con le righe aperte, l'ultima nota finiva sotto i due tasti fissi. */}
       <div className={`mx-auto w-full max-w-lg flex-1 px-6 pt-3 ${step >= PASSO_CAPITO ? "pb-[calc(11rem+env(safe-area-inset-bottom))]" : "pb-32"}`}>
+        {/* Il passo dell'invito: in alto chi invita, come nella pagina d'invito (revisore 15/11: era mezzo vuoto). */}
+        {step === PASSO_INVITO && invito && (
+          <div data-testid="invito-avatar" className="mb-4">
+            {invito.nome ? (
+              <Avatar person={{ display_name: invito.nome }} size={72} className="ring-4 ring-accent-light" />
+            ) : (
+              <span aria-hidden className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-accent-light text-4xl">💌</span>
+            )}
+          </div>
+        )}
         {/* Un solo titolo per tutti i passi (mockup A): serif grande e una riga sotto. */}
         <h1 className={`${SERIF} mb-1.5 text-balance text-[34px] font-medium leading-[1.06] tracking-[-0.02em] text-[#141414] min-[380px]:text-[38px]`}>
           {step === PASSO_INVITO ? `${invito?.nome ?? "Un amico"} ti ha invitato` : step === PASSO_CAPITO && frase.length === 0 ? "Partiamo da zero" : config.title}
@@ -841,9 +857,10 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
             ) : (
               <>
                 <p data-testid="invito-domanda" className="text-[15px] font-sans text-text-muted">
-                  {invito.stato === "errore" ? <span role="alert" className="text-error">Non ci sono riuscito: riprova.</span> : invito.stato === "nome" ? <span role="alert" className="text-error">Prima scrivi il tuo nome.</span> : `Da amici vi vedete per nome in Amici${invito.nome ? `: ${invito.nome} vedrà il tuo` : ""}.`}
+                  {invito.stato === "errore" ? <span role="alert" className="text-error">Non ci sono riuscito: riprova.</span> : invito.stato === "nome" ? <span role="alert" className="text-error">Prima scrivi il tuo nome.</span> : nomeNoto ? `Da amici vi vedete per nome in Amici: ${invito.nome ?? "il tuo amico"} ti vedrà come ${nomeNoto}.` : `Da amici vi vedete per nome in Amici${invito.nome ? `: ${invito.nome} vedrà il tuo` : ""}.`}
                 </p>
-                <label className="block text-sm font-display font-semibold text-text">
+                {/* Il nome c'è già: niente campo (torna solo se il server lo chiede comunque). */}
+                {(!nomeNoto || invito.stato === "nome") && <label className="block text-sm font-display font-semibold text-text">
                   Il tuo nome
                   <input
                     ref={nomeRef}
@@ -856,7 +873,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
                     aria-invalid={invito.stato === "nome"}
                     className="mt-1.5 block min-h-12 w-full rounded-btn border border-border bg-white px-3 text-[16px] font-sans font-normal text-text outline-none focus:border-brand aria-[invalid=true]:border-error"
                   />
-                </label>
+                </label>}
               </>
             )}
           </section>

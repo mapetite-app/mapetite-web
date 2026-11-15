@@ -126,8 +126,9 @@ export default async function AmiciPage() {
 
           {scopritori && <ScopritoriAmici amici={scopritori} mie={mieGemme} viewer={viewer} />}
 
-          <section className="mt-6" aria-labelledby="attivita-titolo">
-            <h2 id="attivita-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Attività</h2>
+          {/* Revisore 15/11: con la pagina vuota sotto c'è solo l'invito, niente intestazione "Attività". */}
+          <section className="mt-6" aria-labelledby={vuota ? undefined : "attivita-titolo"} aria-label={vuota ? "Invita un amico" : undefined}>
+            {!vuota && <h2 id="attivita-titolo" data-testid="attivita-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Attività</h2>}
             {vuota ? (
               <div data-testid="amici-vuoto" className="mt-2">
                 <InvitaAmico userId={viewer} handle={feed.mio?.handle ?? null} codice={codiceInvito} senzaNome={senzaNome} vuoto />
@@ -169,8 +170,9 @@ export default async function AmiciPage() {
           </section>
 
           {/* "Fatti trovare" (revisore 14/11, quarto giro): uscito dal primo accesso, qui un riquadro discreto. Il
-              profilo si rende pubblico da /profilo, dove si vede prima cosa vedranno gli altri. */}
-          {privato && (
+              profilo si rende pubblico da /profilo, dove si vede prima cosa vedranno gli altri.
+              Revisore 15/11: nello stato vuoto una cosa sola, "Manda il tuo link"; "Fatti trovare" quando c'è qualcuno. */}
+          {privato && !vuota && (
             <section data-testid="amici-fatti-trovare" className="mt-6 flex items-center gap-3 rounded-card border border-[#e3e7e7] bg-white px-4 py-3">
               <span aria-hidden className="text-xl">🙋</span>
               <p className="min-w-0 flex-1 text-[13px] font-sans leading-snug text-text-muted">

@@ -52,14 +52,14 @@ const SEZIONI: { titolo: string; righe: string[]; id?: string }[] = [
     titolo: "Profilo pubblico e amici",
     id: "profilo-pubblico",
     righe: [
-      "Il profilo nasce privato. Diventa pubblico solo se lo accendi tu (\"Profilo pubblico\" alla fine del primo accesso, oppure Profilo → Impostazioni → Profilo pubblico), dopo aver letto cosa vedranno gli altri.",
+      "Il profilo nasce privato, anche dopo il primo accesso. Diventa pubblico solo se lo accendi tu, da Profilo → Impostazioni → Profilo pubblico (ci porta anche \"Rendi pubblico\" in Amici), dopo aver letto cosa vedranno gli altri.",
       // Stesse parole del foglio di conferma (src/lib/privacy-profilo.ts): una sola fonte.
       `Se è pubblico, ${PUBBLICO_CHI.charAt(0).toLocaleLowerCase("it")}${PUBBLICO_CHI.slice(1)}: ${elenco(PUBBLICO_VEDONO)}`,
       `${NON_FA_PER_ME_NOTA} La pagina del tuo profilo non mostra date.`,
       `Mai, nemmeno con il profilo pubblico: ${PUBBLICO_MAI.join(", ")}.`,
       "Base giuridica: il tuo consenso. Lo revochi in un tocco spegnendo \"Profilo pubblico\": da quel momento profilo e posti non si vedono più e le tue recensioni tornano anonime (\"Un membro di Mapetite\"). Non possiamo cancellare quello che qualcuno ha già visto o copiato prima.",
       "Si possono seguire solo i profili pubblici, con un'eccezione: gli amici da invito (sotto). Mapetite non manda messaggi a tuo nome e non mostra a nessuno chi guarda il tuo profilo.",
-      "Link d'invito: per averlo scegli un nome. Il link contiene un codice casuale; chi lo apre vede il tuo nome (anche nell'anteprima del messaggio) e, se vuole, tocca \"Diventa amico\" scrivendo il suo. Da amici vi seguite a vicenda e vi vedete per nome in Amici, anche con il profilo privato; i posti solo se il profilo è pubblico. Ognuno dei due può togliere l'amicizia quando vuole (\"Togli dagli amici\"). Al massimo 30 amicizie da invito per account.",
+      "Link d'invito: per averlo scegli un nome. Il link contiene un codice casuale; chi lo apre vede il tuo nome (anche nell'anteprima del messaggio) e, se vuole, tocca \"Diventa amico\" scrivendo il suo. Da amici vi seguite a vicenda e vi vedete per nome in Amici, anche con il profilo privato; i posti solo se il profilo è pubblico. Ognuno dei due può togliere l'amicizia quando vuole (\"Togli dagli amici\"); per tornare amici serve un link nuovo di chi l'ha tolta. Al massimo 30 amicizie da invito per account.",
       "Trova amici dalla rubrica (solo Android): scegli tu i contatti nel selettore del telefono. Le loro email diventano sul telefono un'impronta (SHA-256) e solo quella arriva al server, che risponde con chi ha il profilo pubblico. Un'impronta non è una cifratura: chi conosce un'email può calcolarla, per questo le ricerche sono al massimo 3 al giorno da 200 contatti. Né le impronte né i contatti vengono conservati.",
     ],
   },

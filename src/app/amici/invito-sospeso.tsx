@@ -39,13 +39,13 @@ export default function InvitoSospeso({ senzaNome }: { senzaNome: boolean }) {
   return (
     <section data-testid="invito-sospeso" aria-label="Invito di un amico" className="mt-4 rounded-card border border-[#e3e7e7] bg-white p-4">
       <p className="font-display text-[15px] font-semibold text-text">💌 {invito.nome ?? "Un amico"} ti ha invitato</p>
-      <p className="mb-3 mt-0.5 text-[13px] font-sans text-text-muted">Da amici vi vedete per nome qui in Amici.</p>
       <InvitoAccetta
         codice={invito.codice}
         nome={invito.nome}
         chiediNome={senzaNome}
         contesto="amici"
         className=""
+        riga={<p data-testid="invito-riga" className="mb-3 mt-0.5 text-[13px] font-sans text-text-muted">Da amici vi vedete per nome qui in Amici.</p>}
         nonOra={() => {
           trackFeature("invito_amico", { stato: "non_ora", contesto: "amici" });
           clearStoredInvite();

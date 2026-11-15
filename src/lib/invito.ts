@@ -66,9 +66,12 @@ export function clearStoredInvite(): void {
 }
 
 // Perché un invito non è andato (revisore 14/11, quarto giro: prima ogni "no" diceva "chiedi un link nuovo",
-// anche quando un link nuovo non serviva a niente). Motivi da accetta_invito (migrazioni 20261114e/f).
+// anche quando un link nuovo non serviva a niente). Motivi da accetta_invito (migrazioni 20261114e/f, 20261115).
+// Amicizia tolta (20261115): si torna amici solo con un link nuovo di chi l'aveva tolta. "gia-usato" a chi è stato
+// tolto (o riapre un link già usato), "tolto-da-te" a chi l'aveva tolta e apre il link dell'altro.
 export function testoInvitoNo(motivo: string, nome: string | null): string {
-  if (motivo === "gia-usato") return "Avevate già usato un invito: per tornare amici rendete pubblico il profilo e seguitevi a vicenda.";
+  if (motivo === "gia-usato") return "Vi eravate tolti dagli amici: per tornare, chi aveva tolto l'amicizia deve mandarti un link nuovo.";
+  if (motivo === "tolto-da-te") return `Avevi tolto ${nome ?? "questa persona"} dagli amici: per tornare, manda tu un link nuovo.`;
   if (motivo === "troppi") return "Raggiunto il massimo di amici da invito.";
   return `Questo invito non vale più: chiedi a ${nome ?? "chi te l'ha mandato"} un link nuovo.`;
 }

@@ -40,8 +40,9 @@ export default function InvitaAmico({ userId, handle, codice = null, vuoto = fal
           <span className="h-12 w-12 rounded-full border-[1.5px] border-dashed border-white/35" />
         </div>
         <p className="relative mt-4 font-sans text-[18px] font-medium leading-snug">Invita un amico</p>
-        <p className="relative mx-auto mt-1 max-w-[290px] text-sm font-sans leading-relaxed text-white/80">
-          Nessun amico qui, per ora. Mandagli il tuo link: in un minuto ha la sua mappa dei locali, e vi passate i posti con un tocco.
+        {/* Revisore 15/11: niente "vi passate i posti con un tocco": col profilo privato gli amici vedono solo il nome. */}
+        <p data-testid="invita-amico-testo" className="relative mx-auto mt-1 max-w-[290px] text-sm font-sans leading-relaxed text-white/80">
+          Nessun amico qui, per ora. Mandagli il tuo link: in un minuto ha la sua mappa dei locali e, se vuole, diventate amici.
         </p>
         {senzaNome ? <NomePerInvito /> : <div className="relative mt-4">
           {condividi("w-full min-h-12 border-0 bg-accent! text-[15px] text-white!", "Manda il tuo link")}
