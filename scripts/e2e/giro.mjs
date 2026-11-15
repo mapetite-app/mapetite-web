@@ -5039,7 +5039,7 @@ else {
     ok(await foglio.isVisible() && toccabile && (await foglio.getByTestId("togli-annulla").isVisible()) && /rgb\((1[5-9]\d|2\d\d), \d{1,2}, \d{1,2}\)/.test(colore), `amici: toccando l'amico si apre il foglio con 'Togli dagli amici' (rosso, toccabile senza scorrere) e 'Annulla' (${colore})`);
     // Revisore 14/11 (quarto giro): prima di togliere si sa che un invito non vi rimetterà amici.
     { const av = foglio.getByTestId("togli-avviso"); const ya = (await av.boundingBox())?.y ?? -1; const yt = (await foglio.getByTestId("togli-amico").boundingBox())?.y ?? -1;
-      ok(((await av.textContent()) ?? "").includes("Per tornare amici dovrai mandare tu un link nuovo") && ya >= 0 && ya < yt, "amici: sopra 'Togli dagli amici' la riga 'Per tornare amici dovrai mandare tu un link nuovo'"); }
+      ok(((await av.textContent()) ?? "").includes("Per tornare amici dovrai creare un link nuovo: quello di prima smetterà di funzionare") && ya >= 0 && ya < yt, "amici: sopra 'Togli dagli amici' la riga 'Per tornare amici dovrai creare un link nuovo: quello di prima smetterà di funzionare'"); }
     await sp.screenshot({ path: `${OUT}/62-amici-togli.png`, caret: "initial" });
     await foglio.getByTestId("togli-annulla").click();
     ok((await sp.getByTestId("amico-foglio").count()) === 0 && (await pr.count()) === 1, "amici: 'Annulla' chiude il foglio e l'amico resta");
