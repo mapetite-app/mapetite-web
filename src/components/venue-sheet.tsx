@@ -10,7 +10,7 @@ import { isUuid } from "@/lib/gruppi";
 import { bookingMakesSense } from "@/lib/bookable";
 import SchedaCarosello from "@/components/scheda-carosello";
 import AmiciQuiBox, { type FriendPerson } from "@/components/amici-qui-box";
-import { mapetiteShareUrl } from "@/lib/share-place";
+import { conConsigliatoDa, mapetiteShareUrl, mioPrimoNome } from "@/lib/share-place";
 import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -267,8 +267,9 @@ export default function VenueSheet({
   const share = async () => {
     signal("condividi");
     // Link Mapetite (pagina pubblica con il verdetto); se non si può creare, Google Maps.
-    const mapetiteUrl = await mapetiteShareUrl({ ...venue, lat, lng });
-    const url = mapetiteUrl ?? mapsUrl;
+    // Proposta 58: con il nome del proprio profilo ("da=Giulia"), letto insieme al link e mai oltre 0,7 s.
+    const [mapetiteUrl, da] = await Promise.all([mapetiteShareUrl({ ...venue, lat, lng }), mioPrimoNome()]);
+    const url = mapetiteUrl ? conConsigliatoDa(mapetiteUrl, da) : mapsUrl;
     const base = verdict?.trim() ? `${name} — ${verdict.trim()}` : name;
     const text = mapetiteUrl ? `${base} · su Mapetite` : base;
     try {
