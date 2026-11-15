@@ -4326,7 +4326,8 @@ export default function MapView({
               }
               setSavedPlaces(prev => [
                 ...prev.filter(p => p.id !== uuid),
-                { ...pendingPlace, id: uuid ?? pendingPlace.id, tags, note, soloPerMe: soloPerMe === true },
+                // Revisore 15/11: già salvato col lucchetto e foglio lasciato spento → nel database resta true, qui pure.
+                { ...pendingPlace, id: uuid ?? pendingPlace.id, tags, note, soloPerMe: soloPerMe === true || prev.some((p) => p.id === uuid && p.soloPerMe === true) },
               ]);
               setPendingSavePlaceId(null);
               setPendingSaveTags([]);
