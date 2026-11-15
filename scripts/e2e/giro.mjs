@@ -4602,7 +4602,8 @@ if (!fakeUser) {
   ok((await gcard.getByTestId("reel-adv").count()) === 0, "reel: senza dicitura di pubblicità nessuna riga (proposta 60)");
   // Proposta 60: la didascalia dice "#adv" → riga neutra sotto il posto salvato; mai indovinare.
   { const { segnataComePubblicita: adv } = await import(new URL("../../src/lib/adv.ts", import.meta.url).href);
-    const casi = [["Cena top #adv", true], ["#ad da Mario", true], ["#adorable pasta", false], ["Pubblicità - Trattoria", true], ["in collaborazione con @mario", true], ["adventure food", false], ["ADV | Pizzeria", true], ["la mia adv", false], ["Trattoria Da Enzo a Roma", false]];
+    const casi = [["Cena top #adv", true], ["#ad da Mario", true], ["#adorable pasta", false], ["Pubblicità - Trattoria", true], ["in collaborazione con @mario", true], ["adventure food", false], ["ADV | Pizzeria", true], ["la mia adv", false], ["Trattoria Da Enzo a Roma", false],
+      ["non sponsorizzato, pago io", false], ["Non è pubblicità!", false], ["no pubblicità, solo amore", false], ["cena in collaborazione con lo chef Rossi", false], ["evento in collaborazione con @cantinax", true], ["#collaborazione con amici", false], ["Advertising week a Milano", false]];
     const sbagliati = casi.filter(([t, e]) => adv(t) !== e).map(([t]) => t);
     ok(sbagliati.length === 0, `reel adv: solo diciture esplicite (#adv, Pubblicità, in collaborazione con, ADV maiuscolo), niente '#adorable' o 'adventure' (${sbagliati.join(" | ")})`);
     await mp.evaluate(() => sessionStorage.clear());
