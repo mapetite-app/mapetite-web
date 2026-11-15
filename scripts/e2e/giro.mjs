@@ -4973,12 +4973,14 @@ else {
   await sd.getByTestId("consigliato-scheda").scrollIntoViewIfNeeded().catch(() => {});
   await sd.screenshot({ path: `${OUT}/55-scheda-consigliato.png`, caret: "initial" });
   // Condividi con il nome (profilo pubblico): link con da=Luca, riga "Il link porta il tuo nome · Togli".
+  ok(((await sd.getByTestId("condividi-nome").textContent().catch(() => "")) ?? "").includes("Il link porta il tuo nome"), "condividi: mai scelto, la riga 'Il link porta il tuo nome · Togli' si vede già prima del primo link");
   await sd.evaluate(() => { window.__condiviso = []; navigator.share = async (d) => { window.__condiviso.push(d); }; });
   const condividi = sd.getByLabel("Condividi Da Enzo al 29").first();
   await condividi.click().catch(() => {});
   await sd.waitForFunction(() => window.__condiviso.length >= 1, null, { timeout: 4000 }).catch(() => {});
   const url1 = (await sd.evaluate(() => window.__condiviso[0]?.url)) ?? "";
   ok(url1.endsWith("/locali/00000000-0000-4000-8000-000000005801?da=Luca"), `condividi: con profilo pubblico il link porta il primo nome (${url1})`);
+  ok(await sd.evaluate(() => { try { return localStorage.getItem("mapetite.condividi.nome"); } catch { return null; } }) === "si", "condividi: dopo il primo link la scelta è segnata (la riga non resta fissa nelle schede dopo)");
   const rigaN = sd.getByTestId("condividi-nome");
   ok(((await rigaN.textContent().catch(() => "")) ?? "").includes("Il link porta il tuo nome") && await altezza44(sd.getByTestId("condividi-nome-cambia")), "condividi: riga 'Il link porta il tuo nome · Togli' (tocco da 44 px)");
   await sd.screenshot({ path: `${OUT}/55b-condividi-con-nome.png`, caret: "initial" });

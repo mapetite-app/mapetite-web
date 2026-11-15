@@ -10,7 +10,7 @@ import { isUuid } from "@/lib/gruppi";
 import { bookingMakesSense } from "@/lib/bookable";
 import SchedaCarosello from "@/components/scheda-carosello";
 import AmiciQuiBox, { type FriendPerson } from "@/components/amici-qui-box";
-import { conConsigliatoDa, mapetiteShareUrl, mioNome, nomeNeiLinkAcceso, setNomeNeiLink, type MioNome } from "@/lib/share-place";
+import { conConsigliatoDa, mapetiteShareUrl, mioNome, nomeNeiLinkAcceso, sceltaNomeFatta, setNomeNeiLink, type MioNome } from "@/lib/share-place";
 import { messaggioGrazie } from "@/lib/consigliato-da";
 import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
@@ -238,7 +238,7 @@ export default function VenueSheet({
   useEffect(() => {
     if (!shareOn) return;
     let vivo = true;
-    void mioNome(userId).then((m) => { if (vivo) { setMio(m); setNomeAcceso(nomeNeiLinkAcceso()); } });
+    void mioNome(userId).then((m) => { if (vivo) { setMio(m); setNomeAcceso(nomeNeiLinkAcceso()); if (!sceltaNomeFatta()) setRigaNome(true); } });
     return () => { vivo = false; };
   }, [shareOn, userId]);
   const cambiaNomeNeiLink = (acceso: boolean) => { setNomeNeiLink(acceso); setNomeAcceso(acceso); trackFeature("condividi_nome", { stato: acceso ? "si" : "no" }); };
@@ -299,7 +299,7 @@ export default function VenueSheet({
     const mapetiteUrl = await mapetiteShareUrl({ ...venue, lat, lng });
     const conNome = mapetiteUrl != null && mio?.nelLink === true;
     const url = mapetiteUrl ? conConsigliatoDa(mapetiteUrl, conNome && nomeAcceso ? mio.nome : null) : mapsUrl;
-    if (conNome) setRigaNome(true);
+    if (conNome) { setRigaNome(true); if (!sceltaNomeFatta()) setNomeNeiLink(nomeAcceso); }
     const base = verdict?.trim() ? `${name} — ${verdict.trim()}` : name;
     const text = mapetiteUrl ? `${base} · su Mapetite` : base;
     try {
@@ -563,7 +563,7 @@ export default function VenueSheet({
                     className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-3 text-sm font-display font-semibold text-brand active:scale-[0.98]"
                   >
                     <Share2 size={15} className="shrink-0" aria-hidden />
-                    <span className="truncate">Dillo a {consigliatoDa}</span>
+                    <span className="truncate">Dillo a {consigliatoDa.split(" ")[0]}</span>
                   </button>
                 )}
                 {onAltriCome && !personalTags?.includes("Non fa per me") && (

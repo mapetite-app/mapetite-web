@@ -48,7 +48,12 @@ async function placeUuid(p: ShareablePlace): Promise<string | null> {
 // profilo pubblico oppure almeno un amico (una riga in follows, da una parte o dall'altra). Qualsiasi errore: niente
 // nome, la condivisione va avanti; un errore di rete non resta in memoria.
 export type MioNome = { nome: string | null; nelLink: boolean };
-const letti = new Map<string, Promise<MioNome>>();
+// Revisore 15/11 (terzo): tenuta in memoria per tutta la sessione, dopo "Profilo privato" il link portava ancora il
+// nome. Ora vale 20 secondi (basta per la scheda appena aperta) e si dimentica appena cambiano profilo o amici.
+const letti = new Map<string, { p: Promise<MioNome>; at: number }>();
+const VALE_MS = 20_000;
+/** Da chiamare quando cambiano nome, profilo pubblico o amici: il prossimo Condividi rilegge. */
+export function dimenticaMioNome(): void { letti.clear(); }
 async function leggiMioNome(uid: string | null, chiave: string): Promise<MioNome> {
   const nessuno: MioNome = { nome: null, nelLink: false };
   try {
@@ -75,11 +80,13 @@ async function leggiMioNome(uid: string | null, chiave: string): Promise<MioNome
     return nessuno;
   }
 }
-/** Il proprio primo nome e se può andare nei link condivisi (una lettura per sessione). */
+/** Il proprio primo nome e se può andare nei link condivisi (riletto dopo 20 secondi o dopo un cambio). */
 export function mioNome(uid?: string | null): Promise<MioNome> {
   const chiave = uid ?? "";
-  let p = letti.get(chiave);
-  if (!p) { p = leggiMioNome(uid ?? null, chiave); letti.set(chiave, p); }
+  const c = letti.get(chiave);
+  if (c && Date.now() - c.at < VALE_MS) return c.p;
+  const p = leggiMioNome(uid ?? null, chiave);
+  letti.set(chiave, { p, at: Date.now() });
   return p;
 }
 
@@ -89,7 +96,12 @@ export function nomeNeiLinkAcceso(): boolean {
   try { return localStorage.getItem(PREF_NOME) !== "no"; } catch { return true; }
 }
 export function setNomeNeiLink(acceso: boolean): void {
-  try { if (acceso) localStorage.removeItem(PREF_NOME); else localStorage.setItem(PREF_NOME, "no"); } catch { /* memoria del telefono non disponibile */ }
+  try { localStorage.setItem(PREF_NOME, acceso ? "si" : "no"); } catch { /* memoria del telefono non disponibile */ }
+}
+/** Revisore 15/11 (terzo): finché non hai mai condiviso né scelto, la riga "Il link porta il tuo nome · Togli" si vede
+ *  già all'apertura della scheda, prima del primo link. Senza memoria del telefono: come se avessi scelto (niente riga fissa). */
+export function sceltaNomeFatta(): boolean {
+  try { return localStorage.getItem(PREF_NOME) !== null; } catch { return true; }
 }
 
 /** Link Mapetite del locale (con la foto, se c'è), oppure null se non si può creare. */

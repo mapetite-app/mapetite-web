@@ -7,6 +7,7 @@ import Avatar from "@/components/avatar";
 import { personName, profilePath } from "@/lib/handle";
 import { trackFeature } from "@/lib/track";
 import { togliAmico } from "./actions";
+import { dimenticaMioNome } from "@/lib/share-place";
 
 // Un amico (vi seguite a vicenda) nella riga in cima ad Amici. Un tocco apre un foglio dal basso, come Places:
 // "Apri il profilo" se è pubblico, "Togli dagli amici" in rosso (toglie i due "segui") e "Annulla".
@@ -72,6 +73,7 @@ export default function AmicoRiga({ amico }: { amico: Amico }) {
                 onClick={async () => {
                   setStato("salvo");
                   const ok = await togliAmico(amico.id).catch(() => false);
+                  dimenticaMioNome();
                   trackFeature("amico_tolto", { stato: ok ? "ok" : "errore" });
                   if (!ok) { setStato("errore"); return; }
                   setStato("tolto");

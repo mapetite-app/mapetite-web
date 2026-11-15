@@ -5,6 +5,7 @@ import { useState } from "react";
 import { UserPlus, UserCheck } from "lucide-react";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { withNext } from "@/lib/next-path";
+import { dimenticaMioNome } from "@/lib/share-place";
 
 // "Segui" / "Segui già": scrive in follows con la sessione dell'utente (RLS: solo i propri
 // follow, solo profili pubblici). Senza accesso porta alla registrazione e poi torna qui.
@@ -59,6 +60,7 @@ export default function SeguiButton({
       ? await client.from("follows").insert({ follower_id: viewerId, followed_id: targetId })
       : await client.from("follows").delete().eq("follower_id", viewerId).eq("followed_id", targetId);
     setBusy(false);
+    dimenticaMioNome();
     // 23505 = segui già (doppio tocco): lo stato giusto è "segui".
     if (err && !(next && err.code === "23505")) {
       setError("Non è andata. Riprova tra poco.");

@@ -455,7 +455,8 @@ export default function SalvatiLista({
     return all.filter((p) => ids.has(p.id));
   }, [all, zonaOn]);
   const base = useMemo(() => (amiciOn ? baseZona.filter((p) => !!p.consigliatoDa) : baseZona), [baseZona, amiciOn]);
-  const nAmici = useMemo(() => baseZona.filter((p) => !!p.consigliatoDa).length, [baseZona]);
+  // Revisore 15/11 (terzo): il numero segue anche stato e raccolta accesi (con "Da provare" diceva 2 e la lista 1).
+  const nAmici = useMemo(() => baseZona.filter((p) => !!p.consigliatoDa && (raccolta === null || !!p.tags?.includes(raccolta)) && (statoOn === null || hasStateOrTag(p.tags, statoOn))).length, [baseZona, raccolta, statoOn]);
   // Testo di ogni salvato calcolato una volta (non a ogni lettera).
   const testi = useMemo(() => new globalThis.Map(all.map((p) => [p.id, testoSalvato(p)])), [all]);
   const perStato = useMemo(() => base.filter((p) => (raccolta === null || !!p.tags?.includes(raccolta)) && (statoOn === null || hasStateOrTag(p.tags, statoOn))), [base, raccolta, statoOn]);
