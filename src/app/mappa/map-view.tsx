@@ -29,6 +29,7 @@ import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRec
 import { cityFromAddress } from "@/lib/city";
 import { hasStateOrTag, isStateTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
 import { CONSIGLIATO_MAX, NOME_NON_VALIDO, leggiCampoNome } from "@/lib/consigliato-da";
+import { mioNome } from "@/lib/share-place";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, tipoGoogleSconosciuto } from "@/lib/category-label";
@@ -148,6 +149,15 @@ function SaveModal({
   const [note, setNote] = useState(initialNote);
   const [consigliato, setConsigliato] = useState(initialConsigliatoDa ?? "");
   const [soloPerMe, setSoloPerMe] = useState(initialSoloPerMe);
+  // Proposta 59, al primo salvataggio: il lucchetto si offre solo a chi si fa vedere (profilo pubblico o almeno un
+  // amico): agli altri sarebbe una riga in più che non cambia niente. In Modifica c'è sempre.
+  const [lucchettoUtile, setLucchettoUtile] = useState(false);
+  useEffect(() => {
+    if (mode === "edit") return;
+    let vivo = true;
+    void mioNome(userId).then((m) => { if (vivo) setLucchettoUtile(m.nelLink); });
+    return () => { vivo = false; };
+  }, [mode, userId]);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState(false);
 
@@ -224,7 +234,7 @@ function SaveModal({
   ) : null;
 
   // Proposta 59: "Solo per me", il lucchetto sul singolo posto. Un interruttore con una riga che dice cosa fa.
-  const soloField = () => mode === "edit" ? (
+  const soloField = () => mode === "edit" || lucchettoUtile ? (
     <button
       type="button"
       role="switch"
@@ -304,20 +314,20 @@ function SaveModal({
         // 2. collega in saved_places con l'UUID
         const { error } = await supabase
           .from("saved_places")
-          .insert({ user_id: userId, place_id: placeUuid, tags, note: noteValue });
+          .insert({ user_id: userId, place_id: placeUuid, tags, note: noteValue, ...(soloPerMe ? { solo_per_me: true } : {}) });
         if (error?.code === "23505") {
           // Era già salvato (la mappa non lo sapeva ancora): si aggiornano tag e nota scelti
           // qui, invece di mostrarli e perderli al prossimo caricamento.
           const { error: upErr } = await supabase
             .from("saved_places")
-            .update({ tags, note: noteValue })
+            .update({ tags, note: noteValue, ...(soloPerMe ? { solo_per_me: true } : {}) })
             .eq("user_id", userId)
             .eq("place_id", placeUuid);
           if (upErr) { setError(true); return; }
         } else if (error) { setError(true); return; }
       }
 
-      onSaved(tags, noteValue, savedUuid, mode === "edit" ? consigliatoValue : undefined, mode === "edit" ? soloPerMe : undefined);
+      onSaved(tags, noteValue, savedUuid, mode === "edit" ? consigliatoValue : undefined, soloPerMe);
     });
   };
 
@@ -4307,7 +4317,7 @@ export default function MapView({
             // Solo se la card aveva già la foto (stesso indirizzo, già in cache): nessuna foto in più.
             photoRef={carouselOrder.indexOf(pendingPlace.id) > -1 && carouselOrder.indexOf(pendingPlace.id) < PHOTO_CARDS ? venueDetails[pendingPlace.id]?.photoRef ?? null : null}
             userId={userId}
-            onSaved={(tags, note, uuid) => {
+            onSaved={(tags, note, uuid, _da, soloPerMe) => {
               track("salva", { id: uuid ?? pendingPlace.id, lat: pendingPlace.lat, lng: pendingPlace.lng }, { fonte: "finestra", ...((tags ?? []).includes(VISIT_DONE) ? { stato: VISIT_DONE } : (tags ?? []).includes(VISIT_WANT) ? { stato: VISIT_WANT } : {}) });
               // Mai i nomi delle raccolte: sono testo scritto dall'utente ("Cena con Giulia").
               if (uuid) {
@@ -4316,7 +4326,7 @@ export default function MapView({
               }
               setSavedPlaces(prev => [
                 ...prev.filter(p => p.id !== uuid),
-                { ...pendingPlace, id: uuid ?? pendingPlace.id, tags, note },
+                { ...pendingPlace, id: uuid ?? pendingPlace.id, tags, note, soloPerMe: soloPerMe === true },
               ]);
               setPendingSavePlaceId(null);
               setPendingSaveTags([]);

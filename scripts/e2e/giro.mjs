@@ -3918,6 +3918,34 @@ else {
   await sheet.waitFor({ state: "detached", timeout: 4000 });
   const ins2 = writes.find((w) => w.m === "POST");
   ok(!!ins2 && JSON.stringify(ins2.body?.tags) === '["Già visitato","Con amici","Brunch","Terrazza"]' && ins2.body?.note === "Prenotare", "salva B: scrive 'Già visitato' + tag scelti + tag nuovi (anche senza Invio) + nota");
+  ok(!("solo_per_me" in (ins2?.body ?? {})), "salva B: senza profilo pubblico né amici niente lucchetto e niente solo_per_me (proposta 59)");
+  // Proposta 59 al primo salvataggio: con il profilo pubblico il foglio offre "Solo per me" (pagina nuova: il nome si rilegge).
+  { await vctx.route("**/rest/v1/profiles**", (r) => {
+      const comeOggetto = (r.request().headers()["accept"] ?? "").includes("vnd.pgrst.object");
+      const riga = { display_name: "Luca Bianchi", is_public: true };
+      return r.fulfill({ json: comeOggetto ? riga : [riga] });
+    });
+    const v2 = await vctx.newPage();
+    v2.on("pageerror", (e) => errors.push(e.message));
+    writes.length = 0;
+    await v2.goto(`${BASE}/mappa?beta=salva`, { waitUntil: "networkidle" });
+    await (await esempio(v2)).click();
+    await apriCard(v2, "Rooftop Tre");
+    addMode = "error";
+    await v2.locator("button:text-is('Salva')").first().click();
+    const sh2 = v2.getByTestId("salva-foglio");
+    await sh2.waitFor({ timeout: 3000 }).catch(() => {});
+    const sw = sh2.getByTestId("solo-per-me");
+    await sw.waitFor({ timeout: 3000 }).catch(() => {});
+    ok(await sw.isVisible().catch(() => false) && (await sw.getAttribute("aria-checked")) === "false", "salva B: con il profilo pubblico il foglio offre 'Solo per me', spento");
+    await sw.click().catch(() => {});
+    addMode = "ok";
+    await sh2.getByRole("button", { name: "Fatto" }).click().catch(() => {});
+    await sh2.waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
+    const ins3 = writes.find((w) => w.m === "POST");
+    ok(ins3?.body?.solo_per_me === true, `salva B: 'Solo per me' acceso al primo salvataggio si scrive (${JSON.stringify(ins3?.body ?? null)})`);
+    await v2.close();
+    await vctx.unroute("**/rest/v1/profiles**"); }
   await v.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
   await vctx.close();
 }
