@@ -699,8 +699,7 @@ await page.unroute("**/api/search");
   // Revisore 15/11: accesa, i filtri restano in vista (prima sparivano e spegnerne uno cambiava i tre senza dirlo).
   ok((await page.getByTestId("filtri-mappa").getByRole("button", { name: "Aperto ora" }).count()) === 1 && (await tre.getAttribute("aria-pressed")) === "true", "scegli tra 3: accesa, i filtri restano in vista e il tasto è premuto");
   // Revisore 15/11: aprire la scheda di uno dei tre e chiuderla torna ai tre, non a tutta la lista.
-  await page.locator("ul.snap-x li[data-id=T1]").click();
-  if (!(await page.getByTestId("barra-azioni").first().waitFor({ timeout: 1500 }).then(() => true, () => false))) await page.locator("ul.snap-x li[data-id=T1]").click().catch(() => {});
+  await apriCard(page, "Trattoria Prima");
   const schedaAperta = await page.getByTestId("barra-azioni").first().waitFor({ timeout: 3000 }).then(() => true, () => false);
   await page.getByRole("button", { name: /^Chiudi/ }).first().click().catch(() => {});
   await page.waitForTimeout(900);
