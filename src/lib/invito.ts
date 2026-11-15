@@ -72,6 +72,19 @@ export function clearStoredInvite(): void {
 export function testoInvitoNo(motivo: string, nome: string | null): string {
   if (motivo === "gia-usato") return "Vi eravate tolti dagli amici: per tornare, chi aveva tolto l'amicizia deve mandarti un link nuovo.";
   if (motivo === "tolto-da-te") return `Avevi tolto ${nome ?? "questa persona"} dagli amici: per tornare, manda tu un link nuovo.`;
-  if (motivo === "troppi") return "Raggiunto il massimo di amici da invito.";
+  // Revisore 15/11 (sesto giro): prima la stessa frase a chi accetta e a chi invita. Il tetto (20261115c) dice chi è.
+  if (motivo === "troppi") return "Hai già 30 amici da invito, il massimo: per aggiungerne uno, togline un altro in Amici.";
+  if (motivo === "troppi-lui") return `${nome ?? "Chi ti ha invitato"} ha già 30 amici da invito, il massimo: per ora non può aggiungerne altri.`;
   return `Questo invito non vale più: chiedi a ${nome ?? "chi te l'ha mandato"} un link nuovo.`;
+}
+
+// Invito di un amico in attesa di risposta in Amici (revisore 15/11, sesto giro): mentre c'è, "Invita un amico"
+// si nasconde (prima due campi nome e due tasti nella stessa pagina) e torna appena si risponde.
+export const INVITO_SOSPESO_EVENT = "mapetite:invito-sospeso";
+export function segnalaInvitoSospeso(attivo: boolean): void {
+  try {
+    window.dispatchEvent(new CustomEvent(INVITO_SOSPESO_EVENT, { detail: attivo }));
+  } catch {
+    // ignorato
+  }
 }

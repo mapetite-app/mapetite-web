@@ -98,7 +98,7 @@ export default async function InvitoPage({ params }: Props) {
         </div>
         <div className="mt-6">
           {puoiAccettare && codice ? (
-            <InvitoAccetta codice={codice} nome={name} chiediNome={chiediNome} riga={<p data-testid="invito-riga" className="-mt-4 mb-4 text-center text-[15px] font-sans text-text-muted">Da amici vi vedete per nome in Amici.</p>} />
+            <InvitoAccetta codice={codice} nome={name} chiediNome={chiediNome} uscita={{ href: "/mappa", label: "Apri la tua mappa" }} riga={<p data-testid="invito-riga" className="-mt-4 mb-4 text-center text-[15px] font-sans text-text-muted">Da amici vi vedete per nome in Amici.</p>} />
           ) : giaAmici ? (
             <p data-testid="invito-gia-amici" className="mb-3 text-center text-sm font-sans text-text-muted">Vi trovate in Amici.</p>
           ) : (
@@ -106,13 +106,13 @@ export default async function InvitoPage({ params }: Props) {
               {proprio ? "Questo è il tuo link d'invito: mandalo a un amico." : perAmico && a !== "errore" ? "Questo invito non vale più: chiedi un link nuovo." : "Hai già un account: sei dentro."}
             </p>
           )}
-          <Link
+          {!puoiAccettare && <Link
             href={giaAmici ? "/amici" : "/mappa"}
             data-testid="invito-apri"
             className={puoiAccettare ? "flex min-h-11 w-full items-center justify-center font-display text-sm font-semibold text-brand" : "flex min-h-13 w-full items-center justify-center rounded-pill bg-accent px-6 py-3.5 font-display text-base font-semibold text-white shadow-float active:scale-[0.98]"}
           >
             {giaAmici ? "Apri Amici" : "Apri la tua mappa"}
-          </Link>
+          </Link>}
         </div>
       </main>
     );

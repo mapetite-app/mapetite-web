@@ -11,18 +11,37 @@ import { trackFeature } from "@/lib/track";
 // "className": il margine sotto (in Amici il riquadro ha già il suo spazio: niente vuoto in fondo).
 // "riga": la frase sopra il tasto ("Da amici vi vedete per nome…"): solo finché si può ancora accettare, mai dopo
 // un esito negativo (revisore 15/11: restava sotto "Vi eravate tolti dagli amici").
-export default function InvitoAccetta({ codice, nome, chiediNome, contesto = "gia_iscritto", nonOra, className = "mb-3", riga }: { codice: string; nome: string | null; chiediNome: boolean; contesto?: string; nonOra?: () => void; className?: string; riga?: ReactNode }) {
+export default function InvitoAccetta({ codice, nome, chiediNome, contesto = "gia_iscritto", nonOra, onFine, uscita, className = "mb-3", riga }: { codice: string; nome: string | null; chiediNome: boolean; contesto?: string; nonOra?: () => void; onFine?: (amici: boolean) => void; uscita?: { href: string; label: string }; className?: string; riga?: ReactNode }) {
   const [mio, setMio] = useState("");
   // Il server può chiedere il nome anche se la pagina pensava di averlo (revisore 14/11, terzo giro).
   const [serveNome, setServeNome] = useState(chiediNome);
   const [stato, setStato] = useState<"idle" | "salvo" | "amici" | "no" | "errore" | "nome">("idle");
   // Perché l'invito non è andato: link scaduto, già usato tra voi due, o troppi amici da invito.
   const [motivo, setMotivo] = useState("");
-  if (stato === "amici") {
+  if (stato === "amici" && !uscita) {
     return <p data-testid="invito-accettato" className={`${className} rounded-card bg-accent-light p-3 text-center text-[15px] font-sans text-text`}>🤝 Tu e {nome ?? "il tuo amico"} siete amici: vi trovate in Amici.</p>;
   }
+  // "uscita" (pagina d'invito, revisore 15/11 sesto giro): prima del tocco un link discreto sotto il tasto; dopo un
+  // esito negativo diventa il tasto principale, così la pagina non resta senza niente da fare. Se l'amicizia l'avevi
+  // tolta tu, il tasto porta al tuo link nuovo (è l'unico modo di tornare amici).
+  const tasto = "flex min-h-13 w-full items-center justify-center rounded-pill bg-accent px-6 py-3.5 font-display text-base font-semibold text-white shadow-float active:scale-[0.98]";
   if (stato === "no") {
-    return <p data-testid="invito-scaduto" data-motivo={motivo} className={`${className} text-center text-sm font-sans text-text-muted`}>{testoInvitoNo(motivo, nome)}</p>;
+    return (
+      <div className={className}>
+        <p data-testid="invito-scaduto" data-motivo={motivo} className="text-center text-sm font-sans text-text-muted">{testoInvitoNo(motivo, nome)}</p>
+        {uscita && (motivo === "tolto-da-te"
+          ? <a href="/profilo#invita" data-testid="invito-apri" className={`${tasto} mt-4`}>Manda il tuo link nuovo</a>
+          : <a href={uscita.href} data-testid="invito-apri" className={`${tasto} mt-4`}>{uscita.label}</a>)}
+      </div>
+    );
+  }
+  if (stato === "amici" && uscita) {
+    return (
+      <div className={className}>
+        <p data-testid="invito-accettato" className="rounded-card bg-accent-light p-3 text-center text-[15px] font-sans text-text">🤝 Tu e {nome ?? "il tuo amico"} siete amici: vi trovate in Amici.</p>
+        <a href="/amici" data-testid="invito-apri" className={`${tasto} mt-4`}>Apri Amici</a>
+      </div>
+    );
   }
   const senzaNome = serveNome && !mio.trim();
   return (
@@ -54,6 +73,7 @@ export default function InvitoAccetta({ codice, nome, chiediNome, contesto = "gi
           clearStoredInvite();
           if (r.stato === "no") setMotivo(r.motivo);
           setStato(r.stato === "ok" ? "amici" : "no");
+          onFine?.(r.stato === "ok");
         }}
         // Spento finché manca il nome: grigio chiaro con testo scuro, leggibile (prima corallo sbiadito, revisore 14/11).
         className={`flex min-h-13 w-full items-center justify-center rounded-pill px-6 py-3.5 font-display text-base font-semibold active:scale-[0.98] ${senzaNome ? "bg-[#e3e7e7] text-text-muted" : "bg-accent text-white shadow-float disabled:opacity-80"}`}
@@ -64,6 +84,9 @@ export default function InvitoAccetta({ codice, nome, chiediNome, contesto = "gi
         <button type="button" data-testid="invito-no" onClick={nonOra} disabled={stato === "salvo"} className="mt-1 flex min-h-11 w-full items-center justify-center font-display text-sm font-semibold text-text-muted">
           Non ora
         </button>
+      )}
+      {uscita && !nonOra && (
+        <a href={uscita.href} data-testid="invito-apri" className="mt-1 flex min-h-11 w-full items-center justify-center font-display text-sm font-semibold text-brand">{uscita.label}</a>
       )}
       {stato === "errore" && <p role="alert" className="mt-2 text-center text-sm text-error">Non ci sono riuscito: riprova.</p>}
       {stato === "nome" && <p role="alert" data-testid="invito-serve-nome" className="mt-2 text-center text-sm text-error">Prima scrivi il tuo nome: lo vedrà {nome ?? "il tuo amico"}.</p>}

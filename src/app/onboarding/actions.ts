@@ -164,6 +164,7 @@ export async function accettaInvito(raw: unknown, nomeRaw?: unknown): Promise<Es
     if (codice.endsWith("00000000a5a5")) return { stato: "no", motivo: "gia-usato" };
     if (codice.endsWith("00000000a6a6")) return { stato: "no", motivo: "tolto-da-te" };
     if (codice.endsWith("00000000a7a7")) return { stato: "no", motivo: "troppi" };
+    if (codice.endsWith("00000000a8a8")) return { stato: "no", motivo: "troppi-lui" };
     return { stato: "ok", nome: nomeFinto(codice) };
   }
   const supabase = await createClient();

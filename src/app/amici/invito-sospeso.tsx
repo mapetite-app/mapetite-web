@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import InvitoAccetta from "@/components/invito-accetta";
 import { chiInvita } from "@/app/onboarding/actions";
-import { clearStoredInvite, isFriendCode, readStoredInvite } from "@/lib/invito";
+import { clearStoredInvite, isFriendCode, readStoredInvite, segnalaInvitoSospeso } from "@/lib/invito";
 import { trackFeature } from "@/lib/track";
 
 // L'invito di un amico rimasto senza risposta (revisore 14/11, terzo giro): chi chiudeva il primo accesso con
@@ -12,6 +13,7 @@ import { trackFeature } from "@/lib/track";
 // Revisore 14/11 (quarto giro): se siete già amici, "Siete già amici" e basta (niente "Diventa amico").
 export default function InvitoSospeso({ senzaNome }: { senzaNome: boolean }) {
   const [invito, setInvito] = useState<{ codice: string; nome: string | null; amico: boolean } | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const codice = readStoredInvite();
@@ -23,6 +25,7 @@ export default function InvitoSospeso({ senzaNome }: { senzaNome: boolean }) {
         if (r) setInvito({ codice, nome: r.nome, amico: r.amico });
         else clearStoredInvite(); // il codice non esiste più (per esempio dopo "Nuovo link")
         if (r && r.amico) clearStoredInvite(); // già amici: non c'è niente da rispondere
+        if (!r || r.amico) segnalaInvitoSospeso(false); // niente da rispondere: "Invita un amico" torna
       })
       .catch(() => {});
     return () => { vivo = false; };
@@ -50,6 +53,13 @@ export default function InvitoSospeso({ senzaNome }: { senzaNome: boolean }) {
           trackFeature("invito_amico", { stato: "non_ora", contesto: "amici" });
           clearStoredInvite();
           setInvito(null);
+          segnalaInvitoSospeso(false);
+        }}
+        // Risposto (revisore 15/11, sesto giro): da amici la pagina si ricarica e lo mostra nella riga degli amici;
+        // con un esito negativo resta la frase e torna "Invita un amico", il tasto principale della pagina.
+        onFine={(amici) => {
+          segnalaInvitoSospeso(false);
+          if (amici) router.refresh();
         }}
       />
     </section>

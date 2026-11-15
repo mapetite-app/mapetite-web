@@ -5054,8 +5054,11 @@ else {
   { const s = sp.getByTestId("invito-sospeso");
     await s.waitFor({ timeout: 4000 }).catch(() => {});
     ok(((await s.textContent().catch(() => "")) ?? "").includes("Giulia ti ha invitato") && await s.getByTestId("invito-si").isDisabled() && await s.getByTestId("invito-mio-nome").isVisible() && await s.getByTestId("invito-no").isVisible(), "amici: l'invito rimasto senza risposta si ripropone, con il nome da scrivere e 'Non ora'");
+    // Revisore 15/11 (sesto giro): con l'invito in sospeso niente "Invita un amico" (due campi nome e due tasti).
+    ok((await sp.getByTestId("amici-invita").count()) === 0, "amici: con l'invito in sospeso 'Invita un amico' è nascosto");
     await s.getByTestId("invito-no").click();
     ok((await sp.getByTestId("invito-sospeso").count()) === 0 && (await sp.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "amici: 'Non ora' chiude l'invito e lo dimentica");
+    ok(await sp.getByTestId("amici-invita").isVisible(), "amici: dopo 'Non ora' torna 'Invita un amico'");
     await sp.evaluate(() => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: "i-0000000000aa", t: Date.now() })));
     await sp.reload({ waitUntil: "networkidle" });
     await s.waitFor({ timeout: 4000 }).catch(() => {});
@@ -8700,7 +8703,7 @@ else {
   const GIU = { id: "00000000-0000-4000-8000-0000000009a1", handle: "giulia.rm", display_name: "Giulia", bio: null, city: "Roma", visitati: 4, da_provare: 7, seguaci: 0, seguiti: 0 };
   // Link personale da amico (14/11): codice casuale "i-…"; il nome arriva dall'anteprima (anteprima_invito).
   const COD_AMICO = "i-0000000000aa";
-  const socialInv = { profili: [GIU], salvati: [], seguo: [], mio: { handle: "lorenzo", display_name: "Lorenzo", bio: null, city: "Roma", is_public: true }, anteprime: { [COD_AMICO]: { nome: "Giulia", handle: null }, "i-00000000a5a5": { nome: "Marta", handle: null }, "i-00000000a6a6": { nome: "Sara", handle: null }, "i-00000000a7a7": { nome: "Paolo", handle: null }, "i-00000000a1a1": { nome: "Giulia", handle: null, amico: true } } };
+  const socialInv = { profili: [GIU], salvati: [], seguo: [], mio: { handle: "lorenzo", display_name: "Lorenzo", bio: null, city: "Roma", is_public: true }, anteprime: { [COD_AMICO]: { nome: "Giulia", handle: null }, "i-00000000a5a5": { nome: "Marta", handle: null }, "i-00000000a6a6": { nome: "Sara", handle: null }, "i-00000000a7a7": { nome: "Paolo", handle: null }, "i-00000000a8a8": { nome: "Pietro", handle: null }, "i-00000000a1a1": { nome: "Giulia", handle: null, amico: true } } };
   const ictx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   const ievents = [];
   await ictx.route("**/api/events", (r) => { ievents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
@@ -8772,7 +8775,7 @@ else {
     await ip.screenshot({ path: `${OUT}/invito-gia-iscritto.png`, caret: "initial" }); }
   // Esiti distinti: già usato tra voi due, l'avevi tolto tu, troppi amici da invito (prima tutti "chiedi un link nuovo").
   // Revisore 15/11: dopo un'amicizia tolta niente "rendete pubblico il profilo": si torna con un link nuovo di chi l'ha tolta.
-  for (const [cod, atteso, cosa, vietato] of [["i-00000000a5a5", "chi aveva tolto l'amicizia deve mandarti un link nuovo", "già usato", "pubblico"], ["i-00000000a6a6", "Avevi tolto Sara dagli amici: per tornare, manda tu un link nuovo", "tolto da te", "pubblico"], ["i-00000000a7a7", "Raggiunto il massimo di amici da invito", "troppi", "link nuovo"]]) {
+  for (const [cod, atteso, cosa, vietato] of [["i-00000000a5a5", "chi aveva tolto l'amicizia deve mandarti un link nuovo", "già usato", "pubblico"], ["i-00000000a6a6", "Avevi tolto Sara dagli amici: per tornare, manda tu un link nuovo", "tolto da te", "pubblico"], ["i-00000000a7a7", "Hai già 30 amici da invito", "troppi", "link nuovo"], ["i-00000000a8a8", "Pietro ha già 30 amici da invito", "troppi di chi invita", "Hai già"]]) {
     await ip.goto(`${BASE}/invito/${cod}`, { waitUntil: "networkidle" });
     const rigaPrima = await ip.getByTestId("invito-riga").isVisible();
     if (await ip.getByTestId("invito-mio-nome").count()) await ip.getByTestId("invito-mio-nome").fill("Luca");
@@ -8781,6 +8784,9 @@ else {
     const t = (await ip.getByTestId("invito-scaduto").textContent().catch(() => "")) ?? "";
     ok(t.includes(atteso) && !t.includes(vietato), `invito da già iscritto, ${cosa}: il motivo vero (${t})`);
     // Revisore 15/11: "Da amici vi vedete per nome in Amici" c'è prima del tocco, non dopo un no.
+    // Revisore 15/11 (sesto giro): dopo un no la pagina ha il suo tasto principale (prima un link discreto e basta).
+    { const a = ip.getByTestId("invito-apri"); const bg = await a.evaluate((e) => getComputedStyle(e).backgroundColor).catch(() => "");
+      ok((await a.count()) === 1 && bg === "rgb(255, 107, 74)" && (await a.getAttribute("href")) === (cosa === "tolto da te" ? "/profilo#invita" : "/mappa"), `invito da già iscritto, ${cosa}: dopo il no un solo tasto principale in corallo (${bg}, ${await a.getAttribute("href").catch(() => "")})`); }
     ok(rigaPrima && (await ip.getByTestId("invito-riga").count()) === 0 && !((await ip.getByTestId("invito-pagina").textContent()) ?? "").includes("vi vedete per nome"), `invito da già iscritto, ${cosa}: dopo il no sparisce 'Da amici vi vedete per nome'`); }
   // Già amici: "Siete già amici", niente "Diventa amico".
   await ip.goto(`${BASE}/invito/i-00000000a1a1`, { waitUntil: "networkidle" });

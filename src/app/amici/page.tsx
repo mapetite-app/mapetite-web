@@ -12,6 +12,7 @@ import { groupActivity, isVisited, whenLabel } from "@/lib/social-view";
 import CercaPersone from "./cerca-persone";
 import AmicoRiga from "./amico";
 import InvitoSospeso from "./invito-sospeso";
+import SenzaInvitoSospeso from "./senza-invito-sospeso";
 import CreatorListe from "./creator-liste";
 import InvitaAmico from "@/components/invita-amico";
 
@@ -95,9 +96,11 @@ export default async function AmiciPage() {
             {/* Gli amici che non sono ancora su Mapetite: il link personale (sta nel profilo, si apre da solo).
                 Con la pagina vuota l'invito è già sotto, a tutta larghezza: niente doppione. */}
             {!vuota && (
-              <Link href="/profilo#invita" data-testid="amici-invita" className={chip}>
-                <span aria-hidden>💌</span> Invita un amico
-              </Link>
+              <SenzaInvitoSospeso>
+                <Link href="/profilo#invita" data-testid="amici-invita" className={chip}>
+                  <span aria-hidden>💌</span> Invita un amico
+                </Link>
+              </SenzaInvitoSospeso>
             )}
           </nav>
 
@@ -130,9 +133,11 @@ export default async function AmiciPage() {
           <section className="mt-6" aria-labelledby={vuota ? undefined : "attivita-titolo"} aria-label={vuota ? "Invita un amico" : undefined}>
             {!vuota && <h2 id="attivita-titolo" data-testid="attivita-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Attività</h2>}
             {vuota ? (
-              <div data-testid="amici-vuoto" className="mt-2">
-                <InvitaAmico userId={viewer} handle={feed.mio?.handle ?? null} codice={codiceInvito} senzaNome={senzaNome} vuoto />
-              </div>
+              <SenzaInvitoSospeso>
+                <div data-testid="amici-vuoto" className="mt-2">
+                  <InvitaAmico userId={viewer} handle={feed.mio?.handle ?? null} codice={codiceInvito} senzaNome={senzaNome} vuoto />
+                </div>
+              </SenzaInvitoSospeso>
             ) : feed.attivita.length === 0 ? (
               <p data-testid="amici-nessuna-attivita" className="mt-2 rounded-card border border-[#e3e7e7] bg-white p-5 text-center text-sm font-sans text-text-muted">
                 {feed.seguiti.length === 0 ? "I tuoi amici hanno il profilo privato: i loro posti non si vedono." : "Chi segui non ha ancora salvato posti. Torna più tardi."}
