@@ -4880,8 +4880,12 @@ else {
   await campo.locator("input").press("Enter").catch(() => {});
   ok(((await dp.getByTestId("consigliato-errore").textContent().catch(() => "")) ?? "").includes("Solo lettere, massimo 40") && await campo.isVisible(), "consigliato da: 'Marco 2' → 'Solo lettere, massimo 40', il campo resta aperto");
   await dp.screenshot({ path: `${OUT}/53b-consigliato-nome-non-valido.png`, caret: "initial" });
-  await salvaPubblico();
-  ok(inserts.at(-1)?.consigliato_da === "Giulia", `consigliato da: con un nome non valido resta quello di prima (${inserts.at(-1)?.consigliato_da ?? "nessuno"})`);
+  // Revisore 15/11 (secondo): "Marco 2" scritto e Salva toccato subito (senza OK) non deve salvare in silenzio.
+  await campo.locator("input").fill("Marco 2").catch(() => {});
+  const primaNonValido = inserts.length;
+  await dp.getByRole("button", { name: "📌 Salva in Mapetite" }).click().catch(() => {});
+  await dp.waitForTimeout(600);
+  ok(inserts.length === primaNonValido && ((await dp.getByTestId("consigliato-errore").textContent().catch(() => "")) ?? "").includes("Solo lettere") && (await dp.getByTestId("salvato-pubblico").count()) === 0, `consigliato da: nome non valido e Salva senza OK → non salva, l'errore resta in vista (${inserts.length - primaNonValido} salvataggi)`);
   await dp.goto(`${BASE}/locali/${LOC_CD}?da=Giulia`, { waitUntil: "networkidle" });
   await dp.getByTestId("consigliato-riga").waitFor({ timeout: 4000 }).catch(() => {});
   await dp.getByTestId("consigliato-cambia").click().catch(() => {});
@@ -4999,7 +5003,7 @@ else {
   await sd.evaluate(() => { navigator.share = undefined; window.__aperto = null; window.open = (u) => { window.__aperto = u; return null; }; });
   await dillo.click().catch(() => {});
   const aperto = await sd.evaluate(() => window.__aperto);
-  ok((aperto ?? "").startsWith("https://wa.me/?text=") && decodeURIComponent(aperto.split("text=")[1] ?? "") === "Provato Da Enzo al 29, grazie del consiglio!", `consigliato da: senza foglio di condivisione si apre WhatsApp, senza 👍 solo il grazie (${aperto ?? "nessuno"})`);
+  ok((aperto ?? "").startsWith("https://wa.me/?text=") && /^Provato Da Enzo al 29, grazie del consiglio!(\nhttps?:\/\/[^\s]+\/locali\/[0-9a-f-]{36})?$/.test(decodeURIComponent(aperto.split("text=")[1] ?? "")), `consigliato da: senza foglio di condivisione si apre WhatsApp, senza 👍 solo il grazie (${aperto ?? "nessuno"})`);
   // Modifica: etichetta visibile; un nome non valido non si salva; vuoto toglie il nome.
   await sd.getByTestId("tue-note").getByRole("button", { name: "Modifica", exact: true }).click().catch(() => {});
   const campoM = sd.getByTestId("consigliato-modifica");

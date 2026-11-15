@@ -243,13 +243,13 @@ export default function VenueSheet({
   }, [shareOn, userId]);
   const cambiaNomeNeiLink = (acceso: boolean) => { setNomeNeiLink(acceso); setNomeAcceso(acceso); trackFeature("condividi_nome", { stato: acceso ? "si" : "no" }); };
   const rigaNomeLink = rigaNome && mio?.nelLink ? (
-    <p data-testid="condividi-nome" role="status" className="flex items-center gap-1 text-xs font-sans text-text-muted">
+    <span data-testid="condividi-nome" role="status" className="flex items-center gap-1 text-[13px] font-sans text-text">
       <span>{nomeAcceso ? "Il link porta il tuo nome" : "Link senza nome"}</span>
       <span aria-hidden>·</span>
-      <button type="button" data-testid="condividi-nome-cambia" onClick={() => cambiaNomeNeiLink(!nomeAcceso)} className="min-h-11 px-1 font-display font-semibold text-brand underline underline-offset-2">
+      <button type="button" data-testid="condividi-nome-cambia" onClick={() => cambiaNomeNeiLink(!nomeAcceso)} className="inline-flex min-h-11 min-w-11 items-center justify-center px-1 font-display font-semibold text-brand underline underline-offset-2">
         {nomeAcceso ? "Togli" : "Metti il nome"}
       </button>
-    </p>
+    </span>
   ) : null;
   const [addressCopied, setAddressCopied] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(autoBook);
@@ -325,17 +325,20 @@ export default function VenueSheet({
   const dilloA = async (chi: string) => {
     const piaciuto = personalTags?.includes("Mi è piaciuto") ?? false;
     trackFeature("dillo_amico", { voto: piaciuto ? "su" : "altro" });
+    // Revisore 15/11 (secondo): con il link del posto il consiglio riporta l'amico su Mapetite. I salvati hanno già
+    // l'UUID: il link si scrive subito, senza attese che farebbero perdere il tocco su iPhone.
+    const url = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(venue.id) ? `${window.location.origin}/locali/${venue.id}` : null;
     const text = messaggioGrazie(name, piaciuto);
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: `Per ${chi}`, text });
+        await navigator.share(url ? { title: `Per ${chi}`, text, url } : { title: `Per ${chi}`, text });
         return;
       } catch (err) {
         // Chiuso il foglio: niente. Altri errori (es. il telefono non accetta più il tocco): si passa a WhatsApp.
         if (err instanceof DOMException && err.name === "AbortError") return;
       }
     }
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+    window.open(`https://wa.me/?text=${encodeURIComponent(url ? `${text}\n${url}` : text)}`, "_blank", "noopener,noreferrer");
   };
 
   const hasReviews = selectedReviews != null && selectedReviews.length > 0;

@@ -64,9 +64,12 @@ async function leggiMioNome(uid: string | null, chiave: string): Promise<MioNome
     const nome = primoNome(data?.display_name);
     if (!nome) return nessuno;
     if (data?.is_public) return { nome, nelLink: true };
-    const { data: amici, error: aErr } = await client.from("follows").select("follower_id").or(`follower_id.eq.${id},followed_id.eq.${id}`).limit(1);
-    if (aErr) return { nome, nelLink: false };
-    return { nome, nelLink: Array.isArray(amici) && amici.length > 0 };
+    // Revisore 15/11 (secondo): "amico" come in Amici, cioè reciproco (seguire un profilo pubblico non basta).
+    const { data: seguo, error: aErr } = await client.from("follows").select("followed_id").eq("follower_id", id).limit(500);
+    if (aErr || !Array.isArray(seguo) || seguo.length === 0) return { nome, nelLink: false };
+    const ids = seguo.map((r: { followed_id: string }) => r.followed_id);
+    const { data: reciproci, error: rErr } = await client.from("follows").select("follower_id").eq("followed_id", id).in("follower_id", ids).limit(1);
+    return { nome, nelLink: !rErr && Array.isArray(reciproci) && reciproci.length > 0 };
   } catch {
     letti.delete(chiave);
     return nessuno;

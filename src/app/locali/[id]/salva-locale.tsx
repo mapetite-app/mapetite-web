@@ -71,6 +71,9 @@ export default function SalvaLocale({
 
   const save = async () => {
     if (!userId || state === "saving") return;
+    // Revisore 15/11 (secondo): "Marco 2" scritto e poi Salva senza OK partiva con il nome vecchio, in silenzio.
+    // Come in Modifica: con un nome non valido nel campo non si salva e l'errore resta in vista.
+    if (daBozza !== null && daBozza.trim() !== "" && !leggiCampoNome(daBozza).valido) { setErroreNome(true); return; }
     setState("saving");
     // Senza rete il codice di Supabase potrebbe non essere ancora scaricato: errore, non pulsante bloccato.
     const client = await browserClient().catch(() => null);
@@ -133,6 +136,7 @@ export default function SalvaLocale({
             {/* Proposta 58: chi te l'ha consigliato, una riga discreta sopra Salva (si toglie o si cambia). */}
             {daBozza !== null ? (
               <>
+              <p className="mb-1 px-3 font-display text-[10.5px] font-semibold uppercase tracking-[0.14em] text-text-muted">Te l&apos;ha consigliato</p>
               <form
                 data-testid="consigliato-campo"
                 onSubmit={(e) => { e.preventDefault(); confermaDa(); }}
