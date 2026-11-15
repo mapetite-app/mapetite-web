@@ -13,6 +13,7 @@ import { trackFeature } from "@/lib/track";
 import { cityArea } from "@/lib/named-city";
 import { saveLastView } from "@/lib/last-view";
 import { clearStoredInvite, isFriendCode, readStoredInvite, testoInvitoNo } from "@/lib/invito";
+import Avatar from "@/components/avatar";
 
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 
@@ -512,6 +513,16 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
       {/* Contenuto */}
       {/* Revisore 7/11: nella frase, con le righe aperte, l'ultima nota finiva sotto i due tasti fissi. */}
       <div className={`mx-auto w-full max-w-lg flex-1 px-6 pt-3 ${step >= PASSO_CAPITO ? "pb-[calc(11rem+env(safe-area-inset-bottom))]" : "pb-32"}`}>
+        {/* Il passo dell'invito: in alto chi invita, come nella pagina d'invito (revisore 15/11: era mezzo vuoto). */}
+        {step === PASSO_INVITO && invito && (
+          <div data-testid="invito-avatar" className="mb-4">
+            {invito.nome ? (
+              <Avatar person={{ display_name: invito.nome }} size={72} className="ring-4 ring-accent-light" />
+            ) : (
+              <span aria-hidden className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-accent-light text-4xl">💌</span>
+            )}
+          </div>
+        )}
         {/* Un solo titolo per tutti i passi (mockup A): serif grande e una riga sotto. */}
         <h1 className={`${SERIF} mb-1.5 text-balance text-[34px] font-medium leading-[1.06] tracking-[-0.02em] text-[#141414] min-[380px]:text-[38px]`}>
           {step === PASSO_INVITO ? `${invito?.nome ?? "Un amico"} ti ha invitato` : step === PASSO_CAPITO && frase.length === 0 ? "Partiamo da zero" : config.title}

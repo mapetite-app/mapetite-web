@@ -8852,6 +8852,8 @@ else {
     await ia.waitFor({ timeout: 4000 }).catch(() => {});
     ok(((await ip.locator("h1").textContent()) ?? "").includes("Giulia ti ha invitato") && await ip.getByTestId("invito-si").isVisible() && await ip.getByTestId("invito-no").isVisible() && (await ip.getByTestId("benvenuto-passo").textContent()) === "8 di 8" && (await ip.getByRole("progressbar").getAttribute("aria-valuemax")) === "8", `primo accesso da invito: passo a sé 'Giulia ti ha invitato' con 'Diventa amico' e 'Non ora', contato come ultimo passo '8 di 8' (${await ip.locator("h1").textContent()})`);
     ok((await ip.getByTestId("invito-collegato").count()) === 0, "primo accesso da invito: nessuna amicizia prima del sì");
+    { const av = ip.getByTestId("invito-avatar"); const ya = (await av.boundingBox())?.y ?? -1; const yh = (await ip.locator("h1").boundingBox())?.y ?? -1;
+      ok(await av.isVisible() && ((await av.textContent()) ?? "").trim() === "G" && ya >= 0 && ya < yh, `primo accesso da invito: in alto l'avatar di chi invita, sopra il titolo (${(await av.textContent())?.trim()})`); }
     // Revisore 14/11 (secondo): chi accetta scrive il suo nome (l'amico vedeva "Qualcuno"). Un solo campo nome.
     { const bg = await ip.getByTestId("invito-si").evaluate((e) => getComputedStyle(e).backgroundColor);
       ok(await ip.getByTestId("invito-si").isDisabled() && await ia.getByTestId("invito-mio-nome").isVisible() && (await ip.locator("input[autocomplete=name]").count()) === 1 && bg === "rgb(227, 231, 231)", `primo accesso da invito: un solo campo nome, 'Diventa amico' spento ma leggibile finché manca (${bg})`); }
