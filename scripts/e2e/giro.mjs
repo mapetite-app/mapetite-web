@@ -4987,6 +4987,7 @@ else {
   { const v = sp.getByTestId("amici-vuoto");
     ok((await v.getByTestId("invita-amico").getAttribute("data-vuoto")) === "1" && await v.getByTestId("nome-per-invito").isVisible() && !((await v.textContent()) ?? "").includes("Non segui ancora nessuno") && (await sp.getByTestId("amici-invita").count()) === 0, "amici vuoto: riquadro 'Invita un amico' con il nome da scrivere, niente chip doppione");
     ok((await sp.getByTestId("attivita-titolo").count()) === 0 && (await sp.getByText("Attività", { exact: true }).count()) === 0, "amici vuoto: niente intestazione 'Attività' sopra il solo invito");
+    { const t = (await v.getByTestId("invita-amico-testo").textContent()) ?? ""; ok(t.includes("se vuole, diventate amici") && !t.includes("vi passate i posti"), `amici vuoto: il testo promette solo quello che succede (${t})`); }
     { const b = v.getByTestId("nome-per-invito-crea"); const st = await b.evaluate((e) => [getComputedStyle(e).backgroundColor, getComputedStyle(e).opacity]).catch(() => []);
       ok(await b.isDisabled() && st[0] === "rgb(227, 231, 231)" && st[1] === "1", `amici vuoto: senza nome 'Crea il link' spento ma leggibile (grigio chiaro, testo scuro: ${st.join(" ")})`);
       await v.getByTestId("nome-per-invito-campo").fill("Luca");
