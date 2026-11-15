@@ -4599,6 +4599,20 @@ if (!fakeUser) {
   await gcard.getByTestId("reel-salvato").waitFor({ timeout: 4000 });
   ok(mAdd.at(-1)?.googlePlaceId === "GM1" && mReels.some((x) => x.m === "POST" && x.body?.url === "https://www.instagram.com/reel/ABC123" && x.body?.fonte === "Instagram"), "instagram: 'Sì, salva' salva il locale e collega il reel (link pulito)");
 
+  ok((await gcard.getByTestId("reel-adv").count()) === 0, "reel: senza dicitura di pubblicità nessuna riga (proposta 60)");
+  // Proposta 60: la didascalia dice "#adv" → riga neutra sotto il posto salvato; mai indovinare.
+  { const { segnataComePubblicita: adv } = await import(new URL("../../src/lib/adv.ts", import.meta.url).href);
+    const casi = [["Cena top #adv", true], ["#ad da Mario", true], ["#adorable pasta", false], ["Pubblicità - Trattoria", true], ["in collaborazione con @mario", true], ["adventure food", false], ["ADV | Pizzeria", true], ["la mia adv", false], ["Trattoria Da Enzo a Roma", false]];
+    const sbagliati = casi.filter(([t, e]) => adv(t) !== e).map(([t]) => t);
+    ok(sbagliati.length === 0, `reel adv: solo diciture esplicite (#adv, Pubblicità, in collaborazione con, ADV maiuscolo), niente '#adorable' o 'adventure' (${sbagliati.join(" | ")})`);
+    await mp.evaluate(() => sessionStorage.clear());
+    await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("Pizzeria Bella a Roma #adv https://www.instagram.com/reel/ADV777/")}`, { waitUntil: "networkidle" });
+    await mp.getByTestId("reel-conferma").click({ timeout: 6000 }).catch(() => {});
+    await mp.getByTestId("reel-salvato").waitFor({ timeout: 5000 }).catch(() => {});
+    ok(((await mp.getByTestId("reel-adv").textContent().catch(() => "")) ?? "").includes("Il reel è segnato come pubblicità · il verdetto viene dalle recensioni"), "reel adv: con '#adv' nel testo, sotto il posto salvato 'Il reel è segnato come pubblicità · il verdetto viene dalle recensioni'");
+    await mp.getByTestId("reel-adv").scrollIntoViewIfNeeded().catch(() => {});
+    await mp.screenshot({ path: `${OUT}/39c-reel-adv.png`, caret: "initial" }); }
+
   // Instagram senza testo: un solo passo, screenshot o nome; nessuna lettura AI prima del tocco.
   await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("https://www.instagram.com/p/XYZ/")}`, { waitUntil: "networkidle" });
   const c0 = capBodies.length;

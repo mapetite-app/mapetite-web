@@ -16,6 +16,7 @@ import { trackFeature } from "@/lib/track";
 import PlacePhoto from "@/components/place-photo";
 import QuandoCiVai from "@/components/quando-ci-vai";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { RIGA_ADV, segnataComePubblicita } from "@/lib/adv";
 
 // "Salva dal reel" in un gesto (sprint 25/10, chiave di volta A). Dal link condiviso o incollato:
 //  - TikTok/YouTube: si legge da soli la didascalia (oEmbed ufficiale) → l'AI trova i locali;
@@ -27,7 +28,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 // si salva solo un risultato di Google, e solo se il nome letto nel video è dentro il nome Google.
 
 export type Luogo = { nome: string; citta: string | null; categoria: string | null };
-type Lettura = { nome: string | null; citta: string | null; categoria: string | null; luoghi?: Luogo[] };
+type Lettura = { nome: string | null; citta: string | null; categoria: string | null; luoghi?: Luogo[]; adv?: boolean };
 
 function errorText(e: unknown): string {
   if (e instanceof TypeError) return "Errore di rete. Controlla la connessione e riprova.";
@@ -48,7 +49,7 @@ function remember(key: string, v: unknown) {
   try { sessionStorage.setItem(key, JSON.stringify(v)); } catch { /* storage non disponibile */ }
 }
 
-async function readReel(body: { link: string } | { caption: string } | { image: string }): Promise<Luogo[]> {
+async function readReel(body: { link: string } | { caption: string } | { image: string }, segnaAdv: () => void): Promise<Luogo[]> {
   const res = await fetch("/api/import-caption", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -56,6 +57,7 @@ async function readReel(body: { link: string } | { caption: string } | { image: 
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as { error?: string }).error ?? "Non riesco a leggere il locale.");
+  if ((data as Lettura).adv === true || ("caption" in body && segnataComePubblicita(body.caption))) segnaAdv();
   return luoghiOf(data as Lettura);
 }
 
@@ -102,6 +104,10 @@ export default function ReelSave({
   const [ask, setAsk] = useState<string | null>(null);
   const [draft, setDraft] = useState(() => placeHintFromText(text) ?? "");
   const [error, setError] = useState<string | null>(null);
+  // Proposta 60: il reel dice da solo di essere pubblicità (testo condiviso, didascalia letta o scritta).
+  const advKey = `${readKey}:adv`;
+  const [adv, setAdv] = useState(() => segnataComePubblicita(text) || cached<boolean>(advKey) === true);
+  const segnaAdv = () => { setAdv(true); remember(advKey, true); };
   // Lettura chiesta con un tocco qui (screenshot, nome scritto): vale come il gesto del Condividi.
   const [daTocco, setDaTocco] = useState(false);
   // Reel Instagram incorporato (embed ufficiale di Meta) per leggere nome e posizione senza uscire
@@ -120,7 +126,7 @@ export default function ReelSave({
     setReading(true);
     setError(null);
     const bodies = Array.isArray(body) ? body : [body];
-    void Promise.allSettled(bodies.map((b) => readReel(b)))
+    void Promise.allSettled(bodies.map((b) => readReel(b, segnaAdv)))
       .then((all) => {
         const ok = all.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
         if (ok.length === 0) throw (all[0] as PromiseRejectedResult).reason;
@@ -264,7 +270,7 @@ export default function ReelSave({
 
       {luoghi && (
         <>
-          <PlaceRow key={queryOf(luoghi[0])} luogo={luoghi[0]} userId={userId} reelUrl={reelUrl} source={source} auto autoSave={autoSave || daTocco} />
+          <PlaceRow key={queryOf(luoghi[0])} luogo={luoghi[0]} userId={userId} reelUrl={reelUrl} source={source} auto autoSave={autoSave || daTocco} adv={adv} />
           {luoghi.length > 1 && (
             <div className="space-y-2 pt-1" data-testid="reel-altri">
               <p className="text-sm font-semibold text-text">Nel reel ci sono anche</p>
@@ -296,6 +302,7 @@ function PlaceRow({
   source,
   auto = false,
   autoSave = true,
+  adv = false,
 }: {
   luogo: Luogo;
   userId: string;
@@ -303,6 +310,8 @@ function PlaceRow({
   source: ReelSource | null;
   auto?: boolean;
   autoSave?: boolean;
+  // Proposta 60: il reel è segnato come pubblicità (dicitura esplicita).
+  adv?: boolean;
 }) {
   const savedKey = `mapetite.reel-salvato:${reelUrl ?? ""}:${queryOf(luogo)}`;
   const [st, setSt] = useState<RowState>(auto ? { s: "searching" } : { s: "idle" });
@@ -463,6 +472,7 @@ function PlaceRow({
         <p className="mt-1 font-title text-2xl text-brand">{st.top.name}{where(st.top) ? `, ${where(st.top)}` : ""}</p>
         <p className="mt-0.5 text-xs text-text-muted">{displayAddress(st.top.address)}</p>
         <VerdettoSubito place={st.top} />
+        {adv && <p className="mt-2 text-xs text-text-muted" data-testid="reel-adv">📣 {RIGA_ADV}</p>}
         {!st.out.alreadySaved && <QuandoCiVai userId={userId} placeId={place.id} />}
         {reelOk && <p className="mt-2 text-xs text-text-muted" data-testid="reel-collegato">🎬 Il reel resta collegato: lo ritrovi nella scheda.</p>}
         {/* Una cosa principale ("Apri sulla mappa"); le altre due in una riga di testo sotto (collaudo 31/10:
