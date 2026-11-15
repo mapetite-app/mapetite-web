@@ -700,8 +700,13 @@ await page.unroute("**/api/search");
   // Revisore 15/11: accesa, i filtri restano in vista (prima sparivano e spegnerne uno cambiava i tre senza dirlo).
   ok((await page.getByTestId("filtri-mappa").getByRole("button", { name: "Aperto ora" }).count()) === 1 && (await tre.getAttribute("aria-pressed")) === "true", "scegli tra 3: accesa, i filtri restano in vista e il tasto è premuto");
   // Revisore 15/11: aprire la scheda di uno dei tre e chiuderla torna ai tre, non a tutta la lista.
-  await apriCard(page, "Trattoria Prima");
-  const schedaAperta = await page.getByTestId("barra-azioni").first().waitFor({ timeout: 3000 }).then(() => true, () => false);
+  await page.locator("ul.snap-x li[data-id=T1]").scrollIntoViewIfNeeded().catch(() => {});
+  // Tocco sul nome in basso a sinistra (non sul tasto Salva in alto a destra della card).
+  const tocca = async () => { const b = await page.locator("ul.snap-x li[data-id=T1]").boundingBox({ timeout: 3000 }).catch(() => null); if (b) await page.mouse.click(b.x + 50, b.y + b.height - 50); };
+  await tocca();
+  await page.waitForTimeout(1200);
+  if (await page.locator("ul.snap-x li[data-id=T1]").isVisible().catch(() => false)) { await tocca(); await page.waitForTimeout(1200); }
+  const schedaAperta = !(await page.locator("ul.snap-x li[data-id=T1]").isVisible().catch(() => false)) && await page.getByRole("button", { name: /^Chiudi/ }).first().isVisible().catch(() => false);
   if (!schedaAperta) await shot("05c-tre-scheda-non-aperta");
   await page.getByRole("button", { name: /^Chiudi/ }).first().click().catch(() => {});
   await page.waitForTimeout(900);
