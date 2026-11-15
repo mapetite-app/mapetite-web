@@ -87,7 +87,8 @@ export default async function InvitoPage({ params }: Props) {
             <span aria-hidden className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-accent-light text-4xl">💌</span>
           )}
           <h1 data-testid="invito-titolo" className="mt-4 font-title text-[1.6rem] font-semibold leading-tight text-text">
-            {giaAmici ? `Tu e ${name ?? "chi ti ha invitato"} siete già amici` : name ? `${name} ti ha invitato` : (codice && GENERICI[codice]) || "Ti hanno invitato su Mapetite"}
+            {/* Revisore 15/11: aprendo il proprio link non "<il tuo nome> ti ha invitato". */}
+            {proprio ? "Il tuo link d'invito" : giaAmici ? `Tu e ${name ?? "chi ti ha invitato"} siete già amici` : name ? `${name} ti ha invitato` : (codice && GENERICI[codice]) || "Ti hanno invitato su Mapetite"}
           </h1>
           {p && posti > 0 && (
             <p data-testid="invito-posti" className="mt-1.5 text-sm font-sans text-text-muted">

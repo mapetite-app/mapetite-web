@@ -8691,6 +8691,7 @@ else {
   await ictx.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialInv, invito: COD_AMICO })), url: BASE }]);
   await ip.goto(`${BASE}/invito/${COD_AMICO}`, { waitUntil: "networkidle" });
   ok((await ip.getByTestId("invito-accetta").count()) === 0 && ((await ip.getByTestId("invito-neutro").textContent()) ?? "").includes("il tuo link"), "invito: il proprio link non propone di diventare amico di se stessi");
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Il tuo link d'invito", `invito: aprendo il proprio link il titolo è 'Il tuo link d'invito' (${await ip.getByTestId("invito-titolo").textContent()})`);
   await ictx.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify(socialInv)), url: BASE }]);
   await ictx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
   await ip.evaluate((c) => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: c, t: Date.now() })), COD_AMICO);
