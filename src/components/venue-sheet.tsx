@@ -1,7 +1,7 @@
 "use client";
 
 import { tagLabel, isStateTag } from "@/lib/tags";
-import { X, Quote, Navigation, Globe, Phone, Check, Share, Share2, Footprints, CalendarCheck, Ellipsis, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck, ChevronRight, Sparkles } from "lucide-react";
+import { Lock, X, Quote, Navigation, Globe, Phone, Check, Share, Share2, Footprints, CalendarCheck, Ellipsis, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck, ChevronRight, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import Link from "next/link";
@@ -10,7 +10,8 @@ import { isUuid } from "@/lib/gruppi";
 import { bookingMakesSense } from "@/lib/bookable";
 import SchedaCarosello from "@/components/scheda-carosello";
 import AmiciQuiBox, { type FriendPerson } from "@/components/amici-qui-box";
-import { mapetiteShareUrl } from "@/lib/share-place";
+import { conConsigliatoDa, mapetiteShareUrl, mioNome, nomeNeiLinkAcceso, sceltaNomeFatta, setNomeNeiLink, type MioNome } from "@/lib/share-place";
+import { messaggioGrazie } from "@/lib/consigliato-da";
 import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -66,6 +67,10 @@ export type Venue = {
   matchReason: string | null;
   personalTags: string[] | null;
   personalNote: string | null;
+  // Proposta 58: chi te l'ha consigliato (solo sui salvati, privato).
+  consigliatoDa?: string | null;
+  // Proposta 59: lucchetto "Solo per me" (si cambia in Modifica).
+  soloPerMe?: boolean;
   photoRef?: string | null;
   orari?: Orari | null;
   photoAuthor?: string | null;
@@ -115,6 +120,8 @@ type VenueSheetProps = {
   nav?: { pos: number; total: number } | null;
   onNavPrev?: () => void;
   onNavNext?: () => void;
+  // Proposta 58: chi sta guardando (per leggere il proprio nome da mettere nei link condivisi).
+  userId?: string | null;
 };
 
 // "In breve" senza etichette quasi uguali ("intimo" e "esperienza intima", collaudo 23/10): un'etichetta
@@ -164,6 +171,7 @@ export default function VenueSheet({
   nav = null,
   onNavPrev,
   onNavNext,
+  userId = null,
 }: VenueSheetProps) {
   const {
     name,
@@ -187,6 +195,7 @@ export default function VenueSheet({
     personalTags,
     personalNote,
   } = venue;
+  const consigliatoDa = isSaved ? venue.consigliatoDa?.trim() || null : null;
   // Segnali di comportamento (percorso, chiama, sito, condividi): vedi src/lib/track.ts.
   // `da` distingue i tocchi della barra azioni in basso da quelli nel resto della scheda.
   const signal = (type: "percorso" | "chiama" | "sito" | "condividi", da?: string) =>
@@ -224,6 +233,27 @@ export default function VenueSheet({
   const shareOn = useBeta("condividi");
   const gem = useOptIn("gemme") && isGem(rating, userRatingCount, name);
   const [shareNote, setShareNote] = useState<string | null>(null);
+  // Proposta 58: il proprio nome per i link (letto all'apertura), la scelta del telefono e la riga dopo Condividi.
+  const [mio, setMio] = useState<MioNome | null>(null);
+  const [nomeAcceso, setNomeAcceso] = useState(true);
+  const [rigaNome, setRigaNome] = useState(false);
+  useEffect(() => {
+    if (!shareOn) return;
+    let vivo = true;
+    void mioNome(userId).then((m) => { if (vivo) { setMio(m); setNomeAcceso(nomeNeiLinkAcceso()); if (!sceltaNomeFatta()) setRigaNome(true); } });
+    return () => { vivo = false; };
+  }, [shareOn, userId]);
+  const cambiaNomeNeiLink = (acceso: boolean) => { setNomeNeiLink(acceso); setNomeAcceso(acceso); trackFeature("condividi_nome", { stato: acceso ? "si" : "no" }); };
+  // Revisore 15/11 (proposta 59): su un posto col lucchetto la riga non invita a condividerlo col proprio nome.
+  const rigaNomeLink = rigaNome && mio?.nelLink && !(isSaved && venue.soloPerMe) ? (
+    <span data-testid="condividi-nome" role="status" className="flex items-center gap-1 text-[13px] font-sans text-text">
+      <span>{nomeAcceso ? "Il link porta il tuo nome" : "Link senza nome"}</span>
+      <span aria-hidden>·</span>
+      <button type="button" data-testid="condividi-nome-cambia" onClick={() => cambiaNomeNeiLink(!nomeAcceso)} className="inline-flex min-h-11 min-w-11 items-center justify-center px-1 font-display font-semibold text-brand underline underline-offset-2">
+        {nomeAcceso ? "Togli" : "Metti il nome"}
+      </button>
+    </span>
+  ) : null;
   const [addressCopied, setAddressCopied] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(autoBook);
   // Scheda B: sezione aperta e menu "Altro".
@@ -267,8 +297,12 @@ export default function VenueSheet({
   const share = async () => {
     signal("condividi");
     // Link Mapetite (pagina pubblica con il verdetto); se non si può creare, Google Maps.
+    // Proposta 58: con il proprio primo nome ("da=Giulia"), già letto all'apertura della scheda, solo se il profilo
+    // è pubblico o si ha almeno un amico, e se non l'hai tolto ("Togli" qui sotto). Mai un'attesa in più al tocco.
     const mapetiteUrl = await mapetiteShareUrl({ ...venue, lat, lng });
-    const url = mapetiteUrl ?? mapsUrl;
+    const conNome = mapetiteUrl != null && mio?.nelLink === true;
+    const url = mapetiteUrl ? conConsigliatoDa(mapetiteUrl, conNome && nomeAcceso ? mio.nome : null) : mapsUrl;
+    if (conNome) { setRigaNome(true); if (!sceltaNomeFatta()) setNomeNeiLink(nomeAcceso); }
     const base = verdict?.trim() ? `${name} — ${verdict.trim()}` : name;
     const text = mapetiteUrl ? `${base} · su Mapetite` : base;
     try {
@@ -287,6 +321,27 @@ export default function VenueSheet({
         setTimeout(() => setShareNote(null), 4000);
       }
     }
+  };
+
+  // "Dillo a Giulia" (proposta 58): il messaggio pronto per chi te l'ha consigliato, dal foglio di condivisione
+  // del telefono o, senza, da WhatsApp. Nessun dato passa da noi: solo il segnale d'uso, senza nome né testo.
+  const dilloA = async (chi: string) => {
+    const piaciuto = personalTags?.includes("Mi è piaciuto") ?? false;
+    trackFeature("dillo_amico", { voto: piaciuto ? "su" : "altro" });
+    // Revisore 15/11 (secondo): con il link del posto il consiglio riporta l'amico su Mapetite. I salvati hanno già
+    // l'UUID: il link si scrive subito, senza attese che farebbero perdere il tocco su iPhone.
+    const url = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(venue.id) ? `${window.location.origin}/locali/${venue.id}` : null;
+    const text = messaggioGrazie(name, piaciuto);
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share(url ? { title: `Per ${chi}`, text, url } : { title: `Per ${chi}`, text });
+        return;
+      } catch (err) {
+        // Chiuso il foglio: niente. Altri errori (es. il telefono non accetta più il tocco): si passa a WhatsApp.
+        if (err instanceof DOMException && err.name === "AbortError") return;
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(url ? `${text}\n${url}` : text)}`, "_blank", "noopener,noreferrer");
   };
 
   const hasReviews = selectedReviews != null && selectedReviews.length > 0;
@@ -450,6 +505,20 @@ export default function VenueSheet({
         <p className={`font-display font-semibold uppercase text-accent ${editorial ? "text-[10.5px] tracking-[0.14em]" : "text-xs tracking-wide"}`}>
           Le tue note
         </p>
+        {/* Proposta 59: il lucchetto "Solo per me" (si cambia in Modifica). */}
+        {isSaved && venue.soloPerMe && (
+          <p data-testid="solo-per-me-scheda" className="mt-1.5 flex items-center gap-1.5 text-sm font-sans text-text-muted">
+            <Lock size={14} className="shrink-0 text-brand" aria-hidden />
+            <span>Solo per te: non lo vedono gli amici</span>
+          </p>
+        )}
+        {/* Proposta 58: chi te l'ha consigliato (dal link condiviso o scritto a mano in Modifica). */}
+        {consigliatoDa && (
+          <p data-testid="consigliato-scheda" className="mt-1.5 flex items-center gap-1.5 text-sm font-sans text-text-muted">
+            <UsersRound size={14} className="shrink-0 text-brand" aria-hidden />
+            <span className="min-w-0 truncate">Te l&apos;ha consigliato <span className="font-display font-semibold text-brand">{consigliatoDa}</span></span>
+          </p>
+        )}
         {withStatus && onVisitStatus && (
           <div className="mt-2 flex gap-2" data-testid="stato-salvato">
             {([["Da provare", "📌 Da provare"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => {
@@ -492,16 +561,32 @@ export default function VenueSheet({
                 );
               })}
             </div>
-            {/* Proposta 27: dal posto che ti è piaciuto, una ricerca con i suoi tratti (vedi altriCome in map-view). */}
-            {onAltriCome && !personalTags?.includes("Non fa per me") && (
-              <button
-                type="button"
-                data-testid="altri-come"
-                onClick={onAltriCome}
-                className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill border border-accent/40 bg-accent/5 px-4 text-sm font-display font-semibold text-accent active:scale-[0.98]"
-              >
-                ✨ Altri come questo
-              </button>
+            {/* Proposta 58 e 27: "Dillo a Giulia" e "Altri come questo" su una riga sola, metà ciascuno (revisore 15/11:
+                due tasti bordati uno sotto l'altro pesavano troppo). Da soli prendono tutta la riga. */}
+            {(consigliatoDa || (onAltriCome && !personalTags?.includes("Non fa per me"))) && (
+              <div className="mt-2 flex gap-2">
+                {consigliatoDa && (
+                  <button
+                    type="button"
+                    data-testid="dillo-amico"
+                    onClick={() => void dilloA(consigliatoDa)}
+                    className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-3 text-sm font-display font-semibold text-brand active:scale-[0.98]"
+                  >
+                    <Share2 size={15} className="shrink-0" aria-hidden />
+                    <span className="truncate">Dillo a {consigliatoDa.split(" ")[0]}</span>
+                  </button>
+                )}
+                {onAltriCome && !personalTags?.includes("Non fa per me") && (
+                  <button
+                    type="button"
+                    data-testid="altri-come"
+                    onClick={onAltriCome}
+                    className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-pill border border-accent/40 bg-accent/5 px-3 text-sm font-display font-semibold text-accent active:scale-[0.98]"
+                  >
+                    <span className="truncate">✨ {consigliatoDa ? "Altri così" : "Altri come questo"}</span>
+                  </button>
+                )}
+              </div>
             )}
             {/* Proposta CEO 20/10: ti è piaciuto un posto poco recensito? Un tocco per lasciare due righe su Google,
                 dove servono al locale (link pubblico di Google, nessun dato passa da noi). Non sui locali con 300 recensioni o più (non ne hanno bisogno). */}
@@ -802,6 +887,7 @@ export default function VenueSheet({
             )}
           </h2>
           {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
+          {rigaNomeLink}
           {(venue.businessStatus === "CLOSED_PERMANENTLY" || venue.businessStatus === "CLOSED_TEMPORARILY") && (
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <p data-testid="scheda-chiuso" className="inline-flex rounded-pill bg-[#33373d] px-2.5 py-1 text-[12.5px] font-semibold font-sans text-white">
@@ -1222,6 +1308,7 @@ export default function VenueSheet({
       {/* 1. HEADER */}
       <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
         {shareNote && <span role="status" className="rounded-pill bg-surface px-2.5 py-1 text-xs font-sans text-text shadow-card">{shareNote}</span>}
+        {rigaNomeLink && <span className="rounded-pill bg-surface px-2.5 shadow-card">{rigaNomeLink}</span>}
         {shareOn && (
           <button
             type="button"

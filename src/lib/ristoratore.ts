@@ -81,7 +81,7 @@ export function mostraPersone(n: number): string {
 }
 
 const DAY = 86_400_000;
-const STATO_VISITATO = "Già visitato";
+export const STATO_VISITATO = "Già visitato";
 const romeDay = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" });
 const romeHour = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", hourCycle: "h23" });
 const dayKey = (t: number | string): string => romeDay.format(new Date(t));

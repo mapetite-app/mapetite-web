@@ -4802,6 +4802,275 @@ else {
   await pctx.close();
 }
 
+// 13b. "Te l'ha consigliato Giulia" (proposta 58): il nome nel link (?da=), sulla pagina del locale, sul salvato,
+//      "Dillo a Giulia" dopo la visita e il filtro "Dagli amici". Supabase simulato, niente Google.
+{
+  let cd = null;
+  try { cd = await import(new URL("../../src/lib/consigliato-da.ts", import.meta.url).href); } catch (e) { ok(false, `consigliato da: modulo src/lib/consigliato-da.ts importabile (${e.message})`); }
+  if (cd) {
+    const { pulisciConsigliatoDa: pul, primoNome, messaggioGrazie, leggiCampoNome, stessoNome } = cd;
+    ok(pul("Giulia") === "Giulia" && pul("  Maria   Rosa ") === "Maria Rosa" && pul("D'Angelo") === "D'Angelo" && pul("Anna-Lisa") === "Anna-Lisa" && pul("Nicolò") === "Nicolò", "consigliato da: nomi veri accettati (spazi, apostrofo, trattino, accenti)");
+    ok([null, undefined, "", "   ", "<b>x</b>", "http://evil.it", "Giulia2", "a".repeat(41), "Giulia!", ["Giulia"]].every((v) => pul(v) === null), "consigliato da: parametro sporco, troppo lungo o non testuale ignorato");
+    ok(primoNome("Giulia Rossi") === "Giulia" && primoNome("  ") === null && primoNome(null) === null && primoNome("R2D2 Rossi") === null, "consigliato da: dal profilo solo il primo nome");
+    ok(messaggioGrazie("Da Enzo", true) === "Provato Da Enzo: avevi ragione, grazie del consiglio!" && messaggioGrazie("Da Enzo", false) === "Provato Da Enzo, grazie del consiglio!", "consigliato da: messaggio di ringraziamento neutro (niente 'Sono stato da Da…'), con e senza 👍");
+    const v1 = leggiCampoNome(""), v2 = leggiCampoNome("Marco"), v3 = leggiCampoNome("Giulia & Marco"), v4 = leggiCampoNome("Marco 2");
+    ok(v1.valido && v1.nome === null && v2.valido && v2.nome === "Marco" && !v3.valido && !v4.valido, "consigliato da: campo vuoto = togli, cifre o simboli = non valido (mai null in silenzio)");
+    ok(stessoNome("Nicolò", "nicolo") && !stessoNome("Giulia", "Marco") && !stessoNome(null, "Giulia"), "consigliato da: confronto con il proprio nome senza maiuscole e accenti");
+  }
+}
+if (!fakeUser) console.log("SKIP  consigliato da: dev server senza E2E_FAKE_USER");
+else {
+  // Profilo finto di chi guarda: risposta come oggetto (maybeSingle) o come lista, secondo l'intestazione.
+  const profiloFinto = (get) => (r) => {
+    const riga = get();
+    const comeOggetto = (r.request().headers()["accept"] ?? "").includes("vnd.pgrst.object");
+    if (comeOggetto) return riga ? r.fulfill({ json: riga }) : r.fulfill({ status: 406, json: { code: "PGRST116", message: "0 rows" } });
+    return r.fulfill({ json: riga ? [riga] : [] });
+  };
+  const altezza44 = async (loc) => { const b = await loc.boundingBox().catch(() => null); return b != null && b.height >= 44; };
+  const LOC_CD = "44444444-0000-4000-8000-000000000058";
+  const localeCd = { place: { id: LOC_CD, name: "Trattoria del Vicolo", address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469, category: "restaurant", rating: 4.6, price_level: 2, google_place_id: "GVICOLO58" }, synthesis: null };
+  const dctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await dctx.addCookies([{ name: "e2e_locale", value: encodeURIComponent(JSON.stringify(localeCd)), url: BASE }, { name: "e2e_anonimo", value: "1", url: BASE }]);
+  await dctx.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  let mioProfilo = null;
+  await dctx.route("**/rest/v1/profiles**", profiloFinto(() => mioProfilo));
+  await dctx.route("**/rest/v1/follows**", (r) => r.fulfill({ json: [] }));
+  const inserts = [];
+  let patches = [];
+  let dup = false;
+  await dctx.route("**/rest/v1/saved_places**", (r) => {
+    const m = r.request().method();
+    if (m === "POST") { inserts.push(r.request().postDataJSON()); return dup ? r.fulfill({ status: 409, json: { code: "23505", message: "duplicate key" } }) : r.fulfill({ status: 201, body: "" }); }
+    if (m === "PATCH") { patches.push({ body: r.request().postDataJSON(), url: decodeURIComponent(r.request().url()) }); return r.fulfill({ status: 204, body: "" }); }
+    return r.fulfill({ json: [] });
+  });
+  const dp = await dctx.newPage();
+  dp.on("pageerror", (e) => errors.push(e.message));
+  const salvaPubblico = async () => {
+    await dp.getByRole("button", { name: "📌 Salva in Mapetite" }).click();
+    await dp.getByTestId("salvato-pubblico").waitFor({ timeout: 4000 }).catch(() => {});
+  };
+  // Da disconnessi: l'invito dice chi l'ha consigliato e il ritorno dopo la registrazione tiene il nome.
+  await dp.goto(`${BASE}/locali/${LOC_CD}?da=Giulia`, { waitUntil: "networkidle" });
+  ok(((await dp.getByTestId("invito-titolo").textContent().catch(() => "")) ?? "").trim() === "Giulia ti ha consigliato Trattoria del Vicolo", `consigliato da: link con ?da=Giulia → "Giulia ti ha consigliato…" (${await dp.getByTestId("invito-titolo").textContent().catch(() => "assente")})`);
+  ok(await dp.getByRole("link", { name: "📌 Salva in Mapetite" }).getAttribute("href") === `/signup?next=${encodeURIComponent(`/locali/${LOC_CD}?salva=1&da=Giulia`)}` && await dp.getByTestId("invito-accedi").getByRole("link", { name: "Hai già un account? Accedi" }).getAttribute("href") === `/login?next=${encodeURIComponent(`/locali/${LOC_CD}?salva=1&da=Giulia`)}`, "consigliato da: login e registrazione riportano al locale con il nome");
+  await dp.screenshot({ path: `${OUT}/52-consigliato-invito.png`, caret: "initial" });
+  for (const sporco of ["%3Cscript%3Ealert(1)%3C%2Fscript%3E", "http%3A%2F%2Fevil.it", "Giulia2", "a".repeat(50)]) {
+    await dp.goto(`${BASE}/locali/${LOC_CD}?da=${sporco}`, { waitUntil: "networkidle" });
+    ok(((await dp.getByTestId("invito-titolo").textContent().catch(() => "")) ?? "").trim() === "Ti hanno consigliato Trattoria del Vicolo?" && !((await dp.getByRole("link", { name: "📌 Salva in Mapetite" }).getAttribute("href")) ?? "").includes("da%3D"), `consigliato da: parametro sporco ignorato (${sporco.slice(0, 24)})`);
+  }
+  // Da collegati: la riga "Te l'ha consigliato Giulia" sopra Salva; salvando il nome va sul salvato.
+  await dctx.clearCookies({ name: "e2e_anonimo" });
+  mioProfilo = { display_name: "Luca Bianchi", is_public: true };
+  await dp.goto(`${BASE}/locali/${LOC_CD}?salva=1&da=Giulia`, { waitUntil: "networkidle" });
+  await dp.getByTestId("consigliato-riga").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(((await dp.getByTestId("consigliato-riga").textContent().catch(() => "")) ?? "").includes("Te l'ha consigliato Giulia") && (await dp.getByTestId("invito-mapetite").count()) === 0, "consigliato da: da collegati la riga 'Te l'ha consigliato Giulia' sopra Salva");
+  ok(await altezza44(dp.getByTestId("consigliato-cambia")) && await altezza44(dp.getByTestId("consigliato-togli")) && ((await dp.getByTestId("consigliato-togli").boundingBox())?.width ?? 0) >= 44, "consigliato da: 'Cambia' e ✕ alti almeno 44 px (la ✕ anche larga 44)");
+  await dp.screenshot({ path: `${OUT}/53-consigliato-salva.png`, caret: "initial" });
+  await salvaPubblico();
+  ok(inserts.at(-1)?.consigliato_da === "Giulia" && inserts.at(-1)?.place_id === LOC_CD && JSON.stringify(inserts.at(-1)?.tags) === '["Da provare"]', `consigliato da: salvando, consigliato_da = Giulia (${JSON.stringify(inserts.at(-1))})`);
+  // "Cambia": lo decide chi salva. Un nome con cifre o simboli non cancella quello di prima.
+  await dp.goto(`${BASE}/locali/${LOC_CD}?da=Giulia`, { waitUntil: "networkidle" });
+  await dp.getByTestId("consigliato-riga").waitFor({ timeout: 4000 }).catch(() => {});
+  await dp.getByTestId("consigliato-cambia").click().catch(() => {});
+  const campo = dp.getByTestId("consigliato-campo");
+  ok(await altezza44(campo.locator("input")) && await altezza44(campo.getByRole("button", { name: "OK" })), "consigliato da: campo e OK alti almeno 44 px");
+  await campo.locator("input").fill("Marco 2").catch(() => {});
+  await campo.locator("input").press("Enter").catch(() => {});
+  ok(((await dp.getByTestId("consigliato-errore").textContent().catch(() => "")) ?? "").includes("Solo lettere, massimo 40") && await campo.isVisible(), "consigliato da: 'Marco 2' → 'Solo lettere, massimo 40', il campo resta aperto");
+  await dp.screenshot({ path: `${OUT}/53b-consigliato-nome-non-valido.png`, caret: "initial" });
+  // Revisore 15/11 (secondo): "Marco 2" scritto e Salva toccato subito (senza OK) non deve salvare in silenzio.
+  await campo.locator("input").fill("Marco 2").catch(() => {});
+  const primaNonValido = inserts.length;
+  await dp.getByRole("button", { name: "📌 Salva in Mapetite" }).click().catch(() => {});
+  await dp.waitForTimeout(600);
+  ok(inserts.length === primaNonValido && ((await dp.getByTestId("consigliato-errore").textContent().catch(() => "")) ?? "").includes("Solo lettere") && (await dp.getByTestId("salvato-pubblico").count()) === 0, `consigliato da: nome non valido e Salva senza OK → non salva, l'errore resta in vista (${inserts.length - primaNonValido} salvataggi)`);
+  await dp.goto(`${BASE}/locali/${LOC_CD}?da=Giulia`, { waitUntil: "networkidle" });
+  await dp.getByTestId("consigliato-riga").waitFor({ timeout: 4000 }).catch(() => {});
+  await dp.getByTestId("consigliato-cambia").click().catch(() => {});
+  await dp.getByTestId("consigliato-campo").locator("input").fill("Marco").catch(() => {});
+  await dp.getByTestId("consigliato-campo").locator("input").press("Enter").catch(() => {});
+  ok(((await dp.getByTestId("consigliato-riga").textContent().catch(() => "")) ?? "").includes("Marco"), "consigliato da: 'Cambia' mette un altro nome");
+  await salvaPubblico();
+  ok(inserts.at(-1)?.consigliato_da === "Marco", "consigliato da: salvando dopo 'Cambia' resta il nome scelto");
+  // ✕: si salva senza nome.
+  await dp.goto(`${BASE}/locali/${LOC_CD}?da=Giulia`, { waitUntil: "networkidle" });
+  await dp.getByTestId("consigliato-riga").waitFor({ timeout: 4000 }).catch(() => {});
+  await dp.getByTestId("consigliato-togli").click().catch(() => {});
+  ok((await dp.getByTestId("consigliato-riga").count()) === 0, "consigliato da: la ✕ toglie la riga");
+  await salvaPubblico();
+  ok(inserts.at(-1) != null && !("consigliato_da" in inserts.at(-1)), "consigliato da: tolto il nome, si salva senza");
+  // Il proprio link: "Giulia" che apre ?da=Giulia non vede sé stessa e non la salva.
+  mioProfilo = { display_name: "Giulia Rossi", is_public: true };
+  await dp.goto(`${BASE}/locali/${LOC_CD}?da=Giulia`, { waitUntil: "networkidle" });
+  await dp.waitForTimeout(500);
+  ok((await dp.getByTestId("consigliato-riga").count()) === 0, "consigliato da: chi apre il proprio link non vede 'Te l'ha consigliato' sé stesso");
+  await salvaPubblico();
+  ok(inserts.at(-1) != null && !("consigliato_da" in inserts.at(-1)), "consigliato da: il proprio nome non si salva");
+  // Omonimo (Giulia consigliata da un'altra Giulia): la riga chiede "Sì" invece di sparire; con Sì il nome si salva.
+  await dp.goto(`${BASE}/locali/${LOC_CD}?da=Giulia`, { waitUntil: "networkidle" });
+  await dp.getByTestId("consigliato-chiedi").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(((await dp.getByTestId("consigliato-chiedi").textContent().catch(() => "")) ?? "").includes("Te l'ha consigliato Giulia?"), "consigliato da: con lo stesso nome la riga chiede 'Te l'ha consigliato Giulia? Sì'");
+  const siBox = await dp.getByTestId("consigliato-si").boundingBox().catch(() => null);
+  ok(siBox != null && siBox.height >= 44 && siBox.width >= 44, `consigliato da: 'Sì' toccabile per 44px (${siBox?.width}x${siBox?.height})`);
+  await dp.getByTestId("consigliato-si").click().catch(() => {});
+  ok((await dp.getByTestId("consigliato-riga").count()) === 1, "consigliato da: dopo 'Sì' la riga normale con Cambia e ✕");
+  await salvaPubblico();
+  ok(inserts.at(-1)?.consigliato_da === "Giulia", "consigliato da: omonimo, dopo 'Sì' il nome si salva");
+  mioProfilo = null;
+  // Già salvato (23505): il nome si aggiunge solo se il campo era vuoto.
+  dup = true; patches = [];
+  await dp.goto(`${BASE}/locali/${LOC_CD}?da=Giulia`, { waitUntil: "networkidle" });
+  await salvaPubblico();
+  await dp.waitForTimeout(300);
+  ok(((await dp.getByTestId("salvato-pubblico").textContent().catch(() => "")) ?? "").includes("È già tra i tuoi salvati") && patches.length === 1 && patches[0].body?.consigliato_da === "Giulia" && patches[0].url.includes("consigliato_da=is.null"), `consigliato da: già salvato, il nome si scrive solo se mancava (${JSON.stringify(patches)})`);
+  await dctx.close();
+
+  // Salvati: etichetta in card, riga nella scheda, Modifica, "Dillo a Giulia", filtro "Dagli amici", nome nel link.
+  const pz = (n, name) => ({ id: `00000000-0000-4000-8000-0000000058${n}`, name, category: "restaurant", address: "Via di Prova 1, 00153 Roma RM, Italy", lat: 41.889 + Number(n) * 0.001, lng: 12.469, google_place_id: `GCD${n}`, rating: 4.4, price_level: 2 });
+  let rowsD = [
+    { created_at: "2026-11-01T10:00:00Z", tags: ["Da provare"], note: null, consigliato_da: "Giulia", places: pz("01", "Da Enzo al 29") },
+    { created_at: "2026-11-02T10:00:00Z", tags: ["Da provare"], note: null, consigliato_da: null, solo_per_me: true, places: pz("02", "Osteria Mia") },
+    { created_at: "2026-11-03T10:00:00Z", tags: ["Già visitato"], note: null, consigliato_da: null, places: pz("03", "Bar Sotto") },
+  ];
+  const sctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const evD = [];
+  await sctx2.route("**/api/events", (r) => { evD.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await sctx2.route("**/api/places/add", (r) => r.fulfill({ json: { place: { id: "00000000-0000-4000-8000-000000005801" } } }));
+  for (const t of ["place_synthesis", "contenuti_locali", "foto_locali"]) await sctx2.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+  let mioProfilo2 = { display_name: "Luca Bianchi", is_public: true };
+  let amici2 = [];
+  await sctx2.route("**/rest/v1/profiles**", profiloFinto(() => mioProfilo2));
+  await sctx2.route("**/rest/v1/follows**", (r) => r.fulfill({ json: amici2 }));
+  const patchD = [];
+  await sctx2.route("**/rest/v1/saved_places**", (r) => {
+    const m = r.request().method();
+    if (m === "PATCH") { patchD.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); }
+    if (m !== "GET") return r.fulfill({ status: 204, body: "" });
+    const u = decodeURIComponent(r.request().url());
+    if (u.includes("select=place_id")) return r.fulfill({ json: rowsD.map((x) => ({ place_id: x.places.id })) });
+    if (u.includes("places(")) return r.fulfill({ json: rowsD });
+    return r.fulfill({ json: [] });
+  });
+  const sd = await sctx2.newPage();
+  sd.on("pageerror", (e) => errors.push(e.message));
+  await sd.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" }).catch(() => {});
+  const Ld = sd.getByTestId("salvati-lista");
+  await Ld.waitFor({ timeout: 8000 }).catch(() => {});
+  await sd.waitForTimeout(800);
+  ok((await Ld.getByTestId("salvato-solo-per-me").count()) === 1 && (await Ld.getByTestId("salvato-riga").filter({ hasText: "Osteria Mia" }).getByTestId("salvato-solo-per-me").count()) === 1, "solo per me: il lucchetto sulla card del posto con solo_per_me (proposta 59)");
+  ok(JSON.stringify(await Ld.getByTestId("salvato-consigliato").allTextContents()) === '["da Giulia"]' && (await Ld.getByTestId("salvato-riga").filter({ hasText: "Da Enzo al 29" }).getByTestId("salvato-consigliato").count()) === 1, `card dei salvati: micro-etichetta 'da Giulia' accanto allo stato, solo dove c'è il nome (${JSON.stringify(await Ld.getByTestId("salvato-consigliato").allTextContents())})`);
+  const amiciBtn = Ld.getByTestId("salvati-amici");
+  ok(await amiciBtn.isVisible().catch(() => false) && ((await amiciBtn.textContent()) ?? "").trim() === "Dagli amici 1", `dagli amici: pillola 'Dagli amici 1' con un salvato consigliato (${await amiciBtn.textContent().catch(() => "assente")})`);
+  await amiciBtn.click().catch(() => {});
+  await sd.waitForTimeout(300);
+  const nomiD = await Ld.getByTestId("salvato-riga").locator("span.block.truncate").allTextContents();
+  ok(nomiD.length === 1 && nomiD[0] === "Da Enzo al 29" && (await amiciBtn.getAttribute("aria-pressed").catch(() => null)) === "true", `dagli amici: acceso, solo i posti consigliati (${nomiD.join(", ")})`);
+  await sd.screenshot({ path: `${OUT}/54-salvati-dagli-amici.png`, caret: "initial" });
+  await Ld.getByTestId("salvato-riga").filter({ hasText: "Da Enzo al 29" }).click().catch(() => {});
+  await sd.getByTestId("tue-note").waitFor({ timeout: 5000 }).catch(() => {});
+  ok(((await sd.getByTestId("consigliato-scheda").textContent().catch(() => "")) ?? "").includes("Te l'ha consigliato Giulia") && (await sd.getByTestId("dillo-amico").count()) === 0, "consigliato da: nella scheda del salvato 'Te l'ha consigliato Giulia', 'Dillo a' solo dopo la visita");
+  await sd.getByTestId("consigliato-scheda").scrollIntoViewIfNeeded().catch(() => {});
+  await sd.screenshot({ path: `${OUT}/55-scheda-consigliato.png`, caret: "initial" });
+  // Condividi con il nome (profilo pubblico): link con da=Luca, riga "Il link porta il tuo nome · Togli".
+  ok(((await sd.getByTestId("condividi-nome").textContent().catch(() => "")) ?? "").includes("Il link porta il tuo nome"), "condividi: mai scelto, la riga 'Il link porta il tuo nome · Togli' si vede già prima del primo link");
+  await sd.evaluate(() => { window.__condiviso = []; navigator.share = async (d) => { window.__condiviso.push(d); }; });
+  const condividi = sd.getByLabel("Condividi Da Enzo al 29").first();
+  await condividi.click().catch(() => {});
+  await sd.waitForFunction(() => window.__condiviso.length >= 1, null, { timeout: 4000 }).catch(() => {});
+  const url1 = (await sd.evaluate(() => window.__condiviso[0]?.url)) ?? "";
+  ok(url1.endsWith("/locali/00000000-0000-4000-8000-000000005801?da=Luca"), `condividi: con profilo pubblico il link porta il primo nome (${url1})`);
+  ok(await sd.evaluate(() => { try { return localStorage.getItem("mapetite.condividi.nome"); } catch { return null; } }) === "si", "condividi: dopo il primo link la scelta è segnata (la riga non resta fissa nelle schede dopo)");
+  const rigaN = sd.getByTestId("condividi-nome");
+  ok(((await rigaN.textContent().catch(() => "")) ?? "").includes("Il link porta il tuo nome") && await altezza44(sd.getByTestId("condividi-nome-cambia")), "condividi: riga 'Il link porta il tuo nome · Togli' (tocco da 44 px)");
+  await sd.screenshot({ path: `${OUT}/55b-condividi-con-nome.png`, caret: "initial" });
+  await sd.getByTestId("condividi-nome-cambia").click().catch(() => {});
+  ok(((await rigaN.textContent().catch(() => "")) ?? "").replace(/\s+/g, "") === "Linksenzanome·Mettiilnome", "condividi: dopo 'Togli' la riga dice 'Link senza nome · Metti il nome'");
+  await condividi.click().catch(() => {});
+  await sd.waitForFunction(() => window.__condiviso.length >= 2, null, { timeout: 4000 }).catch(() => {});
+  const url2 = (await sd.evaluate(() => window.__condiviso[1]?.url)) ?? "";
+  ok(url2 !== "" && !url2.includes("da="), `condividi: dopo 'Togli' il link esce senza nome (${url2})`);
+  ok(await sd.evaluate(() => { try { return localStorage.getItem("mapetite.condividi.nome"); } catch { return null; } }) === "no", "condividi: la scelta resta sul telefono");
+  await sd.getByTestId("condividi-nome-cambia").click().catch(() => {});
+  // "Dillo a Giulia" dopo "Ci sono stato".
+  await sd.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click().catch(() => {});
+  await sd.getByTestId("diario-foglio").waitFor({ timeout: 4000 }).then(() => sd.getByTestId("diario-salta").click(), () => {});
+  await sd.getByTestId("com-era").waitFor({ timeout: 4000 }).catch(() => {});
+  const dillo = sd.getByTestId("dillo-amico");
+  ok(await dillo.isVisible().catch(() => false) && ((await dillo.textContent()) ?? "").trim() === "Dillo a Giulia", "consigliato da: dopo 'Ci sono stato', in 'Com'era?' il tasto 'Dillo a Giulia'");
+  await sd.getByTestId("com-era").getByRole("button", { name: "👍 Mi è piaciuto" }).click().catch(() => {});
+  await sd.waitForTimeout(400);
+  await sd.evaluate(() => { window.__grazie = null; navigator.share = async (d) => { window.__grazie = d; }; });
+  await dillo.scrollIntoViewIfNeeded().catch(() => {});
+  await sd.screenshot({ path: `${OUT}/56-dillo-a-giulia.png`, caret: "initial" });
+  await dillo.click().catch(() => {});
+  await sd.waitForFunction(() => window.__grazie != null, null, { timeout: 3000 }).catch(() => {});
+  const grazie = await sd.evaluate(() => window.__grazie);
+  {
+    const bd = await dillo.boundingBox().catch(() => null), ba = await sd.getByTestId("altri-come").boundingBox().catch(() => null);
+    ok(bd != null && ba != null && Math.abs(bd.y - ba.y) < 2 && bd.height >= 44 && ba.height >= 44 && bd.x + bd.width <= ba.x, `consigliato da: 'Dillo a Giulia' e 'Altri così' sulla stessa riga, 44px (${JSON.stringify([bd, ba])})`);
+  }
+  ok(grazie?.text === "Provato Da Enzo al 29: avevi ragione, grazie del consiglio!", `consigliato da: 'Dillo a Giulia' con 👍, messaggio neutro "Provato …: avevi ragione" (${grazie?.text ?? "nessuno"})`);
+  await sd.waitForTimeout(300);
+  ok(evD.some((e) => e?.type === "funzione" && e.props?.nome === "dillo_amico" && e.props?.voto === "su") && droppedKeys(evD.filter((e) => ["dillo_amico", "salvati_amici", "condividi_nome"].includes(e?.props?.nome))).length === 0, "consigliato da: segnali 'dillo_amico', 'salvati_amici' e 'condividi_nome' con chiavi accettate dal server");
+  // Senza foglio di condivisione: WhatsApp con il messaggio (qui senza 👍: solo il grazie).
+  await sd.getByTestId("com-era").getByRole("button", { name: "👍 Mi è piaciuto" }).click().catch(() => {});
+  await sd.waitForTimeout(400);
+  await sd.evaluate(() => { navigator.share = undefined; window.__aperto = null; window.open = (u) => { window.__aperto = u; return null; }; });
+  await dillo.click().catch(() => {});
+  const aperto = await sd.evaluate(() => window.__aperto);
+  ok((aperto ?? "").startsWith("https://wa.me/?text=") && /^Provato Da Enzo al 29, grazie del consiglio!(\nhttps?:\/\/[^\s]+\/locali\/[0-9a-f-]{36})?$/.test(decodeURIComponent(aperto.split("text=")[1] ?? "")), `consigliato da: senza foglio di condivisione si apre WhatsApp, senza 👍 solo il grazie (${aperto ?? "nessuno"})`);
+  // Modifica: etichetta visibile; un nome non valido non si salva; vuoto toglie il nome.
+  await sd.getByTestId("tue-note").getByRole("button", { name: "Modifica", exact: true }).click().catch(() => {});
+  const campoM = sd.getByTestId("consigliato-modifica");
+  await campoM.waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await campoM.inputValue().catch(() => "") === "Giulia" && await sd.locator("label").filter({ has: campoM }).getByText("Te l'ha consigliato", { exact: true }).isVisible().catch(() => false), "modifica: etichetta visibile 'Te l'ha consigliato' sopra il campo con il nome");
+  patchD.length = 0;
+  await campoM.fill("Giulia & Marco").catch(() => {});
+  const salvaM = sd.getByRole("button", { name: /^(Salva|Fatto)$/ }).last();
+  await salvaM.click().catch(() => {});
+  await sd.waitForTimeout(400);
+  ok(((await sd.getByTestId("consigliato-errore").textContent().catch(() => "")) ?? "").includes("Solo lettere, massimo 40") && patchD.length === 0 && await campoM.isVisible().catch(() => false), `modifica: 'Giulia & Marco' non si salva e non cancella il nome, lo dice (${JSON.stringify(patchD)})`);
+  await sd.screenshot({ path: `${OUT}/57-modifica-nome-non-valido.png`, caret: "initial" });
+  await campoM.fill("").catch(() => {});
+  await salvaM.click().catch(() => {});
+  await sd.waitForTimeout(500);
+  ok(patchD.length === 1 && "consigliato_da" in patchD[0] && patchD[0].consigliato_da === null && (await sd.getByTestId("consigliato-scheda").count()) === 0, `modifica: campo vuoto toglie il nome (${JSON.stringify(patchD)})`);
+  ok(!("solo_per_me" in (patchD[0] ?? {})), "solo per me: senza toccare il lucchetto non si scrive");
+  // Proposta 59: "Solo per me" in Modifica, poi la riga nella scheda.
+  { patchD.length = 0;
+    ok((await sd.getByTestId("solo-per-me-scheda").count()) === 0, "solo per me: senza lucchetto nessuna riga nella scheda");
+    await sd.getByTestId("tue-note").getByRole("button", { name: "Modifica", exact: true }).click().catch(() => {});
+    const sw = sd.getByTestId("solo-per-me");
+    await sw.waitFor({ timeout: 4000 }).catch(() => {});
+    const bx = await sw.boundingBox().catch(() => null);
+    ok((await sw.getAttribute("aria-checked")) === "false" && bx != null && bx.height >= 44, `solo per me: in Modifica l'interruttore spento, alto 44px (${bx?.height})`);
+    await sw.click().catch(() => {});
+    await sw.scrollIntoViewIfNeeded().catch(() => {});
+    await sd.screenshot({ path: `${OUT}/57b-solo-per-me-modifica.png`, caret: "initial" });
+    await sd.getByRole("button", { name: /^(Salva|Fatto)$/ }).last().click().catch(() => {});
+    await sd.waitForTimeout(500);
+    ok(patchD.length === 1 && patchD[0].solo_per_me === true, `solo per me: acceso e salvato (${JSON.stringify(patchD)})`);
+    ok(((await sd.getByTestId("solo-per-me-scheda").textContent().catch(() => "")) ?? "").includes("Solo per te"), "solo per me: nella scheda 'Solo per te: non lo vedono gli amici'"); }
+  // Profilo privato e nessun amico: il link esce senza nome e senza riga.
+  mioProfilo2 = { display_name: "Luca Bianchi", is_public: false }; amici2 = [];
+  rowsD = rowsD.map((x) => ({ ...x, consigliato_da: null }));
+  await sd.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" }).catch(() => {});
+  await Ld.waitFor({ timeout: 8000 }).catch(() => {});
+  await sd.waitForTimeout(800);
+  ok((await Ld.getByTestId("salvato-riga").count()) === 3 && (await Ld.getByTestId("salvati-amici").count()) === 0 && (await Ld.getByTestId("salvato-consigliato").count()) === 0, "dagli amici: senza consigli niente pillola né etichette");
+  await Ld.getByTestId("salvato-riga").filter({ hasText: "Osteria Mia" }).click().catch(() => {});
+  await sd.getByTestId("tue-note").waitFor({ timeout: 5000 }).catch(() => {});
+  await sd.waitForTimeout(400);
+  await sd.evaluate(() => { window.__condiviso = []; navigator.share = async (d) => { window.__condiviso.push(d); }; });
+  await sd.getByLabel("Condividi Osteria Mia").first().click().catch(() => {});
+  await sd.waitForFunction(() => window.__condiviso.length >= 1, null, { timeout: 4000 }).catch(() => {});
+  const url3 = (await sd.evaluate(() => window.__condiviso[0]?.url)) ?? "";
+  ok(url3 !== "" && !url3.includes("da=") && (await sd.getByTestId("condividi-nome").count()) === 0, `condividi: profilo privato e nessun amico, link senza nome e nessuna riga (${url3})`);
+  await sctx2.close();
+}
+
 // 14. Social (piano 5.1–5.4): profilo pubblico, mappa di una persona, Amici, "N amici ci sono stati".
 //     Il server legge i dati finti dal cookie "e2e_social"; senza cookie la parte social è "in arrivo"
 //     (come in produzione finché la migrazione 20261015_social non è applicata).
@@ -7409,7 +7678,7 @@ else {
   ];
   await setCookie("e2e_prenotazioni", prenR);
   await setCookie("e2e_ristoratore", {
-    locale: Lr, simili: [Lr], verificato: true, salvati: [],
+    locale: Lr, simili: [Lr], verificato: true, salvati: [], passaparola: 2,
     eventi: [
       { created_at: iso(60), type: "ricerca", user_id: null, anon_id: "x1", session_id: "s1", place_id: null, google_place_id: null, props: { modo: "ai", tipo: "trattoria", requisiti: ["non turistico"], zona: "Pigneto" } },
       { created_at: iso(59), type: "apri_scheda", user_id: null, anon_id: "x1", session_id: "s1", place_id: null, google_place_id: "GOSTERIA", props: { fonte: "ricerca" } },
@@ -7418,6 +7687,7 @@ else {
   });
   { const r = await rp.goto(`${BASE}/ristoratore/${LOC}`, { waitUntil: "networkidle" });
     ok(r?.status() === 200 && await rp.getByTestId("pannello-pochi-dati").isVisible() && (await rp.getByTestId("pannello-azioni").textContent())?.includes("meno di 3") && (await rp.getByTestId("pannello-demo-etichetta").count()) === 0 && await rp.getByTestId("pannello-andamento-nascosto").isVisible(), "pannello ristoratore: dati veri, pochi → 'dati ancora pochi', 'meno di 3' e niente curva giornaliera");
+    ok((await rp.getByTestId("pannello-passaparola").count()) === 0, "pannello ristoratore: 'Da un amico' sotto 3 persone non si mostra (proposta 58)");
     ok((await rp.getByTestId("pannello-richieste-locale").textContent())?.includes("non turistico") && await rp.getByTestId("pannello-verificato").isVisible(), "pannello ristoratore: 'come ti trovano' con le richieste della ricerca");
     await rp.goto(`${BASE}/ristoratore/${LOC}?beta=-tavoli`, { waitUntil: "networkidle" });
     ok((await rp.getByTestId("pannello-tavoli").count()) === 0, "pannello ristoratore: 'tavoli da Mapetite' si spegne con ?beta=-tavoli");
@@ -7479,6 +7749,7 @@ else {
     const box = await lab.boundingBox();
     ok(r?.status() === 200 && (await lab.textContent())?.includes("Esempio dimostrativo") && !!box && box.y < 200, "pannello demo: etichetta 'Esempio dimostrativo' in cima");
     { const t = ((await rp.getByTestId("pannello-in-attesa").innerText()) ?? "").replace(/\s+/g, " ");
+      ok(t.includes("🗣️ Da un amico · 6") && (await rp.getByTestId("pannello-passaparola").count()) === 1, `pannello demo: tra chi vuole provarti 'Da un amico · 6' (proposta 58) (${t.slice(0, 140)})`);
       ok(t.includes("31 ti vogliono provare") && t.includes("Con amici · 9") && t.includes("Romantico · 7") && t.includes("Cena di lavoro · 3"), `pannello demo: 'ti vogliono provare' con le occasioni (${t.slice(0, 120)})`);
       ok(((await rp.getByTestId("pannello-visite-vere").innerText()) ?? "").replace(/\s+/g, " ").match(/👍 10 è piaciuto su 11/) !== null, "pannello demo: visite vere con il 'Com'è andata?' (👍 10 è piaciuto, su 11)");
       { const d = ((await rp.getByTestId("pannello-disdette").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");

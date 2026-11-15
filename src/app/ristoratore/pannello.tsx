@@ -364,6 +364,7 @@ export default function Pannello({
   vista,
   serate = { giorni: [], at: null },
   prenotazioni = null,
+  passaparola = 0,
 }: {
   p: PannelloRistoratore;
   locale: RistLocale;
@@ -375,6 +376,8 @@ export default function Pannello({
   vista?: string;
   serate?: { giorni: number[]; at: string | null; apertoDal?: string | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
   prenotazioni?: { tavoli: number; diParola: number; persone: number; personeParola: number } | null;
+  // Proposta 58: tra chi ti vuole provare, quanti l'hanno salvato su consiglio di un amico. Solo il numero, mai chi.
+  passaparola?: number;
 }) {
   const categoria = categoryLabel(locale.category);
   const az = (t: Azione["tipo"]) => p.azioni.find((a) => a.tipo === t)!;
@@ -410,8 +413,12 @@ export default function Pannello({
           {attesa.persone > 0 && (
             <p className="mt-0.5 text-xs font-sans text-white/65">ti hanno salvato e non sono ancora venuti</p>
           )}
-          {attesa.occasioni.some((o) => o.persone >= SOGLIA) && (
+          {(attesa.occasioni.some((o) => o.persone >= SOGLIA) || passaparola >= SOGLIA) && (
             <p className="mt-2 flex flex-wrap gap-1.5" aria-label="Per quale occasione">
+              {/* Proposta 58: il passaparola che si vede, tra chi ti vuole provare. Sotto SOGLIA non si scrive (si riconoscerebbe chi). */}
+              {passaparola >= SOGLIA && (
+                <span data-testid="pannello-passaparola" className="rounded-pill bg-accent px-2.5 py-0.5 text-xs font-display font-semibold">🗣️ Da un amico · {passaparola}</span>
+              )}
               {attesa.occasioni.filter((o) => o.persone >= SOGLIA).map((o) => (
                 <span key={o.chiave} className="rounded-pill bg-white/15 px-2.5 py-0.5 text-xs font-display font-semibold">{o.chiave} · {o.persone}</span>
               ))}

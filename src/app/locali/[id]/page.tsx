@@ -12,6 +12,7 @@ import SalvaLocale from "./salva-locale";
 import AmiciQui from "./amici-qui";
 import CommunityLocale from "@/components/community-locale";
 import { safeNext } from "@/lib/next-path";
+import { pulisciConsigliatoDa } from "@/lib/consigliato-da";
 import {
   cleanList,
   currentUserId,
@@ -68,9 +69,15 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
   const userId = await currentUserId();
   // Ritorno dopo accesso/registrazione: di nuovo qui, con "salva=1" per evidenziare il pulsante
   // (il salvataggio resta un tocco esplicito). La foto si tiene se il percorso non diventa troppo lungo.
+  // Proposta 58: chi l'ha consigliato (?da=Giulia, ripulito: solo un nome) resta anche nel ritorno.
+  const daParam = Array.isArray(sp.da) ? sp.da[0] : sp.da;
+  const consigliatoDa = pulisciConsigliatoDa(daParam);
+  const daQuery = consigliatoDa ? `&da=${encodeURIComponent(consigliatoDa)}` : "";
   const backBase = `/locali/${place.id}?salva=1`;
   const returnPath =
-    (photoRef ? safeNext(`${backBase}&foto=${encodeURIComponent(photoRef)}`) : null) ?? backBase;
+    (photoRef ? safeNext(`${backBase}&foto=${encodeURIComponent(photoRef)}${daQuery}`) : null) ??
+    (daQuery ? safeNext(`${backBase}${daQuery}`) : null) ??
+    backBase;
   const salvaParam = Array.isArray(sp.salva) ? sp.salva[0] : sp.salva;
   const highlightSave = userId != null && salvaParam === "1";
 
@@ -202,7 +209,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
         </a>
       </div>
 
-      <SalvaLocale placeId={place.id} placeName={place.name} userId={userId} returnPath={returnPath} highlight={highlightSave} />
+      <SalvaLocale placeId={place.id} placeName={place.name} userId={userId} returnPath={returnPath} highlight={highlightSave} consigliatoDa={consigliatoDa} />
 
       {/* Piani 5.6c e 5.6d: recensioni degli utenti e reel collegati al locale, separati dai dati Google. */}
       <section data-testid="community-pubblica" className="mx-5 mt-6 border-t border-border pt-4">

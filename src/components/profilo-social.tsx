@@ -7,6 +7,7 @@ import CondividiLink from "@/components/condividi-link";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { cleanHandle, isValidHandle, profileMapPath, profilePath } from "@/lib/handle";
 import { elenco, NON_FA_PER_ME_NOTA, PUBBLICO_CHI, PUBBLICO_MAI, PUBBLICO_REVOCA, PUBBLICO_VEDONO } from "@/lib/privacy-profilo";
+import { dimenticaMioNome } from "@/lib/share-place";
 
 // Impostazioni del profilo pubblico (piano 5.1) dentro /profilo: nome pubblico (handle), nome,
 // città, una riga su di sé e l'interruttore "Profilo pubblico" (spento di default).
@@ -77,6 +78,7 @@ export default function ProfiloSocial({ userId, initial }: { userId: string; ini
       setError(err.code === "23505" ? `Il nome "${handle}" è già preso: provane un altro.` : "Non sono riuscito a salvare. Riprova tra poco.");
       return;
     }
+    dimenticaMioNome();
     setSaved(next);
     setState("fatto");
   };

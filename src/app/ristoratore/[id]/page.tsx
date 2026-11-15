@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { puoGestireLocale } from "@/lib/ristoratore-accesso";
 import { cityFromAddress } from "@/lib/city";
-import { computeRistoratore, type RistEvento, type RistLocale, type RistSalvataggio } from "@/lib/ristoratore";
+import { computeRistoratore, STATO_VISITATO, type RistEvento, type RistLocale, type RistSalvataggio } from "@/lib/ristoratore";
 import { pulisciGiorni } from "@/lib/serate";
 import { pulisciApertoDal } from "@/lib/aperto-dal";
 import { giornoItalia, pulisciOmaggio, OMAGGIO_OGNI_GIORNI, type Omaggio } from "@/lib/omaggio";
@@ -28,7 +28,7 @@ const MAX_ROWS = 50_000;
 
 type Serate = { giorni: number[]; at: string | null; apertoDal: string | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
 type Prenotazioni = { tavoli: number; diParola: number; persone: number; personeParola: number };
-type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null; serate: Serate; prenotazioni: Prenotazioni | null };
+type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null; serate: Serate; prenotazioni: Prenotazioni | null; passaparola?: number };
 
 // Tavoli chiesti da Mapetite nel periodo (dalla data della richiesta, come gli altri numeri).
 const inizioPeriodo = (giorni: number) => Date.now() - giorni * 86_400_000;
@@ -52,7 +52,7 @@ async function e2eDati(id: string): Promise<Dati | null> {
     let finte: unknown = null;
     try { finte = JSON.parse(decodeURIComponent((await cookies()).get("e2e_prenotazioni")?.value ?? "null")); } catch { /* niente */ }
     const prenotazioni = Array.isArray(finte) ? contaPrenotazioni(finte, v.locale, giorni) : null;
-    return { prenotazioni, locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal), omaggio: pulisciOmaggio(v.serate?.omaggio?.testo, v.serate?.omaggio?.soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: Number(v.serate?.omaggiMostrati) || 0 } };
+    return { prenotazioni, locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, passaparola: Number(v.passaparola) || 0, serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal), omaggio: pulisciOmaggio(v.serate?.omaggio?.testo, v.serate?.omaggio?.soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: Number(v.serate?.omaggiMostrati) || 0 } };
   } catch {
     return null;
   }
@@ -147,7 +147,11 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
       prenotazioni = contaPrenotazioni(righe ?? [], locale, giorni);
     } else if (!pErr) prenotazioni = { tavoli: 0, diParola: 0, persone: 0, personeParola: 0 };
   }
-  return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso, serate, prenotazioni };
+  // Proposta 58: tra chi ti vuole provare (salvato, non ancora visitato), quanti su consiglio di un amico.
+  // Si conta e basta: il nome non esce dal database.
+  const { count: passaparola, error: ppErr } = await db.from("saved_places").select("place_id", { count: "exact", head: true }).eq("place_id", id).not("consigliato_da", "is", null).not("tags", "cs", `{"${STATO_VISITATO}"}`);
+  if (ppErr && ppErr.code !== "42703") console.error("[ristoratore] conteggio passaparola:", ppErr.message);
+  return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso, serate, prenotazioni, passaparola: ppErr ? 0 : passaparola ?? 0 };
 }
 
 // "Tavoli da Mapetite" (PROPOSTE.md 3, passo 3): bocciata due volte il 31/10 notte, rifatta e approvata
@@ -165,5 +169,5 @@ export default async function RistoratorePage({ params, searchParams }: { params
     if (!dati) notFound();
   }
   const p = computeRistoratore(dati, giorni);
-  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} serate={dati.serate} prenotazioni={sp.beta === "-tavoli" ? null : dati.prenotazioni} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
+  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} serate={dati.serate} prenotazioni={sp.beta === "-tavoli" ? null : dati.prenotazioni} passaparola={dati.passaparola ?? 0} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
 }
