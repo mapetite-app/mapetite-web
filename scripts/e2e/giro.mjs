@@ -4921,7 +4921,7 @@ else {
     ok(await foglio.isVisible() && toccabile && (await foglio.getByTestId("togli-annulla").isVisible()) && /rgb\((1[5-9]\d|2\d\d), \d{1,2}, \d{1,2}\)/.test(colore), `amici: toccando l'amico si apre il foglio con 'Togli dagli amici' (rosso, toccabile senza scorrere) e 'Annulla' (${colore})`);
     // Revisore 14/11 (quarto giro): prima di togliere si sa che un invito non vi rimetterà amici.
     { const av = foglio.getByTestId("togli-avviso"); const ya = (await av.boundingBox())?.y ?? -1; const yt = (await foglio.getByTestId("togli-amico").boundingBox())?.y ?? -1;
-      ok(((await av.textContent()) ?? "").includes("Non potrete tornare amici con un invito") && ya >= 0 && ya < yt, "amici: sopra 'Togli dagli amici' la riga 'Non potrete tornare amici con un invito'"); }
+      ok(((await av.textContent()) ?? "").includes("Per tornare amici dovrai mandare tu un link nuovo") && ya >= 0 && ya < yt, "amici: sopra 'Togli dagli amici' la riga 'Per tornare amici dovrai mandare tu un link nuovo'"); }
     await sp.screenshot({ path: `${OUT}/62-amici-togli.png`, caret: "initial" });
     await foglio.getByTestId("togli-annulla").click();
     ok((await sp.getByTestId("amico-foglio").count()) === 0 && (await pr.count()) === 1, "amici: 'Annulla' chiude il foglio e l'amico resta");
@@ -8592,7 +8592,7 @@ else {
   const GIU = { id: "00000000-0000-4000-8000-0000000009a1", handle: "giulia.rm", display_name: "Giulia", bio: null, city: "Roma", visitati: 4, da_provare: 7, seguaci: 0, seguiti: 0 };
   // Link personale da amico (14/11): codice casuale "i-…"; il nome arriva dall'anteprima (anteprima_invito).
   const COD_AMICO = "i-0000000000aa";
-  const socialInv = { profili: [GIU], salvati: [], seguo: [], mio: { handle: "lorenzo", display_name: "Lorenzo", bio: null, city: "Roma", is_public: true }, anteprime: { [COD_AMICO]: { nome: "Giulia", handle: null }, "i-00000000a5a5": { nome: "Marta", handle: null }, "i-00000000a7a7": { nome: "Paolo", handle: null }, "i-00000000a1a1": { nome: "Giulia", handle: null, amico: true } } };
+  const socialInv = { profili: [GIU], salvati: [], seguo: [], mio: { handle: "lorenzo", display_name: "Lorenzo", bio: null, city: "Roma", is_public: true }, anteprime: { [COD_AMICO]: { nome: "Giulia", handle: null }, "i-00000000a5a5": { nome: "Marta", handle: null }, "i-00000000a6a6": { nome: "Sara", handle: null }, "i-00000000a7a7": { nome: "Paolo", handle: null }, "i-00000000a1a1": { nome: "Giulia", handle: null, amico: true } } };
   const ictx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   const ievents = [];
   await ictx.route("**/api/events", (r) => { ievents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
@@ -8662,14 +8662,15 @@ else {
     const bg = await ip.getByTestId("invito-si").evaluate((e) => getComputedStyle(e).backgroundColor);
     ok((await ip.getByTestId("invito-mio-nome").count()) === 0 && !(await ip.getByTestId("invito-si").isDisabled()) && bg === "rgb(255, 107, 74)", `invito da già iscritto con il nome: 'Diventa amico' acceso, in corallo (${bg})`);
     await ip.screenshot({ path: `${OUT}/invito-gia-iscritto.png`, caret: "initial" }); }
-  // Esiti distinti: già usato tra voi due, troppi amici da invito (prima tutti "chiedi un link nuovo").
-  for (const [cod, atteso, cosa] of [["i-00000000a5a5", "Avevate già usato un invito", "già usato"], ["i-00000000a7a7", "Raggiunto il massimo di amici da invito", "troppi"]]) {
+  // Esiti distinti: già usato tra voi due, l'avevi tolto tu, troppi amici da invito (prima tutti "chiedi un link nuovo").
+  // Revisore 15/11: dopo un'amicizia tolta niente "rendete pubblico il profilo": si torna con un link nuovo di chi l'ha tolta.
+  for (const [cod, atteso, cosa, vietato] of [["i-00000000a5a5", "chi aveva tolto l'amicizia deve mandarti un link nuovo", "già usato", "pubblico"], ["i-00000000a6a6", "Avevi tolto Sara dagli amici: per tornare, manda tu un link nuovo", "tolto da te", "pubblico"], ["i-00000000a7a7", "Raggiunto il massimo di amici da invito", "troppi", "link nuovo"]]) {
     await ip.goto(`${BASE}/invito/${cod}`, { waitUntil: "networkidle" });
     if (await ip.getByTestId("invito-mio-nome").count()) await ip.getByTestId("invito-mio-nome").fill("Luca");
     await ip.getByTestId("invito-si").click();
     await ip.getByTestId("invito-scaduto").waitFor({ timeout: 4000 }).catch(() => {});
     const t = (await ip.getByTestId("invito-scaduto").textContent().catch(() => "")) ?? "";
-    ok(t.includes(atteso) && !t.includes("link nuovo"), `invito da già iscritto, ${cosa}: il motivo vero (${t})`); }
+    ok(t.includes(atteso) && !t.includes(vietato), `invito da già iscritto, ${cosa}: il motivo vero (${t})`); }
   // Già amici: "Siete già amici", niente "Diventa amico".
   await ip.goto(`${BASE}/invito/i-00000000a1a1`, { waitUntil: "networkidle" });
   ok((await ip.getByTestId("invito-accetta").count()) === 0 && ((await ip.getByTestId("invito-titolo").textContent()) ?? "").includes("siete già amici") && (await ip.getByTestId("invito-apri").getAttribute("href")) === "/amici", `invito da chi è già amico: 'Siete già amici' (${await ip.getByTestId("invito-titolo").textContent()})`);

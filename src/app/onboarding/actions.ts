@@ -151,8 +151,9 @@ export async function accettaInvito(raw: unknown, nomeRaw?: unknown): Promise<Es
   // Troncato per caratteri veri (emoji comprese), non per unità UTF-16 (revisore 14/11).
   const nome = typeof nomeRaw === "string" ? Array.from(nomeRaw.trim()).slice(0, 40).join("") : "";
   if (await fakeE2E()) {
-    // Giro automatico: codici finti per gli esiti "già usato" e "troppi".
+    // Giro automatico: codici finti per gli esiti "già usato", "l'avevi tolto tu" e "troppi".
     if (codice.endsWith("00000000a5a5")) return { stato: "no", motivo: "gia-usato" };
+    if (codice.endsWith("00000000a6a6")) return { stato: "no", motivo: "tolto-da-te" };
     if (codice.endsWith("00000000a7a7")) return { stato: "no", motivo: "troppi" };
     return { stato: "ok", nome: nomeFinto(codice) };
   }

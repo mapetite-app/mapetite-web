@@ -63,8 +63,8 @@ export default function AmicoRiga({ amico }: { amico: Amico }) {
                   Apri il profilo
                 </Link>
               )}
-              {/* Revisore 14/11 (quarto giro): lo si dice prima. accetta_invito risponde "gia-usato" alla coppia tolta. */}
-              <p data-testid="togli-avviso" className="mt-1 text-center text-[13px] font-sans text-text-muted">Non potrete tornare amici con un invito.</p>
+              {/* Revisore 14/11 (quarto giro): lo si dice prima. Migrazione 20261115: si torna amici solo con un link nuovo di chi ha tolto. */}
+              <p data-testid="togli-avviso" className="mt-1 text-center text-[13px] font-sans text-text-muted">Per tornare amici dovrai mandare tu un link nuovo.</p>
               <button
                 type="button"
                 data-testid="togli-amico"
