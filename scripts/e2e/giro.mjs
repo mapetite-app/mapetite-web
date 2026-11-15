@@ -4907,6 +4907,7 @@ else {
   // Amici: chi segui, attività raggruppata, ricerca persone.
   await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
   ok(await sp.getByTestId("seguiti").getByText("Giulia").isVisible(), "amici: riga di chi segui");
+  ok(await sp.getByTestId("attivita-titolo").isVisible(), "amici: con qualcuno da seguire l'intestazione 'Attività' c'è");
   { const riga = sp.getByTestId("seguiti");
     const pr = riga.locator('[data-testid="amico"][data-privato="1"]');
     ok((await pr.count()) === 1 && ((await pr.textContent()) ?? "").includes("Pietro") && ((await pr.textContent()) ?? "").includes("Privato") && (await pr.locator("a").count()) === 0 && (await riga.getByText("Giulia").count()) === 1, "amici: l'amico con il profilo privato si vede per nome, senza link ai suoi posti; Giulia non è ripetuta");
@@ -4985,6 +4986,7 @@ else {
   await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
   { const v = sp.getByTestId("amici-vuoto");
     ok((await v.getByTestId("invita-amico").getAttribute("data-vuoto")) === "1" && await v.getByTestId("nome-per-invito").isVisible() && !((await v.textContent()) ?? "").includes("Non segui ancora nessuno") && (await sp.getByTestId("amici-invita").count()) === 0, "amici vuoto: riquadro 'Invita un amico' con il nome da scrivere, niente chip doppione");
+    ok((await sp.getByTestId("attivita-titolo").count()) === 0 && (await sp.getByText("Attività", { exact: true }).count()) === 0, "amici vuoto: niente intestazione 'Attività' sopra il solo invito");
     await sp.screenshot({ path: `${OUT}/62-amici-vuoto.png`, caret: "initial", fullPage: true }); }
   await setSocial(soctx, { ...social, seguo: [], amici: [], invito: "i-00000000c0de", mio: { ...social.mio, display_name: "Luca" } });
   await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });

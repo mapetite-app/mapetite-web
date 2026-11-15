@@ -126,8 +126,9 @@ export default async function AmiciPage() {
 
           {scopritori && <ScopritoriAmici amici={scopritori} mie={mieGemme} viewer={viewer} />}
 
-          <section className="mt-6" aria-labelledby="attivita-titolo">
-            <h2 id="attivita-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Attività</h2>
+          {/* Revisore 15/11: con la pagina vuota sotto c'è solo l'invito, niente intestazione "Attività". */}
+          <section className="mt-6" aria-labelledby={vuota ? undefined : "attivita-titolo"} aria-label={vuota ? "Invita un amico" : undefined}>
+            {!vuota && <h2 id="attivita-titolo" data-testid="attivita-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Attività</h2>}
             {vuota ? (
               <div data-testid="amici-vuoto" className="mt-2">
                 <InvitaAmico userId={viewer} handle={feed.mio?.handle ?? null} codice={codiceInvito} senzaNome={senzaNome} vuoto />
