@@ -4987,6 +4987,12 @@ else {
   { const v = sp.getByTestId("amici-vuoto");
     ok((await v.getByTestId("invita-amico").getAttribute("data-vuoto")) === "1" && await v.getByTestId("nome-per-invito").isVisible() && !((await v.textContent()) ?? "").includes("Non segui ancora nessuno") && (await sp.getByTestId("amici-invita").count()) === 0, "amici vuoto: riquadro 'Invita un amico' con il nome da scrivere, niente chip doppione");
     ok((await sp.getByTestId("attivita-titolo").count()) === 0 && (await sp.getByText("Attività", { exact: true }).count()) === 0, "amici vuoto: niente intestazione 'Attività' sopra il solo invito");
+    { const b = v.getByTestId("nome-per-invito-crea"); const st = await b.evaluate((e) => [getComputedStyle(e).backgroundColor, getComputedStyle(e).opacity]).catch(() => []);
+      ok(await b.isDisabled() && st[0] === "rgb(227, 231, 231)" && st[1] === "1", `amici vuoto: senza nome 'Crea il link' spento ma leggibile (grigio chiaro, testo scuro: ${st.join(" ")})`);
+      await v.getByTestId("nome-per-invito-campo").fill("Luca");
+      const bg = await b.evaluate((e) => getComputedStyle(e).backgroundColor);
+      ok(!(await b.isDisabled()) && bg === "rgb(255, 107, 74)", `amici vuoto: con il nome 'Crea il link' acceso, in corallo (${bg})`);
+      await v.getByTestId("nome-per-invito-campo").fill(""); }
     ok((await sp.getByTestId("amici-fatti-trovare").count()) === 0 && (await sp.getByTestId("amici-rendi-pubblico").count()) === 0, "amici vuoto: una cosa sola (l'invito), niente 'Fatti trovare / Rendi pubblico'");
     await sp.screenshot({ path: `${OUT}/62-amici-vuoto.png`, caret: "initial", fullPage: true }); }
   await setSocial(soctx, { ...social, seguo: [], amici: [], invito: "i-00000000c0de", mio: { ...social.mio, display_name: "Luca" } });

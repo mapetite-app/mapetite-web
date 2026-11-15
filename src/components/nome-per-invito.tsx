@@ -35,7 +35,14 @@ export default function NomePerInvito({ chiaro = false }: { chiaro?: boolean }) 
           aria-label="Il tuo nome"
           className="min-h-11 min-w-0 flex-1 rounded-pill border-0 bg-white px-4 text-[16px] font-sans text-text outline-none placeholder:text-text-muted"
         />
-        <button type="submit" disabled={!nome.trim() || stato === "salvo"} className="inline-flex min-h-11 shrink-0 items-center rounded-pill bg-accent px-4 font-display text-sm font-semibold text-white disabled:opacity-60">
+        {/* Spento finché manca il nome: grigio chiaro con testo scuro, come "Diventa amico" (revisore 15/11: il corallo
+            sbiadito sul teal non si leggeva). */}
+        <button
+          type="submit"
+          data-testid="nome-per-invito-crea"
+          disabled={!nome.trim() || stato === "salvo"}
+          className={`inline-flex min-h-11 shrink-0 items-center rounded-pill px-4 font-display text-sm font-semibold ${nome.trim() ? "bg-accent text-white disabled:opacity-80" : "bg-[#e3e7e7] text-text-muted"}`}
+        >
           {stato === "salvo" ? "…" : "Crea il link"}
         </button>
       </div>
