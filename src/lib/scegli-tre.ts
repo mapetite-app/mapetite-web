@@ -83,7 +83,7 @@ export function scegliTre<T extends PostoTre>(
   const gemma = (p: T) => opz.gemme !== false && !!opz.recensioni && isGem(p.rating, opz.recensioni(p.id), p.name);
   const primoGemma = gemma(buoni[0]);
   scelti.push({ posto: buoni[0], motivo: primoGemma ? "temaGemma" : "tema" });
-  if (!primoGemma && opz.gemme !== false && opz.recensioni) {
+  if (opz.gemme !== false && opz.recensioni) {
     // Revisore 15/11: il 💎 è il primo nell'ordine della lista (il più in tema tra i poco conosciuti), non il primo
     // di un tipo nuovo, che spingeva verso i posti più lontani dalla richiesta (una pasticceria per una cena).
     const g = buoni.find((p) => !preso(p) && isGem(p.rating, opz.recensioni!(p.id), p.name));
