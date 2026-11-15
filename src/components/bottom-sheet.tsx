@@ -412,11 +412,6 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   const treAttivabile = variant === "b" && pillSlot != null && title != null && !savedMode && allPlaces.length >= MIN_POSTI_TRE;
   const treScelta = treLista.length === 3 && !loadingVerdicts;
   const treOn = treAttivabile && treScelta && treDi === allKey;
-  // Se la scelta non è più possibile (filtri) si spegne davvero: non si riaccende da sola togliendo un filtro.
-  useEffect(() => {
-    if (treDi !== null && treDi === allKey && !loadingVerdicts && treLista.length !== 3) setTreDi(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [treDi, allKey, loadingVerdicts, treLista.length]);
   const motivi = useMemo(() => new Map<string, Motivo>(treOn ? treLista.map((t) => [t.posto.id, t.motivo]) : []), [treOn, treLista]);
   const places = useMemo(() => {
     if (treOn) return treLista.map((t) => t.posto);
@@ -437,6 +432,15 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderKey]);
   const toggleQuick = (f: QuickFilter) => {
+    // Revisore 15/11: se col filtro nuovo la scelta tra 3 non è più possibile, si spegne davvero (prima tornava
+    // accesa da sola togliendo il filtro).
+    if (treOn) {
+      const next = new Set(quick);
+      if (next.has(f)) next.delete(f);
+      else next.add(f);
+      const resta = scegliTre(applyQuickFilters(allPlaces, next, details), { recensioni: (id) => details?.[id]?.userRatingCount, origine: distanceOrigin === undefined ? origin : distanceOrigin, fuoriTema: offTopic, gemme: gemsOn });
+      if (resta.length !== 3) setTreDi(null);
+    }
     if (onToggleQuick) return onToggleQuick(f);
     setQuickLocal((prev) => {
       const next = new Set(prev);
