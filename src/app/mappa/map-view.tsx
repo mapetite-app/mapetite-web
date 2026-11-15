@@ -28,7 +28,7 @@ import { Bookmark, ArrowUp, ThumbsDown, ChevronRight, Lightbulb, List as ListIco
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { hasStateOrTag, isStateTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
-import { CONSIGLIATO_MAX, pulisciConsigliatoDa } from "@/lib/consigliato-da";
+import { CONSIGLIATO_MAX, NOME_NON_VALIDO, leggiCampoNome } from "@/lib/consigliato-da";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, tipoGoogleSconosciuto } from "@/lib/category-label";
@@ -198,18 +198,24 @@ function SaveModal({
     );
 
   // Proposta 58: chi te l'ha consigliato, a mano (o corretto se è arrivato dal link). Solo modificando un salvato.
+  // Vuoto = togli il nome; un nome con cifre o simboli non si salva (mai cancellato in silenzio): lo si dice sotto.
+  const campoNome = leggiCampoNome(consigliato);
+  const nomeNonValido = mode === "edit" && !campoNome.valido;
   const consigliatoField = (cls: string) => mode === "edit" ? (
-    <label className="block">
-      <span className="sr-only">Chi te l&apos;ha consigliato?</span>
+    <label className="mt-3 block">
+      <span className="mb-1 block text-xs font-sans text-text-muted">Te l&apos;ha consigliato</span>
       <input
         data-testid="consigliato-modifica"
         value={consigliato}
         onChange={(e) => setConsigliato(e.target.value)}
         maxLength={CONSIGLIATO_MAX}
         enterKeyHint="done"
-        placeholder="Chi te l'ha consigliato?"
-        className={cls}
+        placeholder="es. Giulia"
+        aria-invalid={nomeNonValido}
+        aria-describedby={nomeNonValido ? "consigliato-errore" : undefined}
+        className={`${cls}${nomeNonValido ? " border-error" : ""}`}
       />
+      {nomeNonValido && <span id="consigliato-errore" data-testid="consigliato-errore" role="alert" className="mt-1 block text-xs font-sans text-error">{NOME_NON_VALIDO}</span>}
     </label>
   ) : null;
 
@@ -223,6 +229,7 @@ function SaveModal({
 
   const handleSave = () => {
     setError(false);
+    if (nomeNonValido) return;
     startTransition(async () => {
       const supabase = await browserClient();
       // Tag scritto ma non ancora confermato (su iPhone il campo può restare attivo toccando Salva).
@@ -233,7 +240,7 @@ function SaveModal({
 
       let savedUuid: string | undefined;
       // Nome ripulito (solo lettere, max 40); si scrive solo se cambiato, così senza la colonna il resto si salva.
-      const consigliatoValue = pulisciConsigliatoDa(consigliato);
+      const consigliatoValue = campoNome.valido ? campoNome.nome : (initialConsigliatoDa ?? null);
       const daCambiato = mode === "edit" && consigliatoValue !== (initialConsigliatoDa ?? null);
 
       if (mode === "edit") {
@@ -338,7 +345,7 @@ function SaveModal({
               className="w-full resize-none rounded-card border border-border bg-white px-4 py-3 text-base font-sans text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand"
             />
           </label>
-          {consigliatoField("mt-2 min-h-11 w-full rounded-pill border border-border bg-white px-4 text-base font-sans text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand")}
+          {consigliatoField("min-h-11 w-full rounded-pill border border-border bg-white px-4 text-base font-sans text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand")}
 
           <p className="mb-2 mt-3 text-xs font-display font-semibold uppercase tracking-wider text-text-muted">I tuoi tag</p>
           <div className="flex flex-wrap gap-2">
@@ -409,7 +416,7 @@ function SaveModal({
           rows={3}
           className="w-full resize-none rounded-btn border border-border px-3 py-2 text-base font-sans focus:outline-none focus:ring-2 focus:ring-brand"
         />
-        {consigliatoField("mt-2 min-h-11 w-full rounded-btn border border-border px-3 text-base font-sans focus:outline-none focus:ring-2 focus:ring-brand")}
+        {consigliatoField("min-h-11 w-full rounded-btn border border-border px-3 text-base font-sans focus:outline-none focus:ring-2 focus:ring-brand")}
 
         {error && (
           <p className="mt-1 text-sm text-error">
@@ -4173,6 +4180,7 @@ export default function MapView({
           <DragToClose key={selected.id} onClose={() => dispatch({ type: "CLOSE" })} className={`h-dvh w-full max-w-lg overflow-y-auto overscroll-contain bg-surface shadow-float lg:h-auto lg:min-h-0 lg:max-w-none lg:max-h-none lg:flex-1 lg:rounded-none lg:shadow-none`}>
             <VenueSheet
               key={selected.id}
+              userId={userId}
               origin={userPos ?? searchOrigin}
               googlePlaceId={/^[0-9a-f-]{36}$/i.test(selected.id) ? Object.keys(placeUuids).find((g) => placeUuids[g] === selected.id) ?? null : selected.id}
               venue={{

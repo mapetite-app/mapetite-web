@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { withNext } from "@/lib/next-path";
-import { CONSIGLIATO_MAX, pulisciConsigliatoDa } from "@/lib/consigliato-da";
+import { CONSIGLIATO_MAX, NOME_NON_VALIDO, leggiCampoNome, stessoNome } from "@/lib/consigliato-da";
+import { mioNome } from "@/lib/share-place";
 
 // Invito per chi ha ricevuto il link: salvarlo in Mapetite ("📌 Da provare", tag "Da provare",
 // lo stesso dei salvataggi da link e dalla scheda) oppure scoprire l'app.
@@ -38,11 +39,35 @@ export default function SalvaLocale({
   // È la nota di chi salva: può toglierlo o cambiarlo prima di salvare.
   const [da, setDa] = useState<string | null>(consigliatoDa);
   const [daBozza, setDaBozza] = useState<string | null>(null);
+  const [erroreNome, setErroreNome] = useState(false);
+  // Vuoto = togli il nome; cifre o simboli = resta il nome di prima e si dice perché (mai cancellato in silenzio).
   const confermaDa = () => {
     if (daBozza === null) return;
-    setDa(pulisciConsigliatoDa(daBozza));
+    const campo = leggiCampoNome(daBozza);
+    if (!campo.valido) { setErroreNome(true); return; }
+    setDa(campo.nome);
     setDaBozza(null);
+    setErroreNome(false);
   };
+  // Chi apre il proprio link non vede "Te l'ha consigliato <sé stesso>": si confronta con il proprio primo nome
+  // (stessa lettura del profilo di Condividi). Finché non si sa, la riga non compare.
+  const [controllato, setControllato] = useState(!userId || !consigliatoDa);
+  const controllo = useRef<Promise<void> | null>(null);
+  const sonoIo = useRef(false);
+  useEffect(() => {
+    if (!userId || !consigliatoDa) return;
+    let vivo = true;
+    const p = mioNome(userId).then((m) => {
+      if (!vivo) return;
+      if (stessoNome(m.nome, consigliatoDa)) {
+        sonoIo.current = true;
+        setDa((cur) => (cur === consigliatoDa ? null : cur));
+      }
+      setControllato(true);
+    });
+    controllo.current = p;
+    return () => { vivo = false; };
+  }, [userId, consigliatoDa]);
 
   const save = async () => {
     if (!userId || state === "saving") return;
@@ -50,7 +75,11 @@ export default function SalvaLocale({
     // Senza rete il codice di Supabase potrebbe non essere ancora scaricato: errore, non pulsante bloccato.
     const client = await browserClient().catch(() => null);
     if (!client) { setState("error"); return; }
-    const nome = daBozza !== null ? pulisciConsigliatoDa(daBozza) : da;
+    if (controllo.current) await controllo.current;
+    const campo = daBozza !== null ? leggiCampoNome(daBozza) : null;
+    // Il nome proprio (arrivato dal proprio link) non si salva mai.
+    const scelto = campo ? (campo.valido ? campo.nome : da) : da;
+    const nome = scelto && !(sonoIo.current && scelto === consigliatoDa) ? scelto : null;
     const row: Record<string, unknown> = { user_id: userId, place_id: placeId, tags: [WANT_TAG], note: null };
     let { error } = await client.from("saved_places").insert(nome ? { ...row, consigliato_da: nome } : row);
     // Colonna consigliato_da non ancora creata (migrazione 20261115e): si salva senza il nome.
@@ -103,31 +132,39 @@ export default function SalvaLocale({
           <>
             {/* Proposta 58: chi te l'ha consigliato, una riga discreta sopra Salva (si toglie o si cambia). */}
             {daBozza !== null ? (
+              <>
               <form
                 data-testid="consigliato-campo"
                 onSubmit={(e) => { e.preventDefault(); confermaDa(); }}
-                className="mb-2 flex items-center gap-2 rounded-pill bg-surface px-2 py-1 shadow-card"
+                className="mb-2 flex items-center gap-2 rounded-pill bg-surface px-2 shadow-card"
               >
                 <input
                   autoFocus
                   value={daBozza}
-                  onChange={(e) => setDaBozza(e.target.value)}
+                  onChange={(e) => { setDaBozza(e.target.value); setErroreNome(false); }}
                   onBlur={confermaDa}
                   maxLength={CONSIGLIATO_MAX}
                   enterKeyHint="done"
                   placeholder="Chi te l'ha consigliato?"
                   aria-label="Chi te l'ha consigliato?"
-                  className="min-h-9 min-w-0 flex-1 bg-transparent px-2 text-base font-sans text-text focus:outline-none"
+                  aria-invalid={erroreNome}
+                  className="min-h-11 min-w-0 flex-1 bg-transparent px-2 text-base font-sans text-text focus:outline-none"
                 />
-                <button type="submit" className="min-h-9 shrink-0 rounded-pill px-3 text-sm font-display font-semibold text-brand">OK</button>
+                <button type="submit" className="min-h-11 min-w-11 shrink-0 rounded-pill px-3 text-sm font-display font-semibold text-brand">OK</button>
               </form>
-            ) : da ? (
+              {erroreNome && (
+                <p data-testid="consigliato-errore" role="alert" className="-mt-1 mb-2 text-center text-xs font-sans text-error">
+                  {NOME_NON_VALIDO}{da ? ` · resta ${da}` : ""}
+                </p>
+              )}
+              </>
+            ) : da && controllato ? (
               <p data-testid="consigliato-riga" className="mb-2 flex items-center justify-center gap-1 text-sm font-sans text-text-muted">
                 <span className="truncate">Te l&apos;ha consigliato <span className="font-display font-semibold text-brand">{da}</span></span>
-                <button type="button" data-testid="consigliato-cambia" onClick={() => setDaBozza(da)} className="min-h-9 shrink-0 px-1.5 font-display text-xs font-semibold text-brand underline underline-offset-2">
+                <button type="button" data-testid="consigliato-cambia" onClick={() => setDaBozza(da)} className="min-h-11 shrink-0 px-2 font-display text-xs font-semibold text-brand underline underline-offset-2">
                   Cambia
                 </button>
-                <button type="button" data-testid="consigliato-togli" onClick={() => setDa(null)} aria-label="Togli chi te l'ha consigliato" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text-muted">
+                <button type="button" data-testid="consigliato-togli" onClick={() => setDa(null)} aria-label="Togli chi te l'ha consigliato" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-muted">
                   <X size={14} aria-hidden />
                 </button>
               </p>
