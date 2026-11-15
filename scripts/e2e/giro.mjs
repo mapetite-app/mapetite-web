@@ -4931,7 +4931,7 @@ else {
   const pz = (n, name) => ({ id: `00000000-0000-4000-8000-0000000058${n}`, name, category: "restaurant", address: "Via di Prova 1, 00153 Roma RM, Italy", lat: 41.889 + Number(n) * 0.001, lng: 12.469, google_place_id: `GCD${n}`, rating: 4.4, price_level: 2 });
   let rowsD = [
     { created_at: "2026-11-01T10:00:00Z", tags: ["Da provare"], note: null, consigliato_da: "Giulia", places: pz("01", "Da Enzo al 29") },
-    { created_at: "2026-11-02T10:00:00Z", tags: ["Da provare"], note: null, consigliato_da: null, places: pz("02", "Osteria Mia") },
+    { created_at: "2026-11-02T10:00:00Z", tags: ["Da provare"], note: null, consigliato_da: null, solo_per_me: true, places: pz("02", "Osteria Mia") },
     { created_at: "2026-11-03T10:00:00Z", tags: ["Già visitato"], note: null, consigliato_da: null, places: pz("03", "Bar Sotto") },
   ];
   const sctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -4959,6 +4959,7 @@ else {
   const Ld = sd.getByTestId("salvati-lista");
   await Ld.waitFor({ timeout: 8000 }).catch(() => {});
   await sd.waitForTimeout(800);
+  ok((await Ld.getByTestId("salvato-solo-per-me").count()) === 1 && (await Ld.getByTestId("salvato-riga").filter({ hasText: "Osteria Mia" }).getByTestId("salvato-solo-per-me").count()) === 1, "solo per me: il lucchetto sulla card del posto con solo_per_me (proposta 59)");
   ok(JSON.stringify(await Ld.getByTestId("salvato-consigliato").allTextContents()) === '["da Giulia"]' && (await Ld.getByTestId("salvato-riga").filter({ hasText: "Da Enzo al 29" }).getByTestId("salvato-consigliato").count()) === 1, `card dei salvati: micro-etichetta 'da Giulia' accanto allo stato, solo dove c'è il nome (${JSON.stringify(await Ld.getByTestId("salvato-consigliato").allTextContents())})`);
   const amiciBtn = Ld.getByTestId("salvati-amici");
   ok(await amiciBtn.isVisible().catch(() => false) && ((await amiciBtn.textContent()) ?? "").trim() === "Dagli amici 1", `dagli amici: pillola 'Dagli amici 1' con un salvato consigliato (${await amiciBtn.textContent().catch(() => "assente")})`);
@@ -5036,6 +5037,22 @@ else {
   await salvaM.click().catch(() => {});
   await sd.waitForTimeout(500);
   ok(patchD.length === 1 && "consigliato_da" in patchD[0] && patchD[0].consigliato_da === null && (await sd.getByTestId("consigliato-scheda").count()) === 0, `modifica: campo vuoto toglie il nome (${JSON.stringify(patchD)})`);
+  ok(!("solo_per_me" in (patchD[0] ?? {})), "solo per me: senza toccare il lucchetto non si scrive");
+  // Proposta 59: "Solo per me" in Modifica, poi la riga nella scheda.
+  { patchD.length = 0;
+    ok((await sd.getByTestId("solo-per-me-scheda").count()) === 0, "solo per me: senza lucchetto nessuna riga nella scheda");
+    await sd.getByTestId("tue-note").getByRole("button", { name: "Modifica", exact: true }).click().catch(() => {});
+    const sw = sd.getByTestId("solo-per-me");
+    await sw.waitFor({ timeout: 4000 }).catch(() => {});
+    const bx = await sw.boundingBox().catch(() => null);
+    ok((await sw.getAttribute("aria-checked")) === "false" && bx != null && bx.height >= 44, `solo per me: in Modifica l'interruttore spento, alto 44px (${bx?.height})`);
+    await sw.click().catch(() => {});
+    await sw.scrollIntoViewIfNeeded().catch(() => {});
+    await sd.screenshot({ path: `${OUT}/57b-solo-per-me-modifica.png`, caret: "initial" });
+    await sd.getByRole("button", { name: /^(Salva|Fatto)$/ }).last().click().catch(() => {});
+    await sd.waitForTimeout(500);
+    ok(patchD.length === 1 && patchD[0].solo_per_me === true, `solo per me: acceso e salvato (${JSON.stringify(patchD)})`);
+    ok(((await sd.getByTestId("solo-per-me-scheda").textContent().catch(() => "")) ?? "").includes("Solo per te"), "solo per me: nella scheda 'Solo per te: non lo vedono gli amici'"); }
   // Profilo privato e nessun amico: il link esce senza nome e senza riga.
   mioProfilo2 = { display_name: "Luca Bianchi", is_public: false }; amici2 = [];
   rowsD = rowsD.map((x) => ({ ...x, consigliato_da: null }));

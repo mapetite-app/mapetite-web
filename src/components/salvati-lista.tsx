@@ -2,7 +2,7 @@
 
 import { Fragment, memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, Map as MapIcon, Moon, Plus, Search, Sparkles, SquarePlay, UsersRound, X } from "lucide-react";
+import { Check, ChevronDown, Lock, Map as MapIcon, Moon, Plus, Search, Sparkles, SquarePlay, UsersRound, X } from "lucide-react";
 import type { Place } from "@/app/mappa/map-view";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -266,6 +266,12 @@ const Riga = memo(function Riga({ p, primo, foto, fonte, verdict, origin, daMese
                 <span data-testid="salvato-consigliato" className={`${chip} max-w-[11rem] bg-[#eef1f1] font-medium text-[#33373d]`}>
                   <UsersRound size={12} aria-hidden className="shrink-0 text-brand" />
                   <span className="truncate">da {p.consigliatoDa}</span>
+                </span>
+              )}
+              {/* Proposta 59: il lucchetto, solo un'icona (la spiegazione è nella scheda e in Modifica). */}
+              {p.soloPerMe && (
+                <span data-testid="salvato-solo-per-me" role="img" aria-label="Solo per te" title="Solo per te" className={`${chip} bg-[#eef1f1] text-brand`}>
+                  <Lock size={12} aria-hidden />
                 </span>
               )}
               {liked && (

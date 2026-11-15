@@ -1,7 +1,7 @@
 "use client";
 
 import { tagLabel, isStateTag } from "@/lib/tags";
-import { X, Quote, Navigation, Globe, Phone, Check, Share, Share2, Footprints, CalendarCheck, Ellipsis, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck, ChevronRight, Sparkles } from "lucide-react";
+import { Lock, X, Quote, Navigation, Globe, Phone, Check, Share, Share2, Footprints, CalendarCheck, Ellipsis, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck, ChevronRight, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import Link from "next/link";
@@ -69,6 +69,8 @@ export type Venue = {
   personalNote: string | null;
   // Proposta 58: chi te l'ha consigliato (solo sui salvati, privato).
   consigliatoDa?: string | null;
+  // Proposta 59: lucchetto "Solo per me" (si cambia in Modifica).
+  soloPerMe?: boolean;
   photoRef?: string | null;
   orari?: Orari | null;
   photoAuthor?: string | null;
@@ -503,6 +505,12 @@ export default function VenueSheet({
           Le tue note
         </p>
         {/* Proposta 58: chi te l'ha consigliato (dal link condiviso o scritto a mano in Modifica). */}
+        {isSaved && venue.soloPerMe && (
+          <p data-testid="solo-per-me-scheda" className="mt-1.5 flex items-center gap-1.5 text-sm font-sans text-text-muted">
+            <Lock size={14} className="shrink-0 text-brand" aria-hidden />
+            <span>Solo per te: non lo vedono gli amici</span>
+          </p>
+        )}
         {consigliatoDa && (
           <p data-testid="consigliato-scheda" className="mt-1.5 flex items-center gap-1.5 text-sm font-sans text-text-muted">
             <UsersRound size={14} className="shrink-0 text-brand" aria-hidden />
