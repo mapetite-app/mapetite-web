@@ -10,7 +10,7 @@ import { isUuid } from "@/lib/gruppi";
 import { bookingMakesSense } from "@/lib/bookable";
 import SchedaCarosello from "@/components/scheda-carosello";
 import AmiciQuiBox, { type FriendPerson } from "@/components/amici-qui-box";
-import { conConsigliatoDa, mapetiteShareUrl, mioPrimoNome } from "@/lib/share-place";
+import { conConsigliatoDa, mapetiteShareUrl, mioNome, nomeNeiLinkAcceso, setNomeNeiLink, type MioNome } from "@/lib/share-place";
 import { messaggioGrazie } from "@/lib/consigliato-da";
 import { isGem } from "@/lib/gem";
 import PlacePhoto from "@/components/place-photo";
@@ -118,6 +118,8 @@ type VenueSheetProps = {
   nav?: { pos: number; total: number } | null;
   onNavPrev?: () => void;
   onNavNext?: () => void;
+  // Proposta 58: chi sta guardando (per leggere il proprio nome da mettere nei link condivisi).
+  userId?: string | null;
 };
 
 // "In breve" senza etichette quasi uguali ("intimo" e "esperienza intima", collaudo 23/10): un'etichetta
@@ -167,6 +169,7 @@ export default function VenueSheet({
   nav = null,
   onNavPrev,
   onNavNext,
+  userId = null,
 }: VenueSheetProps) {
   const {
     name,
@@ -228,6 +231,26 @@ export default function VenueSheet({
   const shareOn = useBeta("condividi");
   const gem = useOptIn("gemme") && isGem(rating, userRatingCount, name);
   const [shareNote, setShareNote] = useState<string | null>(null);
+  // Proposta 58: il proprio nome per i link (letto all'apertura), la scelta del telefono e la riga dopo Condividi.
+  const [mio, setMio] = useState<MioNome | null>(null);
+  const [nomeAcceso, setNomeAcceso] = useState(true);
+  const [rigaNome, setRigaNome] = useState(false);
+  useEffect(() => {
+    if (!shareOn) return;
+    let vivo = true;
+    void mioNome(userId).then((m) => { if (vivo) { setMio(m); setNomeAcceso(nomeNeiLinkAcceso()); } });
+    return () => { vivo = false; };
+  }, [shareOn, userId]);
+  const cambiaNomeNeiLink = (acceso: boolean) => { setNomeNeiLink(acceso); setNomeAcceso(acceso); trackFeature("condividi_nome", { stato: acceso ? "si" : "no" }); };
+  const rigaNomeLink = rigaNome && mio?.nelLink ? (
+    <p data-testid="condividi-nome" role="status" className="flex items-center gap-1 text-xs font-sans text-text-muted">
+      <span>{nomeAcceso ? "Il link porta il tuo nome" : "Link senza nome"}</span>
+      <span aria-hidden>·</span>
+      <button type="button" data-testid="condividi-nome-cambia" onClick={() => cambiaNomeNeiLink(!nomeAcceso)} className="min-h-11 px-1 font-display font-semibold text-brand underline underline-offset-2">
+        {nomeAcceso ? "Togli" : "Metti il nome"}
+      </button>
+    </p>
+  ) : null;
   const [addressCopied, setAddressCopied] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(autoBook);
   // Scheda B: sezione aperta e menu "Altro".
@@ -271,9 +294,12 @@ export default function VenueSheet({
   const share = async () => {
     signal("condividi");
     // Link Mapetite (pagina pubblica con il verdetto); se non si può creare, Google Maps.
-    // Proposta 58: con il nome del proprio profilo ("da=Giulia"), letto insieme al link e mai oltre 0,7 s.
-    const [mapetiteUrl, da] = await Promise.all([mapetiteShareUrl({ ...venue, lat, lng }), mioPrimoNome()]);
-    const url = mapetiteUrl ? conConsigliatoDa(mapetiteUrl, da) : mapsUrl;
+    // Proposta 58: con il proprio primo nome ("da=Giulia"), già letto all'apertura della scheda, solo se il profilo
+    // è pubblico o si ha almeno un amico, e se non l'hai tolto ("Togli" qui sotto). Mai un'attesa in più al tocco.
+    const mapetiteUrl = await mapetiteShareUrl({ ...venue, lat, lng });
+    const conNome = mapetiteUrl != null && mio?.nelLink === true;
+    const url = mapetiteUrl ? conConsigliatoDa(mapetiteUrl, conNome && nomeAcceso ? mio.nome : null) : mapsUrl;
+    if (conNome) setRigaNome(true);
     const base = verdict?.trim() ? `${name} — ${verdict.trim()}` : name;
     const text = mapetiteUrl ? `${base} · su Mapetite` : base;
     try {
@@ -844,6 +870,7 @@ export default function VenueSheet({
             )}
           </h2>
           {shareNote && <p role="status" className="mt-1 text-xs font-sans text-text-muted">{shareNote}</p>}
+          {rigaNomeLink}
           {(venue.businessStatus === "CLOSED_PERMANENTLY" || venue.businessStatus === "CLOSED_TEMPORARILY") && (
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <p data-testid="scheda-chiuso" className="inline-flex rounded-pill bg-[#33373d] px-2.5 py-1 text-[12.5px] font-semibold font-sans text-white">
@@ -1264,6 +1291,7 @@ export default function VenueSheet({
       {/* 1. HEADER */}
       <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
         {shareNote && <span role="status" className="rounded-pill bg-surface px-2.5 py-1 text-xs font-sans text-text shadow-card">{shareNote}</span>}
+        {rigaNomeLink && <span className="rounded-pill bg-surface px-2.5 shadow-card">{rigaNomeLink}</span>}
         {shareOn && (
           <button
             type="button"
