@@ -236,7 +236,7 @@ function SaveModal({
       <Lock size={16} aria-hidden className={`shrink-0 ${soloPerMe ? "text-brand" : "text-text-muted"}`} />
       <span className="min-w-0 flex-1">
         <span className="block font-display text-sm font-semibold text-brand">Solo per me</span>
-        <span className="block text-xs font-sans text-text-muted">Non lo vedono gli amici né chi apre il tuo profilo</span>
+        <span className="block text-xs font-sans text-text-muted">Fuori dal profilo e dalla mappa degli amici</span>
       </span>
       <span aria-hidden className={`relative h-6 w-10 shrink-0 rounded-pill transition-colors ${soloPerMe ? "bg-brand" : "bg-border"}`}>
         <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${soloPerMe ? "left-[18px]" : "left-0.5"}`} />

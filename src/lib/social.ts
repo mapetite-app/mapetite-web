@@ -380,7 +380,9 @@ export async function loadMyGems(userId: string): Promise<{ gemme: number; prova
     .from("saved_places")
     .select("tags, places!inner(poco_conosciuto)")
     .eq("user_id", userId)
-    .eq("places.poco_conosciuto", true);
+    .eq("places.poco_conosciuto", true)
+    // Proposta 59: come nella vista degli amici, i posti col lucchetto non contano (stessi numeri a confronto).
+    .eq("solo_per_me", false);
   if (error) {
     console.error(`[social] mie gemme: ${error.code ?? ""} ${error.message} (migrazione 20261016_scopritori non applicata?)`);
     return null;

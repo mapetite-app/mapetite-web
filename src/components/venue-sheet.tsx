@@ -244,7 +244,8 @@ export default function VenueSheet({
     return () => { vivo = false; };
   }, [shareOn, userId]);
   const cambiaNomeNeiLink = (acceso: boolean) => { setNomeNeiLink(acceso); setNomeAcceso(acceso); trackFeature("condividi_nome", { stato: acceso ? "si" : "no" }); };
-  const rigaNomeLink = rigaNome && mio?.nelLink ? (
+  // Revisore 15/11 (proposta 59): su un posto col lucchetto la riga non invita a condividerlo col proprio nome.
+  const rigaNomeLink = rigaNome && mio?.nelLink && !(isSaved && venue.soloPerMe) ? (
     <span data-testid="condividi-nome" role="status" className="flex items-center gap-1 text-[13px] font-sans text-text">
       <span>{nomeAcceso ? "Il link porta il tuo nome" : "Link senza nome"}</span>
       <span aria-hidden>·</span>
@@ -504,13 +505,14 @@ export default function VenueSheet({
         <p className={`font-display font-semibold uppercase text-accent ${editorial ? "text-[10.5px] tracking-[0.14em]" : "text-xs tracking-wide"}`}>
           Le tue note
         </p>
-        {/* Proposta 58: chi te l'ha consigliato (dal link condiviso o scritto a mano in Modifica). */}
+        {/* Proposta 59: il lucchetto "Solo per me" (si cambia in Modifica). */}
         {isSaved && venue.soloPerMe && (
           <p data-testid="solo-per-me-scheda" className="mt-1.5 flex items-center gap-1.5 text-sm font-sans text-text-muted">
             <Lock size={14} className="shrink-0 text-brand" aria-hidden />
             <span>Solo per te: non lo vedono gli amici</span>
           </p>
         )}
+        {/* Proposta 58: chi te l'ha consigliato (dal link condiviso o scritto a mano in Modifica). */}
         {consigliatoDa && (
           <p data-testid="consigliato-scheda" className="mt-1.5 flex items-center gap-1.5 text-sm font-sans text-text-muted">
             <UsersRound size={14} className="shrink-0 text-brand" aria-hidden />
