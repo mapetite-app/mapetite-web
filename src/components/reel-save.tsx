@@ -106,8 +106,9 @@ export default function ReelSave({
   const [error, setError] = useState<string | null>(null);
   // Proposta 60: il reel dice da solo di essere pubblicità (testo condiviso, didascalia letta o scritta).
   const advKey = `${readKey}:adv`;
-  const [adv, setAdv] = useState(() => segnataComePubblicita(text) || cached<boolean>(advKey) === true);
-  const segnaAdv = () => { setAdv(true); remember(advKey, true); };
+  // Solo con il link del reel in memoria (senza link, es. screenshot, la chiave sarebbe la stessa per tutti).
+  const [adv, setAdv] = useState(() => segnataComePubblicita(text) || (!!reelUrl && cached<boolean>(advKey) === true));
+  const segnaAdv = () => { setAdv(true); if (reelUrl) remember(advKey, true); };
   // Lettura chiesta con un tocco qui (screenshot, nome scritto): vale come il gesto del Condividi.
   const [daTocco, setDaTocco] = useState(false);
   // Reel Instagram incorporato (embed ufficiale di Meta) per leggere nome e posizione senza uscire
@@ -472,7 +473,7 @@ function PlaceRow({
         <p className="mt-1 font-title text-2xl text-brand">{st.top.name}{where(st.top) ? `, ${where(st.top)}` : ""}</p>
         <p className="mt-0.5 text-xs text-text-muted">{displayAddress(st.top.address)}</p>
         <VerdettoSubito place={st.top} />
-        {adv && <p className="mt-2 text-xs text-text-muted" data-testid="reel-adv">📣 {RIGA_ADV}</p>}
+        {adv && <p className="mt-2 text-xs text-text-muted" data-testid="reel-adv">{RIGA_ADV}</p>}
         {!st.out.alreadySaved && <QuandoCiVai userId={userId} placeId={place.id} />}
         {reelOk && <p className="mt-2 text-xs text-text-muted" data-testid="reel-collegato">🎬 Il reel resta collegato: lo ritrovi nella scheda.</p>}
         {/* Una cosa principale ("Apri sulla mappa"); le altre due in una riga di testo sotto (collaudo 31/10:
