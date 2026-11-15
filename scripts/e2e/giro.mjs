@@ -471,6 +471,9 @@ ok((await page.getByTestId("filtri-lista").count()) === 0, "semplificare: i filt
 { const fm = page.getByTestId("filtri-mappa"); const pb = await page.getByTestId("opzioni-ricerca").boundingBox(); const fb = await fm.boundingBox();
   const nomi = await fm.getByRole("button").evaluateAll((els) => els.map((e) => e.textContent.trim()));
   ok(await fm.isVisible() && JSON.stringify(nomi.slice(0, 3)) === '["Aperto ora","Fino a €€","Voto 4,5+"]' && !!pb && !!fb && fb.y >= pb.y + pb.height && fb.y + fb.height <= 175, `mappa: filtri rapidi in vista sotto la pillola (${nomi.join(", ")}, y ${Math.round(fb?.y ?? 0)})`);
+  // Revisori 15/11: pillole dei filtri toccabili per almeno 44px (prima 36), aspetto poco più alto (36–40).
+  { const misure = await fm.evaluate((el) => [...el.querySelectorAll("button")].map((b) => ({ t: Math.round(b.getBoundingClientRect().height), v: Math.round(b.querySelector("[data-testid=pillola-filtro]")?.getBoundingClientRect().height ?? 0) })));
+    ok(misure.length >= 3 && misure.every((m) => m.t >= 44 && m.v >= 36 && m.v <= 40), `mappa: pillole dei filtri toccabili ≥ 44px, pillola visibile 36–40 (${misure.map((m) => `${m.t}/${m.v}`).join(", ")})`); }
   // Il primo segnalino in alto sta sotto la riga dei filtri (l'inquadratura ne tiene conto).
   await page.waitForTimeout(1200);
   const altoPin = await page.evaluate(() => Math.min(...[...document.querySelectorAll("[data-testid=pin]")].map((e) => e.getBoundingClientRect().top)));
@@ -718,17 +721,19 @@ await page.unroute("**/api/search");
   ok(chiamate === 1, `scegli tra 3: nessuna ricerca in più (${chiamate} chiamata)`);
   await page.unroute("**/api/search");
   // Revisore 14/11 sera: con tutte trattorie nessuna card dice "un altro tipo" (era "Diverso dagli altri", falso).
+  // Revisori 15/11: senza un 💎 né la posizione le card sono due (niente due "Anche in tema"), e il tasto lo dice.
   { const tutte = sei.slice(0, 5).map((x, i) => ({ ...x, name: `Trattoria ${["Uno", "Due", "Tre", "Quattro", "Cinque"][i]}`, category: "trattoria", userRatingCount: 900 }));
     await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: tutte, sintesi_pendente: null } }));
     await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
     await (await esempio(page)).click();
     await page.locator("ul.snap-x li[data-id=T1]").waitFor({ timeout: 5000 });
+    const tasto = ((await page.getByTestId("filtri-mappa").getByTestId("scegli-tre").innerText().catch(() => "")) ?? "").trim();
     await page.getByTestId("filtri-mappa").getByTestId("scegli-tre").click();
     await page.waitForTimeout(300);
     const m = await page.locator("ul.snap-x").getByTestId("tre-motivo").allInnerTexts();
     const t = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
     const dd = (await page.getByTestId("frase-dettaglio").innerText().catch(() => "")).trim();
-    ok(m.length === 3 && !m.some((x) => /altro tipo/i.test(x)) && t === "Tre da scegliere" && !/altro tipo|diversi/.test(dd), `scegli tra 3: tutti dello stesso tipo → niente "diverso" né "un altro tipo" (${m.join(" / ")} · '${t}' · '${dd}')`);
+    ok(tasto === "Scegli tra 2" && JSON.stringify(m) === '["Il più in tema","Anche in tema"]' && t === "Due da scegliere" && !/altro tipo|diversi/.test(dd), `scegli tra 3: tutti dello stesso tipo → due card, niente "un altro tipo" né doppioni ('${tasto}' · ${m.join(" / ")} · '${t}' · '${dd}')`);
     await page.unroute("**/api/search"); }
   // Revisore 15/11: i tipi si confrontano come scritti sulle card. Due "Trattoria …" con tipi Google diversi
   // (italian_restaurant, seafood_restaurant) e due pasticcerie (pastry_shop, cake_shop) non sono "altri tipi".
@@ -749,8 +754,29 @@ await page.unroute("**/api/search");
     const m = await page.locator("ul.snap-x").getByTestId("tre-motivo").allInnerTexts();
     const t = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
     const pasticcerie = ids.filter((id) => id === "M3" || id === "M4").length;
-    const diverso = m.filter((x) => x === "Un altro tipo").length;
-    ok(pasticcerie === 1 && diverso <= 1 && (t === "Tre, diversi tra loro") === (new Set(ids.map((id) => (id === "M3" || id === "M4" ? "p" : "t"))).size === 3), `scegli tra 3: tipi confrontati come sulle card (${ids.join(", ")} · ${m.join(" / ")} · '${t}')`);
+    const diverso = m.filter((x) => x.startsWith("Un altro tipo")).length;
+    // Revisori 15/11: un solo tipo nuovo (le pasticcerie) → due card, non una terza "Anche in tema" che ripete il primo.
+    ok(pasticcerie === 1 && diverso === 1 && ids.length === 2 && m[1] === "Un altro tipo · Pasticceria" && t === "Due, diversi tra loro", `scegli tra 3: tipi confrontati come sulle card (${ids.join(", ")} · ${m.join(" / ")} · '${t}')`);
+    await page.unroute("**/api/search"); }
+  // Revisori 15/11: senza un 💎 né la posizione uscivano due card "Un altro tipo" uguali. Ora ognuna dice il suo
+  // tipo vero, diverso dal primo e dall'altra.
+  { const vari = [
+      mk("V1", "Trattoria Prima", 41.9, 12.49, { category: "trattoria", rating: 4.6, userRatingCount: 900 }),
+      mk("V2", "Trattoria Seconda", 41.9005, 12.491, { category: "trattoria", rating: 4.5, userRatingCount: 2400 }),
+      mk("V3", "Pizzeria Terza", 41.903, 12.495, { category: "pizzeria", rating: 4.5, userRatingCount: 1100 }),
+      mk("V4", "Sushi Quarto", 41.897, 12.486, { category: "sushi_restaurant", rating: 4.4, userRatingCount: 700 }),
+      mk("V5", "Bar Quinto", 41.905, 12.5, { category: "bar", rating: 4.3, userRatingCount: 3000 }),
+    ];
+    await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: vari, sintesi_pendente: null } }));
+    await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await (await esempio(page)).click();
+    await page.locator("ul.snap-x li[data-id=V1]").waitFor({ timeout: 5000 });
+    await page.getByTestId("filtri-mappa").getByTestId("scegli-tre").click();
+    await page.waitForTimeout(300);
+    const ids = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((els) => els.map((e) => e.dataset.id));
+    const m = await page.locator("ul.snap-x").getByTestId("tre-motivo").allInnerTexts();
+    ok(JSON.stringify(ids) === '["V1","V3","V4"]' && m[0] === "Il più in tema" && m[1].startsWith("Un altro tipo · ") && m[2].startsWith("Un altro tipo · ") && new Set(m).size === 3, `scegli tra 3: senza 💎 né posizione due "altro tipo" di tipi diversi, ognuno col suo nome (${ids.join(", ")} · ${m.join(" / ")})`);
+    await shot("05c-scegli-tra-3-tipi");
     await page.unroute("**/api/search"); }
   // Con meno di 5 posti il tasto non c'è: si vedono già tutti.
   await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
@@ -5167,6 +5193,9 @@ else {
   await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
   ok(await sp.getByTestId("seguiti").getByText("Giulia").isVisible(), "amici: riga di chi segui");
   ok(await sp.getByTestId("attivita-titolo").isVisible(), "amici: con qualcuno da seguire l'intestazione 'Attività' c'è");
+  // Revisori 15/11: il sottotitolo dice cosa fa la pagina (i posti degli amici), non "chi ha gusti come i tuoi".
+  { const sub = ((await sp.getByTestId("amici-sottotitolo").textContent()) ?? "").trim();
+    ok(sub === "Dove sono stati e dove vogliono andare i tuoi amici." && !/gusti/i.test(sub), `amici: sottotitolo vero, una riga ('${sub}')`); }
   { const riga = sp.getByTestId("seguiti");
     const pr = riga.locator('[data-testid="amico"][data-privato="1"]');
     ok((await pr.count()) === 1 && ((await pr.textContent()) ?? "").includes("Pietro") && ((await pr.textContent()) ?? "").includes("Privato") && (await pr.locator("a").count()) === 0 && (await riga.getByText("Giulia").count()) === 1, "amici: l'amico con il profilo privato si vede per nome, senza link ai suoi posti; Giulia non è ripetuta");

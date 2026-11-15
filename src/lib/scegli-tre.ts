@@ -7,7 +7,9 @@ import { categoryLabel } from "@/lib/category-label";
 // restano tre posti che non si somigliano, ognuno con il suo perché in due parole:
 //  1. "Il più in tema": il primo della lista com'è ordinata (adattezza alla richiesta e ai gusti, mai le recensioni).
 //  2. "💎 Poco conosciuto": il primo posto con buon voto e poche recensioni (VISIONE: far emergere i non mainstream).
-//  3. "Il più vicino": il più vicino a te, se sappiamo dove sei; altrimenti "Diverso dagli altri" (un altro tipo).
+//  3. "Il più vicino": il più vicino a te, se sappiamo dove sei; altrimenti "Un altro tipo · Pizzeria" (il tipo vero).
+// Revisori 15/11: i posti "di un altro tipo" sono di tipi diversi tra loro e dal primo, e l'etichetta dice quale.
+// Se non ci sono abbastanza tipi diversi le card sono due, non tre con un doppione.
 // Nessuna scelta usa il numero di recensioni per premiare: al contrario, il 💎 lo usa per far salire i piccoli.
 // Niente chiamate a Google o all'AI: solo scelta e ordine sui dati già in pagina.
 
@@ -60,6 +62,17 @@ export function candidatiTre<T extends PostoTre>(posti: readonly T[], fuoriTema?
   return posti.filter((p) => !p.businessStatus?.startsWith("CLOSED") && !(fuoriTema?.includes(p.id) ?? false));
 }
 
+// L'etichetta del perché sulla card: "Un altro tipo · Pizzeria" dice il tipo vero (due "Un altro tipo" uguali
+// non aiutavano a scegliere).
+export function etichettaMotivo(motivo: Motivo, p: { category: string | null; name: string }): string {
+  if (motivo !== "diverso") return MOTIVO_LABEL[motivo];
+  const tipo = categoryLabel(p.category, p.name);
+  return tipo ? `${MOTIVO_LABEL.diverso} · ${tipo}` : MOTIVO_LABEL.diverso;
+}
+
+// Quanti posti servono almeno alla scelta: con uno solo non c'è niente da scegliere.
+export const MIN_SCELTI = 2;
+
 export function scegliTre<T extends PostoTre>(
   posti: readonly T[],
   opz: {
@@ -77,8 +90,6 @@ export function scegliTre<T extends PostoTre>(
   // Revisore 15/11: il tipo si confronta com'è scritto sulla card ("Trattoria" anche con italian_restaurant e
   // seafood_restaurant; pastry_shop e cake_shop sono entrambe "Pasticceria"), non col tipo Google grezzo.
   const giaTipo = (p: T) => scelti.some((s) => stessoTipo(s.posto, p));
-  // A parità, un tipo nuovo prima di uno già scelto: tre pizzerie non sono una scelta.
-  const primo = (lista: readonly T[]) => lista.find((p) => !preso(p) && !giaTipo(p)) ?? lista.find((p) => !preso(p));
 
   const gemma = (p: T) => opz.gemme !== false && !!opz.recensioni && isGem(p.rating, opz.recensioni(p.id), p.name);
   const primoGemma = gemma(buoni[0]);
@@ -97,10 +108,17 @@ export function scegliTre<T extends PostoTre>(
     const v = vicini[0];
     if (v && !preso(v) && distanceMeters(o, v) <= VICINO_MAX_M) scelti.push({ posto: v, motivo: "vicino" });
   }
+  // "Un altro tipo": il primo nell'ordine della lista di un tipo che non c'è ancora tra quelli scelti (mai per recensioni).
+  // Revisori 15/11: senza un 💎 né la posizione uscivano due "Un altro tipo"; ora ognuno è di un tipo suo.
   while (scelti.length < 3) {
-    const d = primo(buoni);
+    const d = buoni.find((p) => !preso(p) && !giaTipo(p));
     if (!d) break;
-    scelti.push({ posto: d, motivo: giaTipo(d) ? "altro" : "diverso" });
+    scelti.push({ posto: d, motivo: "diverso" });
+  }
+  // Tutti dello stesso tipo e nessun altro perché: il secondo nell'ordine, "Anche in tema" (uno solo, mai un doppione).
+  if (scelti.length < MIN_SCELTI) {
+    const a = buoni.find((p) => !preso(p));
+    if (a) scelti.push({ posto: a, motivo: "altro" });
   }
   return scelti.slice(0, 3);
 }
