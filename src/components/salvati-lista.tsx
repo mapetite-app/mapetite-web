@@ -261,6 +261,13 @@ const Riga = memo(function Riga({ p, primo, foto, fonte, verdict, origin, daMese
                 {done ? "Ci sono stato" : "Da provare"}
                 {daMese && <span data-testid="salvato-da-mesi" className="font-medium">da {daMese}</span>}
               </span>
+              {/* Proposta 58: chi te l'ha consigliato, accanto allo stato (privato, solo tuo). */}
+              {p.consigliatoDa && (
+                <span data-testid="salvato-consigliato" className={`${chip} max-w-[11rem] bg-[#eef1f1] font-medium text-[#33373d]`}>
+                  <UsersRound size={12} aria-hidden className="shrink-0 text-brand" />
+                  <span className="truncate">da {p.consigliatoDa}</span>
+                </span>
+              )}
               {liked && (
                 <span data-testid="salvato-piaciuto" className={`${chip} bg-[#eef1f1] text-[#33373d]`}>{tagLabel(OPINION_LIKE)}</span>
               )}
