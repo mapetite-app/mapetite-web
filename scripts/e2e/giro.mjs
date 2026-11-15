@@ -4908,6 +4908,16 @@ else {
   ok((await dp.getByTestId("consigliato-riga").count()) === 0, "consigliato da: chi apre il proprio link non vede 'Te l'ha consigliato' sé stesso");
   await salvaPubblico();
   ok(inserts.at(-1) != null && !("consigliato_da" in inserts.at(-1)), "consigliato da: il proprio nome non si salva");
+  // Omonimo (Giulia consigliata da un'altra Giulia): la riga chiede "Sì" invece di sparire; con Sì il nome si salva.
+  await dp.goto(`${BASE}/locali/${LOC_CD}?da=Giulia`, { waitUntil: "networkidle" });
+  await dp.getByTestId("consigliato-chiedi").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(((await dp.getByTestId("consigliato-chiedi").textContent().catch(() => "")) ?? "").includes("Te l'ha consigliato Giulia?"), "consigliato da: con lo stesso nome la riga chiede 'Te l'ha consigliato Giulia? Sì'");
+  const siBox = await dp.getByTestId("consigliato-si").boundingBox().catch(() => null);
+  ok(siBox != null && siBox.height >= 44 && siBox.width >= 44, `consigliato da: 'Sì' toccabile per 44px (${siBox?.width}x${siBox?.height})`);
+  await dp.getByTestId("consigliato-si").click().catch(() => {});
+  ok((await dp.getByTestId("consigliato-riga").count()) === 1, "consigliato da: dopo 'Sì' la riga normale con Cambia e ✕");
+  await salvaPubblico();
+  ok(inserts.at(-1)?.consigliato_da === "Giulia", "consigliato da: omonimo, dopo 'Sì' il nome si salva");
   mioProfilo = null;
   // Già salvato (23505): il nome si aggiunge solo se il campo era vuoto.
   dup = true; patches = [];
@@ -4994,6 +5004,10 @@ else {
   await dillo.click().catch(() => {});
   await sd.waitForFunction(() => window.__grazie != null, null, { timeout: 3000 }).catch(() => {});
   const grazie = await sd.evaluate(() => window.__grazie);
+  {
+    const bd = await dillo.boundingBox().catch(() => null), ba = await sd.getByTestId("altri-come").boundingBox().catch(() => null);
+    ok(bd != null && ba != null && Math.abs(bd.y - ba.y) < 2 && bd.height >= 44 && ba.height >= 44 && bd.x + bd.width <= ba.x, `consigliato da: 'Dillo a Giulia' e 'Altri così' sulla stessa riga, 44px (${JSON.stringify([bd, ba])})`);
+  }
   ok(grazie?.text === "Provato Da Enzo al 29: avevi ragione, grazie del consiglio!", `consigliato da: 'Dillo a Giulia' con 👍, messaggio neutro "Provato …: avevi ragione" (${grazie?.text ?? "nessuno"})`);
   await sd.waitForTimeout(300);
   ok(evD.some((e) => e?.type === "funzione" && e.props?.nome === "dillo_amico" && e.props?.voto === "su") && droppedKeys(evD.filter((e) => ["dillo_amico", "salvati_amici", "condividi_nome"].includes(e?.props?.nome))).length === 0, "consigliato da: segnali 'dillo_amico', 'salvati_amici' e 'condividi_nome' con chiavi accettate dal server");

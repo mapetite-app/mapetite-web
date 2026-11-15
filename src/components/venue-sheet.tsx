@@ -551,28 +551,32 @@ export default function VenueSheet({
                 );
               })}
             </div>
-            {/* Proposta 58: chiudi il giro con chi te l'ha consigliato (messaggio pronto, lo mandi tu). */}
-            {consigliatoDa && (
-              <button
-                type="button"
-                data-testid="dillo-amico"
-                onClick={() => void dilloA(consigliatoDa)}
-                className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand active:scale-[0.98]"
-              >
-                <Share2 size={15} className="shrink-0" aria-hidden />
-                <span className="truncate">Dillo a {consigliatoDa}</span>
-              </button>
-            )}
-            {/* Proposta 27: dal posto che ti è piaciuto, una ricerca con i suoi tratti (vedi altriCome in map-view). */}
-            {onAltriCome && !personalTags?.includes("Non fa per me") && (
-              <button
-                type="button"
-                data-testid="altri-come"
-                onClick={onAltriCome}
-                className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-pill border border-accent/40 bg-accent/5 px-4 text-sm font-display font-semibold text-accent active:scale-[0.98]"
-              >
-                ✨ Altri come questo
-              </button>
+            {/* Proposta 58 e 27: "Dillo a Giulia" e "Altri come questo" su una riga sola, metà ciascuno (revisore 15/11:
+                due tasti bordati uno sotto l'altro pesavano troppo). Da soli prendono tutta la riga. */}
+            {(consigliatoDa || (onAltriCome && !personalTags?.includes("Non fa per me"))) && (
+              <div className="mt-2 flex gap-2">
+                {consigliatoDa && (
+                  <button
+                    type="button"
+                    data-testid="dillo-amico"
+                    onClick={() => void dilloA(consigliatoDa)}
+                    className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-pill border border-border bg-white px-3 text-sm font-display font-semibold text-brand active:scale-[0.98]"
+                  >
+                    <Share2 size={15} className="shrink-0" aria-hidden />
+                    <span className="truncate">Dillo a {consigliatoDa}</span>
+                  </button>
+                )}
+                {onAltriCome && !personalTags?.includes("Non fa per me") && (
+                  <button
+                    type="button"
+                    data-testid="altri-come"
+                    onClick={onAltriCome}
+                    className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-pill border border-accent/40 bg-accent/5 px-3 text-sm font-display font-semibold text-accent active:scale-[0.98]"
+                  >
+                    <span className="truncate">✨ {consigliatoDa ? "Altri così" : "Altri come questo"}</span>
+                  </button>
+                )}
+              </div>
             )}
             {/* Proposta CEO 20/10: ti è piaciuto un posto poco recensito? Un tocco per lasciare due righe su Google,
                 dove servono al locale (link pubblico di Google, nessun dato passa da noi). Non sui locali con 300 recensioni o più (non ne hanno bisogno). */}

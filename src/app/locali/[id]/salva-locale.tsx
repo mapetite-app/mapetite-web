@@ -54,6 +54,9 @@ export default function SalvaLocale({
   const [controllato, setControllato] = useState(!userId || !consigliatoDa);
   const controllo = useRef<Promise<void> | null>(null);
   const sonoIo = useRef(false);
+  // Revisore 15/11 (secondo): chi si chiama come chi gli consiglia il posto (Giulia da Giulia) perdeva la riga.
+  // Ora non si salva da solo ma si chiede: "Te l'ha consigliato Giulia? Sì".
+  const [omonimo, setOmonimo] = useState(false);
   useEffect(() => {
     if (!userId || !consigliatoDa) return;
     let vivo = true;
@@ -61,6 +64,7 @@ export default function SalvaLocale({
       if (!vivo) return;
       if (stessoNome(m.nome, consigliatoDa)) {
         sonoIo.current = true;
+        setOmonimo(true);
         setDa((cur) => (cur === consigliatoDa ? null : cur));
       }
       setControllato(true);
@@ -170,6 +174,18 @@ export default function SalvaLocale({
                 </button>
                 <button type="button" data-testid="consigliato-togli" onClick={() => setDa(null)} aria-label="Togli chi te l'ha consigliato" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-muted">
                   <X size={14} aria-hidden />
+                </button>
+              </p>
+            ) : omonimo && !da && consigliatoDa && controllato ? (
+              <p data-testid="consigliato-chiedi" className="mb-2 flex items-center justify-center gap-1 text-sm font-sans text-text-muted">
+                <span className="truncate">Te l&apos;ha consigliato <span className="font-display font-semibold text-brand">{consigliatoDa}</span>?</span>
+                <button
+                  type="button"
+                  data-testid="consigliato-si"
+                  onClick={() => { sonoIo.current = false; setOmonimo(false); setDa(consigliatoDa); }}
+                  className="min-h-11 min-w-11 shrink-0 px-2 font-display text-xs font-semibold text-brand underline underline-offset-2"
+                >
+                  Sì
                 </button>
               </p>
             ) : null}
