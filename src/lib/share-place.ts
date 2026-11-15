@@ -43,30 +43,50 @@ async function placeUuid(p: ShareablePlace): Promise<string | null> {
   }
 }
 
-// "Te l'ha consigliato Giulia" (proposta 58): il primo nome del proprio profilo, letto al primo tocco su
-// Condividi e poi tenuto per la sessione. Sessione locale (nessuna rete per sapere chi sei), poi una sola
-// lettura di profiles.display_name. Qualsiasi errore: nessun nome nel link, la condivisione va avanti.
-let nomeLetto: Promise<string | null> | null = null;
-async function leggiPrimoNome(): Promise<string | null> {
+// "Te l'ha consigliato Giulia" (proposta 58). Il proprio primo nome si legge quando si apre la scheda (così il foglio
+// di condivisione non aspetta), una volta per sessione. Va nel link solo se chi condivide si è già fatto vedere:
+// profilo pubblico oppure almeno un amico (una riga in follows, da una parte o dall'altra). Qualsiasi errore: niente
+// nome, la condivisione va avanti; un errore di rete non resta in memoria.
+export type MioNome = { nome: string | null; nelLink: boolean };
+const letti = new Map<string, Promise<MioNome>>();
+async function leggiMioNome(uid: string | null, chiave: string): Promise<MioNome> {
+  const nessuno: MioNome = { nome: null, nelLink: false };
   try {
     const client = await browserClient();
-    const { data: s } = await client.auth.getSession();
-    const uid = s?.session?.user?.id;
-    if (!uid) return null;
-    const { data, error } = await client.from("profiles").select("display_name").eq("id", uid).maybeSingle<{ display_name: string | null }>();
+    let id = uid;
+    if (!id) {
+      const { data: s } = await client.auth.getSession();
+      id = s?.session?.user?.id ?? null;
+    }
+    if (!id) return nessuno;
+    const { data, error } = await client.from("profiles").select("display_name, is_public").eq("id", id).maybeSingle<{ display_name: string | null; is_public: boolean | null }>();
     if (error) throw error;
-    return primoNome(data?.display_name);
+    const nome = primoNome(data?.display_name);
+    if (!nome) return nessuno;
+    if (data?.is_public) return { nome, nelLink: true };
+    const { data: amici, error: aErr } = await client.from("follows").select("follower_id").or(`follower_id.eq.${id},followed_id.eq.${id}`).limit(1);
+    if (aErr) return { nome, nelLink: false };
+    return { nome, nelLink: Array.isArray(amici) && amici.length > 0 };
   } catch {
-    // Rete o lettura fallita: non resta in memoria, al prossimo tocco si riprova.
-    nomeLetto = null;
-    return null;
+    letti.delete(chiave);
+    return nessuno;
   }
 }
-/** Primo nome di chi condivide, senza mai far aspettare più di `attesaMs` (dopo, si condivide senza). */
-export function mioPrimoNome(attesaMs = 700): Promise<string | null> {
-  nomeLetto ??= leggiPrimoNome();
-  const attesa = new Promise<null>((r) => setTimeout(() => r(null), attesaMs));
-  return Promise.race([nomeLetto, attesa]);
+/** Il proprio primo nome e se può andare nei link condivisi (una lettura per sessione). */
+export function mioNome(uid?: string | null): Promise<MioNome> {
+  const chiave = uid ?? "";
+  let p = letti.get(chiave);
+  if (!p) { p = leggiMioNome(uid ?? null, chiave); letti.set(chiave, p); }
+  return p;
+}
+
+// Scelta sul telefono: "Togli" sotto Condividi e i link dopo escono senza nome (finché non si rimette).
+const PREF_NOME = "mapetite.condividi.nome";
+export function nomeNeiLinkAcceso(): boolean {
+  try { return localStorage.getItem(PREF_NOME) !== "no"; } catch { return true; }
+}
+export function setNomeNeiLink(acceso: boolean): void {
+  try { if (acceso) localStorage.removeItem(PREF_NOME); else localStorage.setItem(PREF_NOME, "no"); } catch { /* memoria del telefono non disponibile */ }
 }
 
 /** Link Mapetite del locale (con la foto, se c'è), oppure null se non si può creare. */

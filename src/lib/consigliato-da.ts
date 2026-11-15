@@ -23,9 +23,25 @@ export function primoNome(displayName: string | null | undefined): string | null
   return pulisciConsigliatoDa(first.slice(0, CONSIGLIATO_MAX));
 }
 
-/** Messaggio di "Dillo a Giulia" dopo la visita: con 👍 "avevi ragione", altrimenti solo il grazie. */
+/** Messaggio di "Dillo a Giulia" dopo la visita, in forma neutra: con 👍 "avevi ragione", altrimenti solo il grazie. */
 export function messaggioGrazie(posto: string, piaciuto: boolean): string {
   return piaciuto
-    ? `Sono stato da ${posto}: avevi ragione, grazie del consiglio!`
-    : `Sono stato da ${posto}, grazie del consiglio!`;
+    ? `Provato ${posto}: avevi ragione, grazie del consiglio!`
+    : `Provato ${posto}, grazie del consiglio!`;
+}
+
+export const NOME_NON_VALIDO = "Solo lettere, massimo 40";
+
+/** Campo "Chi te l'ha consigliato?": vuoto = togli il nome; testo non valido = non si salva (mai null in silenzio). */
+export function leggiCampoNome(raw: string): { valido: true; nome: string | null } | { valido: false } {
+  if (raw.trim() === "") return { valido: true, nome: null };
+  const nome = pulisciConsigliatoDa(raw);
+  return nome ? { valido: true, nome } : { valido: false };
+}
+
+/** Stesso nome (senza maiuscole e accenti diversi): chi apre il proprio link non vede "Te l'ha consigliato" sé stesso. */
+export function stessoNome(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const n = (x: string) => x.normalize("NFD").replace(/\p{M}/gu, "").trim().toLocaleLowerCase("it");
+  return n(a) === n(b);
 }
