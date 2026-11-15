@@ -471,6 +471,9 @@ ok((await page.getByTestId("filtri-lista").count()) === 0, "semplificare: i filt
 { const fm = page.getByTestId("filtri-mappa"); const pb = await page.getByTestId("opzioni-ricerca").boundingBox(); const fb = await fm.boundingBox();
   const nomi = await fm.getByRole("button").evaluateAll((els) => els.map((e) => e.textContent.trim()));
   ok(await fm.isVisible() && JSON.stringify(nomi.slice(0, 3)) === '["Aperto ora","Fino a €€","Voto 4,5+"]' && !!pb && !!fb && fb.y >= pb.y + pb.height && fb.y + fb.height <= 175, `mappa: filtri rapidi in vista sotto la pillola (${nomi.join(", ")}, y ${Math.round(fb?.y ?? 0)})`);
+  // Revisori 15/11: pillole dei filtri toccabili per almeno 44px (prima 36), aspetto poco più alto (36–40).
+  { const misure = await fm.evaluate((el) => [...el.querySelectorAll("button")].map((b) => ({ t: Math.round(b.getBoundingClientRect().height), v: Math.round(b.querySelector("[data-testid=pillola-filtro]")?.getBoundingClientRect().height ?? 0) })));
+    ok(misure.length >= 3 && misure.every((m) => m.t >= 44 && m.v >= 36 && m.v <= 40), `mappa: pillole dei filtri toccabili ≥ 44px, pillola visibile 36–40 (${misure.map((m) => `${m.t}/${m.v}`).join(", ")})`); }
   // Il primo segnalino in alto sta sotto la riga dei filtri (l'inquadratura ne tiene conto).
   await page.waitForTimeout(1200);
   const altoPin = await page.evaluate(() => Math.min(...[...document.querySelectorAll("[data-testid=pin]")].map((e) => e.getBoundingClientRect().top)));
