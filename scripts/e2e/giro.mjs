@@ -1890,7 +1890,9 @@ for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
 // Norme sulla privacy (29/10): le chiede Google per pubblicare l'accesso con Google; aperte anche senza account.
 { const resp = await page.goto(`${BASE}/privacy`, { waitUntil: "networkidle" });
   const t = (await page.getByTestId("privacy").innerText().catch(() => "")) ?? "";
-  ok(resp?.status() === 200 && t.includes("I tuoi diritti") && t.includes("founder.mapetite@gmail.com") && new URL(page.url()).pathname === "/privacy", "privacy: /privacy si apre, con contatto e diritti"); }
+  ok(resp?.status() === 200 && t.includes("I tuoi diritti") && t.includes("founder.mapetite@gmail.com") && new URL(page.url()).pathname === "/privacy", "privacy: /privacy si apre, con contatto e diritti");
+  // Revisore 15/11: "Profilo pubblico" non sta più nel primo accesso; l'informativa non deve dirlo.
+  ok(!t.includes("alla fine del primo accesso") && t.includes("Profilo → Impostazioni → Profilo pubblico"), "privacy: il profilo si rende pubblico dal Profilo, non dal primo accesso"); }
 await page.goto(`${BASE}/miei-locali`, { waitUntil: "networkidle" });
 ok(new URL(page.url()).pathname === "/mappa" && new URL(page.url()).searchParams.get("vista") === "salvati", "pagina vecchia /miei-locali: porta a 'I miei salvati'");
 // Suggerimento col meteo (piano 2.3): pioggia alle 19:30 → un posto al coperto; caldo → all'aperto.

@@ -52,7 +52,7 @@ const SEZIONI: { titolo: string; righe: string[]; id?: string }[] = [
     titolo: "Profilo pubblico e amici",
     id: "profilo-pubblico",
     righe: [
-      "Il profilo nasce privato. Diventa pubblico solo se lo accendi tu (\"Profilo pubblico\" alla fine del primo accesso, oppure Profilo → Impostazioni → Profilo pubblico), dopo aver letto cosa vedranno gli altri.",
+      "Il profilo nasce privato, anche dopo il primo accesso. Diventa pubblico solo se lo accendi tu, da Profilo → Impostazioni → Profilo pubblico (ci porta anche \"Rendi pubblico\" in Amici), dopo aver letto cosa vedranno gli altri.",
       // Stesse parole del foglio di conferma (src/lib/privacy-profilo.ts): una sola fonte.
       `Se è pubblico, ${PUBBLICO_CHI.charAt(0).toLocaleLowerCase("it")}${PUBBLICO_CHI.slice(1)}: ${elenco(PUBBLICO_VEDONO)}`,
       `${NON_FA_PER_ME_NOTA} La pagina del tuo profilo non mostra date.`,
