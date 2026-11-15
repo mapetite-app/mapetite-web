@@ -6,6 +6,14 @@ Obiettivo: entro fine ottobre 2026 un'app che un gruppo ristretto di persone pos
 Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) · IN PR · FATTA.
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
+## SESSIONE DI DOMENICA 15/11 (22:05) — CEO apre e chiude
+- **CEO apre:** nessun commento nuovo di Lorenzo. Esito della #149 (correzioni piccole): **VALIDATA**. Proposta 58 (#150): DA RIVEDERE fino al revisore nuovo, ripresa subito.
+- **Proposta 58 "Te l'ha consigliato Giulia":** corretti i due minori (chi si chiama come chi consiglia ora vede "Te l'ha consigliato Giulia? Sì"; "Dillo a Giulia" e "Altri così" sulla stessa riga). **Revisore nuovo n. 3: 8,6, APPROVATA.** Corretti anche i suoi punti: il nome nei link si rilegge dopo 20 secondi o dopo un cambio di profilo o amici (prima restava in memoria dopo "Profilo privato"); la riga "Il link porta il tuo nome · Togli" si vede già prima del primo link; solo il primo nome nel tasto "Dillo a"; il numero di "Dagli amici" segue i filtri.
+- **Conteggio per il ristoratore (proposta 58):** nel pannello, tra chi ti vuole provare, la pillola "🗣️ Da un amico · N" (solo il numero, da 3 persone in su, mai chi). Anche nel pannello di esempio.
+- **Proposta 59 "Solo per me":** lucchetto sul singolo salvato (in Modifica; icona sulla card; riga nella scheda). Colonna `saved_places.solo_per_me` e 4 viste pubbliche filtrate (migrazione `20261115f`, provata in una transazione annullata e **applicata in produzione**: solo aggiunta, nessun dato toccato). **Revisore separato: 8,6, sicurezza OK, APPROVATA.** Corretti i minori: testo "Fuori dal profilo e dalla mappa degli amici" (recensioni e foto pubblicate restano tue scelte a parte), niente riga del nome nei link sui posti col lucchetto, le proprie gemme contate come quelle degli amici.
+- **CEO chiude:** ricerche web già fatte alle 03:05 di oggi.
+- **Prossima sessione (in ordine):** (1) se questa PR non è unita, unirla dopo giro e build. (2) Lucchetto anche nel foglio Salva al primo salvataggio e su una raccolta intera (resto della proposta 59). (3) Proposta 60 "Il reel è segnato come pubblicità" (PRONTA, S).
+
 ## SESSIONE DI DOMENICA 15/11 (14:05) — CEO apre e chiude
 - **CEO apre:** nessun commento nuovo di Lorenzo. Esito delle voci della #148 (inviti tra amici, "Scegli tra 3"): **VALIDATA** tutte e due (approvate 8,6 e 8,7, in produzione).
 - **Giro dal vivo con due account veri (inviti): NON fatto.** Creare il secondo account di prova con la chiave di servizio è stato bloccato dai permessi dell'ambiente. Resta da fare con un account creato da Lorenzo (vedi DA-FARE-LORENZO) o a mano dal telefono.
