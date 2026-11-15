@@ -1,6 +1,7 @@
 import { isGem } from "@/lib/gem";
 import { distanceMeters } from "@/lib/distance";
 import { getCategoryEmoji } from "@/lib/emoji";
+import { categoryLabel } from "@/lib/category-label";
 
 // Proposta 55 "Tre, non trenta" (PROBLEMI.md 24: davanti a dodici posti non si decide). Dai risultati già arrivati
 // restano tre posti che non si somigliano, ognuno con il suo perché in due parole:
@@ -38,8 +39,18 @@ const VICINO_MAX_M = 3_000;
 // Il tipo come lo legge la persona sulla card.
 // Revisore 15/11 (secondo): per famiglia, non per parola ("Ristorante", "Ristorante italiano" e "Ristorante
 // mediterraneo" sono la stessa cosa per chi sceglie): la famiglia è l'emoji della card, che la persona vede.
-export function tipoMostrato(p: { category: string | null; name: string; types?: readonly string[] | null }): string {
-  return getCategoryEmoji(p.category, p.name, p.types ?? null);
+// Due posti sono dello stesso tipo se hanno la stessa emoji O la stessa parola sulla card ("Trattoria" con
+// italian_restaurant e con seafood_restaurant): il primo revisore guardava la parola, il secondo la famiglia.
+type ConTipo = { category: string | null; name: string; types?: readonly string[] | null };
+export function tipoMostrato(p: ConTipo): string[] {
+  return [`e:${getCategoryEmoji(p.category, p.name, p.types ?? null)}`, `l:${(categoryLabel(p.category, p.name) ?? p.category ?? "").toLowerCase()}`];
+}
+export function stessoTipo(a: ConTipo, b: ConTipo): boolean {
+  const ta = tipoMostrato(a);
+  return tipoMostrato(b).some((k) => ta.includes(k));
+}
+export function tuttiDiversi(posti: readonly ConTipo[]): boolean {
+  return posti.every((p, i) => posti.every((q, j) => j <= i || !stessoTipo(p, q)));
 }
 
 // Su quanti posti si sceglie davvero: senza i chiusi e i fuori tema (revisore 15/11: "Su 6" contava un chiuso).
@@ -63,10 +74,9 @@ export function scegliTre<T extends PostoTre>(
   const preso = (p: T) => scelti.some((s) => s.posto.id === p.id);
   // Revisore 15/11: il tipo si confronta com'è scritto sulla card ("Trattoria" anche con italian_restaurant e
   // seafood_restaurant; pastry_shop e cake_shop sono entrambe "Pasticceria"), non col tipo Google grezzo.
-  const tipo = (p: T) => tipoMostrato(p);
-  const tipi = () => new Set(scelti.map((s) => tipo(s.posto)));
+  const giaTipo = (p: T) => scelti.some((s) => stessoTipo(s.posto, p));
   // A parità, un tipo nuovo prima di uno già scelto: tre pizzerie non sono una scelta.
-  const primo = (lista: readonly T[]) => lista.find((p) => !preso(p) && !tipi().has(tipo(p))) ?? lista.find((p) => !preso(p));
+  const primo = (lista: readonly T[]) => lista.find((p) => !preso(p) && !giaTipo(p)) ?? lista.find((p) => !preso(p));
 
   scelti.push({ posto: buoni[0], motivo: "tema" });
   if (opz.gemme !== false && opz.recensioni) {
@@ -86,7 +96,7 @@ export function scegliTre<T extends PostoTre>(
   while (scelti.length < 3) {
     const d = primo(buoni);
     if (!d) break;
-    scelti.push({ posto: d, motivo: tipi().has(tipo(d)) ? "altro" : "diverso" });
+    scelti.push({ posto: d, motivo: giaTipo(d) ? "altro" : "diverso" });
   }
   return scelti.slice(0, 3);
 }

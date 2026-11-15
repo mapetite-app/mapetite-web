@@ -18,7 +18,7 @@ import { searchFeedbackMailto } from "@/lib/feedback";
 import { trackFeature } from "@/lib/track";
 import UtileFeedback from "@/components/utile-feedback";
 import { cityFromAddress } from "@/lib/city";
-import { MIN_POSTI_TRE, MOTIVO_LABEL, candidatiTre, scegliTre, tipoMostrato, type Motivo } from "@/lib/scegli-tre";
+import { MIN_POSTI_TRE, MOTIVO_LABEL, candidatiTre, scegliTre, tuttiDiversi, type Motivo } from "@/lib/scegli-tre";
 
 // Solo le prime card mostrano la foto: contiene il costo di Place Photos.
 export const PHOTO_CARDS = 6;
@@ -796,7 +796,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     const nuova = pillSlot != null && title != null;
     // Con "Scegli tra 3" la frase dice solo su quanti si è scelto (revisore 15/11: i perché sono già sulle card).
     // "Diversi tra loro" solo se i tipi, come scritti sulle card, lo sono davvero.
-    const tipiDiversi = new Set(treLista.map((t) => tipoMostrato(t.posto))).size === treLista.length;
+    const tipiDiversi = tuttiDiversi(treLista.map((t) => t.posto));
     const fraseOggi = nuova && treOn ? { titolo: tipiDiversi ? "Tre, diversi tra loro" : "Tre da scegliere", dettaglio: `Scelti tra ${treTra} posti` } : nuova && frase ? fraseRisultati({
       n: places.length,
       posti: places,

@@ -718,7 +718,7 @@ await page.unroute("**/api/search");
   ok(chiamate === 1, `scegli tra 3: nessuna ricerca in più (${chiamate} chiamata)`);
   await page.unroute("**/api/search");
   // Revisore 14/11 sera: con tutte trattorie nessuna card dice "un altro tipo" (era "Diverso dagli altri", falso).
-  { const tutte = sei.slice(0, 5).map((x) => ({ ...x, category: "trattoria", userRatingCount: 900 }));
+  { const tutte = sei.slice(0, 5).map((x, i) => ({ ...x, name: `Trattoria ${["Uno", "Due", "Tre", "Quattro", "Cinque"][i]}`, category: "trattoria", userRatingCount: 900 }));
     await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: tutte, sintesi_pendente: null } }));
     await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
     await (await esempio(page)).click();
