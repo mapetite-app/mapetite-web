@@ -21,5 +21,7 @@ export default async function RistoratoreDemoPage({ searchParams }: { searchPara
   const tavoli = Math.round(giorni * 0.6) + 4;
   // Accesa come nel pannello vero (approvata il 1/11); si spegne con ?beta=-tavoli.
   const prenotazioni = sp.beta !== "-tavoli" ? { tavoli, diParola: Math.round(tavoli * 0.45), persone: tavoli - Math.round(tavoli * 0.15), personeParola: Math.round(tavoli * 0.4) } : null;
-  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato base="/ristoratore/demo" demo prenotazioni={prenotazioni} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
+  // Proposta 58: tra chi ti vuole provare, su consiglio di un amico; inventati come il resto (circa uno su cinque).
+  const passaparola = Math.round(p.inAttesa.persone / 5);
+  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato base="/ristoratore/demo" demo prenotazioni={prenotazioni} passaparola={passaparola} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
 }
