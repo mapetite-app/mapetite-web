@@ -103,7 +103,7 @@ export default async function InvitoPage({ params }: Props) {
             <p data-testid="invito-gia-amici" className="mb-3 text-center text-sm font-sans text-text-muted">Vi trovate in Amici.</p>
           ) : (
             <p data-testid="invito-neutro" className="mb-3 text-center text-sm font-sans text-text-muted">
-              {proprio ? "Questo è il tuo link d'invito: mandalo a un amico." : perAmico && a !== "errore" ? "Questo invito non vale più: chiedi un link nuovo." : "Hai già un account: sei dentro."}
+              {proprio ? "Questo è il tuo link d'invito: mandalo a un amico." : perAmico && a === "errore" ? "Non riesco a leggere l'invito: riprova tra poco." : perAmico ? "Questo invito non vale più: chiedi un link nuovo." : "Hai già un account: sei dentro."}
             </p>
           )}
           {!puoiAccettare && <Link

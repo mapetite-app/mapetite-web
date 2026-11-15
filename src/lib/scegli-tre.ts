@@ -22,9 +22,11 @@ export type PostoTre = {
   types?: readonly string[] | null;
 };
 
-export type Motivo = "tema" | "gemma" | "vicino" | "diverso" | "altro";
+export type Motivo = "tema" | "temaGemma" | "gemma" | "vicino" | "diverso" | "altro";
 export const MOTIVO_LABEL: Record<Motivo, string> = {
   tema: "Il più in tema",
+  // Revisore 15/11 (terzo giro): se il primo è anche poco conosciuto lo si dice, invece di togliergli il 💎.
+  temaGemma: "Il più in tema · 💎",
   gemma: "💎 Poco conosciuto",
   vicino: "Il più vicino",
   diverso: "Un altro tipo",
@@ -78,8 +80,10 @@ export function scegliTre<T extends PostoTre>(
   // A parità, un tipo nuovo prima di uno già scelto: tre pizzerie non sono una scelta.
   const primo = (lista: readonly T[]) => lista.find((p) => !preso(p) && !giaTipo(p)) ?? lista.find((p) => !preso(p));
 
-  scelti.push({ posto: buoni[0], motivo: "tema" });
-  if (opz.gemme !== false && opz.recensioni) {
+  const gemma = (p: T) => opz.gemme !== false && !!opz.recensioni && isGem(p.rating, opz.recensioni(p.id), p.name);
+  const primoGemma = gemma(buoni[0]);
+  scelti.push({ posto: buoni[0], motivo: primoGemma ? "temaGemma" : "tema" });
+  if (!primoGemma && opz.gemme !== false && opz.recensioni) {
     // Revisore 15/11: il 💎 è il primo nell'ordine della lista (il più in tema tra i poco conosciuti), non il primo
     // di un tipo nuovo, che spingeva verso i posti più lontani dalla richiesta (una pasticceria per una cena).
     const g = buoni.find((p) => !preso(p) && isGem(p.rating, opz.recensioni!(p.id), p.name));

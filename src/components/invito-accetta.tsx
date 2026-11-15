@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { accettaInvito } from "@/app/onboarding/actions";
+import MandaLinkNuovo from "@/components/manda-link-nuovo";
 import { clearStoredInvite, testoInvitoNo } from "@/lib/invito";
 import { trackFeature } from "@/lib/track";
 
@@ -30,7 +31,7 @@ export default function InvitoAccetta({ codice, nome, chiediNome, contesto = "gi
       <div className={className}>
         <p data-testid="invito-scaduto" data-motivo={motivo} className="text-center text-sm font-sans text-text-muted">{testoInvitoNo(motivo, nome)}</p>
         {uscita && (motivo === "tolto-da-te"
-          ? <a href="/profilo#invita" data-testid="invito-apri" className={`${tasto} mt-4`}>Manda il tuo link nuovo</a>
+          ? <MandaLinkNuovo nome={nome} className={tasto} />
           : <a href={uscita.href} data-testid="invito-apri" className={`${tasto} mt-4`}>{uscita.label}</a>)}
       </div>
     );

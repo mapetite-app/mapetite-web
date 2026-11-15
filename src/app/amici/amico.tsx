@@ -37,7 +37,7 @@ export default function AmicoRiga({ amico }: { amico: Amico }) {
       <button type="button" onClick={() => setAperto(true)} aria-haspopup="dialog" aria-expanded={aperto} className="flex w-16 flex-col items-center gap-1 text-center">
         <Avatar person={amico} size={52} />
         <span className="w-full truncate text-[11px] font-display text-text">{nome}</span>
-        {!pubblico && <span className="text-[10px] font-sans text-text-muted">Privato</span>}
+        {!pubblico && <span className="text-[11px] font-sans text-text-muted">Privato</span>}
       </button>
       {aperto && createPortal(
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40" onClick={chiudi}>
@@ -64,7 +64,7 @@ export default function AmicoRiga({ amico }: { amico: Amico }) {
                 </Link>
               )}
               {/* Revisore 14/11 (quarto giro): lo si dice prima. Migrazione 20261115: si torna amici solo con un link nuovo di chi ha tolto. */}
-              <p data-testid="togli-avviso" className="mt-1 text-center text-[13px] font-sans text-text-muted">Per tornare amici dovrai mandare tu un link nuovo.</p>
+              <p data-testid="togli-avviso" className="mt-1 text-center text-[13px] font-sans text-text-muted">Per tornare amici dovrai creare un link nuovo: quello di prima smetterà di funzionare.</p>
               <button
                 type="button"
                 data-testid="togli-amico"

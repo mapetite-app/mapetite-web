@@ -409,7 +409,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   }, [allPlaces, quick, quickFiltersOn, details, origin, distanceOrigin, offTopic, gemsOn]);
   // Revisori 15/11: il tasto c'è appena ci sono abbastanza risultati e non sparisce più (spento mentre arrivano i
   // verdetti o se, con i filtri, restano meno di 5 posti adatti), così la riga dei filtri non slitta.
-  const treAttivabile = variant === "b" && pillSlot != null && title != null && !savedMode && allPlaces.length >= MIN_POSTI_TRE;
+  // Revisore 15/11 (terzo giro): niente tasto morto: finiti i verdetti serve almeno 5 posti adatti nella lista intera
+  // (senza chiusi e fuori tema); grigio solo mentre i verdetti arrivano.
+  const treAttivabile = variant === "b" && pillSlot != null && title != null && !savedMode && (loadingVerdicts ? allPlaces.length : candidatiTre(allPlaces, offTopic).length) >= MIN_POSTI_TRE;
   const treScelta = treLista.length === 3 && !loadingVerdicts;
   const treOn = treAttivabile && treScelta && treDi === allKey;
   const motivi = useMemo(() => new Map<string, Motivo>(treOn ? treLista.map((t) => [t.posto.id, t.motivo]) : []), [treOn, treLista]);
@@ -801,7 +803,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     // Con "Scegli tra 3" la frase dice solo su quanti si è scelto (revisore 15/11: i perché sono già sulle card).
     // "Diversi tra loro" solo se i tipi, come scritti sulle card, lo sono davvero.
     const tipiDiversi = tuttiDiversi(treLista.map((t) => t.posto));
-    const fraseOggi = nuova && treOn ? { titolo: tipiDiversi ? "Tre, diversi tra loro" : "Tre da scegliere", dettaglio: `Scelti tra ${treTra} posti` } : nuova && frase ? fraseRisultati({
+    const fraseOggi = nuova && treOn ? { titolo: tipiDiversi ? "Tre, diversi tra loro" : "Tre da scegliere", dettaglio: treTra === treTutti ? `Scelti tra ${treTra} posti` : `Scelti tra ${treTra} dei ${treTutti} posti` } : nuova && frase ? fraseRisultati({
       n: places.length,
       posti: places,
       ...frase,
@@ -1049,7 +1051,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         // "Scegli tra 3": il perché di questo posto prende il posto dell'etichetta (una sola sulla card).
                         // Revisore 15/11: il tipo è già scritto sotto ("PIZZERIA"), l'etichetta non lo ripete; il salvato
                         // si riconosce dal segnalibro pieno in alto a destra, come in tutta l'app.
-                        <span data-testid="tre-motivo" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{MOTIVO_LABEL[motivo]}</span>
+                        <span data-testid="tre-motivo" className="rounded-pill bg-accent px-2 py-0.5 text-[11px] font-display font-semibold">{MOTIVO_LABEL[motivo]}</span>
                       ) : (stato || saved || gem || poco) && (
                       <span className="flex">
                         {stato ? (

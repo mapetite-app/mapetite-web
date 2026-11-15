@@ -31,6 +31,13 @@ export default function InvitoSospeso({ senzaNome }: { senzaNome: boolean }) {
     return () => { vivo = false; };
   }, []);
 
+  // "Siete già amici" (revisore 15/11, settimo giro): una frase senza azione resta poco; sparisce da sola.
+  useEffect(() => {
+    if (!invito?.amico) return;
+    const t = setTimeout(() => setInvito(null), 5000);
+    return () => clearTimeout(t);
+  }, [invito]);
+
   if (!invito) return null;
   if (invito.amico) {
     return (

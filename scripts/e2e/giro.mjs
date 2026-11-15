@@ -695,7 +695,7 @@ await page.unroute("**/api/search");
   // Trattoria e osteria sono la stessa famiglia (stessa emoji 🍝 sulla card): la frase non dice "diversi tra loro".
   const titolo = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
   const det = (await page.getByTestId("frase-dettaglio").innerText().catch(() => "")).trim();
-  ok(titolo === "Tre da scegliere" && det === "Scelti tra 5 posti", `scegli tra 3: la frase dice su quanti si sceglie, senza il posto chiuso ('${titolo}' · '${det}')`);
+  ok(titolo === "Tre da scegliere" && det === "Scelti tra 5 dei 6 posti", `scegli tra 3: la frase dice su quanti si sceglie, senza il posto chiuso ('${titolo}' · '${det}')`);
   ok((await page.getByTestId("conteggio-risultati").innerText()).trim() === "3 posti" && (await page.locator("[data-testid=pin]").count()) === 3, "scegli tra 3: pillola '3 posti' e tre segnalini sulla mappa");
   // Revisore 15/11: accesa, i filtri restano in vista (prima sparivano e spegnerne uno cambiava i tre senza dirlo).
   ok((await page.getByTestId("filtri-mappa").getByRole("button", { name: "Aperto ora" }).count()) === 1 && (await tre.getAttribute("aria-pressed")) === "true", "scegli tra 3: accesa, i filtri restano in vista e il tasto è premuto");
@@ -757,6 +757,32 @@ await page.unroute("**/api/search");
   await (await esempio(page)).click();
   await page.locator("ul.snap-x li[data-id=P1]").waitFor({ timeout: 5000 });
   ok((await page.getByTestId("scegli-tre").count()) === 0, "scegli tra 3: con 3 posti il tasto non c'è"); }
+// Revisore 15/11 (terzo giro): il primo poco conosciuto tiene il 💎 ("Il più in tema · 💎"); con 5 posti di cui uno
+// chiuso niente tasto morto (prima restava grigio per sempre).
+{ const g = [
+    mk("G1", "Osteria Gemma", 41.9, 12.49, { category: "osteria", rating: 4.8, userRatingCount: 120 }),
+    mk("G2", "Pizzeria Due", 41.9005, 12.491, { category: "pizzeria", rating: 4.5, userRatingCount: 2400 }),
+    mk("G3", "Enoteca Tre", 41.903, 12.495, { category: "wine_bar", rating: 4.4, userRatingCount: 800 }),
+    mk("G4", "Bar Quattro", 41.897, 12.486, { category: "bar", rating: 4.3, userRatingCount: 700 }),
+    mk("G5", "Sushi Cinque", 41.905, 12.5, { category: "sushi_restaurant", rating: 4.4, userRatingCount: 900 }),
+  ];
+  await page.unroute("**/api/search");
+  await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: g, sintesi_pendente: null } }));
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id=G1]").waitFor({ timeout: 5000 });
+  await page.getByTestId("filtri-mappa").getByTestId("scegli-tre").click();
+  await page.waitForTimeout(300);
+  { const m = await page.locator("ul.snap-x").getByTestId("tre-motivo").allInnerTexts();
+    ok(m[0] === "Il più in tema · 💎", `scegli tra 3: il primo poco conosciuto tiene il 💎 (${m.join(" / ")})`); }
+  await page.unroute("**/api/search");
+  await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: [...g.slice(0, 4), { ...g[4], businessStatus: "CLOSED_PERMANENTLY" }], sintesi_pendente: null } }));
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id=G1]").waitFor({ timeout: 5000 });
+  await page.waitForTimeout(300);
+  ok((await page.getByTestId("scegli-tre").count()) === 0, "scegli tra 3: con 5 posti di cui uno chiuso niente tasto (prima restava grigio per sempre)");
+  await page.unroute("**/api/search"); }
 // Le gemme sono accese per tutti dal 14/10: ?beta=off le spegne nella visita in cui compare.
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
@@ -8786,7 +8812,14 @@ else {
     // Revisore 15/11: "Da amici vi vedete per nome in Amici" c'è prima del tocco, non dopo un no.
     // Revisore 15/11 (sesto giro): dopo un no la pagina ha il suo tasto principale (prima un link discreto e basta).
     { const a = ip.getByTestId("invito-apri"); const bg = await a.evaluate((e) => getComputedStyle(e).backgroundColor).catch(() => "");
-      ok((await a.count()) === 1 && bg === "rgb(255, 107, 74)" && (await a.getAttribute("href")) === (cosa === "tolto da te" ? "/profilo#invita" : "/mappa"), `invito da già iscritto, ${cosa}: dopo il no un solo tasto principale in corallo (${bg}, ${await a.getAttribute("href").catch(() => "")})`); }
+      const tolto = cosa === "tolto da te";
+      ok((await a.count()) === 1 && bg === "rgb(255, 107, 74)" && (tolto ? ((await a.textContent()) ?? "").includes("Crea un link nuovo") : (await a.getAttribute("href")) === "/mappa"), `invito da già iscritto, ${cosa}: dopo il no un solo tasto principale in corallo (${bg}, ${await a.textContent().catch(() => "")})`);
+      // Revisore 15/11 (settimo giro): da "l'avevi tolto tu" il link NUOVO si crea qui e si manda, non quello vecchio dal profilo.
+      if (tolto) {
+        await a.click();
+        await ip.getByTestId("manda-link-nuovo-condividi").waitFor({ timeout: 4000 }).catch(() => {});
+        ok(((await ip.getByTestId("manda-link-nuovo").textContent().catch(() => "")) ?? "").includes("Manda il link a Sara") && ((await ip.getByTestId("manda-link-nuovo").textContent()) ?? "").includes("quello di prima non funziona più"), "invito da già iscritto, tolto da te: 'Crea un link nuovo' e poi 'Manda il link a Sara'");
+      } }
     ok(rigaPrima && (await ip.getByTestId("invito-riga").count()) === 0 && !((await ip.getByTestId("invito-pagina").textContent()) ?? "").includes("vi vedete per nome"), `invito da già iscritto, ${cosa}: dopo il no sparisce 'Da amici vi vedete per nome'`); }
   // Già amici: "Siete già amici", niente "Diventa amico".
   await ip.goto(`${BASE}/invito/i-00000000a1a1`, { waitUntil: "networkidle" });
