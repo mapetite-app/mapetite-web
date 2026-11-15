@@ -5025,6 +5025,9 @@ else {
   await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
   ok(await sp.getByTestId("seguiti").getByText("Giulia").isVisible(), "amici: riga di chi segui");
   ok(await sp.getByTestId("attivita-titolo").isVisible(), "amici: con qualcuno da seguire l'intestazione 'Attività' c'è");
+  // Revisori 15/11: il sottotitolo dice cosa fa la pagina (i posti degli amici), non "chi ha gusti come i tuoi".
+  { const sub = ((await sp.getByTestId("amici-sottotitolo").textContent()) ?? "").trim();
+    ok(sub === "Dove sono stati e dove vogliono andare i tuoi amici." && !/gusti/i.test(sub), `amici: sottotitolo vero, una riga ('${sub}')`); }
   { const riga = sp.getByTestId("seguiti");
     const pr = riga.locator('[data-testid="amico"][data-privato="1"]');
     ok((await pr.count()) === 1 && ((await pr.textContent()) ?? "").includes("Pietro") && ((await pr.textContent()) ?? "").includes("Privato") && (await pr.locator("a").count()) === 0 && (await riga.getByText("Giulia").count()) === 1, "amici: l'amico con il profilo privato si vede per nome, senza link ai suoi posti; Giulia non è ripetuta");
