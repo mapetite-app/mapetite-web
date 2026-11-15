@@ -7,8 +7,14 @@ import Avatar from "@/components/avatar";
 import SeguiButton from "@/components/segui-button";
 import { browserClient } from "@/lib/supabase/client-lazy";
 import { cleanHandle, personName, profilePath } from "@/lib/handle";
+import TrovaRubrica from "./trova-rubrica";
 
 // Ricerca persone per nome pubblico (handle) o nome: solo profili pubblici (vista profili_pubblici).
+// Il nome da cercare com'è scritto: lettere (anche accentate), numeri e spazi singoli, niente virgolette o virgole.
+export function parolaNome(raw: string): string {
+  return raw.replace(/[^\p{L}\p{N} ]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 40);
+}
+
 type Person = { id: string; handle: string; display_name: string | null; city: string | null };
 
 export default function CercaPersone({ viewerId, seguo }: { viewerId: string; seguo: string[] }) {
@@ -26,10 +32,13 @@ export default function CercaPersone({ viewerId, seguo }: { viewerId: string; se
       const client = await browserClient().catch(() => null);
       if (!client) { if (my === seq.current) setState("errore"); return; }
       // Il termine è già ripulito (solo lettere, numeri, "." e "_"): sicuro nel filtro "or".
+      // Lorenzo 14/11 ("non trovo nessuno"): "Giulia Rossi" diventava "giuliarossi" e non trovava il nome con lo
+      // spazio. Il nome si cerca com'è scritto (solo lettere, numeri e spazi, tra virgolette nel filtro).
+      const nome = parolaNome(q);
       const { data, error } = await client
         .from("profili_pubblici")
         .select("id, handle, display_name, city")
-        .or(`handle.ilike.${term}%,display_name.ilike.%${term}%`)
+        .or(`handle.ilike.${term}%,display_name.ilike."%${nome || term}%"`)
         .neq("id", viewerId)
         .limit(10);
       if (my !== seq.current) return;
@@ -58,6 +67,8 @@ export default function CercaPersone({ viewerId, seguo }: { viewerId: string; se
         />
       </label>
 
+      {term.length < 2 && <TrovaRubrica viewerId={viewerId} seguo={seguo} />}
+
       {term.length >= 2 && (
         <div data-testid="persone-risultati" className="mt-3">
           {state === "cerco" && results === null && <p className="text-sm font-sans text-text-muted">Cerco…</p>}
@@ -65,7 +76,11 @@ export default function CercaPersone({ viewerId, seguo }: { viewerId: string; se
             <p className="text-sm font-sans text-text-muted">La ricerca delle persone arriva presto. Riprova più tardi.</p>
           )}
           {results && results.length === 0 && state !== "errore" && (
-            <p className="text-sm font-sans text-text-muted">Nessuno con questo nome. Chiedi all&apos;amico il suo nome su Mapetite.</p>
+            // Lorenzo 14/11: chi non si trova di solito non ha acceso "Fatti trovare": il link d'invito lo collega lo stesso.
+            <p data-testid="persone-nessuno" className="text-sm font-sans text-text-muted">
+              Nessuno con questo nome. Forse ha il profilo privato:{" "}
+              <Link href="/profilo#invita" className="font-semibold text-brand underline underline-offset-2">mandagli il tuo link</Link>.
+            </p>
           )}
           {results && results.length > 0 && (
             <ul className="space-y-2">

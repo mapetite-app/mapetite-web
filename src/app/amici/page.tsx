@@ -5,12 +5,16 @@ import Avatar from "@/components/avatar";
 import AmiciIntanto from "./amici-intanto";
 import { loadMySaved } from "@/lib/raccolte-server";
 import { PostoCard } from "@/components/posto-persona";
-import { loadCreatorLists, loadFeed, loadMyGems, loadScopritori, loadVerdetti, viewerId } from "@/lib/social";
+import { loadAmici, loadCreatorLists, loadFeed, loadMyGems, loadMySocial, loadScopritori, loadVerdetti, mioInvito, viewerId } from "@/lib/social";
 import ScopritoriAmici from "./scopritori-amici";
 import { personName, profilePath } from "@/lib/handle";
 import { groupActivity, isVisited, whenLabel } from "@/lib/social-view";
 import CercaPersone from "./cerca-persone";
+import AmicoRiga from "./amico";
+import InvitoSospeso from "./invito-sospeso";
+import SenzaInvitoSospeso from "./senza-invito-sospeso";
 import CreatorListe from "./creator-liste";
+import InvitaAmico from "@/components/invita-amico";
 
 // Amici (piano 5.2): chi segui, cosa ha salvato o dove è stato, e la ricerca delle persone.
 // Stile Places "People": riga di avatar in alto, poi attività con le card dei locali.
@@ -37,11 +41,23 @@ export default async function AmiciPage() {
 
   const [feed, creators] = await Promise.all([loadFeed(viewer), loadCreatorLists(viewer)]);
   const seguo = feed.stato === "in-arrivo" ? [] : feed.seguiti.map((p) => p.id);
+  // Amici (ci si segue a vicenda, 14/11): tutti con il foglio "Togli dagli amici"; quelli con il profilo privato
+  // si vedono per nome, mai i posti. Chi segui senza essere amici resta un link al suo profilo.
+  const amici = feed.stato === "in-arrivo" ? [] : await loadAmici();
+  const amiciIds = new Set(amici.map((a) => a.id));
+  const soloSeguiti = feed.stato === "in-arrivo" ? [] : feed.seguiti.filter((p) => !amiciIds.has(p.id));
+  // Senza nome non si accetta un invito (lo vedrà l'amico) né si ha il link: serve a "Diventa amico" e a InvitaAmico.
+  const mioSocial = feed.stato === "in-arrivo" ? await loadMySocial(viewer) : feed.mio;
+  const senzaNome = !!mioSocial && !("stato" in mioSocial) && !mioSocial.display_name?.trim();
   // Scopritori (5.6): null senza la migrazione 20261016_scopritori → la sezione non compare.
   const [scopritori, mieGemme, verdetti] = seguo.length > 0 && feed.stato !== "in-arrivo"
     ? await Promise.all([loadScopritori(seguo), loadMyGems(viewer), loadVerdetti(feed.attivita.map((s) => s.place_id))])
     : [null, null, {} as Record<string, string>];
   const hasCreators = creators.some((c) => c.places.length > 0);
+  // Nessun amico e nessuno seguito (revisore 14/11, quarto giro): lo stato vuoto è l'invito, non una frase.
+  const vuota = feed.stato !== "in-arrivo" && feed.seguiti.length === 0 && amici.length === 0;
+  const codiceInvito = vuota ? await mioInvito() : null;
+  const privato = feed.stato !== "in-arrivo" && !feed.mio?.is_public;
   const creatorSection = (
     <div id="creator" className="scroll-mt-4">
       <CreatorListe creators={creators} viewer={viewer} seguo={seguo} />
@@ -55,10 +71,11 @@ export default async function AmiciPage() {
     <div className="mx-auto max-w-2xl px-4 pb-10 pt-6" data-testid="amici">
       <h1 className="font-title text-3xl font-semibold text-text">Amici</h1>
       <p className="mt-1 text-sm font-sans text-text-muted">I posti di chi ha gusti come i tuoi, non quelli di tutti.</p>
+      <InvitoSospeso senzaNome={senzaNome} />
 
       {feed.stato === "in-arrivo" ? (
         // Revisore 2/11: niente più "Gli amici arrivano presto" a tutta pagina: le cose vere che si fanno già.
-        <AmiciIntanto userId={viewer} saved={await loadMySaved(viewer).catch(() => [])} />
+        <AmiciIntanto userId={viewer} saved={await loadMySaved(viewer).catch(() => [])} codice={await mioInvito()} senzaNome={senzaNome} />
       ) : (
         <>
           {/* Trova persone: la ricerca per nome, come "Search by name" di Places. */}
@@ -76,25 +93,29 @@ export default async function AmiciPage() {
                 <span aria-hidden>⭐</span> Creator da seguire
               </a>
             )}
-            {/* Gli amici che non sono ancora su Mapetite: il link personale (sta nel profilo, si apre da solo). */}
-            <Link href="/profilo#invita" data-testid="amici-invita" className={chip}>
-              <span aria-hidden>💌</span> Invita un amico
-            </Link>
-            {!feed.mio?.is_public && (
-              <Link href="/profilo#profilo-pubblico" data-testid="amici-rendi-pubblico" className={chip}>
-                <span aria-hidden>🙋</span> Fatti trovare
-              </Link>
+            {/* Gli amici che non sono ancora su Mapetite: il link personale (sta nel profilo, si apre da solo).
+                Con la pagina vuota l'invito è già sotto, a tutta larghezza: niente doppione. */}
+            {!vuota && (
+              <SenzaInvitoSospeso>
+                <Link href="/profilo#invita" data-testid="amici-invita" className={chip}>
+                  <span aria-hidden>💌</span> Invita un amico
+                </Link>
+              </SenzaInvitoSospeso>
             )}
           </nav>
 
           {/* Senza nessuno da seguire, i creator sono il primo passo: vengono subito. */}
           {feed.seguiti.length === 0 && creatorSection}
 
-          {feed.seguiti.length > 0 && (
+          {amici.length + soloSeguiti.length > 0 && (
             <section className="mt-6" aria-labelledby="seguiti-titolo">
-              <h2 id="seguiti-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Chi segui · {feed.seguiti.length}</h2>
+              {/* Revisore 14/11 (terzo giro): "Amici" quando lo sono (vi seguite a vicenda), non "Chi segui". */}
+              <h2 id="seguiti-titolo" data-testid="seguiti-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">
+                {soloSeguiti.length === 0 ? "Amici" : amici.length === 0 ? "Chi segui" : "Amici e chi segui"} · {amici.length + soloSeguiti.length}
+              </h2>
               <ul data-testid="seguiti" className="-mx-4 mt-2 flex gap-3 overflow-x-auto px-4 pb-1">
-                {feed.seguiti.map((p) => (
+                {amici.map((a) => <AmicoRiga key={a.id} amico={a} />)}
+                {soloSeguiti.map((p) => (
                   <li key={p.id} className="shrink-0">
                     <Link href={profilePath(p.handle)} className="flex w-16 flex-col items-center gap-1 text-center">
                       <Avatar person={p} size={52} />
@@ -108,18 +129,18 @@ export default async function AmiciPage() {
 
           {scopritori && <ScopritoriAmici amici={scopritori} mie={mieGemme} viewer={viewer} />}
 
-          <section className="mt-6" aria-labelledby="attivita-titolo">
-            <h2 id="attivita-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Attività</h2>
-            {feed.seguiti.length === 0 ? (
-              <div data-testid="amici-vuoto" className="mt-2 rounded-card border border-[#e3e7e7] bg-white p-5 text-center">
-                <p className="font-display text-base font-semibold text-brand">Non segui ancora nessuno</p>
-                <p className="mx-auto mt-1 max-w-xs text-sm font-sans text-text-muted">
-                  Cerca un amico per nome in alto, oppure apri il link del suo profilo e tocca &quot;Segui&quot;.
-                </p>
-              </div>
+          {/* Revisore 15/11: con la pagina vuota sotto c'è solo l'invito, niente intestazione "Attività". */}
+          <section className="mt-6" aria-labelledby={vuota ? undefined : "attivita-titolo"} aria-label={vuota ? "Invita un amico" : undefined}>
+            {!vuota && <h2 id="attivita-titolo" data-testid="attivita-titolo" className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Attività</h2>}
+            {vuota ? (
+              <SenzaInvitoSospeso>
+                <div data-testid="amici-vuoto" className="mt-2">
+                  <InvitaAmico userId={viewer} handle={feed.mio?.handle ?? null} codice={codiceInvito} senzaNome={senzaNome} vuoto />
+                </div>
+              </SenzaInvitoSospeso>
             ) : feed.attivita.length === 0 ? (
               <p data-testid="amici-nessuna-attivita" className="mt-2 rounded-card border border-[#e3e7e7] bg-white p-5 text-center text-sm font-sans text-text-muted">
-                Chi segui non ha ancora salvato posti. Torna più tardi.
+                {feed.seguiti.length === 0 ? "I tuoi amici hanno il profilo privato: i loro posti non si vedono." : "Chi segui non ha ancora salvato posti. Torna più tardi."}
               </p>
             ) : (
               <ul className="mt-2 divide-y divide-border">
@@ -152,6 +173,22 @@ export default async function AmiciPage() {
               </ul>
             )}
           </section>
+
+          {/* "Fatti trovare" (revisore 14/11, quarto giro): uscito dal primo accesso, qui un riquadro discreto. Il
+              profilo si rende pubblico da /profilo, dove si vede prima cosa vedranno gli altri.
+              Revisore 15/11: nello stato vuoto una cosa sola, "Manda il tuo link"; "Fatti trovare" quando c'è qualcuno. */}
+          {privato && !vuota && (
+            <section data-testid="amici-fatti-trovare" className="mt-6 flex items-center gap-3 rounded-card border border-[#e3e7e7] bg-white px-4 py-3">
+              <span aria-hidden className="text-xl">🙋</span>
+              <p className="min-w-0 flex-1 text-[13px] font-sans leading-snug text-text-muted">
+                <span className="block font-display text-[14px] font-semibold text-text">Fatti trovare</span>
+                Gli amici ti cercano per nome solo con il profilo pubblico.
+              </p>
+              <Link href="/profilo#profilo-pubblico" data-testid="amici-rendi-pubblico" className="inline-flex min-h-11 shrink-0 items-center px-1 font-display text-sm font-semibold text-brand">
+                Rendi pubblico
+              </Link>
+            </section>
+          )}
 
           {feed.seguiti.length > 0 && creatorSection}
         </>

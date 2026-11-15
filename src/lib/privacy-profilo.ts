@@ -13,6 +13,8 @@ export const PUBBLICO_VEDONO = [
   "Recensioni, foto e video che pubblichi, con il tuo nome",
   "Chi ha l'accesso: i posti che avete in comune",
   "Chi ti segue: i posti che salvi e quando, anche sulla pagina di ogni locale",
+  // Lorenzo 14/11, "Trova amici dalla rubrica" (Android): la tua email non si mostra, ma chi la conosce ti trova.
+  "Chi conosce la tua email: che sei su Mapetite, se la cerca tra i contatti",
 ] as const;
 
 export const PUBBLICO_MAI = ["note", "il giudizio “Non fa per me”", "gusti", "prenotazioni", "posizione", "email", "data del diario"] as const;

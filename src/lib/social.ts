@@ -69,6 +69,9 @@ type FakeSocial = {
   creator?: CreatorInfo[];
   scopritori?: ScopritoreRow[]; // assente = migrazione 20261016_scopritori non applicata
   verdetti?: Record<string, string>; // UUID del locale → verdetto Mapetite
+  amici?: Amico[]; // amici reciproci (miei_amici), anche con il profilo privato
+  invito?: string; // il mio codice d'invito (mio_invito)
+  anteprime?: Record<string, { nome: string | null; handle: string | null; amico?: boolean }>; // codice → chi invita
 };
 const dev = () => process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER;
 
@@ -384,4 +387,45 @@ export async function loadMyGems(userId: string): Promise<{ gemme: number; prova
   }
   const rows = (data ?? []) as { tags: string[] | null }[];
   return { gemme: rows.length, provate: rows.filter((r) => r.tags?.includes("Già visitato")).length };
+}
+
+// ── Inviti tra amici (migrazione 20261114c_inviti_sicuri) ─────────────────────
+// Codice d'invito casuale e segreto di chi guarda ("i-" + 12 cifre). null se la funzione non c'è
+// ancora: allora il link resta quello vecchio, che conta gli arrivi ma non rende amici.
+export type Amico = { id: string; display_name: string | null; handle: string | null; is_public: boolean };
+
+export async function mioInvito(): Promise<string | null> {
+  const f = await fake();
+  if (f === "in-arrivo") return null;
+  if (f) return f.invito ?? null;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("mio_invito");
+  if (error) { console.error(`[social] mio_invito: ${error.code ?? ""} ${error.message}`); return null; }
+  return typeof data === "string" ? data : null;
+}
+
+// Chi invita, per la pagina d'arrivo: il nome che si è scelto (ha mandato lui il link), il @nome solo se pubblico,
+// e se chi guarda è già suo amico (migrazione 20261114f: "Siete già amici" invece di "Diventa amico").
+export type AnteprimaInvito = { nome: string | null; handle: string | null; amico: boolean };
+export async function anteprimaInvito(codice: string): Promise<AnteprimaInvito | null | "errore"> {
+  const f = await fake();
+  // Dato finto coerente: chi invita è "già amico" anche se sta tra gli amici del cookie (per nome).
+  if (f && f !== "in-arrivo") { const a = f.anteprime?.[codice]; return a ? { ...a, amico: a.amico === true || (!!a.nome && (f.amici ?? []).some((x) => x.display_name === a.nome)) } : null; }
+  if (f === "in-arrivo" && dev()) return null;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("anteprima_invito", { p_codice: codice });
+  if (error) { console.error(`[social] anteprima_invito: ${error.code ?? ""} ${error.message}`); return "errore"; }
+  const r = data as { nome?: string | null; handle?: string | null; amico?: boolean } | null;
+  return r ? { nome: r.nome ?? null, handle: r.handle ?? null, amico: r.amico === true } : null;
+}
+
+// Gli amici (ci si segue a vicenda): per nome anche con il profilo privato, mai i loro posti.
+export async function loadAmici(): Promise<Amico[]> {
+  const f = await fake();
+  if (f === "in-arrivo") return [];
+  if (f) return f.amici ?? [];
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("miei_amici");
+  if (error) { console.error(`[social] miei_amici: ${error.code ?? ""} ${error.message}`); return []; }
+  return (data as Amico[] | null) ?? [];
 }

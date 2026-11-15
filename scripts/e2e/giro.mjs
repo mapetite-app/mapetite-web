@@ -433,7 +433,18 @@ ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page
     const sotto = (m) => m.punti.filter((p) => p.x * 3.58 > 358 - A.w && p.y * 1.4 > 140 - A.h).length;
     const senza = ms.mappaStatica(pts, 358, 140, "tok", 16, 5_000, false, { max: 30 });
     const con = ms.mappaStatica(pts, 358, 140, "tok", 16, 5_000, false, { max: 30, angolo: A });
-    ok(sotto(senza) === 1 && sotto(con) === 0 && con.punti.length === 4, `mappa del profilo: il posto sotto la pillola resta e la mappa gli fa spazio (prima ${sotto(senza)} sotto, ora ${sotto(con)}; ${con.punti.length} puntini su 4)`); } }
+    ok(sotto(senza) === 1 && sotto(con) === 0 && con.punti.length === 4, `mappa del profilo: il posto sotto la pillola resta e la mappa gli fa spazio (prima ${sotto(senza)} sotto, ora ${sotto(con)}; ${con.punti.length} puntini su 4)`); }
+  // Sessione 14/11 sera: nelle copertine dei Salvati (124×72) i puntini sotto il tondo con l'emoji si toglievano.
+  // Ora la copertina si inquadra attorno al tondo (35×35 in basso a destra): nessun posto sotto, nessuno tolto.
+  { const T = { w: 35, h: 35 };
+    const trovaCaso = () => { for (let k = 0; k < 400; k++) { const r = (n) => Math.abs(Math.sin(k * 12.9898 + n * 78.233) * 43758.5453) % 1;
+      const pts = Array.from({ length: 5 }, (_, j) => ({ lat: 41.89 + r(j) * 0.008, lng: 12.47 + r(j + 9) * 0.01 }));
+      const s0 = ms.mappaStatica(pts, 124, 72, "tok", 8, undefined, true);
+      if (s0 && s0.punti.some((p) => p.x * 1.24 > 124 - T.w && p.y * 0.72 > 72 - T.h)) return [pts, s0.punti.length]; } return [null, 0]; };
+    const [pts, prima] = trovaCaso();
+    const sottoT = (m) => m ? m.punti.filter((p) => p.x * 1.24 > 124 - T.w && p.y * 0.72 > 72 - T.h).length : -1;
+    const con = pts && ms.mappaStatica(pts, 124, 72, "tok", 8, undefined, true, { angolo: T });
+    ok(!!pts && !!con && sottoT(con) === 0 && con.punti.length === prima, `copertine dei Salvati: nessun puntino sotto il tondo con l'emoji e nessun posto tolto (${con ? con.punti.length : 0} puntini su ${prima}, ${sottoT(con)} sotto)`); } }
 // La frase non inventa (src/lib/frase-risultati.ts, senza server): il tipo solo se lo sono tutti per Google,
 // i conteggi dalle recensioni solo a verdetti arrivati, nessun aggettivo della richiesta dato a tutti.
 { const { fraseRisultati } = await import(new URL("../../src/lib/frase-risultati.ts", import.meta.url).href);
@@ -655,6 +666,123 @@ await page.unroute("**/api/search");
   const dett = ((await page.getByTestId("frase-dettaglio").innerText().catch(() => "")) ?? "").replace(/\u00a0/g, " ");
   ok(/Tutti poco conosciuti/.test(dett) && (await page.locator("ul.snap-x").getByTestId("gemma").count()) === 0, `gemme: tutti poco conosciuti → detto una volta sopra le card, nessun 💎 sulle card ('${dett}')`); }
 await page.unroute("**/api/search");
+// Proposta 55 "Scegli tra 3" (sessione 14/11 sera): con 5 posti o più, primo tasto della riga sotto la pillola.
+// Restano tre posti diversi tra loro, ognuno col suo perché; "Tutti i N" torna alla lista intera. Nessuna chiamata in più.
+{ const sei = [
+    mk("T1", "Trattoria Prima", 41.9, 12.49, { category: "trattoria", rating: 4.6, userRatingCount: 900 }),
+    mk("T2", "Trattoria Seconda", 41.9005, 12.491, { category: "trattoria", rating: 4.5, userRatingCount: 2400 }),
+    mk("T3", "Osteria Piccola", 41.903, 12.495, { category: "osteria", rating: 4.7, userRatingCount: 110 }),
+    mk("T4", "Pizzeria Quarta", 41.897, 12.486, { category: "pizzeria", rating: 4.4, userRatingCount: 700 }),
+    mk("T5", "Bar Quinto", 41.905, 12.5, { category: "bar", rating: 4.3, userRatingCount: 300 }),
+    mk("T6", "Trattoria Sesta", 41.899, 12.488, { category: "trattoria", rating: 4.5, userRatingCount: 1500, businessStatus: "CLOSED_PERMANENTLY" }),
+  ];
+  let chiamate = 0;
+  await page.route("**/api/search", (r) => { chiamate++; return r.fulfill({ json: { ...SEARCH_FAST, risultati: sei, sintesi_pendente: null } }); });
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id=T1]").waitFor({ timeout: 5000 });
+  const tre = page.getByTestId("filtri-mappa").getByTestId("scegli-tre");
+  const primoTasto = await page.getByTestId("filtri-mappa").locator("button").first().getAttribute("data-testid");
+  ok(await tre.isVisible() && primoTasto === "scegli-tre" && (await tre.innerText()).trim() === "Scegli tra 3", `scegli tra 3: primo tasto sotto la pillola con 6 posti ('${(await tre.innerText().catch(() => "")).trim()}')`);
+  await tre.click();
+  await page.waitForTimeout(300);
+  const ids = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((els) => els.map((e) => e.dataset.id));
+  const motivi = await page.locator("ul.snap-x").getByTestId("tre-motivo").allInnerTexts();
+  ok(ids.length === 3 && ids[0] === "T1" && ids.includes("T3") && !ids.includes("T6"), `scegli tra 3: tre card, prima la più in tema, dentro il poco conosciuto, mai un posto chiuso (${ids.join(", ")})`);
+  ok(motivi.length === 3 && motivi[0] === "Il più in tema" && motivi.includes("💎 Poco conosciuto") && new Set(motivi).size === 3, `scegli tra 3: ogni card dice perché, tre perché diversi (${motivi.join(" / ")})`);
+  const tipi = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((els) => els.map((e) => e.dataset.id));
+  ok(new Set(tipi.map((id) => sei.find((x) => x.id === id)?.category)).size === 3, "scegli tra 3: tre tipi diversi (non tre trattorie)");
+  // Trattoria e osteria sono la stessa famiglia (stessa emoji 🍝 sulla card): la frase non dice "diversi tra loro".
+  const titolo = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
+  const det = (await page.getByTestId("frase-dettaglio").innerText().catch(() => "")).trim();
+  ok(titolo === "Tre da scegliere" && det === "Scelti tra 5 dei 6 posti", `scegli tra 3: la frase dice su quanti si sceglie, senza il posto chiuso ('${titolo}' · '${det}')`);
+  ok((await page.getByTestId("conteggio-risultati").innerText()).trim() === "3 posti" && (await page.locator("[data-testid=pin]").count()) === 3, "scegli tra 3: pillola '3 posti' e tre segnalini sulla mappa");
+  // Revisore 15/11: accesa, i filtri restano in vista (prima sparivano e spegnerne uno cambiava i tre senza dirlo).
+  ok((await page.getByTestId("filtri-mappa").getByRole("button", { name: "Aperto ora" }).count()) === 1 && (await tre.getAttribute("aria-pressed")) === "true", "scegli tra 3: accesa, i filtri restano in vista e il tasto è premuto");
+  // Revisore 15/11: aprire la scheda di uno dei tre e chiuderla torna ai tre, non a tutta la lista.
+  await page.locator("ul.snap-x li[data-id=T1]").scrollIntoViewIfNeeded().catch(() => {});
+  // Tocco sul nome in basso a sinistra (non sul tasto Salva in alto a destra della card).
+  const tocca = async () => { const b = await page.locator("ul.snap-x li[data-id=T1]").boundingBox({ timeout: 3000 }).catch(() => null); if (b) await page.mouse.click(b.x + 50, b.y + b.height - 50); };
+  await tocca();
+  await page.waitForTimeout(1200);
+  if (await page.locator("ul.snap-x li[data-id=T1]").isVisible().catch(() => false)) { await tocca(); await page.waitForTimeout(1200); }
+  const schedaAperta = !(await page.locator("ul.snap-x li[data-id=T1]").isVisible().catch(() => false)) && await page.getByRole("button", { name: /^Chiudi/ }).first().isVisible().catch(() => false);
+  if (!schedaAperta) await shot("05c-tre-scheda-non-aperta");
+  await page.getByRole("button", { name: /^Chiudi/ }).first().click().catch(() => {});
+  await page.waitForTimeout(900);
+  ok(schedaAperta && (await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count()) === 3 && (await page.locator("ul.snap-x").getByTestId("tre-motivo").count()) === 3, `scegli tra 3: dopo la scheda di uno dei tre si torna ai tre (scheda aperta: ${schedaAperta})`);
+  await shot("05c-scegli-tra-3");
+  await tre.click();
+  await page.waitForTimeout(300);
+  ok((await page.locator("ul.snap-x li[data-id]:not([data-id=''])").count()) === 6 && (await page.locator("ul.snap-x").getByTestId("tre-motivo").count()) === 0 && (await tre.innerText()).trim() === "Scegli tra 3", "scegli tra 3: 'Tutti i 6' torna alla lista intera");
+  ok(chiamate === 1, `scegli tra 3: nessuna ricerca in più (${chiamate} chiamata)`);
+  await page.unroute("**/api/search");
+  // Revisore 14/11 sera: con tutte trattorie nessuna card dice "un altro tipo" (era "Diverso dagli altri", falso).
+  { const tutte = sei.slice(0, 5).map((x, i) => ({ ...x, name: `Trattoria ${["Uno", "Due", "Tre", "Quattro", "Cinque"][i]}`, category: "trattoria", userRatingCount: 900 }));
+    await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: tutte, sintesi_pendente: null } }));
+    await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await (await esempio(page)).click();
+    await page.locator("ul.snap-x li[data-id=T1]").waitFor({ timeout: 5000 });
+    await page.getByTestId("filtri-mappa").getByTestId("scegli-tre").click();
+    await page.waitForTimeout(300);
+    const m = await page.locator("ul.snap-x").getByTestId("tre-motivo").allInnerTexts();
+    const t = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
+    const dd = (await page.getByTestId("frase-dettaglio").innerText().catch(() => "")).trim();
+    ok(m.length === 3 && !m.some((x) => /altro tipo/i.test(x)) && t === "Tre da scegliere" && !/altro tipo|diversi/.test(dd), `scegli tra 3: tutti dello stesso tipo → niente "diverso" né "un altro tipo" (${m.join(" / ")} · '${t}' · '${dd}')`);
+    await page.unroute("**/api/search"); }
+  // Revisore 15/11: i tipi si confrontano come scritti sulle card. Due "Trattoria …" con tipi Google diversi
+  // (italian_restaurant, seafood_restaurant) e due pasticcerie (pastry_shop, cake_shop) non sono "altri tipi".
+  { const misti = [
+      mk("M1", "Trattoria da Lucia", 41.9, 12.49, { category: "italian_restaurant", rating: 4.6, userRatingCount: 900 }),
+      mk("M2", "Trattoria Il Moro", 41.9005, 12.491, { category: "seafood_restaurant", rating: 4.5, userRatingCount: 2000 }),
+      mk("M3", "Pasticceria Uno", 41.903, 12.495, { category: "pastry_shop", rating: 4.5, userRatingCount: 800 }),
+      mk("M4", "Pasticceria Due", 41.897, 12.486, { category: "cake_shop", rating: 4.4, userRatingCount: 700 }),
+      mk("M5", "Trattoria Terza", 41.905, 12.5, { category: "restaurant", rating: 4.3, userRatingCount: 600 }),
+    ];
+    await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: misti, sintesi_pendente: null } }));
+    await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await (await esempio(page)).click();
+    await page.locator("ul.snap-x li[data-id=M1]").waitFor({ timeout: 5000 });
+    await page.getByTestId("filtri-mappa").getByTestId("scegli-tre").click();
+    await page.waitForTimeout(300);
+    const ids = await page.locator("ul.snap-x li[data-id]:not([data-id=''])").evaluateAll((els) => els.map((e) => e.dataset.id));
+    const m = await page.locator("ul.snap-x").getByTestId("tre-motivo").allInnerTexts();
+    const t = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
+    const pasticcerie = ids.filter((id) => id === "M3" || id === "M4").length;
+    const diverso = m.filter((x) => x === "Un altro tipo").length;
+    ok(pasticcerie === 1 && diverso <= 1 && (t === "Tre, diversi tra loro") === (new Set(ids.map((id) => (id === "M3" || id === "M4" ? "p" : "t"))).size === 3), `scegli tra 3: tipi confrontati come sulle card (${ids.join(", ")} · ${m.join(" / ")} · '${t}')`);
+    await page.unroute("**/api/search"); }
+  // Con meno di 5 posti il tasto non c'è: si vedono già tutti.
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id=P1]").waitFor({ timeout: 5000 });
+  ok((await page.getByTestId("scegli-tre").count()) === 0, "scegli tra 3: con 3 posti il tasto non c'è"); }
+// Revisore 15/11 (terzo giro): il primo poco conosciuto tiene il 💎 ("Il più in tema · 💎"); con 5 posti di cui uno
+// chiuso niente tasto morto (prima restava grigio per sempre).
+{ const g = [
+    mk("G1", "Osteria Gemma", 41.9, 12.49, { category: "osteria", rating: 4.8, userRatingCount: 120 }),
+    mk("G2", "Pizzeria Due", 41.9005, 12.491, { category: "pizzeria", rating: 4.5, userRatingCount: 2400 }),
+    mk("G3", "Enoteca Tre", 41.903, 12.495, { category: "wine_bar", rating: 4.4, userRatingCount: 800 }),
+    mk("G4", "Bar Quattro", 41.897, 12.486, { category: "bar", rating: 4.3, userRatingCount: 700 }),
+    mk("G5", "Sushi Cinque", 41.905, 12.5, { category: "sushi_restaurant", rating: 4.4, userRatingCount: 900 }),
+  ];
+  await page.unroute("**/api/search");
+  await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: g, sintesi_pendente: null } }));
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id=G1]").waitFor({ timeout: 5000 });
+  await page.getByTestId("filtri-mappa").getByTestId("scegli-tre").click();
+  await page.waitForTimeout(300);
+  { const m = await page.locator("ul.snap-x").getByTestId("tre-motivo").allInnerTexts();
+    ok(m[0] === "Il più in tema · 💎", `scegli tra 3: il primo poco conosciuto tiene il 💎 (${m.join(" / ")})`); }
+  await page.unroute("**/api/search");
+  await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: [...g.slice(0, 4), { ...g[4], businessStatus: "CLOSED_PERMANENTLY" }], sintesi_pendente: null } }));
+  await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id=G1]").waitFor({ timeout: 5000 });
+  await page.waitForTimeout(300);
+  ok((await page.getByTestId("scegli-tre").count()) === 0, "scegli tra 3: con 5 posti di cui uno chiuso niente tasto (prima restava grigio per sempre)");
+  await page.unroute("**/api/search"); }
 // Le gemme sono accese per tutti dal 14/10: ?beta=off le spegne nella visita in cui compare.
 await page.goto(`${BASE}/mappa?beta=off`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
@@ -1879,7 +2007,9 @@ for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
 // Norme sulla privacy (29/10): le chiede Google per pubblicare l'accesso con Google; aperte anche senza account.
 { const resp = await page.goto(`${BASE}/privacy`, { waitUntil: "networkidle" });
   const t = (await page.getByTestId("privacy").innerText().catch(() => "")) ?? "";
-  ok(resp?.status() === 200 && t.includes("I tuoi diritti") && t.includes("founder.mapetite@gmail.com") && new URL(page.url()).pathname === "/privacy", "privacy: /privacy si apre, con contatto e diritti"); }
+  ok(resp?.status() === 200 && t.includes("I tuoi diritti") && t.includes("founder.mapetite@gmail.com") && new URL(page.url()).pathname === "/privacy", "privacy: /privacy si apre, con contatto e diritti");
+  // Revisore 15/11: "Profilo pubblico" non sta più nel primo accesso; l'informativa non deve dirlo.
+  ok(!t.includes("alla fine del primo accesso") && t.includes("Profilo → Impostazioni → Profilo pubblico"), "privacy: il profilo si rende pubblico dal Profilo, non dal primo accesso"); }
 await page.goto(`${BASE}/miei-locali`, { waitUntil: "networkidle" });
 ok(new URL(page.url()).pathname === "/mappa" && new URL(page.url()).searchParams.get("vista") === "salvati", "pagina vecchia /miei-locali: porta a 'I miei salvati'");
 // Suggerimento col meteo (piano 2.3): pioggia alle 19:30 → un posto al coperto; caldo → all'aperto.
@@ -4669,6 +4799,8 @@ else {
       sv(MARCO, "marco", "Marco", "44444444-0000-4000-8000-000000000008", "Osteria Milano", "restaurant", ["Da provare"], oggi, 45.48, 9.19),
     ],
     seguo: [GIULIA],
+    // Amici reciproci da invito (14/11): Pietro ha il profilo privato (solo il nome), Giulia è già tra chi segui.
+    amici: [{ id: "00000000-0000-4000-8000-0000000009b7", display_name: "Pietro", handle: null, is_public: false }, { id: GIULIA, display_name: "Giulia", handle: "giulia.rm", is_public: true }],
     mio: { handle: null, display_name: null, bio: null, city: null, is_public: false },
     // Verdetti Mapetite (18/10): sulle card del feed come la riga di descrizione di Places. Osteria Milano è di chi non segui.
     verdetti: { [LOC_SOC]: "Cucina romana vera, tavoli fuori nel vicolo.", "44444444-0000-4000-8000-000000000008": "Non deve comparire" },
@@ -4892,6 +5024,33 @@ else {
   // Amici: chi segui, attività raggruppata, ricerca persone.
   await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
   ok(await sp.getByTestId("seguiti").getByText("Giulia").isVisible(), "amici: riga di chi segui");
+  ok(await sp.getByTestId("attivita-titolo").isVisible(), "amici: con qualcuno da seguire l'intestazione 'Attività' c'è");
+  { const riga = sp.getByTestId("seguiti");
+    const pr = riga.locator('[data-testid="amico"][data-privato="1"]');
+    ok((await pr.count()) === 1 && ((await pr.textContent()) ?? "").includes("Pietro") && ((await pr.textContent()) ?? "").includes("Privato") && (await pr.locator("a").count()) === 0 && (await riga.getByText("Giulia").count()) === 1, "amici: l'amico con il profilo privato si vede per nome, senza link ai suoi posti; Giulia non è ripetuta");
+    // Revisore 14/11 (terzo giro): "Amici" quando vi seguite a vicenda, non "Chi segui".
+    ok(((await sp.getByTestId("seguiti-titolo").textContent()) ?? "").startsWith("Amici ·"), `amici: la sezione si chiama 'Amici' quando lo sono (${await sp.getByTestId("seguiti-titolo").textContent()})`);
+    // Revisore 14/11 (terzo giro): "Togli dagli amici" in un foglio dal basso (prima tagliato dalla riga che scorre).
+    await pr.locator("button").first().click();
+    const foglio = sp.getByTestId("amico-foglio");
+    await foglio.waitFor({ timeout: 3000 }).catch(() => {});
+    const toccabile = await sp.getByTestId("togli-amico").evaluate((b) => { const r = b.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2; return y > 0 && y < window.innerHeight && (document.elementFromPoint(x, y) === b || b.contains(document.elementFromPoint(x, y))); }).catch(() => false);
+    const colore = await sp.getByTestId("togli-amico").evaluate((b) => getComputedStyle(b).color).catch(() => "");
+    ok(await foglio.isVisible() && toccabile && (await foglio.getByTestId("togli-annulla").isVisible()) && /rgb\((1[5-9]\d|2\d\d), \d{1,2}, \d{1,2}\)/.test(colore), `amici: toccando l'amico si apre il foglio con 'Togli dagli amici' (rosso, toccabile senza scorrere) e 'Annulla' (${colore})`);
+    // Revisore 14/11 (quarto giro): prima di togliere si sa che un invito non vi rimetterà amici.
+    { const av = foglio.getByTestId("togli-avviso"); const ya = (await av.boundingBox())?.y ?? -1; const yt = (await foglio.getByTestId("togli-amico").boundingBox())?.y ?? -1;
+      ok(((await av.textContent()) ?? "").includes("Per tornare amici dovrai creare un link nuovo: quello di prima smetterà di funzionare") && ya >= 0 && ya < yt, "amici: sopra 'Togli dagli amici' la riga 'Per tornare amici dovrai creare un link nuovo: quello di prima smetterà di funzionare'"); }
+    await sp.screenshot({ path: `${OUT}/62-amici-togli.png`, caret: "initial" });
+    await foglio.getByTestId("togli-annulla").click();
+    ok((await sp.getByTestId("amico-foglio").count()) === 0 && (await pr.count()) === 1, "amici: 'Annulla' chiude il foglio e l'amico resta");
+    // Anche l'amico con il profilo pubblico si toglie da qui (un'azione unica, i due "segui"), e il profilo è a un tocco.
+    await riga.locator('[data-testid="amico"]:not([data-privato])').first().locator("button").click();
+    ok((await sp.getByTestId("amico-foglio").getByTestId("amico-profilo").getAttribute("href")) === "/u/giulia.rm" && await sp.getByTestId("amico-foglio").getByTestId("togli-amico").isVisible(), "amici: anche l'amico con il profilo pubblico ha 'Togli dagli amici', con 'Apri il profilo'");
+    await sp.getByTestId("togli-annulla").click();
+    await pr.locator("button").first().click();
+    await sp.getByTestId("togli-amico").click();
+    await sp.waitForTimeout(800);
+    ok((await riga.locator('[data-testid="amico"][data-privato="1"]').count()) === 0 && (await sp.getByTestId("amico-foglio").count()) === 0, "amici: 'Togli dagli amici' lo toglie dalla riga e chiude il foglio"); }
   { const att = sp.getByTestId("attivita");
     const first = (await att.first().innerText()).replace(/\s+/g, " ");
     ok((await att.count()) === 1 && first.includes("Giulia ha provato Trattoria del Vicolo e altri 2 posti") && first.includes("oggi"), `amici: attività raggruppata per persona (${first.slice(0, 70)})`);
@@ -4899,7 +5058,7 @@ else {
     ok(!(await sp.content()).includes("Osteria Milano"), "amici: niente attività di chi non segui");
     { const v = att.first().getByTestId("card-attivita").first().getByTestId("card-attivita-verdetto");
       ok((await v.textContent()) === "Cucina romana vera, tavoli fuori nel vicolo." && (await att.first().getByTestId("card-attivita-verdetto").count()) === 1 && !(await sp.content()).includes("Non deve comparire"), "amici: sulle card il verdetto Mapetite, solo dove c'è"); } }
-  ok(await sp.getByTestId("amici-rendi-pubblico").isVisible() && (await sp.getByTestId("amici-rendi-pubblico").getAttribute("href")) === "/profilo#profilo-pubblico", "amici: invito a rendere pubblico il proprio profilo (oggi privato)");
+  ok(await sp.getByTestId("amici-rendi-pubblico").isVisible() && (await sp.getByTestId("amici-rendi-pubblico").getAttribute("href")) === "/profilo#profilo-pubblico" && ((await sp.getByTestId("amici-fatti-trovare").textContent()) ?? "").includes("Fatti trovare") && (await sp.getByTestId("amici-ingressi").getByTestId("amici-rendi-pubblico").count()) === 0, "amici: riquadro discreto 'Fatti trovare' (uscito dal primo accesso) che porta a rendere pubblico il profilo");
   // Gerarchia (semplificazione 16/10): ricerca in alto, ingressi compatti, poi chi segui e l'attività.
   { const top = async (id) => (await sp.getByTestId(id).first().boundingBox())?.y ?? -1;
     const [cerca, ingressi, seguiti, attivita] = [await sp.getByLabel("Cerca persone per nome").boundingBox().then((b) => b?.y ?? -1), await top("amici-ingressi"), await top("seguiti"), await top("attivita")];
@@ -4907,6 +5066,68 @@ else {
     ok((await sp.getByTestId("amici-ingressi").getByTestId("amici-gruppi").getAttribute("href")) === "/gruppi", "amici: ingresso compatto 'Liste di gruppo'");
     ok((await sp.getByTestId("amici-ingressi").getByTestId("amici-invita").getAttribute("href")) === "/profilo#invita", "amici: 'Invita un amico' porta al proprio link d'invito"); }
   await sp.screenshot({ path: `${OUT}/62-amici.png`, caret: "initial" });
+  // Revisore 14/11 (terzo giro): l'invito lasciato senza risposta nel primo accesso torna in Amici, mai accettato da solo.
+  ok((await sp.getByTestId("invito-sospeso").count()) === 0, "amici: senza un invito in sospeso nessun riquadro d'invito");
+  // Revisore 15/11: dato finto coerente. Giulia è tra gli amici: il suo invito in sospeso dice "già amici", niente "Diventa amico".
+  await sp.evaluate(() => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: "i-0000000000aa", t: Date.now() })));
+  await sp.reload({ waitUntil: "networkidle" });
+  await sp.getByTestId("invito-gia-amici").waitFor({ timeout: 4000 }).catch(() => {});
+  ok((await sp.getByTestId("invito-sospeso").count()) === 0 && ((await sp.getByTestId("invito-gia-amici").textContent().catch(() => "")) ?? "").includes("Tu e Giulia siete già amici"), "amici: l'invito in sospeso di chi è già tra gli amici non propone 'Diventa amico'");
+  // Da qui Giulia è solo seguita (non amica): l'invito in sospeso si propone.
+  await setSocial(soctx, { ...social, amici: social.amici.filter((a) => a.id !== GIULIA) });
+  await sp.evaluate(() => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: "i-0000000000aa", t: Date.now() })));
+  await sp.reload({ waitUntil: "networkidle" });
+  { const s = sp.getByTestId("invito-sospeso");
+    await s.waitFor({ timeout: 4000 }).catch(() => {});
+    ok(((await s.textContent().catch(() => "")) ?? "").includes("Giulia ti ha invitato") && await s.getByTestId("invito-si").isDisabled() && await s.getByTestId("invito-mio-nome").isVisible() && await s.getByTestId("invito-no").isVisible(), "amici: l'invito rimasto senza risposta si ripropone, con il nome da scrivere e 'Non ora'");
+    // Revisore 15/11 (sesto giro): con l'invito in sospeso niente "Invita un amico" (due campi nome e due tasti).
+    ok((await sp.getByTestId("amici-invita").count()) === 0, "amici: con l'invito in sospeso 'Invita un amico' è nascosto");
+    await s.getByTestId("invito-no").click();
+    ok((await sp.getByTestId("invito-sospeso").count()) === 0 && (await sp.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "amici: 'Non ora' chiude l'invito e lo dimentica");
+    ok(await sp.getByTestId("amici-invita").isVisible(), "amici: dopo 'Non ora' torna 'Invita un amico'");
+    await sp.evaluate(() => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: "i-0000000000aa", t: Date.now() })));
+    await sp.reload({ waitUntil: "networkidle" });
+    await s.waitFor({ timeout: 4000 }).catch(() => {});
+    await s.getByTestId("invito-mio-nome").fill("Luca");
+    await s.getByTestId("invito-si").click();
+    await s.getByTestId("invito-accettato").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(((await s.getByTestId("invito-accettato").textContent().catch(() => "")) ?? "").includes("Tu e Giulia siete amici") && (await sp.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "amici: 'Diventa amico' dall'invito in sospeso, poi il codice si cancella");
+    await sp.screenshot({ path: `${OUT}/62-amici-invito-sospeso.png`, caret: "initial" }); }
+  // Revisore 14/11 (quarto giro): niente spazio vuoto in fondo al riquadro dell'invito in sospeso.
+  await sp.evaluate(() => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: "i-0000000000aa", t: Date.now() })));
+  await sp.reload({ waitUntil: "networkidle" });
+  { const s = sp.getByTestId("invito-sospeso");
+    await s.waitFor({ timeout: 4000 }).catch(() => {});
+    const vuoto = await s.evaluate((el) => { const b = el.getBoundingClientRect().bottom; const kids = [...el.querySelectorAll("button, input, p")].map((k) => k.getBoundingClientRect().bottom); return Math.round(b - Math.max(...kids)); }).catch(() => 99);
+    { const bg = await s.getByTestId("invito-si").evaluate((e) => getComputedStyle(e).backgroundColor).catch(() => "");
+      ok(await s.getByTestId("invito-si").isDisabled() && bg === "rgb(227, 231, 231)", `amici: senza nome 'Diventa amico' spento ma leggibile (grigio chiaro, testo scuro: ${bg})`); }
+    ok(vuoto <= 17, `amici: invito in sospeso senza spazio vuoto in fondo (${vuoto}px dall'ultimo elemento al bordo)`);
+    await s.getByTestId("invito-no").click().catch(() => {}); }
+  // Già amici di chi invita: "Siete già amici", niente "Diventa amico".
+  await sp.evaluate(() => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: "i-00000000a1a1", t: Date.now() })));
+  await sp.reload({ waitUntil: "networkidle" });
+  await sp.getByTestId("invito-gia-amici").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(((await sp.getByTestId("invito-gia-amici").textContent().catch(() => "")) ?? "").includes("siete già amici") && (await sp.getByTestId("invito-sospeso").count()) === 0 && (await sp.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "amici: invito di chi è già amico → 'Siete già amici', niente 'Diventa amico'");
+  // Stato vuoto (social attivo, nessun amico): l'invito a tutta larghezza, con il nome se manca, al posto di una frase.
+  await setSocial(soctx, { ...social, seguo: [], amici: [], invito: "i-00000000c0de" });
+  await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  { const v = sp.getByTestId("amici-vuoto");
+    ok((await v.getByTestId("invita-amico").getAttribute("data-vuoto")) === "1" && await v.getByTestId("nome-per-invito").isVisible() && !((await v.textContent()) ?? "").includes("Non segui ancora nessuno") && (await sp.getByTestId("amici-invita").count()) === 0, "amici vuoto: riquadro 'Invita un amico' con il nome da scrivere, niente chip doppione");
+    ok((await sp.getByTestId("attivita-titolo").count()) === 0 && (await sp.getByText("Attività", { exact: true }).count()) === 0, "amici vuoto: niente intestazione 'Attività' sopra il solo invito");
+    { const t = (await v.getByTestId("invita-amico-testo").textContent()) ?? ""; ok(t.includes("se vuole, diventate amici") && !t.includes("vi passate i posti"), `amici vuoto: il testo promette solo quello che succede (${t})`); }
+    { const b = v.getByTestId("nome-per-invito-crea"); const st = await b.evaluate((e) => [getComputedStyle(e).backgroundColor, getComputedStyle(e).opacity]).catch(() => []);
+      ok(await b.isDisabled() && st[0] === "rgb(227, 231, 231)" && st[1] === "1", `amici vuoto: senza nome 'Crea il link' spento ma leggibile (grigio chiaro, testo scuro: ${st.join(" ")})`);
+      await v.getByTestId("nome-per-invito-campo").fill("Luca");
+      const bg = await b.evaluate((e) => getComputedStyle(e).backgroundColor);
+      ok(!(await b.isDisabled()) && bg === "rgb(255, 107, 74)", `amici vuoto: con il nome 'Crea il link' acceso, in corallo (${bg})`);
+      await v.getByTestId("nome-per-invito-campo").fill(""); }
+    ok((await sp.getByTestId("amici-fatti-trovare").count()) === 0 && (await sp.getByTestId("amici-rendi-pubblico").count()) === 0, "amici vuoto: una cosa sola (l'invito), niente 'Fatti trovare / Rendi pubblico'");
+    await sp.screenshot({ path: `${OUT}/62-amici-vuoto.png`, caret: "initial", fullPage: true }); }
+  await setSocial(soctx, { ...social, seguo: [], amici: [], invito: "i-00000000c0de", mio: { ...social.mio, display_name: "Luca" } });
+  await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
+  ok(await sp.getByTestId("amici-vuoto").getByTestId("invita-amico-condividi").isVisible(), "amici vuoto con il nome: 'Manda il tuo link'");
+  await setSocial(soctx, social);
+  await sp.goto(`${BASE}/amici`, { waitUntil: "networkidle" });
   let searchUrl = null;
   await soctx.route("**/rest/v1/profili_pubblici**", (r) => { searchUrl = decodeURIComponent(r.request().url()); return r.fulfill({ json: [{ id: MARCO, handle: "marco", display_name: "Marco", city: "Milano" }] }); });
   await sp.getByLabel("Cerca persone per nome").fill("@Mar");
@@ -4917,6 +5138,32 @@ else {
   await sp.getByTestId("persona").getByText("Segui già").waitFor({ timeout: 4000 }).catch(() => {});
   ok(follows.some((f) => f.method === "POST" && f.body?.followed_id === MARCO), "amici: 'Segui' dai risultati della ricerca");
   await sp.screenshot({ path: `${OUT}/63-amici-cerca.png`, caret: "initial" });
+  // Lorenzo 14/11 ("non trovo nessuno"): un nome con lo spazio si cerca com'è scritto, non "giuliarossi".
+  searchUrl = null;
+  await sp.getByLabel("Cerca persone per nome").fill("Giulia Rossi");
+  await sp.waitForTimeout(700);
+  ok(!!searchUrl && searchUrl.replace(/\+/g, " ").includes('display_name.ilike."%Giulia Rossi%"'), `amici: 'Giulia Rossi' cerca il nome con lo spazio (${searchUrl?.split("or=")[1]?.slice(0, 90)})`);
+  await soctx.unroute("**/rest/v1/profili_pubblici**");
+  await soctx.route("**/rest/v1/profili_pubblici**", (r) => r.fulfill({ json: [] }));
+  await sp.getByLabel("Cerca persone per nome").fill("Nessuno Qui");
+  await sp.getByTestId("persone-nessuno").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(((await sp.getByTestId("persone-nessuno").textContent().catch(() => "")) ?? "").includes("profilo privato") && (await sp.getByTestId("persone-nessuno").getByRole("link").getAttribute("href")) === "/profilo#invita", "amici: nessun risultato spiega 'Fatti trovare' e porta al link d'invito");
+  // "Trova amici dalla rubrica": solo con il Contact Picker (Android). Qui Chromium da computer non ce l'ha.
+  await sp.getByLabel("Cerca persone per nome").fill("");
+  ok((await sp.getByTestId("trova-rubrica").count()) === 0, "amici: senza Contact Picker (iPhone, computer) niente 'Trova amici dalla rubrica'");
+  await soctx.addInitScript(() => { Object.defineProperty(navigator, "contacts", { configurable: true, value: { select: async () => [{ email: [" Giulia@Example.com "] }, { email: [] }] } }); });
+  let rubricaBody = null;
+  await soctx.route("**/rest/v1/rpc/trova_da_contatti**", (r) => { rubricaBody = r.request().postDataJSON(); return r.fulfill({ json: [{ id: MARCO, handle: "marco", display_name: "Marco", city: "Milano" }] }); });
+  await sp.reload({ waitUntil: "networkidle" });
+  ok(await sp.getByTestId("trova-rubrica-tasto").isVisible(), "amici (Android): 'Trova amici dalla rubrica' sotto la ricerca");
+  await sp.getByTestId("trova-rubrica-tasto").click();
+  await sp.getByTestId("trova-rubrica-risultati").waitFor({ timeout: 4000 }).catch(() => {});
+  // SHA-256 di "giulia@example.com" (minuscolo, senza spazi): l'email in chiaro non parte mai.
+  { const sent = JSON.stringify(rubricaBody ?? {});
+    const atteso = await sp.evaluate(async () => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("giulia@example.com"))), (b) => b.toString(16).padStart(2, "0")).join(""));
+    ok(Array.isArray(rubricaBody?.p_hash) && rubricaBody.p_hash.length === 1 && rubricaBody.p_hash[0] === atteso && !sent.includes("@"), `amici (Android): al server solo l'impronta SHA-256 dell'email, mai l'email (${sent.slice(0, 90)})`); }
+  ok(await sp.getByTestId("trova-rubrica-risultati").getByText("Marco", { exact: true }).isVisible(), "amici (Android): i contatti con 'Fatti trovare' compaiono con 'Segui'");
+  await sp.screenshot({ path: `${OUT}/63b-amici-rubrica.png`, caret: "initial" });
 
   // Impostazioni del profilo pubblico (in /profilo): spento di default, testo chiaro, nome ripulito.
   let profPatch = null;
@@ -8480,7 +8727,9 @@ if (fakeUser) {
 if (!fakeUser) console.log("SKIP  invito: dev server senza E2E_FAKE_USER");
 else {
   const GIU = { id: "00000000-0000-4000-8000-0000000009a1", handle: "giulia.rm", display_name: "Giulia", bio: null, city: "Roma", visitati: 4, da_provare: 7, seguaci: 0, seguiti: 0 };
-  const socialInv = { profili: [GIU], salvati: [], seguo: [], mio: { handle: "lorenzo", display_name: "Lorenzo", bio: null, city: "Roma", is_public: true } };
+  // Link personale da amico (14/11): codice casuale "i-…"; il nome arriva dall'anteprima (anteprima_invito).
+  const COD_AMICO = "i-0000000000aa";
+  const socialInv = { profili: [GIU], salvati: [], seguo: [], mio: { handle: "lorenzo", display_name: "Lorenzo", bio: null, city: "Roma", is_public: true }, anteprime: { [COD_AMICO]: { nome: "Giulia", handle: null }, "i-00000000a5a5": { nome: "Marta", handle: null }, "i-00000000a6a6": { nome: "Sara", handle: null }, "i-00000000a7a7": { nome: "Paolo", handle: null }, "i-00000000a8a8": { nome: "Pietro", handle: null }, "i-00000000a1a1": { nome: "Giulia", handle: null, amico: true } } };
   const ictx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   const ievents = [];
   await ictx.route("**/api/events", (r) => { ievents.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
@@ -8511,6 +8760,9 @@ else {
   ok(stored?.codice === "giulia.rm", `invito: codice ricordato nel telefono fino alla registrazione (${JSON.stringify(stored)})`);
   const og = await ip.locator('meta[property="og:title"]').getAttribute("content");
   ok(og === "Giulia ti invita su Mapetite", `invito: anteprima del link su WhatsApp con il nome (${og})`);
+  // Lorenzo 14/11: chi entra dal link personale diventa amico di chi l'ha mandato; lo si dice prima di "Inizia".
+  // Revisore 14/11: il @nome non rende amici (chiunque lo conosce); solo il codice casuale del link personale.
+  ok((await ip.getByTestId("invito-amicizia").textContent()) === "Gratis, in meno di un minuto.", `invito con il @nome: nessuna promessa di amicizia (${await ip.getByTestId("invito-amicizia").textContent()})`);
   await ip.screenshot({ path: `${OUT}/invito-arrivo.png`, caret: "initial" });
   await ip.reload({ waitUntil: "networkidle" });
   await ip.waitForTimeout(300);
@@ -8526,6 +8778,69 @@ else {
   // Codici generici e sconosciuti: testo neutro, mai un nome inventato.
   await ip.goto(`${BASE}/invito/tester`, { waitUntil: "networkidle" });
   ok((await ip.getByTestId("invito-titolo").textContent()) === "Sei tra i primi a provare Mapetite" && !(await ip.getByTestId("invito-posti").count()), "invito: codice 'tester' per il gruppo di prova");
+  ok((await ip.getByTestId("invito-amicizia").textContent()) === "Gratis, in meno di un minuto.", "invito: il codice 'tester' non collega a nessuno (niente 'diventi amico')");
+  await ip.goto(`${BASE}/invito/${COD_AMICO}`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Giulia ti ha invitato su Mapetite" && ((await ip.getByTestId("invito-amicizia").textContent()) ?? "").includes("se vuoi, diventi amico di Giulia"), `invito da amico (codice casuale): nome di chi invita e amicizia proposta, non imposta (${await ip.getByTestId("invito-amicizia").textContent()})`);
+  { const fs = await ip.getByTestId("invito-amicizia").evaluate((e) => parseFloat(getComputedStyle(e).fontSize)); ok(fs >= 13, `invito: la riga sull'amicizia si legge (${fs}px)`); }
+  // Già iscritto (revisore 14/11, secondo): dal link dell'amico "Diventa amico di Giulia", con il nome se manca.
+  await ictx.clearCookies({ name: "e2e_anonimo" });
+  await ip.goto(`${BASE}/invito/${COD_AMICO}`, { waitUntil: "networkidle" });
+  { const acc = ip.getByTestId("invito-accetta");
+    ok(await acc.isVisible() && ((await acc.getByTestId("invito-si").textContent()) ?? "").includes("Diventa amico di Giulia") && (await ip.getByText("Hai già un account: sei dentro").count()) === 0, "invito da già iscritto: 'Diventa amico di Giulia' al posto di 'sei dentro'");
+    if (await acc.getByTestId("invito-mio-nome").count()) await acc.getByTestId("invito-mio-nome").fill("Luca");
+    await acc.getByTestId("invito-si").click();
+    await ip.getByTestId("invito-accettato").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(((await ip.getByTestId("invito-accettato").textContent().catch(() => "")) ?? "").includes("Tu e Giulia siete amici"), "invito da già iscritto: un tocco e siete amici"); }
+  // Revisore 14/11 (quarto giro): da già iscritto niente presentazione dell'app; in alto chi invita e il tasto.
+  await ip.goto(`${BASE}/invito/${COD_AMICO}`, { waitUntil: "networkidle" });
+  { const b = await ip.getByTestId("invito-si").boundingBox();
+    ok((await ip.getByText("Salvi un locale in un gesto").count()) === 0 && (await ip.getByTestId("invito-titolo").textContent()) === "Giulia ti ha invitato" && !!b && b.y + b.height < 520, `invito da già iscritto: niente presentazione, avatar e tasto in alto (${Math.round(b?.y ?? -1)})`);
+    // Lorenzo ha già un nome: il tasto è acceso (corallo). Lo spento leggibile si prova in Amici e nel primo accesso.
+    const bg = await ip.getByTestId("invito-si").evaluate((e) => getComputedStyle(e).backgroundColor);
+    ok((await ip.getByTestId("invito-mio-nome").count()) === 0 && !(await ip.getByTestId("invito-si").isDisabled()) && bg === "rgb(255, 107, 74)", `invito da già iscritto con il nome: 'Diventa amico' acceso, in corallo (${bg})`);
+    await ip.screenshot({ path: `${OUT}/invito-gia-iscritto.png`, caret: "initial" }); }
+  // Esiti distinti: già usato tra voi due, l'avevi tolto tu, troppi amici da invito (prima tutti "chiedi un link nuovo").
+  // Revisore 15/11: dopo un'amicizia tolta niente "rendete pubblico il profilo": si torna con un link nuovo di chi l'ha tolta.
+  for (const [cod, atteso, cosa, vietato] of [["i-00000000a5a5", "chi aveva tolto l'amicizia deve mandarti un link nuovo", "già usato", "pubblico"], ["i-00000000a6a6", "Avevi tolto Sara dagli amici: per tornare, manda tu un link nuovo", "tolto da te", "pubblico"], ["i-00000000a7a7", "Hai già 30 amici da invito", "troppi", "link nuovo"], ["i-00000000a8a8", "Pietro ha già 30 amici da invito", "troppi di chi invita", "Hai già"]]) {
+    await ip.goto(`${BASE}/invito/${cod}`, { waitUntil: "networkidle" });
+    const rigaPrima = await ip.getByTestId("invito-riga").isVisible();
+    if (await ip.getByTestId("invito-mio-nome").count()) await ip.getByTestId("invito-mio-nome").fill("Luca");
+    await ip.getByTestId("invito-si").click();
+    await ip.getByTestId("invito-scaduto").waitFor({ timeout: 4000 }).catch(() => {});
+    const t = (await ip.getByTestId("invito-scaduto").textContent().catch(() => "")) ?? "";
+    ok(t.includes(atteso) && !t.includes(vietato), `invito da già iscritto, ${cosa}: il motivo vero (${t})`);
+    // Revisore 15/11: "Da amici vi vedete per nome in Amici" c'è prima del tocco, non dopo un no.
+    // Revisore 15/11 (sesto giro): dopo un no la pagina ha il suo tasto principale (prima un link discreto e basta).
+    { const a = ip.getByTestId("invito-apri"); const bg = await a.evaluate((e) => getComputedStyle(e).backgroundColor).catch(() => "");
+      const tolto = cosa === "tolto da te";
+      ok((await a.count()) === 1 && bg === "rgb(255, 107, 74)" && (tolto ? ((await a.textContent()) ?? "").includes("Crea un link nuovo") : (await a.getAttribute("href")) === "/mappa"), `invito da già iscritto, ${cosa}: dopo il no un solo tasto principale in corallo (${bg}, ${await a.textContent().catch(() => "")})`);
+      // Revisore 15/11 (settimo giro): da "l'avevi tolto tu" il link NUOVO si crea qui e si manda, non quello vecchio dal profilo.
+      if (tolto) {
+        await a.click();
+        await ip.getByTestId("manda-link-nuovo-condividi").waitFor({ timeout: 4000 }).catch(() => {});
+        ok(((await ip.getByTestId("manda-link-nuovo").textContent().catch(() => "")) ?? "").includes("Manda il link a Sara") && ((await ip.getByTestId("manda-link-nuovo").textContent()) ?? "").includes("quello di prima non funziona più"), "invito da già iscritto, tolto da te: 'Crea un link nuovo' e poi 'Manda il link a Sara'");
+      } }
+    ok(rigaPrima && (await ip.getByTestId("invito-riga").count()) === 0 && !((await ip.getByTestId("invito-pagina").textContent()) ?? "").includes("vi vedete per nome"), `invito da già iscritto, ${cosa}: dopo il no sparisce 'Da amici vi vedete per nome'`); }
+  // Già amici: "Siete già amici", niente "Diventa amico".
+  await ip.goto(`${BASE}/invito/i-00000000a1a1`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-accetta").count()) === 0 && ((await ip.getByTestId("invito-titolo").textContent()) ?? "").includes("siete già amici") && (await ip.getByTestId("invito-apri").getAttribute("href")) === "/amici", `invito da chi è già amico: 'Siete già amici' (${await ip.getByTestId("invito-titolo").textContent()})`);
+  await ip.setViewportSize({ width: 360, height: 740 });
+  await ip.goto(`${BASE}/invito/${COD_AMICO}`, { waitUntil: "networkidle" });
+  { const ox = await ip.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); ok(ox <= 0, `invito da già iscritto 360px: nessuno scroll orizzontale (${ox}px)`); }
+  await ip.screenshot({ path: `${OUT}/invito-gia-iscritto-360.png`, caret: "initial" });
+  await ip.setViewportSize({ width: 390, height: 844 });
+  // Revisore 14/11 (terzo giro): "Diventa amico" solo se chi invita esiste e non sei tu.
+  await ip.goto(`${BASE}/invito/i-0000000000bb`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-accetta").count()) === 0 && ((await ip.getByTestId("invito-neutro").textContent()) ?? "").includes("non vale più"), "invito da già iscritto, codice che non esiste (più): niente 'Diventa amico', testo neutro");
+  await ictx.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialInv, invito: COD_AMICO })), url: BASE }]);
+  await ip.goto(`${BASE}/invito/${COD_AMICO}`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-accetta").count()) === 0 && ((await ip.getByTestId("invito-neutro").textContent()) ?? "").includes("il tuo link"), "invito: il proprio link non propone di diventare amico di se stessi");
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Il tuo link d'invito", `invito: aprendo il proprio link il titolo è 'Il tuo link d'invito' (${await ip.getByTestId("invito-titolo").textContent()})`);
+  await ictx.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify(socialInv)), url: BASE }]);
+  await ictx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await ip.evaluate((c) => localStorage.setItem("mapetite.invito", JSON.stringify({ codice: c, t: Date.now() })), COD_AMICO);
+  await ip.goto(`${BASE}/invito/i-0000000000bb`, { waitUntil: "networkidle" });
+  ok((await ip.getByTestId("invito-titolo").textContent()) === "Ti hanno invitato su Mapetite", "invito: codice casuale sconosciuto → testo neutro, nessun nome");
   await ip.screenshot({ path: `${OUT}/invito-tester.png`, caret: "initial" });
   await ip.goto(`${BASE}/invito/sconosciuto`, { waitUntil: "networkidle" });
   ok((await ip.getByTestId("invito-titolo").textContent()) === "Ti hanno invitato su Mapetite", "invito: codice senza profilo pubblico → testo neutro");
@@ -8534,7 +8849,7 @@ else {
   await ip.waitForTimeout(300);
   ok((await ip.getByTestId("invito-titolo").textContent()) === "Ti hanno invitato su Mapetite" && arrivi().length === nArr, "invito: codice non valido → pagina neutra, nessun conteggio");
   ok((await ip.evaluate(() => JSON.parse(localStorage.getItem("mapetite.invito") ?? "null")?.codice)) === "sconosciuto", "invito: si ricorda l'ultimo codice valido");
-  await ip.goto(`${BASE}/invito/giulia.rm`, { waitUntil: "networkidle" });
+  await ip.goto(`${BASE}/invito/${COD_AMICO}`, { waitUntil: "networkidle" });
   await ip.getByTestId("invito-inizia").click();
   await ip.waitForURL(/\/signup/, { timeout: 5000 }).then(() => ok(true, "invito: 'Inizia' apre la registrazione"), () => ok(false, "invito: 'Inizia' apre la registrazione"));
 
@@ -8543,10 +8858,10 @@ else {
   await ip.goto(`${BASE}/onboarding?primo=a`, { waitUntil: "networkidle" });
   await ip.waitForTimeout(300);
   const reg = ievents.filter((e) => e?.type === "funzione" && e.props?.nome === "invito_registrato");
-  ok(reg.length === 1 && reg[0].props.contesto === "giulia.rm", `primo accesso: registrazione da invito contata con il codice (${JSON.stringify(reg.map((e) => e.props))})`);
-  ok((await ip.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "primo accesso: codice d'invito usato una volta sola");
+  ok(reg.length === 1 && reg[0].props.contesto === "amico" && droppedKeys(reg).length === 0, `primo accesso: registrazione da invito contata, senza il codice segreto nei segnali (${JSON.stringify(reg.map((e) => e.props))})`);
+  ok((await ip.evaluate(() => JSON.parse(localStorage.getItem("mapetite.invito") ?? "null")?.codice)) === COD_AMICO, "primo accesso: il codice dell'amico resta finché non si risponde");
   // Mappa del gusto (sprint 25/10): 4 passi a schermo intero. 1) città e zone.
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 7" && (await ip.getByRole("progressbar").getAttribute("aria-valuenow")) === "1", "primo accesso: passo 1 di 7 con barra di avanzamento (una domanda per schermata, come Albo)");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 8" && (await ip.getByRole("progressbar").getAttribute("aria-valuenow")) === "1", "primo accesso: passo 1 di 8 con barra di avanzamento (una domanda per schermata, come Albo)");
   ok(await ip.getByTestId("benvenuto-avanti").isDisabled(), "primo accesso: senza città 'Continua' non va avanti (per saltare tutto c'è 'Salta' in alto, niente doppioni)");
   ok((await ip.getByTestId("barra").count()) === 0, "primo accesso: a schermo intero, senza la barra in basso");
   ok(await ip.getByTestId("benvenuto-citta").isVisible() && (await ip.getByTestId("benvenuto-zone").count()) === 0, "primo accesso: si parte dalla città, le zone compaiono dopo");
@@ -8577,7 +8892,7 @@ else {
     ok((await am.getByTestId("gusti-gruppo-apri").count()) === 3, "primo accesso: un gruppo chiuso si apre al tocco");
     while (await am.getByTestId("gusti-gruppo-apri").count()) await am.getByTestId("gusti-gruppo-apri").first().click();
     const chips = await am.getByTestId("gusto-chip").count();
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && (await ip.locator("h1").textContent()) === "Cosa ti piace?" && chips >= 45 && ["Cucina italiana", "Dal mondo", "Veloce", "Dolci & caffè", "Bere"].every((g) => gruppi.some((x) => x.includes(g))), `primo accesso: passo 2 'Cosa ti piace?' con ${chips} tipi in 5 gruppi (le diete stanno in 'Come mangi?') (${gruppi.join(" | ")})`);
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 8" && (await ip.locator("h1").textContent()) === "Cosa ti piace?" && chips >= 45 && ["Cucina italiana", "Dal mondo", "Veloce", "Dolci & caffè", "Bere"].every((g) => gruppi.some((x) => x.includes(g))), `primo accesso: passo 2 'Cosa ti piace?' con ${chips} tipi in 5 gruppi (le diete stanno in 'Come mangi?') (${gruppi.join(" | ")})`);
     ok((await ip.getByTestId("gusti-contatore").textContent()) === "Nessuno scelto" && (await ip.getByTestId("benvenuto-avanti").textContent()) === "Salta", "primo accesso: 'Cosa ti piace?' senza scelte dice 'Nessuno scelto' e il tasto 'Salta'");
     const altezze = await am.getByTestId("gusto-chip").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
     ok(Math.min(...altezze) >= 44, `primo accesso: chip dei gusti alte almeno 44 px (${Math.min(...altezze)})`);
@@ -8594,7 +8909,7 @@ else {
     ok((await ip.getByTestId("gusti-contatore").textContent()) === "Nessuno scelto", "primo accesso: un secondo tocco toglie il gusto");
     await ip.getByTestId("benvenuto-avanti").click(); }
   // 3) dieci tipi di posto 👍/👎
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && (await ip.getByTestId("tipi-contatore").textContent()) === "1 di 10" && (await ip.getByTestId("tipo-card").textContent()).includes("Trattoria di quartiere"), "primo accesso: passo 2, il primo dei 10 tipi di posto");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 8" && (await ip.getByTestId("tipi-contatore").textContent()) === "1 di 10" && (await ip.getByTestId("tipo-card").textContent()).includes("Trattoria di quartiere"), "primo accesso: passo 2, il primo dei 10 tipi di posto");
   await ip.screenshot({ path: `${OUT}/benvenuto-2-tipi.png`, caret: "initial" });
   await ip.getByTestId("tipo-su").click();
   ok((await ip.getByTestId("tipi-contatore").textContent()) === "2 di 10", "primo accesso: dopo il 👍 il tipo successivo");
@@ -8618,29 +8933,29 @@ else {
   for (const v of ["su", "giu", "giu", "su", "su", "su", "giu", "giu", "su", "boh"]) await ip.getByTestId(`tipo-${v}`).click();
   await ip.getByTestId("benvenuto-scoperta").waitFor({ timeout: 3000 }).catch(() => {});
   // 3) famosi o chicche, già proposto dai 👍 (5 chicche su 6, nessun famoso): una domanda sola per schermata.
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 7" && (await ip.getByRole("radio", { name: /Le chicche/ }).getAttribute("aria-checked")) === "true", "primo accesso: finiti i 10 tipi si passa da soli al passo 3, con 'Le chicche' già scelto dai 👍");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 8" && (await ip.getByRole("radio", { name: /Le chicche/ }).getAttribute("aria-checked")) === "true", "primo accesso: finiti i 10 tipi si passa da soli al passo 3, con 'Le chicche' già scelto dai 👍");
   ok((await ip.locator("h1").count()) === 1 && (await ip.getByText("Famosi o chicche?").count()) === 1 && (await ip.getByRole("button", { name: "Niente pesce", exact: true }).count()) === 0 && (await ip.getByRole("button", { name: "Aperitivo", exact: true }).count()) === 0, "primo accesso: al passo 3 una domanda sola, il titolo non si ripete (collaudo 23/10: erano quattro)");
   // Un solo stile in tutti i passi: titolo serif, scelta segnata teal, tasto principale teal (collaudo 23/10).
   const stile = async () => ip.evaluate(() => {
-    const h = document.querySelector("h1"); const t = document.querySelector("[data-testid=benvenuto-avanti], [data-testid=benvenuto-fine]");
+    const h = document.querySelector("h1"); const t = document.querySelector("[data-testid=benvenuto-avanti], [data-testid=benvenuto-fine], [data-testid=capito-avanti]");
     return { titolo: getComputedStyle(h).fontFamily.split(",")[0], tasto: t ? getComputedStyle(t).backgroundColor : "" };
   });
   const stili = [await stile()];
   await ip.screenshot({ path: `${OUT}/benvenuto-3-scoperta.png`, caret: "initial" });
   await ip.getByTestId("benvenuto-avanti").click();
   // 4) come mangi: senza scelte il tasto dice "Mangio di tutto" (una risposta, non "Salta").
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 7" && (await ip.getByTestId("benvenuto-avanti").textContent()) === "Mangio di tutto", `primo accesso: passo 4, senza diete 'Mangio di tutto' (${await ip.getByTestId("benvenuto-avanti").textContent()})`);
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "4 di 8" && (await ip.getByTestId("benvenuto-avanti").textContent()) === "Mangio di tutto", `primo accesso: passo 4, senza diete 'Mangio di tutto' (${await ip.getByTestId("benvenuto-avanti").textContent()})`);
   await ip.getByRole("button", { name: "Niente pesce", exact: true }).click();
   ok((await ip.getByTestId("benvenuto-avanti").textContent()) === "Continua" && (await ip.getByText("Salta", { exact: true }).count()) === 0, "primo accesso: con una scelta 'Continua', e nessun 'Salta' insieme (doppione, collaudo 23/10)");
   stili.push(await stile());
   await ip.getByTestId("benvenuto-avanti").click();
   // 5) occasioni: senza scelte "Salta", con una scelta "Continua".
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "5 di 7" && (await ip.getByTestId("benvenuto-avanti").textContent()) === "Salta", "primo accesso: passo 5, occasioni; senza scelte il tasto dice 'Salta'");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "5 di 8" && (await ip.getByTestId("benvenuto-avanti").textContent()) === "Salta", "primo accesso: passo 5, occasioni; senza scelte il tasto dice 'Salta'");
   await ip.getByRole("button", { name: "Aperitivo", exact: true }).click();
   stili.push(await stile());
   await ip.getByTestId("benvenuto-avanti").click();
   // 6) spesa: saltata.
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "6 di 7", "primo accesso: passo 6, la spesa");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "6 di 8", "primo accesso: passo 6, la spesa");
   await ip.getByTestId("benvenuto-avanti").click();
   // 7) "Ecco cosa ho capito", con i posti per te o prima l'import
   // Mockup A (23/10): una frase da amico con le parole chiave evidenziate; le righe dietro "Correggi".
@@ -8650,7 +8965,7 @@ else {
     const serif = await ip.locator("h1").evaluate((h) => /newsreader/i.test(getComputedStyle(h).fontFamily));
     ok(serif && (await ip.getByTestId("capito-riga").count()) === 0 && f.includes("Ami le trattorie di quartiere") && f.includes("Esci a Monti") && f.includes("giri alla larga dai posti turistici") && f.includes("Eviti il pesce") && !f.includes("aperitivo") && (f.match(/\./g) ?? []).length <= 3, `primo accesso (mockup A): 'Ecco cosa ho capito di te' in 3 frasi al massimo (gusti, dove, diete; occasioni dietro 'Correggi'), titolo serif, righe nascoste (${f.slice(0, 200)})`);
     const c = await ip.getByTestId("capito-correggi").boundingBox();
-    const top = await ip.getByTestId("benvenuto-fine").evaluate((b) => b.closest(".fixed").getBoundingClientRect().top);
+    const top = await ip.locator("[data-testid=benvenuto-fine], [data-testid=capito-avanti]").first().evaluate((b) => b.closest(".fixed").getBoundingClientRect().top);
     ok(c && c.y + c.height <= top, `primo accesso (mockup A): 'Il resto del profilo' sopra i tasti in basso (${Math.round((c?.y ?? 0) + (c?.height ?? 0))} ≤ ${Math.round(top)})`);
     ok(!f.includes(";") && ((await ip.getByTestId("capito-correggi").textContent()) ?? "").trim() === "Il resto del profilo", `primo accesso: niente punto e virgola nella frase, niente "Il resto (1)" (${f.slice(0, 120)})`);
     stili.push(await stile());
@@ -8658,39 +8973,71 @@ else {
   if (capitoA) { await ip.getByTestId("capito-correggi").click();
     // Dietro "Il resto" solo ciò che la frase non dice (prima ripeteva zone, gusti e diete con altre parole: collaudo 23/10).
     const righe = (await ip.getByTestId("capito-riga").allTextContents()).join(" | ");
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && righe.includes("aperitivo") && !righe.includes("Monti") && !righe.includes("Eviti"), `primo accesso (mockup A): dietro 'Il resto' solo ciò che la frase non dice (occasioni), niente doppioni (${righe.slice(0, 220)})`); }
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 8" && righe.includes("aperitivo") && !righe.includes("Monti") && !righe.includes("Eviti"), `primo accesso (mockup A): dietro 'Il resto' solo ciò che la frase non dice (occasioni), niente doppioni (${righe.slice(0, 220)})`); }
   else { const righe = (await ip.getByTestId("capito-riga").allTextContents()).join(" | ");
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && righe.includes("Esci soprattutto a Monti") && righe.includes("Ami le trattorie di quartiere") && righe.includes("Preferisci le chicche") && righe.includes("Eviti il pesce") && righe.includes("l'aperitivo"), `primo accesso: 'Ecco cosa ho capito' riassume zone, gusti, chicche, diete e occasioni (${righe.slice(0, 220)})`); }
-  ok(await ip.getByTestId("benvenuto-fine").isVisible() && await ip.getByTestId("benvenuto-importa-si").isVisible() && (await ip.getByTestId("onboarding-salta").count()) === 0, "primo accesso: alla fine 'Mostrami i posti per me' e 'Prima porta qui i tuoi posti', niente 'Salta' doppio");
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 8" && righe.includes("Esci soprattutto a Monti") && righe.includes("Ami le trattorie di quartiere") && righe.includes("Preferisci le chicche") && righe.includes("Eviti il pesce") && righe.includes("l'aperitivo"), `primo accesso: 'Ecco cosa ho capito' riassume zone, gusti, chicche, diete e occasioni (${righe.slice(0, 220)})`); }
+  // Con l'invito di Giulia in attesa, in basso c'è "Continua" (l'invito è il passo dopo): i tasti di fine si controllano dopo la risposta.
+  ok(await ip.getByTestId("capito-avanti").isVisible() && (await ip.getByTestId("onboarding-salta").count()) === 0, "primo accesso: alla fine, con un invito in attesa, 'Continua' verso l'invito, niente 'Salta' doppio");
   { const t = await ip.locator("h1").boundingBox(); ok(!!t && t.y > 0, "primo accesso: ogni schermata parte dall'alto (titolo visibile)"); }
   await ip.screenshot({ path: `${OUT}/benvenuto-4-capito.png`, caret: "initial" });
+  // Revisore 14/11 (quarto giro): la frase resta la cosa principale. Arrivato dal link di Giulia, l'invito è un passo
+  // a sé subito dopo (una domanda per schermata, come Albo); "Profilo pubblico" non sta più nel primo accesso.
+  // Niente amicizia automatica: "Diventa amico" / "Non ora", con il tuo nome (lo vedrà Giulia).
+  ok(await ip.getByTestId("capito-avanti").isVisible() && (await ip.getByTestId("benvenuto-fine").count()) === 0 && (await ip.getByTestId("invito-amico").count()) === 0 && (await ip.getByTestId("fatti-trovare").count()) === 0 && (await ip.locator("input").count()) === 0, "primo accesso da invito: nella frase niente card dell'invito né 'Profilo pubblico', in basso 'Continua'");
+  await ip.getByTestId("capito-avanti").click();
+  { const ia = ip.getByTestId("invito-amico");
+    await ia.waitFor({ timeout: 4000 }).catch(() => {});
+    ok(((await ip.locator("h1").textContent()) ?? "").includes("Giulia ti ha invitato") && await ip.getByTestId("invito-si").isVisible() && await ip.getByTestId("invito-no").isVisible() && (await ip.getByTestId("benvenuto-passo").textContent()) === "8 di 8" && (await ip.getByRole("progressbar").getAttribute("aria-valuemax")) === "8", `primo accesso da invito: passo a sé 'Giulia ti ha invitato' con 'Diventa amico' e 'Non ora', contato come ultimo passo '8 di 8' (${await ip.locator("h1").textContent()})`);
+    ok((await ip.getByTestId("invito-collegato").count()) === 0, "primo accesso da invito: nessuna amicizia prima del sì");
+    { const av = ip.getByTestId("invito-avatar"); const ya = (await av.boundingBox())?.y ?? -1; const yh = (await ip.locator("h1").boundingBox())?.y ?? -1;
+      ok(await av.isVisible() && ((await av.textContent()) ?? "").trim() === "G" && ya >= 0 && ya < yh, `primo accesso da invito: in alto l'avatar di chi invita, sopra il titolo (${(await av.textContent())?.trim()})`); }
+    // Revisore 14/11 (secondo): chi accetta scrive il suo nome (l'amico vedeva "Qualcuno"). Un solo campo nome.
+    { const bg = await ip.getByTestId("invito-si").evaluate((e) => getComputedStyle(e).backgroundColor);
+      ok(await ip.getByTestId("invito-si").isDisabled() && await ia.getByTestId("invito-mio-nome").isVisible() && (await ip.locator("input[autocomplete=name]").count()) === 1 && bg === "rgb(227, 231, 231)", `primo accesso da invito: un solo campo nome, 'Diventa amico' spento ma leggibile finché manca (${bg})`); }
+    await ip.setViewportSize({ width: 360, height: 740 });
+    { const c = await ia.getByTestId("invito-mio-nome").boundingBox(); const fs = await ia.getByTestId("invito-mio-nome").evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+      const sb = await ip.getByTestId("invito-si").boundingBox();
+      ok(!!c && c.width >= 360 - 48 - 2 && c.height >= 44 && fs >= 16 && !!sb && sb.y + sb.height <= 740, `primo accesso da invito 360px: campo nome a tutta larghezza, alto ≥ 44 px, testo ≥ 16 px, tasto in vista (${Math.round(c?.width ?? 0)}×${Math.round(c?.height ?? 0)}, ${fs})`); }
+    await ip.screenshot({ path: `${OUT}/benvenuto-5-invito-360.png`, caret: "initial" });
+    await ip.setViewportSize({ width: 390, height: 844 });
+    await ia.getByTestId("invito-mio-nome").fill("Luca");
+    await ip.getByTestId("invito-si").click();
+    await ia.getByTestId("invito-collegato").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(((await ia.getByTestId("invito-collegato").textContent().catch(() => "")) ?? "").includes("Tu e Giulia siete amici"), `primo accesso: toccato 'Diventa amico' → 'Tu e Giulia siete amici' (${await ia.getByTestId("invito-collegato").textContent().catch(() => "assente")})`);
+    const ev = ievents.filter((e) => e?.type === "funzione" && e.props?.nome === "invito_amico" && e.props?.contesto !== "gia_iscritto");
+    ok(ev.length === 1 && ev[0].props.stato === "amici" && droppedKeys(ev).length === 0, `primo accesso: risposta all'invito contata (${JSON.stringify(ev.map((e) => e.props))})`);
+    ok((await ip.evaluate(() => localStorage.getItem("mapetite.invito"))) === null, "primo accesso: dopo la risposta il codice d'invito si cancella dal telefono");
+    ok(await ip.getByTestId("benvenuto-fine").isVisible() && await ip.getByTestId("benvenuto-importa-si").isVisible(), "primo accesso: risposto all'invito, in basso 'Apri la mia mappa' e 'Prima porta qui i tuoi posti'");
+    await ip.screenshot({ path: `${OUT}/benvenuto-5-invito-amico.png`, caret: "initial" });
+    await ip.getByRole("button", { name: "Indietro" }).click();
+    ok(await ip.getByTestId("benvenuto-fine").isVisible() && (await ip.getByTestId("capito-avanti").count()) === 0, "primo accesso: tornando alla frase dopo la risposta, i tasti di fine (niente secondo giro dell'invito)"); }
   await ip.setViewportSize({ width: 360, height: 740 });
   { const ox = await ip.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     const ob = await ip.getByTestId("benvenuto-importa-si").boundingBox();
     ok(ox <= 0 && ob && ob.y + ob.height <= 740, `primo accesso 360px: nessuno scroll orizzontale, pulsanti visibili (${ox}px, ${Math.round(ob?.y ?? -1)})`); }
   await ip.setViewportSize({ width: 390, height: 844 });
   if (capitoA) { await ip.getByTestId("capito-parola").filter({ hasText: "le trattorie di quartiere" }).click();
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && ((await ip.getByTestId("tipo-card").textContent()) ?? "").includes("Trattoria di quartiere"), "primo accesso: toccando 'le trattorie di quartiere' nella frase si riapre proprio quella card");
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 8" && ((await ip.getByTestId("tipo-card").textContent()) ?? "").includes("Trattoria di quartiere"), "primo accesso: toccando 'le trattorie di quartiere' nella frase si riapre proprio quella card");
     // Card riaperta: niente "10 di 10" né "↶ Precedente" (annullava un'altra card), ma "Torna alla frase" (collaudo 23/10).
     ok(/^Cambia la risposta · prima (👍|👎)$/.test((await ip.getByTestId("tipi-contatore").textContent()) ?? "") && (await ip.getByTestId("tipo-indietro").count()) === 0 && await ip.getByTestId("torna-frase").isVisible(), `primo accesso: card riaperta dalla frase con 'Torna alla frase', senza contatore né 'Precedente' (${await ip.getByTestId("tipi-contatore").textContent()})`);
     await ip.getByTestId("tipo-su").click();
     await ip.getByTestId("capito-frase").waitFor({ timeout: 3000 }).catch(() => {});
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && ((await ip.getByTestId("capito-frase").textContent()) ?? "").includes("le trattorie di quartiere"), "primo accesso: rivotata la card si torna alla frase");
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 8" && ((await ip.getByTestId("capito-frase").textContent()) ?? "").includes("le trattorie di quartiere"), "primo accesso: rivotata la card si torna alla frase");
     await ip.getByTestId("capito-parola").filter({ hasText: "giri alla larga" }).click();
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 7" && ((await ip.getByTestId("torna-frase").textContent()) ?? "").includes("Torna alla frase"), "primo accesso: toccando 'giri alla larga dai posti turistici' si torna alla domanda che lo cambia, con 'Torna alla frase'");
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "3 di 8" && ((await ip.getByTestId("torna-frase").textContent()) ?? "").includes("Torna alla frase"), "primo accesso: toccando 'giri alla larga dai posti turistici' si torna alla domanda che lo cambia, con 'Torna alla frase'");
     await ip.getByTestId("torna-frase").click();
-    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 7" && await ip.getByTestId("capito-frase").isVisible(), "primo accesso: corretta la domanda toccata nella frase, si torna alla frase (non al passo dopo)");
+    ok((await ip.getByTestId("benvenuto-passo").textContent()) === "7 di 8" && await ip.getByTestId("capito-frase").isVisible(), "primo accesso: corretta la domanda toccata nella frase, si torna alla frase (non al passo dopo)");
     // "e altri N tipi di posto" si tocca come le altre parole (collaudo 24/10): porta all'elenco dei tipi.
     { const altri = ip.getByTestId("capito-parola").filter({ hasText: /^altr[oi] / });
       if (await altri.count()) { await altri.first().click();
-        ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 7" && await ip.getByTestId("torna-frase").isVisible(), "primo accesso: 'e altri N tipi di posto' si tocca e porta ai tipi, con 'Torna alla frase'");
+        ok((await ip.getByTestId("benvenuto-passo").textContent()) === "2 di 8" && await ip.getByTestId("torna-frase").isVisible(), "primo accesso: 'e altri N tipi di posto' si tocca e porta ai tipi, con 'Torna alla frase'");
         if (await ip.getByTestId("tipi-rifai").count()) { await ip.getByTestId("tipi-rifai").click();
           ok((await ip.getByTestId("tipi-rifai").textContent())?.includes("Sicuro?") && await ip.getByTestId("tipi-finiti").isVisible(), "primo accesso: 'Rifai tutti e dieci' chiede conferma prima di cancellare (collaudo 24/10)"); }
         await ip.getByTestId("torna-frase").click(); } }
     // Un tipo toccato nella frase quando non si sono votate tutte le card: c'è sempre l'uscita (collaudo 23/10).
     await ip.getByTestId("capito-parola").filter({ hasText: "Monti" }).click(); }
   else await ip.getByTestId("capito-riga").first().click();
-  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 7" && (await ip.getByRole("button", { name: "Monti", exact: true }).getAttribute("aria-pressed")) === "true", "primo accesso: toccando la zona si torna a cambiarla, con le scelte conservate");
+  ok((await ip.getByTestId("benvenuto-passo").textContent()) === "1 di 8" && (await ip.getByRole("button", { name: "Monti", exact: true }).getAttribute("aria-pressed")) === "true", "primo accesso: toccando la zona si torna a cambiarla, con le scelte conservate");
   ok((await ip.getByTestId("onboarding-salta").count()) === 0, "primo accesso: tornando al passo 1 dalla frase non c'è 'Salta' (cancellava tutte le risposte, collaudo 24/10)");
   await ip.getByTestId("torna-frase").click();
   await ip.getByTestId("benvenuto-importa-si").click();
@@ -8824,9 +9171,43 @@ else {
   ok(px <= 0, `profilo 360px: 'Invita un amico' senza scroll orizzontale (${px}px)`);
   await pp.getByTestId("invita-amico").evaluate((el) => el.scrollIntoView({ block: "center" }));
   await pp.screenshot({ path: `${OUT}/invita-amico-360.png`, caret: "initial" });
+  await pp.setViewportSize({ width: 390, height: 844 });
+  // Revisore 14/11 (terzo giro): sotto il link d'invito tra amici un "Nuovo link" discreto, con conferma.
+  await ictx.addCookies([{ name: "e2e_social", value: encodeURIComponent(JSON.stringify({ ...socialInv, invito: "i-0000000000dd" })), url: BASE }]);
+  // Indirizzo diverso: con solo "#invita" uguale a prima il browser non ricaricava e restava il link /invito/lorenzo.
+  await pp.goto(`${BASE}/profilo?link=nuovo#invita`, { waitUntil: "networkidle" });
+  { const inv = pp.getByTestId("invita-amico");
+    await inv.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    const nl = inv.getByTestId("nuovo-link");
+    const fs = await nl.evaluate((e) => parseFloat(getComputedStyle(e).fontSize)).catch(() => 99);
+    ok((await inv.getByTestId("invita-amico-link").getAttribute("data-path")) === "/invito/i-0000000000dd" && await nl.isVisible() && fs <= 13, `profilo: sotto il link tra amici c'è 'Nuovo link', discreto (${fs}px)`);
+    await nl.click();
+    ok(((await inv.getByTestId("nuovo-link-conferma").textContent().catch(() => "")) ?? "").includes("smetterà di funzionare"), "profilo: 'Nuovo link' chiede conferma (il link di prima smette di funzionare)");
+    await inv.getByTestId("nuovo-link-si").click();
+    await inv.getByTestId("nuovo-link-fatto").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await inv.getByTestId("nuovo-link-fatto").isVisible().catch(() => false), "profilo: confermato, 'Nuovo link' crea il link nuovo");
+    await pp.screenshot({ path: `${OUT}/invita-amico-nuovo-link.png`, caret: "initial" }); }
   // Senza nome pubblico (parte social non ancora attiva): codice dall'id, funziona lo stesso.
   await ictx.clearCookies({ name: "e2e_social" });
   await pp.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  // Revisore 15/11: chi ha già un nome (profilo o accesso Google) non lo riscrive nel passo dell'invito del primo accesso.
+  { const np = await ictx.newPage();
+    np.on("pageerror", (e) => errors.push(e.message));
+    await ictx.clearCookies({ name: "e2e_anonimo" });
+    await ictx.addCookies([{ name: "e2e_gusto", value: encodeURIComponent(JSON.stringify({ zone: [], occasions: [], su: [], giu: [], diete: [], nome: "Luca" })), url: BASE }]);
+    await np.goto(`${BASE}/privacy`, { waitUntil: "domcontentloaded" });
+    await np.evaluate((c) => { localStorage.setItem("mapetite.invito", JSON.stringify({ codice: c, t: Date.now() })); localStorage.setItem("mapetite.benvenuto", JSON.stringify({ step: 7, city: "Roma", amati: ["pizzeria"], ts: Date.now() })); }, COD_AMICO);
+    await np.goto(`${BASE}/onboarding?primo=a`, { waitUntil: "networkidle" });
+    await np.getByTestId("capito-avanti").waitFor({ timeout: 5000 }).catch(() => {});
+    await np.getByTestId("capito-avanti").click().catch(() => {});
+    const ia = np.getByTestId("invito-amico");
+    await ia.waitFor({ timeout: 4000 }).catch(() => {});
+    const dom = (await ia.getByTestId("invito-domanda").textContent().catch(() => "")) ?? "";
+    ok((await ia.getByTestId("invito-mio-nome").count()) === 0 && !(await np.getByTestId("invito-si").isDisabled().catch(() => true)) && dom.includes("Giulia ti vedrà come Luca"), `primo accesso da invito con il nome già nel profilo: niente campo, 'Diventa amico' acceso (${dom})`);
+    await np.screenshot({ path: `${OUT}/benvenuto-5-invito-con-nome.png`, caret: "initial" });
+    await np.evaluate(() => { localStorage.removeItem("mapetite.invito"); localStorage.removeItem("mapetite.benvenuto"); });
+    await ictx.clearCookies({ name: "e2e_gusto" });
+    await np.close(); }
   ok((await pp.getByTestId("invita-amico-link").getAttribute("data-path")) === "/invito/u-00000000", `profilo: senza nome pubblico il link usa un codice breve (${await pp.getByTestId("invita-amico-link").getAttribute("data-path")})`);
   await ictx.close();
 

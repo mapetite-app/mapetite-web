@@ -32,6 +32,11 @@ export function myInviteCode(p: { handle?: string | null; id: string }): string 
 
 export const invitePath = (code: string) => `/invito/${code}`;
 
+// Codice d'invito tra amici (14/11, sera): casuale e segreto, creato nel database (mio_invito). Solo questo
+// rende amici; il @nome e "u-…" restano link che contano gli arrivi e basta.
+export const FRIEND_CODE_RE = /^i-[0-9a-f]{12}$/;
+export const isFriendCode = (code: string | null | undefined): code is string => !!code && FRIEND_CODE_RE.test(code);
+
 // Codice salvato nel telefono, se non scaduto (null altrimenti). Solo nel browser.
 export function readStoredInvite(now = Date.now()): string | null {
   try {
@@ -55,6 +60,30 @@ export function storeInvite(code: string, now = Date.now()): void {
 export function clearStoredInvite(): void {
   try {
     window.localStorage.removeItem(INVITE_KEY);
+  } catch {
+    // ignorato
+  }
+}
+
+// Perché un invito non è andato (revisore 14/11, quarto giro: prima ogni "no" diceva "chiedi un link nuovo",
+// anche quando un link nuovo non serviva a niente). Motivi da accetta_invito (migrazioni 20261114e/f, 20261115).
+// Amicizia tolta (20261115): si torna amici solo con un link nuovo di chi l'aveva tolta. "gia-usato" a chi è stato
+// tolto (o riapre un link già usato), "tolto-da-te" a chi l'aveva tolta e apre il link dell'altro.
+export function testoInvitoNo(motivo: string, nome: string | null): string {
+  if (motivo === "gia-usato") return "Vi eravate tolti dagli amici: per tornare, chi aveva tolto l'amicizia deve mandarti un link nuovo.";
+  if (motivo === "tolto-da-te") return `Avevi tolto ${nome ?? "questa persona"} dagli amici: per tornare, manda tu un link nuovo.`;
+  // Revisore 15/11 (sesto giro): prima la stessa frase a chi accetta e a chi invita. Il tetto (20261115c) dice chi è.
+  if (motivo === "troppi") return "Hai già 30 amici da invito, il massimo: per aggiungerne uno, togline un altro in Amici.";
+  if (motivo === "troppi-lui") return `${nome ?? "Chi ti ha invitato"} ha già 30 amici da invito, il massimo: per ora non può aggiungerne altri.`;
+  return `Questo invito non vale più: chiedi a ${nome ?? "chi te l'ha mandato"} un link nuovo.`;
+}
+
+// Invito di un amico in attesa di risposta in Amici (revisore 15/11, sesto giro): mentre c'è, "Invita un amico"
+// si nasconde (prima due campi nome e due tasti nella stessa pagina) e torna appena si risponde.
+export const INVITO_SOSPESO_EVENT = "mapetite:invito-sospeso";
+export function segnalaInvitoSospeso(attivo: boolean): void {
+  try {
+    window.dispatchEvent(new CustomEvent(INVITO_SOSPESO_EVENT, { detail: attivo }));
   } catch {
     // ignorato
   }

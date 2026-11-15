@@ -1963,13 +1963,19 @@ export default function MapView({
 
   // Pin visibili: con una ricerca AI seguono i filtri rapidi della lista.
   const quickOn = useBeta("filtri-lista");
-  const mapPlaces =
-    aiSearch !== null && quickOn ? applyQuickFilters(displayedPlaces, quickFilters, venueDetails) : displayedPlaces;
+  // "Scegli tra 3" (proposta 55): sulla mappa restano i tre segnalini delle tre card.
+  const [treIds, setTreIds] = useState<string[] | null>(null);
+  // Revisore 15/11: la scelta accesa (chiave della lista) resta qui, non nel foglio: aprire la scheda di uno dei tre
+  // smonta il foglio, e chiudendola si torna ai tre invece che a tutta la lista.
+  const [treDi, setTreDi] = useState<string | null>(null);
+  const mapPlaces = aiSearch !== null && treIds
+    ? displayedPlaces.filter((p) => treIds.includes(p.id))
+    : aiSearch !== null && quickOn ? applyQuickFilters(displayedPlaces, quickFilters, venueDetails) : displayedPlaces;
   // Revisore 4/11: accesi o spenti i filtri rapidi, la mappa si riadatta ai posti rimasti (prima con tre
   // filtri restava in vista un solo segnalino su 4). Solo al cambio dei filtri, non a ogni disegno.
   // Secondo revisore 4/11: si inquadra quando il carosello ha già il nuovo ordine (con "Più vicini" la prima card
   // non è la prima della ricerca), tenendo sempre dentro la prima card.
-  const filtriChiave = [...quickFilters].sort().join(",");
+  const filtriChiave = [...quickFilters].sort().join(",") + (treIds ? `|tre:${treIds.join(",")}` : "");
   const filtriVisti = useRef(filtriChiave);
   const ordineChiave = carouselOrder.join(",");
   const daInquadrare = useRef(false);
@@ -2242,6 +2248,12 @@ export default function MapView({
     // Revisore 5/11: con un risultato lontano (prima card a 7 km) l'inquadratura iniziale li tiene tutti e il
     // quartiere cercato resta una miniatura. Passando a una card del gruppo fitto, la mappa si avvicina al
     // gruppo; tornando sulla card lontana (fuori schermo) si torna all'inquadratura con tutti.
+    // "Scegli tra 3" (revisore 14/11): con le tre card la mappa le tiene tutte e tre in vista. Se il segnalino
+    // della card è fuori dalla fascia libera si reinquadra sui tre (non su tutti i risultati, che li perdeva).
+    if (aiSearch !== null && treIds && treIds.includes(place.id)) {
+      if (!(pt.x > 30 && pt.x < w - 30 && pt.y > 236 && pt.y < h - 300)) fitToPlaces(mapPlaces, 236, 0, [place]);
+      return;
+    }
     if (aiSearch !== null && clusterPlaces === null) {
       const tutti = aiSearch.risultati;
       const fitti = puntiDaInquadrare(tutti);
@@ -2536,7 +2548,7 @@ export default function MapView({
         // La ricerca resta nell'indirizzo (/mappa?q=…&at=…): ricaricare o tornare indietro la ritrova.
         if (mondo && !opts.simile) { scriviRicercaInIndirizzo(q, at); ricercaInIndirizzo.current = ticket; }
         type RawPlace = {
-          id: string; name: string; category: string | null; lat: number | null; lng: number | null;
+          id: string; name: string; businessStatus?: string | null; category: string | null; lat: number | null; lng: number | null;
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
@@ -2558,6 +2570,8 @@ export default function MapView({
           rating: p.rating ?? null,
           priceLevel: p.priceLevel ?? null,
           types: p.types ?? null,
+          // Revisore 15/11: lo stato Google arriva anche alle card dei risultati ("Chiuso per ora"; "Scegli tra 3" non li sceglie).
+          businessStatus: p.businessStatus ?? null,
         }));
         const details: Record<string, VenueDetails> = {};
         for (const p of raw) {
@@ -4393,6 +4407,9 @@ export default function MapView({
           removed={clusterPlaces === null ? aiSearch?.tolti : undefined}
           frase={frase}
           onOrder={setCarouselOrder}
+          onTre={setTreIds}
+          treDi={treDi}
+          onTreDi={setTreDi}
           onRefine={() => { dispatch({ type: "OPEN_AI" }); if (barOn) barInputRef.current?.focus(); }}
           showSearchFeedback={clusterPlaces === null}
           onShareList={shareOn && view === "saved" && aiSearch === null ? async (list) => {

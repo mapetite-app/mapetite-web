@@ -43,6 +43,8 @@ const LINE = "border-[#e3e7e7]";
 const CHIP = "inline-flex min-h-10 shrink-0 items-center whitespace-nowrap rounded-pill bg-white px-2.5 text-[13px] font-sans font-medium text-text shadow-card active:scale-95";
 const FILA = "-mx-4 flex gap-1.5 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]";
 const CHIP_ON = "inline-flex min-h-10 shrink-0 items-center whitespace-nowrap rounded-pill bg-brand px-2.5 text-[13px] font-sans font-medium text-white shadow-card active:scale-95";
+// Tondo con l'emoji in basso a destra delle copertine delle raccolte: 28 px a 6 px dal bordo, più mezzo puntino.
+const ANGOLO_TONDO = { w: 40, h: 40 };
 
 type Filtro = "tutti" | "provati" | "da-provare" | "in-comune";
 
@@ -287,8 +289,8 @@ export default function ProfiloPosti({
                     <span className={`relative block h-[96px] overflow-hidden rounded-[16px] border ${LINE} ${PAPER}`}>
                       <span aria-hidden className="absolute inset-0 flex items-center justify-center gap-1 text-[28px] leading-none">{c?.emoji.map((e) => <span key={e}>{e}</span>)}</span>
                       {c && c.punti.length > 0 && (
-                        <MappaPunti punti={c.punti} w={148} h={96} margine={26} minPunti={3} testId="raccolta-copertina-mappa" dotTestId="raccolta-copertina-puntino">
-                          <span aria-hidden className="absolute left-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[15px] leading-none shadow-[0_1px_3px_rgba(0,0,0,0.18)]">{c.emoji[0]}</span>
+                        <MappaPunti punti={c.punti} w={148} h={96} margine={14} minPunti={3} angolo={ANGOLO_TONDO} testId="raccolta-copertina-mappa" dotTestId="raccolta-copertina-puntino">
+                          <span aria-hidden className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[15px] leading-none shadow-[0_1px_3px_rgba(0,0,0,0.18)]">{c.emoji[0]}</span>
                         </MappaPunti>
                       )}
                     </span>

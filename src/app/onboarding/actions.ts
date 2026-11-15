@@ -9,6 +9,8 @@ import { dieteValide, gustiDaTipi, pulisciMappa, queryPerTe, type MappaGusto } f
 import { ZONE } from "@/lib/gusti";
 import { amatiValidi, oraDiRoma, ordinePerOra, tipoLocale } from "@/lib/tipi-locale";
 import { safeNext, withNext } from "@/lib/next-path";
+import { cleanInviteCode, isFriendCode } from "@/lib/invito";
+import { anteprimaInvito, loadAmici } from "@/lib/social";
 
 interface OnboardingData {
   cuisines: string[];
@@ -119,6 +121,72 @@ export async function completeOnboarding({
   }
 
   goOn(gusti, citta, dest, back, mappa);
+}
+
+// Inviti tra amici (14/11, rifatti dopo la revisione): il primo accesso mostra chi ti ha invitato e chiede
+// "Diventa amico" o "Non ora". Solo i codici casuali "i-…" (migrazione 20261114c_inviti_sicuri).
+// "amico": chi guarda è già amico di chi invita (allora niente "Diventa amico").
+export type ChiInvita = { nome: string | null; amico: boolean } | null | "rete";
+// "nome": il database chiede prima il tuo nome (revisore 14/11, terzo giro: obbligatorio anche nel server).
+export type EsitoInvito = { stato: "ok"; nome: string | null } | { stato: "nome" } | { stato: "no"; motivo: string } | { stato: "rete" };
+
+const fakeE2E = async () => process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER && !(await cookies()).get("e2e_anonimo");
+const nomeFinto = (codice: string) => (codice.endsWith("0000000000aa") ? "Giulia" : null);
+
+export async function chiInvita(raw: unknown): Promise<ChiInvita> {
+  const codice = cleanInviteCode(raw);
+  if (!isFriendCode(codice)) return null;
+  if (await fakeE2E()) {
+    // Giro automatico: come anteprima_invito, "amico" vale anche quando chi invita è già tra gli amici del dato finto
+    // (revisore 15/11: Giulia era tra gli amici e insieme l'invito in sospeso "Diventa amico di Giulia").
+    if (codice.endsWith("ffffffffffff")) return null;
+    const a = await anteprimaInvito(codice);
+    if (a && a !== "errore") return { nome: a.nome, amico: a.amico };
+    const nome = nomeFinto(codice);
+    const amici = await loadAmici();
+    return { nome, amico: codice.endsWith("00000000a1a1") || (!!nome && amici.some((x) => x.display_name === nome)) };
+  }
+  const p = await anteprimaInvito(codice);
+  // Errore del database o rete: "rete", così il telefono tiene il codice e riprova (revisore 14/11).
+  if (p === "errore") return "rete";
+  return p ? { nome: p.nome, amico: p.amico } : null;
+}
+
+// "nome": chi accetta e non ha ancora un nome lo sceglie qui (lo vedrà l'amico: revisore 14/11, prima
+// si vedeva "Qualcuno"). Si scrive solo se il profilo non ne ha già uno (vuoto o fatto di spazi conta come nessuno).
+export async function accettaInvito(raw: unknown, nomeRaw?: unknown): Promise<EsitoInvito> {
+  const codice = cleanInviteCode(raw);
+  if (!isFriendCode(codice)) return { stato: "no", motivo: "codice" };
+  // Troncato per caratteri veri (emoji comprese), non per unità UTF-16 (revisore 14/11).
+  const nome = typeof nomeRaw === "string" ? Array.from(nomeRaw.trim()).slice(0, 40).join("") : "";
+  if (await fakeE2E()) {
+    // Giro automatico: codici finti per gli esiti "già usato", "l'avevi tolto tu" e "troppi".
+    if (codice.endsWith("00000000a5a5")) return { stato: "no", motivo: "gia-usato" };
+    if (codice.endsWith("00000000a6a6")) return { stato: "no", motivo: "tolto-da-te" };
+    if (codice.endsWith("00000000a7a7")) return { stato: "no", motivo: "troppi" };
+    if (codice.endsWith("00000000a8a8")) return { stato: "no", motivo: "troppi-lui" };
+    return { stato: "ok", nome: nomeFinto(codice) };
+  }
+  const supabase = await createClient();
+  if (nome) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: prof } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
+      if (!(prof?.display_name as string | null | undefined)?.trim()) {
+        const { error: nErr } = await supabase.from("profiles").update({ display_name: nome, updated_at: new Date().toISOString() }).eq("id", user.id);
+        if (nErr) console.error("[invito] nome:", nErr.message);
+      }
+    }
+  }
+  const { data, error } = await supabase.rpc("accetta_invito", { p_codice: codice });
+  if (error) {
+    console.error("[invito] accetta:", error.code, error.message);
+    return { stato: "rete" };
+  }
+  const r = data as { stato?: string; nome?: string | null } | null;
+  if (r?.stato === "ok") return { stato: "ok", nome: r.nome ?? null };
+  if (r?.stato === "nome") return { stato: "nome" };
+  return r?.stato === "anonimo" ? { stato: "rete" } : { stato: "no", motivo: r?.stato ?? "?" };
 }
 
 // Dopo l'ultima schermata.

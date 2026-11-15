@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { trackFeature } from "@/lib/track";
-import { readStoredInvite, storeInvite } from "@/lib/invito";
+import { isFriendCode, readStoredInvite, storeInvite } from "@/lib/invito";
 
 // Arrivo da un link d'invito (/invito/<codice>): il telefono si ricorda il codice fino alla
 // registrazione (letto poi dall'onboarding) e il pannello conta l'arrivo una volta per codice.
@@ -12,7 +12,8 @@ export default function InvitoArrivo({ codice, loggedIn }: { codice: string; log
     if (loggedIn) return;
     const already = readStoredInvite() === codice;
     storeInvite(codice);
-    if (!already) trackFeature("invito_arrivo", { contesto: codice });
+    // Il codice dell'amico è segreto: nelle statistiche solo "amico" (revisore 14/11).
+    if (!already) trackFeature("invito_arrivo", { contesto: isFriendCode(codice) ? "amico" : codice });
   }, [codice, loggedIn]);
   return null;
 }

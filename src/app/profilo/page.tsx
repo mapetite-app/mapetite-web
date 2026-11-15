@@ -14,7 +14,7 @@ import { zoneDeiSalvati } from "@/lib/salvati-zone";
 import { isWanted } from "@/lib/tags";
 import ProfiloSocial from "@/components/profilo-social";
 import InvitaAmico from "@/components/invita-amico";
-import { loadMyGems, loadMySocial } from "@/lib/social";
+import { loadMyGems, loadMySocial, mioInvito } from "@/lib/social";
 import { ScopritoreRiga } from "@/components/scopritore";
 import ProfiloClassifica, { type ClassificaRow } from "@/components/profilo-classifica";
 import { isMissingColumn } from "@/lib/classifica";
@@ -227,7 +227,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
   const pillole = pilloleGusto(gustoRow);
   // "I miei gusti" (5/11): i tipi di locale scelti dal catalogo ampio, dentro profiles.gusto.
   const amati = amatiValidi(pulisciMappa(gustoRow?.gusto, () => true).amati);
-  const [social, gems] = await Promise.all([socialPromise, gemsPromise]);
+  const [social, gems, codiceInvito] = await Promise.all([socialPromise, gemsPromise, mioInvito()]);
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
   const initial = (user.email ?? "?").charAt(0).toUpperCase();
@@ -521,7 +521,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
             )}
             {/* Invito (piano 9.1): il proprio link personale. */}
             <ProfiloSezione id="invita" icon={<Send {...icon} />} title="Invita un amico" hint="Il tuo link personale">
-              <InvitaAmico userId={user.id} handle={"stato" in social ? null : social.handle} />
+              <InvitaAmico userId={user.id} handle={"stato" in social ? null : social.handle} codice={codiceInvito} senzaNome={!("stato" in social) && !social.display_name?.trim()} privato={!("stato" in social) && !(social.is_public && social.handle)} />
             </ProfiloSezione>
             {/* Profilo pubblico: solo quando la parte social c'è davvero (niente righe "in arrivo", revisore 1/11). */}
             {!("stato" in social) && (
