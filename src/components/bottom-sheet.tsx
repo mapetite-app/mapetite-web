@@ -643,9 +643,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           type="button"
           aria-pressed={quick.has(k)}
           onClick={() => toggleQuick(k)}
-          className={`min-h-8 rounded-pill border px-2.5 text-xs font-sans font-medium ${quick.has(k) ? "border-brand bg-brand text-white" : "border-transparent bg-white/90 text-text-muted backdrop-blur lg:border-border lg:bg-surface"}`}
+          className="flex min-h-11 items-center"
         >
-          {label}
+          <span data-testid="pillola-filtro" className={`inline-flex min-h-[34px] items-center rounded-pill border px-2.5 text-xs font-sans font-medium ${quick.has(k) ? "border-brand bg-brand text-white" : "border-transparent bg-white/90 text-text-muted backdrop-blur lg:border-border lg:bg-surface"}`}>{label}</span>
         </button>
       ))}
       {chipsVisible && nearestOn && (
@@ -653,9 +653,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           type="button"
           aria-pressed={nearestFirst}
           onClick={() => { setNearestFirst((v) => !v); onNearestToggle?.(); }}
-          className={`min-h-8 rounded-pill border px-2.5 text-xs font-sans font-medium ${nearestFirst ? "border-brand bg-brand text-white" : "border-transparent bg-white/90 text-text-muted backdrop-blur lg:border-border lg:bg-surface"}`}
+          className="flex min-h-11 items-center"
         >
-          Più vicini
+          <span data-testid="pillola-filtro" className={`inline-flex min-h-[34px] items-center rounded-pill border px-2.5 text-xs font-sans font-medium ${nearestFirst ? "border-brand bg-brand text-white" : "border-transparent bg-white/90 text-text-muted backdrop-blur lg:border-border lg:bg-surface"}`}>Più vicini</span>
         </button>
       )}
     </div>
@@ -664,6 +664,10 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // Area 4c del piano (4/11, come i filtri sotto la barra di Google Maps e Places): nella lista nuova i filtri
   // rapidi stanno in vista, in una riga sotto la pillola "N posti", non più dietro la pillola. Un tocco filtra
   // card e segnalini insieme; la pillola tiene solo "Ho capito", Affina e Condividi.
+  // Revisori 15/11: le pillole erano alte 36px. Il tasto è alto 44 (area toccabile), la pillola che si vede 38:
+  // la riga cresce di poco e il dito non sbaglia filtro.
+  const TOCCO = "flex min-h-11 items-center active:scale-95";
+  const PILLOLA = "inline-flex min-h-[38px] items-center rounded-pill px-3.5 text-[13px] font-sans shadow-card";
   const filtriInVista = (quickFiltersOn || nearestOn || treAttivabile) && (
     <div data-testid="filtri-mappa" className="pointer-events-auto -ml-3 -mr-[4.25rem] flex basis-[calc(100%+5rem)] gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&>button]:shrink-0 lg:hidden">
       {/* Proposta 55: primo della riga, perché è una scelta (non un filtro): accesa diventa "Tutti i N" per tornare. */}
@@ -675,9 +679,11 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           disabled={!treOn && !treScelta}
           aria-label={treOn ? "Scegli tra 3, accesa: tocca per tornare a tutti i posti" : loadingVerdicts ? "Scegli tra 3: attendi i verdetti" : treScelta ? `Scegli tra 3 dei ${treTra} posti` : "Scegli tra 3: servono almeno 5 posti adatti"}
           onClick={() => { if (!treOn) trackFeature("scegli_tre", { tra: treTra }); setTreDi(treOn ? null : allKey); }}
-          className={`inline-flex min-h-9 items-center gap-1 rounded-pill px-3.5 text-[13px] font-sans font-semibold shadow-card active:scale-95 disabled:opacity-50 ${treOn ? "bg-brand text-white" : "bg-surface text-brand"}`}
+          className={`${TOCCO} disabled:opacity-50`}
         >
+          <span data-testid="pillola-filtro" className={`${PILLOLA} gap-1 font-semibold ${treOn ? "bg-brand text-white" : "bg-surface text-brand"}`}>
           {treOn ? <><svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg>Tutti i {treTutti}</> : <><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>Scegli tra 3</>}
+          </span>
         </button>
       )}
       {/* Revisori 14 e 15/11: con la scelta accesa i filtri restano tutti in vista: toccarne uno cambia i tre davanti
@@ -688,9 +694,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           type="button"
           aria-pressed={quick.has(k)}
           onClick={() => toggleQuick(k)}
-          className={`min-h-9 rounded-pill px-3.5 text-[13px] font-sans font-medium shadow-card active:scale-95 ${quick.has(k) ? "bg-brand text-white" : "bg-surface text-text"}`}
+          className={TOCCO}
         >
-          {label}
+          <span data-testid="pillola-filtro" className={`${PILLOLA} font-medium ${quick.has(k) ? "bg-brand text-white" : "bg-surface text-text"}`}>{label}</span>
         </button>
       ))}
       {!treOn && nearestOn && (
@@ -698,9 +704,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           type="button"
           aria-pressed={nearestFirst}
           onClick={() => { setNearestFirst((v) => !v); onNearestToggle?.(); }}
-          className={`min-h-9 rounded-pill px-3.5 text-[13px] font-sans font-medium shadow-card active:scale-95 ${nearestFirst ? "bg-brand text-white" : "bg-surface text-text"}`}
+          className={TOCCO}
         >
-          Più vicini
+          <span data-testid="pillola-filtro" className={`${PILLOLA} font-medium ${nearestFirst ? "bg-brand text-white" : "bg-surface text-text"}`}>Più vicini</span>
         </button>
       )}
       {/* Margine in fondo alla riga: l'ultimo filtro non tocca il bordo dello schermo (revisore 4/11). */}
