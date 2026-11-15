@@ -8669,11 +8669,14 @@ else {
   // Revisore 15/11: dopo un'amicizia tolta niente "rendete pubblico il profilo": si torna con un link nuovo di chi l'ha tolta.
   for (const [cod, atteso, cosa, vietato] of [["i-00000000a5a5", "chi aveva tolto l'amicizia deve mandarti un link nuovo", "già usato", "pubblico"], ["i-00000000a6a6", "Avevi tolto Sara dagli amici: per tornare, manda tu un link nuovo", "tolto da te", "pubblico"], ["i-00000000a7a7", "Raggiunto il massimo di amici da invito", "troppi", "link nuovo"]]) {
     await ip.goto(`${BASE}/invito/${cod}`, { waitUntil: "networkidle" });
+    const rigaPrima = await ip.getByTestId("invito-riga").isVisible();
     if (await ip.getByTestId("invito-mio-nome").count()) await ip.getByTestId("invito-mio-nome").fill("Luca");
     await ip.getByTestId("invito-si").click();
     await ip.getByTestId("invito-scaduto").waitFor({ timeout: 4000 }).catch(() => {});
     const t = (await ip.getByTestId("invito-scaduto").textContent().catch(() => "")) ?? "";
-    ok(t.includes(atteso) && !t.includes(vietato), `invito da già iscritto, ${cosa}: il motivo vero (${t})`); }
+    ok(t.includes(atteso) && !t.includes(vietato), `invito da già iscritto, ${cosa}: il motivo vero (${t})`);
+    // Revisore 15/11: "Da amici vi vedete per nome in Amici" c'è prima del tocco, non dopo un no.
+    ok(rigaPrima && (await ip.getByTestId("invito-riga").count()) === 0 && !((await ip.getByTestId("invito-pagina").textContent()) ?? "").includes("vi vedete per nome"), `invito da già iscritto, ${cosa}: dopo il no sparisce 'Da amici vi vedete per nome'`); }
   // Già amici: "Siete già amici", niente "Diventa amico".
   await ip.goto(`${BASE}/invito/i-00000000a1a1`, { waitUntil: "networkidle" });
   ok((await ip.getByTestId("invito-accetta").count()) === 0 && ((await ip.getByTestId("invito-titolo").textContent()) ?? "").includes("siete già amici") && (await ip.getByTestId("invito-apri").getAttribute("href")) === "/amici", `invito da chi è già amico: 'Siete già amici' (${await ip.getByTestId("invito-titolo").textContent()})`);

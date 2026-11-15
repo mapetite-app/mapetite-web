@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { accettaInvito } from "@/app/onboarding/actions";
 import { clearStoredInvite, testoInvitoNo } from "@/lib/invito";
 import { trackFeature } from "@/lib/track";
@@ -9,7 +9,9 @@ import { trackFeature } from "@/lib/track";
 // e i 7 utenti di oggi non potevano diventare amici di nessuno). Un tasto, e il nome se manca.
 // Usato anche in Amici per l'invito rimasto senza risposta nel primo accesso ("contesto": "amici", con "Non ora").
 // "className": il margine sotto (in Amici il riquadro ha già il suo spazio: niente vuoto in fondo).
-export default function InvitoAccetta({ codice, nome, chiediNome, contesto = "gia_iscritto", nonOra, className = "mb-3" }: { codice: string; nome: string | null; chiediNome: boolean; contesto?: string; nonOra?: () => void; className?: string }) {
+// "riga": la frase sopra il tasto ("Da amici vi vedete per nome…"): solo finché si può ancora accettare, mai dopo
+// un esito negativo (revisore 15/11: restava sotto "Vi eravate tolti dagli amici").
+export default function InvitoAccetta({ codice, nome, chiediNome, contesto = "gia_iscritto", nonOra, className = "mb-3", riga }: { codice: string; nome: string | null; chiediNome: boolean; contesto?: string; nonOra?: () => void; className?: string; riga?: ReactNode }) {
   const [mio, setMio] = useState("");
   // Il server può chiedere il nome anche se la pagina pensava di averlo (revisore 14/11, terzo giro).
   const [serveNome, setServeNome] = useState(chiediNome);
@@ -25,6 +27,7 @@ export default function InvitoAccetta({ codice, nome, chiediNome, contesto = "gi
   const senzaNome = serveNome && !mio.trim();
   return (
     <div data-testid="invito-accetta" className={className}>
+      {riga}
       {serveNome && (
         <input
           data-testid="invito-mio-nome"

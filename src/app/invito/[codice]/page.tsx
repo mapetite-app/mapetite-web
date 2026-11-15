@@ -89,7 +89,6 @@ export default async function InvitoPage({ params }: Props) {
           <h1 data-testid="invito-titolo" className="mt-4 font-title text-[1.6rem] font-semibold leading-tight text-text">
             {giaAmici ? `Tu e ${name ?? "chi ti ha invitato"} siete già amici` : name ? `${name} ti ha invitato` : (codice && GENERICI[codice]) || "Ti hanno invitato su Mapetite"}
           </h1>
-          {puoiAccettare && <p className="mt-1.5 text-[15px] font-sans text-text-muted">Da amici vi vedete per nome in Amici.</p>}
           {p && posti > 0 && (
             <p data-testid="invito-posti" className="mt-1.5 text-sm font-sans text-text-muted">
               {posti === 1 ? "1 posto" : `${posti} posti`} sulla sua mappa
@@ -98,7 +97,7 @@ export default async function InvitoPage({ params }: Props) {
         </div>
         <div className="mt-6">
           {puoiAccettare && codice ? (
-            <InvitoAccetta codice={codice} nome={name} chiediNome={chiediNome} />
+            <InvitoAccetta codice={codice} nome={name} chiediNome={chiediNome} riga={<p data-testid="invito-riga" className="-mt-4 mb-4 text-center text-[15px] font-sans text-text-muted">Da amici vi vedete per nome in Amici.</p>} />
           ) : giaAmici ? (
             <p data-testid="invito-gia-amici" className="mb-3 text-center text-sm font-sans text-text-muted">Vi trovate in Amici.</p>
           ) : (
