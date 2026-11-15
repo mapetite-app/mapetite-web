@@ -697,6 +697,8 @@ await page.unroute("**/api/search");
   ok(titolo === "Tre, diversi tra loro" && /^Su 6: il più in tema, un 💎 e (il più vicino|un altro tipo)$/.test(det), `scegli tra 3: la frase sopra le card dice come sono scelti ('${titolo}' · '${det}')`);
   ok((await page.getByTestId("conteggio-risultati").innerText()).trim() === "3 posti" && (await page.locator("[data-testid=pin]").count()) === 3, "scegli tra 3: pillola '3 posti' e tre segnalini sulla mappa");
   ok((await page.getByTestId("filtri-mappa").getByRole("button", { name: "Aperto ora" }).count()) === 0, "scegli tra 3: accesa, gli altri filtri si nascondono (una cosa per volta)");
+  // Revisore 14/11: "Un altro tipo" dice il tipo vero, e un posto salvato resta riconoscibile accanto al perché.
+  ok(!motivi.includes("Un altro tipo") && motivi.every((x) => !/^Altro tipo/.test(x) || /^Altro tipo: \S/.test(x)), `scegli tra 3: il perché "altro tipo" dice quale (${motivi.join(" / ")})`);
   await shot("05c-scegli-tra-3");
   await tre.click();
   await page.waitForTimeout(300);
@@ -714,7 +716,7 @@ await page.unroute("**/api/search");
     const m = await page.locator("ul.snap-x").getByTestId("tre-motivo").allInnerTexts();
     const t = (await page.getByTestId("frase-titolo").innerText().catch(() => "")).trim();
     const dd = (await page.getByTestId("frase-dettaglio").innerText().catch(() => "")).trim();
-    ok(m.length === 3 && !m.includes("Un altro tipo") && t === "Tre da scegliere" && !/altro tipo|diversi/.test(dd), `scegli tra 3: tutti dello stesso tipo → niente "diverso" né "un altro tipo" (${m.join(" / ")} · '${t}' · '${dd}')`);
+    ok(m.length === 3 && !m.some((x) => /altro tipo/i.test(x)) && t === "Tre da scegliere" && !/altro tipo|diversi/.test(dd), `scegli tra 3: tutti dello stesso tipo → niente "diverso" né "un altro tipo" (${m.join(" / ")} · '${t}' · '${dd}')`);
     await page.unroute("**/api/search"); }
   // Con meno di 5 posti il tasto non c'è: si vedono già tutti.
   await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });

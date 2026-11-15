@@ -656,7 +656,8 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {treOn ? <><svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg>Tutti i {treTra}</> : <><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>Scegli tra 3</>}
         </button>
       )}
-      {!treOn && quickFiltersOn && ([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).map(([k, label]) => (
+      {/* Revisore 14/11: con la scelta accesa restano in vista i filtri accesi (la scelta è fatta tra i rimasti). */}
+      {quickFiltersOn && ([["open", "Aperto ora"], ["cheap", "Fino a €€"], ["top", "Voto 4,5+"]] as const).filter(([k]) => !treOn || quick.has(k)).map(([k, label]) => (
         <button
           key={k}
           type="button"
@@ -1025,7 +1026,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       <span aria-hidden data-testid="copertina" className={`h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/95 text-base leading-none shadow-card ${conFoto[place.id] ? "hidden" : "flex"}`}>{getCategoryEmoji(place.category, place.name, place.types)}</span>
                       {motivo ? (
                         // "Scegli tra 3": il perché di questo posto prende il posto dell'etichetta (una sola sulla card).
-                        <span data-testid="tre-motivo" className="rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{MOTIVO_LABEL[motivo]}</span>
+                        // Revisore 14/11: "Salvato" non sparisce sotto il perché: resta un cuore accanto. "Un altro tipo"
+                        // dice il tipo vero ("Altro tipo: enoteca"), se lo conosciamo.
+                        <span className="flex items-center gap-1">
+                          <span data-testid="tre-motivo" className="max-w-[12rem] truncate rounded-pill bg-accent px-2 py-0.5 text-[10px] font-display font-semibold">{motivo === "diverso" && cat ? `Altro tipo: ${cat.toLowerCase()}` : MOTIVO_LABEL[motivo]}</span>
+                          {saved && <span data-testid="tre-salvato" aria-label={saved} title={saved} className="flex h-5 w-5 items-center justify-center rounded-full bg-white/95 text-accent shadow-card"><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3.3 5 6.8 5c2 0 3.6 1.1 4.2 2.6h2C13.6 6.1 15.2 5 17.2 5c3.5 0 5.6 3.6 4.3 6.8C19.5 16.4 12 21 12 21z" /></svg></span>}
+                        </span>
                       ) : (stato || saved || gem || poco) && (
                       <span className="flex">
                         {stato ? (

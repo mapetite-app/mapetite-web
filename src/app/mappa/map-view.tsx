@@ -2245,6 +2245,12 @@ export default function MapView({
     // Revisore 5/11: con un risultato lontano (prima card a 7 km) l'inquadratura iniziale li tiene tutti e il
     // quartiere cercato resta una miniatura. Passando a una card del gruppo fitto, la mappa si avvicina al
     // gruppo; tornando sulla card lontana (fuori schermo) si torna all'inquadratura con tutti.
+    // "Scegli tra 3" (revisore 14/11): con le tre card la mappa le tiene tutte e tre in vista. Se il segnalino
+    // della card è fuori dalla fascia libera si reinquadra sui tre (non su tutti i risultati, che li perdeva).
+    if (aiSearch !== null && treIds && treIds.includes(place.id)) {
+      if (!(pt.x > 30 && pt.x < w - 30 && pt.y > 236 && pt.y < h - 300)) fitToPlaces(mapPlaces, 236, 0, [place]);
+      return;
+    }
     if (aiSearch !== null && clusterPlaces === null) {
       const tutti = aiSearch.risultati;
       const fitti = puntiDaInquadrare(tutti);
