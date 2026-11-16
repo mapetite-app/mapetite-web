@@ -952,7 +952,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
                 disabled={!!submitting}
                 className="mt-1 flex min-h-11 w-full items-center justify-center font-display text-[15px] font-semibold text-brand disabled:opacity-60"
               >
-                {submitting === "importa" ? "Un attimo…" : "Prima porta qui i tuoi posti salvati"}
+                {submitting === "importa" ? "Un attimo…" : "Porta qui tutti i tuoi salvati, gratis"}
               </button>
             </>
           )}

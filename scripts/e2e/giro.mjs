@@ -10351,6 +10351,8 @@ if (fakeUser) {
   // Con più zone i numeri stanno solo sui chip (revisore 3/11: niente doppione nel titolo).
   const zchips = (await tc.getByTestId("file-zona").allTextContents()).join("|");
   ok(ries === "Trovati 5 posti" && zchips === "Roma · 2|Milano · 1|Dalle liste · 2", `file Takeout: titolo corto, città sui chip ("${ries}" · ${zchips})`);
+  { const nt = await tp.getByTestId("nessun-tetto").textContent().catch(() => "");
+    ok(nt === "Nessun tetto al numero di posti, gratis.", `file Takeout (proposta 62): con posti lasciati fuori niente 'Li porti tutti', solo 'Nessun tetto al numero di posti, gratis.' (${nt})`); }
   const scart = await tp.getByTestId("file-scartati").textContent().catch(() => "");
   ok(scart.includes("Lasciati fuori 3 (") && scart.includes("albergo") && scart.includes("museo") && scart.includes("senza nome") && !scart.includes("non sono locali"), `file Takeout: hotel, museo e punto senza nome lasciati fuori, con le ragioni vere ("${scart.slice(0, 80)}")`);
   const liste = await tp.getByTestId("file-liste").textContent();

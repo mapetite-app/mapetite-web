@@ -24,6 +24,8 @@ export type CommunityReview = {
   created_at: string;
   autore: Autore | null; // null = profilo privato: "Un membro di Mapetite"
   amico: boolean; // è una persona che segui
+  // Proposta 61 (migrazione 20261116b): l'autore ha "Ci sono stato" su quel posto; mese della visita se segnato.
+  visita?: { mese: string | null } | null;
 };
 
 export type CommunityReel = { id: string; url: string; fonte: ReelSource; autore: Autore | null; mio: boolean };
@@ -38,9 +40,10 @@ export type Community = {
   foto: FotoCommunity[]; // foto pubbliche degli altri
   mieFoto: FotoUtente[]; // le proprie (anche private: contano per il massimo di 3)
   fotoPronte: boolean; // tabella foto_locali presente
+  possoRecensire: boolean; // chi guarda ha "Ci sono stato" su questo posto (proposta 61)
 };
 
-export const EMPTY_COMMUNITY: Community = { placeId: null, recensioni: [], mia: null, reel: [], reelPronti: false, viewer: false, foto: [], mieFoto: [], fotoPronte: false };
+export const EMPTY_COMMUNITY: Community = { placeId: null, recensioni: [], mia: null, reel: [], reelPronti: false, viewer: false, foto: [], mieFoto: [], fotoPronte: false, possoRecensire: false };
 const EMPTY = EMPTY_COMMUNITY;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SOURCES: readonly string[] = ["Instagram", "TikTok", "YouTube"];
@@ -55,10 +58,10 @@ async function fake(id: string): Promise<Community | null> {
   if (!dev()) return null;
   const raw = (await cookies()).get("e2e_community")?.value;
   const viewer = (await viewerId()) != null;
-  if (!raw) return { ...EMPTY, placeId: UUID_RE.test(id) ? id : null, viewer };
+  if (!raw) return { ...EMPTY, possoRecensire: true, placeId: UUID_RE.test(id) ? id : null, viewer };
   try {
     const data = JSON.parse(decodeURIComponent(raw)) as Partial<Community>;
-    return { ...EMPTY, ...data, placeId: data.placeId ?? (UUID_RE.test(id) ? id : null), viewer };
+    return { ...EMPTY, possoRecensire: true, ...data, placeId: data.placeId ?? (UUID_RE.test(id) ? id : null), viewer };
   } catch {
     return { ...EMPTY, viewer };
   }
@@ -72,6 +75,8 @@ type ReviewRow = {
   user_id: string | null;
   handle?: string | null;
   display_name?: string | null;
+  c_e_stato?: boolean | null;
+  visita_mese?: string | null;
 };
 type ReelRow = { id: string; url: string; fonte: string; user_id: string; handle?: string | null; display_name?: string | null };
 
@@ -94,8 +99,10 @@ export async function loadCommunity(id: string): Promise<Community> {
   }
   if (!placeId) return { ...EMPTY, viewer: viewer != null };
 
-  const [pub, mine, ids, myReels, pubReels, altrui, mie] = await Promise.all([
-    supabase.from("recensioni_pubbliche").select("id, rating, comment, created_at, user_id, handle, display_name").eq("place_id", placeId).order("created_at", { ascending: false }).limit(50),
+  const PUB = "id, rating, comment, created_at, user_id, handle, display_name";
+  const leggiPubbliche = (cols: string) => supabase.from("recensioni_pubbliche").select(cols).eq("place_id", placeId).order("created_at", { ascending: false }).limit(50);
+  const [pub0, mine, ids, myReels, pubReels, altrui, mie, visita] = await Promise.all([
+    leggiPubbliche(`${PUB}, c_e_stato, visita_mese`),
     viewer
       ? supabase.from("reviews").select("id, rating, comment").eq("place_id", placeId).eq("user_id", viewer).maybeSingle<{ id: string; rating: number; comment: string | null }>()
       : Promise.resolve({ data: null, error: null }),
@@ -106,7 +113,13 @@ export async function loadCommunity(id: string): Promise<Community> {
     supabase.from("contenuti_pubblici").select("id, url, fonte, user_id, handle, display_name").eq("place_id", placeId).order("created_at", { ascending: false }).limit(24),
     fotoPubbliche(placeId),
     viewer ? fotoMie(viewer, [placeId]) : Promise.resolve(null),
+    // Proposta 61: si recensisce solo da "Ci sono stato" (lo stesso controllo lo fa il database).
+    viewer
+      ? supabase.from("saved_places").select("tags").eq("user_id", viewer).eq("place_id", placeId).maybeSingle<{ tags: string[] | null }>()
+      : Promise.resolve({ data: null, error: null }),
   ]);
+  // Senza la migrazione 20261116b (colonne mancanti) si rilegge come prima.
+  const pub = pub0.error ? await leggiPubbliche(PUB) : pub0;
 
   // Recensioni: vista pubblica; senza migrazione la tabella reviews com'è oggi (lettura pubblica, anonima).
   let rows: ReviewRow[];
@@ -115,7 +128,7 @@ export async function loadCommunity(id: string): Promise<Community> {
     if (error) console.error("[community] lettura reviews:", error.message);
     rows = ((data as ReviewRow[] | null) ?? []).map((r) => ({ ...r, user_id: null })); // anonime
   } else {
-    rows = (pub.data as ReviewRow[] | null) ?? [];
+    rows = (pub.data as unknown as ReviewRow[] | null) ?? [];
   }
   if (mine.error) console.error("[community] propria recensione:", mine.error.message);
   const myId = mine.data?.id ?? null;
@@ -124,7 +137,10 @@ export async function loadCommunity(id: string): Promise<Community> {
     .filter((r) => r.id !== myId && (r.user_id == null || r.user_id !== viewer))
     .map((r) => {
       const autore = autoreOf(r);
-      return { id: r.id, rating: r.rating, comment: r.comment?.trim() || null, created_at: r.created_at, autore, amico: autore != null && friends.has(autore.user_id) };
+      return {
+        id: r.id, rating: r.rating, comment: r.comment?.trim() || null, created_at: r.created_at, autore, amico: autore != null && friends.has(autore.user_id),
+        visita: r.c_e_stato ? { mese: r.visita_mese ?? null } : null,
+      };
     })
     // Prima chi segui, poi chi ha scritto qualcosa, poi le più recenti: mai "le più votate".
     .sort((a, b) => Number(b.amico) - Number(a.amico) || Number(b.comment != null) - Number(a.comment != null) || b.created_at.localeCompare(a.created_at));
@@ -154,5 +170,6 @@ export async function loadCommunity(id: string): Promise<Community> {
     foto: altrui,
     mieFoto: mie?.foto.get(placeId) ?? [],
     fotoPronte: mie?.pronte ?? false,
+    possoRecensire: (visita.data?.tags ?? []).includes("Già visitato"),
   };
 }

@@ -326,6 +326,14 @@ export default function TakeoutCard({ userId, titolo = true }: { userId: string 
                 {/* Con più zone i numeri ci sono già sui chip qui sotto (revisore 3/11: detti due volte). */}
                 {zones.length === 1 && (zones[0][0] === SENZA_POSIZIONE ? " dalle liste" : ` a ${zones[0][0]}`)}
               </p>
+              {/* Proposta 62 "Nessun tetto": Mapstr fa pagare oltre 300 posti; qui si portano tutti, detto una volta. */}
+              {items.length > 1 && (
+                // Revisore 16/11 sera: con posti lasciati fuori o posizioni da cercare "li porti tutti" non è vero:
+                // lì si dice solo che non c'è un tetto al numero.
+                <p data-testid="nessun-tetto" className="mt-0.5 text-sm text-text-muted">
+                  {skipped.length === 0 && noCoords === 0 ? "Li porti tutti: nessun limite, gratis." : "Nessun tetto al numero di posti, gratis."}
+                </p>
+              )}
 
               {/* Una zona sola: niente scelta (revisore 2/11: un filtro per un solo gruppo è rumore). */}
               {zones.length > 1 && (<>
