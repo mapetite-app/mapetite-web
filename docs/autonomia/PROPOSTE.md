@@ -24,7 +24,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google e TripAdvisor accettano recensioni senza prova; Beli e Corner non lo dicono. Noi abbiamo già il gesto "Ci sono stato": basta legarlo alla recensione.
 - **Valore per l'utente:** stelle di cui fidarsi. **Per il ristoratore:** "su Mapetite ti giudica solo chi è venuto": è un argomento di vendita del pannello.
 - **Sforzo:** M (vincolo nel database con una funzione di controllo, data della visita già salvata, testi della scheda e della privacy; le recensioni vecchie senza visita restano ma senza la riga "C'è stato"). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **16/11 notte: costruita, bocciata due volte sull'interfaccia (7 e 7,5, sicurezza OK), non unita; commit `7ff18844`.**
 
 ### 62. "Nessun tetto": tutti i tuoi posti, gratis, detto dove conta
 - **Problema:** il problema dei 500 cuoricini (richiesta di Lorenzo dell'8/11); Mapstr fa pagare oltre 300 posti salvati ([App Store](https://apps.apple.com/ca/app/id917288465)).
@@ -56,7 +56,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Mapstr lo fa per la mappa e per ogni singolo posto ([App Store FR](https://apps.apple.com/fr/app/mapstr/id917288465)); Corner, Beli e TheFork mostrano i tuoi posti agli amici senza questa scelta in vista. Noi lo mettiamo nel gesto del salvataggio, dove serve.
 - **Valore per l'utente:** accende gli amici senza paura. **Per l'app:** più profili pubblici, quindi più amici e più consigli (proposta 58). **Per il ristoratore:** nessuno diretto; i dati aggregati restano (contano tutti i salvati, senza nomi).
 - **Sforzo:** S/M (una colonna su `saved_places` e un filtro nelle viste pubbliche `salvati_pubblici` e simili: migrazione, prima sul progetto di prova; testi di `privacy-profilo.ts` e `/privacy` aggiornati insieme). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA (con controllo di sicurezza del revisore: nessuna vista pubblica deve far uscire i posti col lucchetto). **15/11 sera: lucchetto sul singolo posto fatto (in Modifica), approvato 8,6, sicurezza OK.** In serata anche al primo salvataggio (8,6). Resta: lucchetto sulla raccolta intera.
+- **Stato proposto:** PRONTA (con controllo di sicurezza del revisore: nessuna vista pubblica deve far uscire i posti col lucchetto). **16/11 notte: lucchetto sulla raccolta intera approvato 8,6, sicurezza OK.** **15/11 sera: lucchetto sul singolo posto fatto (in Modifica), approvato 8,6, sicurezza OK.** In serata anche al primo salvataggio (8,6). Resta: lucchetto sulla raccolta intera.
 
 ### 60. "Il reel è segnato come pubblicità": detto in chiaro quando lo dice il reel stesso
 - **Problema:** `PROBLEMI.md` 25: dal reel non si capisce se il consiglio è sincero o una cena offerta; per AGCOM (FAQ del 16/3/2026) anche un vantaggio non in denaro è promozione e va segnato con "ADV" o "Pubblicità" ([EcNews](https://www.ecnews.it/fiscale/societa-e-bilancio/bilancio/agcom-stringe-la-rete-sugli-influencer-le-nuove-faq-cambiano-le-regole-del-gioco/)).
@@ -64,7 +64,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** nessuna delle app che salvano dai social (Corner, Albo, Mapstr) lo dice; TheFork mette i creator nel feed accanto agli amici. Noi siamo gli unici con il verdetto dalle recensioni, quindi possiamo dire "fidati delle recensioni, non solo del reel" con una prova.
 - **Valore per l'utente:** sa da dove arriva il consiglio, senza dover leggere i tag. **Per il ristoratore:** chi non paga i creator non viene confuso con chi lo fa; per tutti, il verdetto resta lo stesso.
 - **Sforzo:** S (controllo di testo sulla didascalia in `reel-save.tsx` / `src/lib/reel.ts`, una riga nell'interfaccia, un controllo nel giro automatico). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **16/11 notte: bocciata quattro volte in tutto (7,5; 6; 7; 5) per falsi positivi; in pausa** (commit `724097bd`): si riprende solo con un segnale sicuro, non con regole sul testo.
 
 ## 14/11/2026 (sabato, CEO che chiude — tema scelta in gruppo e posti non di massa)
 
