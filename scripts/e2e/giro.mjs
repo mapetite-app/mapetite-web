@@ -10206,6 +10206,30 @@ else {
   await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
   ok(await cp.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "community 360px: niente scorrimento orizzontale");
 
+  // 5b. Proposta 61 "C'è stato davvero": recensisce solo chi ha segnato "Ci sono stato"; le recensioni dicono il mese.
+  await setC("e2e_community", {
+    recensioni: [
+      { id: "r1", rating: 5, comment: "Carbonara da applausi, chiedete il tavolo in fondo.", created_at: "2026-11-10T20:00:00Z", autore: { user_id: "u-giulia", handle: "giulia.rm", display_name: "Giulia" }, amico: true, visita: { mese: "2026-11-01" } },
+      { id: "r2", rating: 4, comment: null, created_at: "2026-10-12T20:00:00Z", autore: null, amico: false, visita: { mese: null } },
+    ],
+    mia: null, reel: [], reelPronti: true, possoRecensire: false,
+  });
+  await cp.setViewportSize({ width: 390, height: 844 });
+  await cp.reload({ waitUntil: "networkidle" });
+  await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
+  { const rr = cp.getByTestId("recensione-community");
+    ok((await cp.getByTestId("recensione-form").count()) === 0 && (await txt(cp.getByTestId("recensione-serve-visita"))).includes("Ci sono stato"), "recensioni (proposta 61): senza 'Ci sono stato' niente modulo, una riga dice come fare");
+    ok((await txt(rr.nth(0))).includes("Visitato a novembre") && !(await txt(rr.nth(0))).includes("C'è stato") && (await txt(rr.nth(1))).includes("Visitato") && !(await txt(rr.nth(1))).includes("ott"), `recensioni (proposta 61): '✓ Visitato a novembre' (forma neutra), senza mese solo 'Visitato' (nessuna data che sembri la visita) (${await txt(rr.nth(1))})`);
+    await cp.getByTestId("recensione-serve-visita").scrollIntoViewIfNeeded();
+    await cp.screenshot({ path: `${OUT}/98b-recensioni-da-visita.png`, caret: "initial" });
+    // Pagina del locale: "✓ Ci sono stato" direttamente qui (niente vicolo cieco), poi il modulo si apre.
+    await cp.getByTestId("recensione-ci-sono-stato").click();
+    await cp.getByTestId("recensione-form").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await cp.getByTestId("recensione-form").isVisible() && (await cp.getByTestId("recensione-serve-visita").count()) === 0, "recensioni (proposta 61): '✓ Ci sono stato' dalla sezione apre subito il modulo");
+    ok((await txt(cp.getByTestId("recensione-visita-segnata"))).includes("Tra i posti dove sei stato"), "recensioni (proposta 61): dopo il tasto la sezione dice che il posto è tra i visitati");
+    ok((await cp.getByText("Salva in Mapetite").count()) === 0 && (await txt(cp.getByTestId("salvato-pubblico"))).includes("Tra i posti dove sei stato"), "recensioni (proposta 61): la barra 'Salva in Mapetite' diventa '✓ Tra i posti dove sei stato'");
+    await cp.screenshot({ path: `${OUT}/98c-recensioni-segnato.png`, caret: "initial" }); }
+
   // 6. Senza accesso: si leggono le recensioni, per scrivere serve "Accedi" (che riporta al locale).
   await setC("e2e_anonimo", 1);
   await cp.setViewportSize({ width: 390, height: 844 });
@@ -10351,6 +10375,7 @@ if (fakeUser) {
   // Con più zone i numeri stanno solo sui chip (revisore 3/11: niente doppione nel titolo).
   const zchips = (await tc.getByTestId("file-zona").allTextContents()).join("|");
   ok(ries === "Trovati 5 posti" && zchips === "Roma · 2|Milano · 1|Dalle liste · 2", `file Takeout: titolo corto, città sui chip ("${ries}" · ${zchips})`);
+  ok((await tp.getByTestId("nessun-tetto").textContent().catch(() => "")).includes("nessun limite, gratis"), "file Takeout (proposta 62): 'Li porti tutti: nessun limite, gratis.' sotto il numero dei posti");
   const scart = await tp.getByTestId("file-scartati").textContent().catch(() => "");
   ok(scart.includes("Lasciati fuori 3 (") && scart.includes("albergo") && scart.includes("museo") && scart.includes("senza nome") && !scart.includes("non sono locali"), `file Takeout: hotel, museo e punto senza nome lasciati fuori, con le ragioni vere ("${scart.slice(0, 80)}")`);
   const liste = await tp.getByTestId("file-liste").textContent();
