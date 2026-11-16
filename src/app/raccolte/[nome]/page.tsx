@@ -4,12 +4,13 @@ import { ArrowLeft, Map as MapIcon } from "lucide-react";
 import MappaPersonaLazy from "@/components/mappa-persona-lazy";
 import CondividiLink from "@/components/condividi-link";
 import RaccoltaAzioni from "@/components/raccolta-azioni";
+import RaccoltaLucchetto from "@/components/raccolta-lucchetto";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
 import { isStateTag } from "@/lib/tags";
 import { collectionColor, collectionFromParam, inCollection, placesLabel, publicCollectionPath, summarizeCollections } from "@/lib/raccolte";
-import { loadMySaved, myUserId, withVerdicts } from "@/lib/raccolte-server";
+import { loadMySaved, loadRaccoltePrivate, myUserId, withVerdicts } from "@/lib/raccolte-server";
 import { loadMySocial } from "@/lib/social";
 
 // Pagina di una propria raccolta (piano 4.1): cartella aperta con mini mappa e lista dei locali,
@@ -48,7 +49,7 @@ export default async function RaccoltaPage({ params }: Props) {
     );
   }
 
-  const [all, social] = await Promise.all([loadMySaved(userId), loadMySocial(userId)]);
+  const [all, social, private_] = await Promise.all([loadMySaved(userId), loadMySocial(userId), loadRaccoltePrivate(userId)]);
   const rows = name && !isStateTag(name) ? await withVerdicts(inCollection(all, name)) : [];
 
   if (!name || rows.length === 0) {
@@ -78,7 +79,11 @@ export default async function RaccoltaPage({ params }: Props) {
       : [],
   );
   const me = "stato" in social ? null : social;
-  const shareable = me?.is_public && me.handle ? publicCollectionPath(me.handle, name) : null;
+  // Proposta 59: con il lucchetto la raccolta non si condivide (il link pubblico sarebbe vuoto).
+  const privata = private_.includes(name);
+  const shareable = !privata && me?.is_public && me.handle ? publicCollectionPath(me.handle, name) : null;
+  // Il lucchetto serve solo a chi si fa vedere (profilo pubblico); se è già acceso resta, per poterlo spegnere.
+  const lucchettoUtile = privata || me?.is_public === true;
   const visited = rows.filter((r) => r.tags.includes("Già visitato")).length;
   const mapHref = `/mappa?${new URLSearchParams({ vista: "salvati", tag: name }).toString()}`;
 
@@ -101,7 +106,7 @@ export default async function RaccoltaPage({ params }: Props) {
         </div>
 
         <div className="mt-3 flex items-center gap-2">
-          {shareable ? (
+          {privata ? null : shareable ? (
             <CondividiLink path={shareable} cosa="raccolta" title={`${name} · Mapetite`} text={`La mia raccolta “${name}” su Mapetite`} testId="condividi-raccolta" variant="solid" />
           ) : (
             <Link href="/profilo#profilo-pubblico" data-testid="condividi-raccolta-privata" className="inline-flex min-h-11 items-center rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand">
@@ -121,11 +126,12 @@ export default async function RaccoltaPage({ params }: Props) {
           <span className="flex-1" />
           <RaccoltaAzioni userId={userId} name={name} rows={rows.map((r) => ({ placeId: r.placeId, tags: r.tags }))} allTags={allTags} others={others} />
         </div>
-        {!shareable && (
+        {!shareable && !privata && (
           <p data-testid="raccolta-privata" className="mt-2 text-xs text-text-muted">
             Per condividerla rendi pubblico il profilo (le note restano tue).
           </p>
         )}
+        {lucchettoUtile && <RaccoltaLucchetto key={`${name}:${privata}`} userId={userId} name={name} initial={privata} />}
       </header>
 
       {spots.length > 0 && (

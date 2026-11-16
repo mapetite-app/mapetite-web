@@ -6,6 +6,7 @@ import { MoreHorizontal } from "lucide-react";
 import { replaceTag } from "@/lib/tags";
 import { checkCollectionName, collectionPath, placesLabel } from "@/lib/raccolte";
 import { updateTags } from "@/lib/raccolte-write";
+import { proteggiPrima, pulisciDopo } from "@/lib/raccolte-private";
 import { trackFeature } from "@/lib/track";
 
 // "⋯" nella pagina di una raccolta: rinomina, unisci con un'altra, elimina. Stessa scrittura
@@ -34,10 +35,17 @@ export default function RaccoltaAzioni({
   const open = (m: Mode) => { setError(null); setText(name); setMode(m); };
   const close = () => { if (!busy) setMode(null); };
 
-  async function run(change: (tags: string[]) => string[], then: string, contesto: "rinomina" | "unisci" | "elimina") {
+  // "a": nome nuovo in cui passa il lucchetto (solo rinomina in un nome che non esiste); null = unisci/elimina.
+  async function run(change: (tags: string[]) => string[], then: string, contesto: "rinomina" | "unisci" | "elimina", a: string | null = null) {
     setBusy(true);
     setError(null);
+    if (!(await proteggiPrima(userId, name, a, rows.map((r) => r.placeId)))) {
+      setBusy(false);
+      setError("Non sono riuscito a tenere privati i posti di questa raccolta: controlla la connessione e riprova.");
+      return;
+    }
     const failed = await updateTags(userId, rows, change);
+    if (failed === 0) await pulisciDopo(userId, name);
     setBusy(false);
     if (failed > 0) {
       setError(`Non sono riuscito ad aggiornare ${placesLabel(failed)}: controlla la connessione e riprova.`);
@@ -53,7 +61,7 @@ export default function RaccoltaAzioni({
     const res = checkCollectionName(text, allTags, name);
     if ("error" in res) { setError(res.error); return; }
     if (res.tag === name) { setMode(null); return; }
-    void run((tags) => replaceTag(tags, name, res.tag), collectionPath(res.tag), "rinomina");
+    void run((tags) => replaceTag(tags, name, res.tag), collectionPath(res.tag), "rinomina", allTags.includes(res.tag) ? null : res.tag);
   };
 
   const primary = "flex min-h-12 w-full items-center justify-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white disabled:opacity-40 active:scale-[0.99]";
