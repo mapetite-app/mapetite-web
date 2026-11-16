@@ -3,6 +3,7 @@
 import { tagLabel, isStateTag } from "@/lib/tags";
 import { Lock, X, Quote, Navigation, Globe, Phone, Check, Share, Share2, Footprints, CalendarCheck, Ellipsis, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck, ChevronRight, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { SchedaVisitaContext, type SchedaVisita } from "@/components/scheda-visita";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import Link from "next/link";
 import { track, trackFeature } from "@/lib/track";
@@ -392,6 +393,17 @@ export default function VenueSheet({
   };
   // Variante della scheda da far scegliere (?scheda=b, stile Places); "a" = attuale.
   const variant = useVariant("scheda");
+  // Proposta 61: la sezione recensioni usa il "Ci sono stato" di questa scheda (un solo tasto per schermata).
+  // Tasto in vista: nei salvati in "Le tue note"; nei non salvati la fila "Da provare / Ci sono stato"
+  // (scheda A sempre, scheda B solo senza barra Salva: altrimenti sta nel menu ⋯).
+  const tastoVisitaInVista = isSaved ? onVisitStatus != null && showPersonalBlock : onQuickSave != null && (variant !== "b" || !saveSlot);
+  const schedaVisita: SchedaVisita = {
+    visitato: isSaved ? (onVisitStatus ? (personalTags?.includes("Già visitato") ?? false) : null) : onQuickSave ? false : null,
+    vai: tastoVisitaInVista
+      ? () => document.querySelector(isSaved ? "[data-testid=stato-salvato]" : "[data-testid=stato-rapido]")?.scrollIntoView({ behavior: "smooth", block: "center" })
+      : null,
+    segna: !tastoVisitaInVista && !isSaved && onQuickSave ? () => onQuickSave("Già visitato") : null,
+  };
   // Locale verificato e "c'è posto" (parola del titolare): spunta accanto al nome e pillola sotto.
   const infoLocale = useInfoLocale(venue.id);
   const emoji = getCategoryEmoji(category, name, venue.types);
@@ -1173,7 +1185,7 @@ export default function VenueSheet({
                   <h3 className="font-display text-base font-semibold text-brand">
                     Dalla community Mapetite
                   </h3>
-                  <div className="mt-2">{communitySlot}</div>
+                  <div className="mt-2"><SchedaVisitaContext.Provider value={schedaVisita}>{communitySlot}</SchedaVisitaContext.Provider></div>
                 </div>
               )}
             </div>
@@ -1537,7 +1549,7 @@ export default function VenueSheet({
             Dalla community Mapetite
             <span className="text-xs font-sans font-normal text-text-muted">Recensioni degli utenti</span>
           </h3>
-          <div className="mt-2">{communitySlot}</div>
+          <div className="mt-2"><SchedaVisitaContext.Provider value={schedaVisita}>{communitySlot}</SchedaVisitaContext.Provider></div>
         </div>
       )}
 

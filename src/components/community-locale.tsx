@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { Play, Plus } from "lucide-react";
 import Avatar from "@/components/avatar";
 import { personName, profilePath } from "@/lib/handle";
-import { trackFeature } from "@/lib/track";
+import { track, trackFeature } from "@/lib/track";
 import { COMMENT_MAX, addReel, saveReview, segnaCiSonoStato } from "@/lib/community-write";
 import { reelSourceOf, seenOn, type ReelSource } from "@/lib/reel";
 import type { Community, CommunityReel, CommunityReview } from "@/lib/community";
 import type { Voto } from "@/lib/diario";
 import type { FotoUtente } from "@/lib/foto-utenti";
 import { FotoCommunityStrip, FotoMieEditor } from "@/components/foto-utenti";
+import { SchedaVisitaContext } from "@/components/scheda-visita";
 
 // "Dalla community Mapetite" (piani 5.6c e 5.6d) nella scheda della mappa e nella pagina pubblica
 // del locale: la tua recensione (stelle + due righe), quelle degli altri (prima chi segui) e i reel
@@ -24,7 +25,6 @@ type Props = {
   contesto: "mappa" | "locale" | "assistente";
   loginHref?: string;
   voto?: Voto | null; // "Com'era?" già dato: suggerimento, non si traduce mai da solo in stelle
-  visitato?: boolean; // dalla mappa: "Ci sono stato" acceso adesso nella scheda (vale più del dato del server)
 };
 
 type Preview = { titolo: string | null; autore: string | null; miniatura: string | null };
@@ -62,8 +62,11 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
   );
 }
 
-// "2026-11-01" → "novembre 2026" (solo il mese: il giorno della visita non si mostra mai).
-const meseVisita = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("it-IT", { month: "long", year: "numeric" });
+// "2026-11-01" → "novembre" (anno solo se non è quello in corso): solo il mese, il giorno della visita non si mostra mai.
+const meseVisita = (iso: string) => {
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
+  return d.toLocaleDateString("it-IT", d.getFullYear() === new Date().getFullYear() ? { month: "long" } : { month: "long", year: "numeric" });
+};
 
 function ReviewRow({ r }: { r: CommunityReview }) {
   return (
@@ -82,7 +85,7 @@ function ReviewRow({ r }: { r: CommunityReview }) {
           <Stars value={r.rating} />
           {r.visita ? (
             <span data-testid="recensione-visita" className="text-xs font-sans text-text-muted">
-              <span className="font-display font-semibold text-success">✓ C&apos;è stato</span>
+              <span className="font-display font-semibold text-success">✓ Visitato</span>
               {r.visita.mese ? ` a ${meseVisita(r.visita.mese)}` : ""}
             </span>
           ) : (
@@ -148,8 +151,9 @@ function reelTitle(reels: CommunityReel[]): string {
   return sources.size === 1 ? seenOn([...sources][0]) : "Visto sui social";
 }
 
-export default function CommunityLocale({ id, contesto, loginHref = "/login", voto = null, visitato: visitatoScheda, userId }: Props & { userId: string | null }) {
+export default function CommunityLocale({ id, contesto, loginHref = "/login", voto = null, userId }: Props & { userId: string | null }) {
   const [data, setData] = useState<{ id: string; c: Community } | null>(null);
+  const scheda = useContext(SchedaVisitaContext);
   // Proposta 61: "Ci sono stato" segnato da qui (pagina del locale, assistente); errore del database "serve la visita".
   const [segnato, setSegnato] = useState<"no" | "attendo" | "ok" | "errore">("no");
   const [serveVisita, setServeVisita] = useState(false);
@@ -193,7 +197,8 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
   const canWrite = userId != null && c.placeId != null;
   // Proposta 61: stelle e commento solo da chi ha segnato "Ci sono stato" (il voto 👍/👎 arriva solo dopo la visita).
   // Dalla mappa vale il tasto della scheda (dato vivo); altrove il server, il voto 👍/👎 o il tasto qui sotto.
-  const visitato = visitatoScheda ?? (c.possoRecensire || voto != null || segnato === "ok");
+  // Se il database ha risposto "serve la visita" (dato vecchio sul telefono), si torna alla riga con il tasto.
+  const visitato = !serveVisita && ((scheda?.visitato ?? null) ?? (c.possoRecensire || voto != null)) || segnato === "ok";
   const formOpen = canWrite && visitato && (editing || !mine);
 
   const publish = async (e: React.FormEvent) => {
@@ -312,18 +317,37 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
           <p className="text-sm font-sans text-text">
             {mine ? "Per modificarla, segna prima che ci sei stato." : "Qui recensisce solo chi c'è stato."}
           </p>
-          {contesto === "mappa" ? (
-            <p className="mt-1 text-xs font-sans text-text-muted">Tocca “Ci sono stato” nella scheda, qui sopra.</p>
+          {scheda?.vai ? (
+            // Il tasto della scheda è in vista: niente secondo "Ci sono stato", si porta a quello.
+            <button
+              type="button"
+              data-testid="recensione-vai-visita"
+              onClick={scheda.vai}
+              className="mt-1 inline-flex min-h-11 items-center text-sm font-display font-semibold text-brand underline underline-offset-2"
+            >
+              Segna «✓ Ci sono stato» qui sopra ↑
+            </button>
           ) : (
             <button
               type="button"
               data-testid="recensione-ci-sono-stato"
               disabled={segnato === "attendo"}
               onClick={async () => {
+                if (scheda?.segna) {
+                  // Lo stesso "Ci sono stato" della scheda (salva il posto come visitato, stesso evento e foglio).
+                  scheda.segna();
+                  setServeVisita(false);
+                  return;
+                }
                 setSegnato("attendo");
                 const ok = await segnaCiSonoStato(userId!, c.placeId!);
                 setSegnato(ok ? "ok" : "errore");
-                if (ok) trackFeature("recensione_community", { stato: "ci_sono_stato", contesto });
+                if (!ok) return;
+                setServeVisita(false);
+                setStatus("idle");
+                track("ci_sono_stato", { id: c.placeId! }, { fonte: "recensioni", contesto });
+                // La barra "Salva in Mapetite" della pagina del locale si aggiorna (salva-locale.tsx).
+                window.dispatchEvent(new CustomEvent("mapetite:visitato", { detail: { placeId: c.placeId } }));
               }}
               className="mt-2 inline-flex min-h-11 items-center rounded-pill border border-brand bg-white px-5 text-sm font-display font-semibold text-brand active:scale-95 disabled:opacity-60"
             >
@@ -332,6 +356,11 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
           )}
           {segnato === "errore" && <p role="alert" className="mt-1 text-xs font-sans text-error">Non sono riuscito a segnarlo. Riprova.</p>}
         </div>
+      )}
+      {canWrite && segnato === "ok" && (
+        <p role="status" data-testid="recensione-visita-segnata" className="mt-3 text-sm font-display font-semibold text-success">
+          ✓ Tra i posti dove sei stato. Com&apos;era?
+        </p>
       )}
       {userId != null && c.placeId == null && (
         <p className="mt-2 text-sm font-sans text-text-muted">Salva il locale per lasciare la tua recensione.</p>
