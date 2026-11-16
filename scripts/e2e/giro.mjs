@@ -7435,44 +7435,54 @@ else {
     await p.waitForURL(/\/raccolte\/Amici/, { timeout: 6000 }).catch(() => {});
     ok(patches.length === 2 && patches.every((x) => x.body?.tags?.includes("Amici del giovedì") && !x.body.tags.includes("Con amici")) && decodeURIComponent(p.url()).endsWith("/raccolte/Amici del giovedì"), `pagina raccolta: rinomina scrive su tutti e porta alla nuova pagina (${JSON.stringify(patches)})`);
     patches = [];
-    // Proposta 59, resto: lucchetto "Solo per me" sulla raccolta intera (profiles.raccolte_private).
-    { let privateDb = ["Con amici"]; const profPatch = [];
+    // Proposta 59, resto: lucchetto "Solo per me" sulla raccolta intera (profiles.raccolte_private, funzione
+    // raccolta_privata un nome alla volta; revisore 16/11: interruttore nel menu ⋯, posti letti dal database).
+    { let privateDb = ["Con amici"]; const rpc = [];
       await p.route("**/rest/v1/profiles**", (r) => {
-        const req = r.request();
-        if (req.method() === "PATCH") { const b = req.postDataJSON(); profPatch.push(b); if (b?.raccolte_private) privateDb = b.raccolte_private; return r.fulfill({ status: 204, body: "" }); }
-        if (new URL(req.url()).searchParams.get("select")?.includes("raccolte_private")) return r.fulfill({ json: { raccolte_private: privateDb } });
+        if (new URL(r.request().url()).searchParams.get("select")?.includes("raccolte_private")) return r.fulfill({ json: { raccolte_private: privateDb } });
         return r.fallback();
+      });
+      await p.route("**/rest/v1/rpc/raccolta_privata", (r) => {
+        const b = r.request().postDataJSON(); rpc.push(`${b.p_on ? "+" : "-"}${b.p_nome}`);
+        privateDb = b.p_on ? [...new Set([...privateDb, b.p_nome])] : privateDb.filter((x) => x !== b.p_nome);
+        return r.fulfill({ json: privateDb });
       });
       await setProfilo(rc, { ...profilo, raccoltePrivate: ["Con amici"] });
       await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
-      const lk = p.getByTestId("raccolta-solo-per-me");
-      ok(await lk.isVisible() && (await lk.getAttribute("aria-checked")) === "true" && (await lk.textContent()).includes("i posti che aggiungi") && await p.getByTestId("raccolta-solo-per-te").isVisible(), "raccolta col lucchetto: interruttore 'Solo per me' acceso");
+      ok(await p.getByTestId("raccolta-solo-per-te").isVisible() && (await p.getByTestId("raccolta-solo-per-me").count()) === 0, "raccolta col lucchetto: 'Solo per te' nella testata, nessuna scheda in più sulla pagina");
       ok((await p.getByTestId("condividi-raccolta-privata").count()) === 0 && (await p.getByTestId("condividi-raccolta").count()) === 0 && (await p.getByTestId("raccolta-privata").count()) === 0, "raccolta col lucchetto: niente Condividi (il link pubblico sarebbe vuoto)");
+      await p.getByTestId("raccolta-pagina-menu").click();
+      const lk = rs.getByTestId("raccolta-solo-per-me");
+      ok(await lk.isVisible() && (await lk.getAttribute("aria-checked")) === "true" && (await lk.textContent()).includes("i posti che aggiungi"), "raccolta col lucchetto: nel menu ⋯ l'interruttore 'Solo per me' acceso");
       { const b = await lk.boundingBox(); ok(b && b.height >= 44, `raccolta col lucchetto: interruttore toccabile per 44px (${b?.height})`); }
       await p.screenshot({ path: `${OUT}/44c-raccolta-lucchetto.png`, caret: "initial" });
       // Rinomina di una raccolta col lucchetto: il lucchetto passa al nome nuovo PRIMA dei tag, poi esce il vecchio.
-      await p.getByTestId("raccolta-pagina-menu").click();
       await rs.getByRole("button", { name: /Rinomina/ }).click();
       await rs.getByLabel("Nuovo nome").fill("Segreti");
       await rs.getByRole("button", { name: "Salva" }).click();
       await p.waitForURL(/\/raccolte\/Segreti/, { timeout: 6000 }).catch(() => {});
-      ok(JSON.stringify(profPatch.map((x) => x.raccolte_private)) === JSON.stringify([["Con amici", "Segreti"], ["Segreti"]]) && patches.length === 2, `raccolta col lucchetto: rinomina tiene il lucchetto sul nome nuovo (${JSON.stringify(profPatch)})`);
-      patches = []; profPatch.length = 0; privateDb = ["Con amici"];
-      // Elimina una raccolta col lucchetto: ogni suo posto prende il lucchetto singolo prima di uscire dalla raccolta.
+      ok(rpc.join() === "+Segreti,-Con amici" && patches.length === 2, `raccolta col lucchetto: rinomina tiene il lucchetto sul nome nuovo (${rpc.join()})`);
+      patches = []; rpc.length = 0; privateDb = ["Con amici"];
+      // Elimina: i posti che hanno ADESSO il tag prendono il lucchetto singolo (filtro sul database, non sulla pagina).
       await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
       await p.getByTestId("raccolta-pagina-menu").click();
       await rs.getByRole("button", { name: /Elimina raccolta/ }).click();
+      ok((await rs.textContent()).includes("e solo per te"), "raccolta col lucchetto: elimina dice che i posti restano solo per te");
       await rs.getByTestId("raccolta-pagina-elimina").click();
       await p.waitForURL(/\/profilo/, { timeout: 6000 }).catch(() => {});
-      ok(patches.length >= 3 && patches[0].body?.solo_per_me === true && patches.slice(1).every((x) => !x.body?.tags?.includes("Con amici")) && JSON.stringify(profPatch.map((x) => x.raccolte_private)) === JSON.stringify([[]]), `raccolta col lucchetto: elimina lascia i posti 'Solo per me' (${JSON.stringify(patches)} ${JSON.stringify(profPatch)})`);
-      patches = []; profPatch.length = 0; privateDb = ["Con amici"];
-      // Spegnere il lucchetto
+      ok(patches.length >= 3 && patches[0].body?.solo_per_me === true && patches[0].id == null && patches.slice(1).every((x) => !x.body?.tags?.includes("Con amici")) && rpc.join() === "-Con amici", `raccolta col lucchetto: elimina lascia i posti 'Solo per me' (${JSON.stringify(patches[0])} ${rpc.join()})`);
+      patches = []; rpc.length = 0; privateDb = ["Con amici"];
+      // Spegnere il lucchetto dal menu
       await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
-      await p.getByTestId("raccolta-solo-per-me").click();
-      await p.waitForFunction(() => document.querySelector('[data-testid="raccolta-solo-per-me"]')?.getAttribute("aria-checked") === "false", null, { timeout: 4000 }).catch(() => {});
-      ok(JSON.stringify(profPatch.map((x) => x.raccolte_private)) === JSON.stringify([[]]), `raccolta col lucchetto: spento con un tocco (${JSON.stringify(profPatch)})`);
+      await p.getByTestId("raccolta-pagina-menu").click();
+      await rs.getByTestId("raccolta-solo-per-me").click();
+      await p.waitForTimeout(600);
+      // (la pagina si rilegge dal cookie finto, che resta "privata": si controlla la scrittura)
+      ok(rpc.join() === "-Con amici", `raccolta col lucchetto: spento con un tocco dal menu (${rpc.join()})`);
+      await p.keyboard.press("Escape").catch(() => {});
       patches = [];
       await p.unroute("**/rest/v1/profiles**");
+      await p.unroute("**/rest/v1/rpc/raccolta_privata");
       await setProfilo(rc, profilo); }
     await p.goto(`${BASE}/raccolte/Non%20esiste`, { waitUntil: "networkidle" });
     ok(await p.getByTestId("raccolta-vuota").isVisible(), "pagina raccolta: nome sconosciuto → 'Raccolta vuota' con il ritorno al profilo");
@@ -10218,6 +10228,23 @@ else {
   await cp.reload({ waitUntil: "networkidle" });
   await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
   ok(await cp.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "community 360px: niente scorrimento orizzontale");
+
+  // 5b. Proposta 61 "C'è stato davvero": recensisce solo chi ha segnato "Ci sono stato"; le recensioni dicono il mese.
+  await setC("e2e_community", {
+    recensioni: [
+      { id: "r1", rating: 5, comment: "Carbonara da applausi, chiedete il tavolo in fondo.", created_at: "2026-11-10T20:00:00Z", autore: { user_id: "u-giulia", handle: "giulia.rm", display_name: "Giulia" }, amico: true, visita: { mese: "2026-11-01" } },
+      { id: "r2", rating: 4, comment: null, created_at: "2026-10-12T20:00:00Z", autore: null, amico: false, visita: { mese: null } },
+    ],
+    mia: null, reel: [], reelPronti: true, possoRecensire: false,
+  });
+  await cp.setViewportSize({ width: 390, height: 844 });
+  await cp.reload({ waitUntil: "networkidle" });
+  await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
+  { const rr = cp.getByTestId("recensione-community");
+    ok((await cp.getByTestId("recensione-form").count()) === 0 && (await txt(cp.getByTestId("recensione-serve-visita"))).includes("Ci sono stato"), "recensioni (proposta 61): senza 'Ci sono stato' niente modulo, una riga dice come fare");
+    ok((await txt(rr.nth(0))).includes("C'è stato a novembre 2026") && (await txt(rr.nth(1))).includes("C'è stato ·"), `recensioni (proposta 61): 'C'è stato a novembre 2026', senza mese solo 'C'è stato' (${await txt(rr.nth(0))})`);
+    await cp.getByTestId("recensione-serve-visita").scrollIntoViewIfNeeded();
+    await cp.screenshot({ path: `${OUT}/98b-recensioni-da-visita.png`, caret: "initial" }); }
 
   // 6. Senza accesso: si leggono le recensioni, per scrivere serve "Accedi" (che riporta al locale).
   await setC("e2e_anonimo", 1);

@@ -7,6 +7,7 @@ import { replaceTag } from "@/lib/tags";
 import { checkCollectionName, collectionPath, placesLabel } from "@/lib/raccolte";
 import { updateTags } from "@/lib/raccolte-write";
 import { proteggiPrima, pulisciDopo } from "@/lib/raccolte-private";
+import RaccoltaLucchetto from "@/components/raccolta-lucchetto";
 import { trackFeature } from "@/lib/track";
 
 // "⋯" nella pagina di una raccolta: rinomina, unisci con un'altra, elimina. Stessa scrittura
@@ -19,12 +20,16 @@ export default function RaccoltaAzioni({
   rows,
   allTags,
   others,
+  privata = false,
+  lucchettoUtile = false,
 }: {
   userId: string;
   name: string;
   rows: { placeId: string; tags: string[] }[]; // i salvati di questa raccolta
   allTags: string[]; // tutti i tag usati dall'utente (per riconoscere un nome già esistente)
   others: { name: string; count: number }[]; // le altre raccolte (per "Unisci con…")
+  privata?: boolean; // ha il lucchetto "Solo per me" (proposta 59)
+  lucchettoUtile?: boolean; // profilo pubblico (o lucchetto già acceso): l'interruttore si offre nel menu
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode | null>(null);
@@ -39,7 +44,8 @@ export default function RaccoltaAzioni({
   async function run(change: (tags: string[]) => string[], then: string, contesto: "rinomina" | "unisci" | "elimina", a: string | null = null) {
     setBusy(true);
     setError(null);
-    if (!(await proteggiPrima(userId, name, a, rows.map((r) => r.placeId)))) {
+    const lucchetto = await proteggiPrima(userId, name, a);
+    if (!lucchetto) {
       setBusy(false);
       setError("Non sono riuscito a tenere privati i posti di questa raccolta: controlla la connessione e riprova.");
       return;
@@ -90,6 +96,7 @@ export default function RaccoltaAzioni({
             </div>
             {mode === "menu" && (
               <div className="flex flex-col gap-2">
+                {lucchettoUtile && <RaccoltaLucchetto key={`${name}:${privata}`} name={name} initial={privata} className="mb-1" />}
                 <button type="button" onClick={() => open("rinomina")} className={secondary}>✏️ Rinomina</button>
                 <button type="button" onClick={() => open("unisci")} disabled={others.length === 0} className={secondary}>🔗 Unisci con…</button>
                 <button type="button" onClick={() => open("elimina")} className={`${secondary} text-error`}>🗑 Elimina raccolta</button>
@@ -124,7 +131,7 @@ export default function RaccoltaAzioni({
             {mode === "elimina" && (
               <div className="flex flex-col gap-3">
                 <p className="text-sm text-text">
-                  La raccolta <strong>“{name}”</strong> sparisce dai tuoi {placesLabel(rows.length)}. I locali restano tra i tuoi salvati, con le loro note.
+                  La raccolta <strong>“{name}”</strong> sparisce dai tuoi {placesLabel(rows.length)}. I locali restano tra i tuoi salvati, con le loro note{privata ? " e solo per te" : ""}.
                 </p>
                 <button type="button" data-testid="raccolta-pagina-elimina" disabled={busy} onClick={() => void run((tags) => tags.filter((t) => t !== name), "/profilo", "elimina")} className={`${primary} bg-error`}>
                   {busy ? "Aggiorno…" : "Sì, elimina la raccolta"}

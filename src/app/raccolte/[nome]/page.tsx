@@ -4,7 +4,6 @@ import { ArrowLeft, Lock, Map as MapIcon } from "lucide-react";
 import MappaPersonaLazy from "@/components/mappa-persona-lazy";
 import CondividiLink from "@/components/condividi-link";
 import RaccoltaAzioni from "@/components/raccolta-azioni";
-import RaccoltaLucchetto from "@/components/raccolta-lucchetto";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
@@ -111,9 +110,7 @@ export default async function RaccoltaPage({ params }: Props) {
         </div>
 
         <div className="mt-3 flex items-center gap-2">
-          {privata ? (
-            <RaccoltaLucchetto key={`${name}:on`} userId={userId} name={name} initial className="min-w-0 flex-1" />
-          ) : shareable ? (
+          {privata ? null : shareable ? (
             <CondividiLink path={shareable} cosa="raccolta" title={`${name} · Mapetite`} text={`La mia raccolta “${name}” su Mapetite`} testId="condividi-raccolta" variant="solid" />
           ) : (
             <Link href="/profilo#profilo-pubblico" data-testid="condividi-raccolta-privata" className="inline-flex min-h-11 items-center rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand">
@@ -130,15 +127,14 @@ export default async function RaccoltaPage({ params }: Props) {
               <MapIcon size={16} aria-hidden /> Sulla mappa
             </Link>
           )}
-          {!privata && <span className="flex-1" />}
-          <RaccoltaAzioni userId={userId} name={name} rows={rows.map((r) => ({ placeId: r.placeId, tags: r.tags }))} allTags={allTags} others={others} />
+          <span className="flex-1" />
+          <RaccoltaAzioni userId={userId} name={name} rows={rows.map((r) => ({ placeId: r.placeId, tags: r.tags }))} allTags={allTags} others={others} privata={privata} lucchettoUtile={lucchettoUtile} />
         </div>
         {!shareable && !privata && (
           <p data-testid="raccolta-privata" className="mt-2 text-xs text-text-muted">
             Per condividerla rendi pubblico il profilo (le note restano tue).
           </p>
         )}
-        {lucchettoUtile && !privata && <RaccoltaLucchetto key={`${name}:off`} userId={userId} name={name} initial={false} />}
       </header>
 
       {spots.length > 0 && (
