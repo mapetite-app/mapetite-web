@@ -4607,7 +4607,11 @@ if (!fakeUser) {
       // Revisore 2 del 15/11: una parola nella frase non è un'etichetta.
       ["NO ADV, pago io", false], ["No #adv", false], ["Non è un post sponsorizzato", false], ["senza pubblicità", false], ["La pubblicità di questo posto", false], ["In collaborazione con la Pro Loco", false],
       ["Niente #adv qui, solo fame", false], ["Questo NON è ADV", false], ["Sponsorizzato da nessuno", false], ["Pubblicità di Barilla ovunque", false], ["La mia pubblicità preferita", false], ["Tutto pagato da me, non sponsorizzato", false],
-      ["(ADV) Carbonara da urlo", true], ["Carbonara da urlo\nADV", true], ["📣 Pubblicità\nTrattoria", true], ["Post sponsorizzato", true], ["Partnership a pagamento con @barilla", true], ["adv: @trattoria", true], ["Carbonara #ADV #roma", true]];
+      ["(ADV) Carbonara da urlo", true], ["Carbonara da urlo\nADV", true], ["📣 Pubblicità\nTrattoria", true], ["Post sponsorizzato", true], ["Partnership a pagamento con @barilla", true], ["adv: @trattoria", true], ["Carbonara #ADV #roma", true],
+      // Revisore 3 del 16/11: la smentita dopo, la domanda, l'hashtag come argomento.
+      ["ADV? No, pagato da me 💸", false], ["Pubblicità? Assolutamente no", false], ["Reel sponsorizzato? No.", false], ["Paid partnership? lol no", false], ["#adv? no", false], ["ADV: no", false],
+      ["Pubblicità: zero", false], ["adv - no", false], ["ADV · ma pago io", false], ["Pubblicità\n\n(scherzo)", false], ["Basta con i finti consigli #adv", false], ["Mi hanno chiesto se fosse #adv: no", false],
+      ["Odio i reel #adv, questo è pagato da me", false], ["#ad hoc la cena", false], ["Supplì da paura 🤤 ADV", true], ["Advertisement | @pizzeria", true], ["ADV @ristorante", true]];
     const sbagliati = casi.filter(([t, e]) => adv(t) !== e).map(([t]) => t);
     ok(sbagliati.length === 0, `reel adv: solo diciture esplicite come etichetta (#adv, Pubblicità, in collaborazione con @, ADV), mai una parola nella frase o dopo una negazione, niente '#adorable' o 'adventure' (${sbagliati.join(" | ")})`);
     await mp.evaluate(() => sessionStorage.clear());

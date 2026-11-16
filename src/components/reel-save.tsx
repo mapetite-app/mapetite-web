@@ -473,7 +473,7 @@ function PlaceRow({
         <p className="mt-1 font-title text-2xl text-brand">{st.top.name}{where(st.top) ? `, ${where(st.top)}` : ""}</p>
         <p className="mt-0.5 text-xs text-text-muted">{displayAddress(st.top.address)}</p>
         <VerdettoSubito place={st.top} />
-        {adv && <p className="mt-2 text-xs text-text-muted" data-testid="reel-adv">{RIGA_ADV}</p>}
+        {adv && <p className="mt-2 text-xs text-text" data-testid="reel-adv">{RIGA_ADV}</p>}
         {!st.out.alreadySaved && <QuandoCiVai userId={userId} placeId={place.id} />}
         {reelOk && <p className="mt-2 text-xs text-text-muted" data-testid="reel-collegato">🎬 Il reel resta collegato: lo ritrovi nella scheda.</p>}
         {/* Una cosa principale ("Apri sulla mappa"); le altre due in una riga di testo sotto (collaudo 31/10:
