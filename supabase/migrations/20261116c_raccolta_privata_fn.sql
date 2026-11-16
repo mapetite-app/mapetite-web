@@ -9,7 +9,9 @@ as $$
 declare
   risultato text[];
 begin
-  if p_nome is null or btrim(p_nome) = '' or char_length(p_nome) > 40 then
+  -- Revisore 16/11: mai i nomi degli stati (nasconderebbero tutti i visitati o i da provare).
+  if p_nome is null or btrim(p_nome) = '' or char_length(p_nome) > 40
+     or p_nome in ('Già visitato', 'Da provare', 'Non fa per me', 'Mi è piaciuto') then
     raise exception 'nome_non_valido' using errcode = 'P0001';
   end if;
   update public.profiles
