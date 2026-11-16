@@ -24,7 +24,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google e TripAdvisor accettano recensioni senza prova; Beli e Corner non lo dicono. Noi abbiamo già il gesto "Ci sono stato": basta legarlo alla recensione.
 - **Valore per l'utente:** stelle di cui fidarsi. **Per il ristoratore:** "su Mapetite ti giudica solo chi è venuto": è un argomento di vendita del pannello.
 - **Sforzo:** M (vincolo nel database con una funzione di controllo, data della visita già salvata, testi della scheda e della privacy; le recensioni vecchie senza visita restano ma senza la riga "C'è stato"). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA. **16/11 notte: costruita, bocciata due volte sull'interfaccia (7 e 7,5, sicurezza OK), non unita; commit `7ff18844`.**
+- **Stato proposto:** PRONTA. **16/11 notte: costruita, bocciata due volte sull'interfaccia (7 e 7,5, sicurezza OK), non unita; commit `7ff18844`.** **16/11 sera: rifatta (un solo "Ci sono stato" per schermata), di nuovo bocciata due volte (7,5 e 7,5), corretta sul branch `claude/busy-mendel-19zrny`, non unita.**
 
 ### 62. "Nessun tetto": tutti i tuoi posti, gratis, detto dove conta
 - **Problema:** il problema dei 500 cuoricini (richiesta di Lorenzo dell'8/11); Mapstr fa pagare oltre 300 posti salvati ([App Store](https://apps.apple.com/ca/app/id917288465)).
@@ -32,7 +32,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Mapstr Plus oltre 300 posti; Albo con la prova a tempo. Noi senza tetto.
 - **Valore per l'utente:** porta tutto in un colpo, senza paura di un muro a pagamento. **Per il ristoratore:** più salvati = più dati aggregati.
 - **Sforzo:** S (un testo, il numero dei posti trovati già c'è). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA. (Il "Com'era?" il giorno dopo il tavolo, pensato all'inizio come 62, c'è già in `booking-reminder.tsx`: tolto come doppione.)
+- **Stato:** FATTA il 16/11 sera, in produzione (PR #154, revisore 8,5). (Il "Com'era?" il giorno dopo il tavolo, pensato all'inizio come 62, c'è già in `booking-reminder.tsx`: tolto come doppione.)
 
 ### 63. Prenota dentro Mapetite con una piattaforma partner (come Resy in Beli)
 - **Problema:** richiesta di Lorenzo dell'8/11 (prenotare dall'app); Resy l'ha fatto con Beli ([Resy](https://blog.resy.com/newsroom/resy-launches-reservations-in-beli/)).
