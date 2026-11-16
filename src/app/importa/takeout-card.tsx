@@ -326,6 +326,10 @@ export default function TakeoutCard({ userId, titolo = true }: { userId: string 
                 {/* Con più zone i numeri ci sono già sui chip qui sotto (revisore 3/11: detti due volte). */}
                 {zones.length === 1 && (zones[0][0] === SENZA_POSIZIONE ? " dalle liste" : ` a ${zones[0][0]}`)}
               </p>
+              {/* Proposta 62 "Nessun tetto": Mapstr fa pagare oltre 300 posti; qui si portano tutti, detto una volta. */}
+              {items.length > 1 && (
+                <p data-testid="nessun-tetto" className="mt-0.5 text-sm text-text-muted">Li porti tutti: nessun limite, gratis.</p>
+              )}
 
               {/* Una zona sola: niente scelta (revisore 2/11: un filtro per un solo gruppo è rumore). */}
               {zones.length > 1 && (<>
