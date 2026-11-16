@@ -10226,7 +10226,7 @@ else {
     await cp.getByTestId("recensione-ci-sono-stato").click();
     await cp.getByTestId("recensione-form").waitFor({ timeout: 4000 }).catch(() => {});
     ok(await cp.getByTestId("recensione-form").isVisible() && (await cp.getByTestId("recensione-serve-visita").count()) === 0, "recensioni (proposta 61): '✓ Ci sono stato' dalla sezione apre subito il modulo");
-    ok((await txt(cp.getByTestId("recensione-visita-segnata"))).includes("Tra i posti dove sei stato"), "recensioni (proposta 61): dopo il tasto la sezione dice che il posto è tra i visitati");
+    ok((await cp.getByTestId("recensione-visita-segnata").count()) === 0, "recensioni (proposta 61): sulla pagina del locale la conferma la dà solo la barra in basso (niente doppione)");
     ok((await cp.getByText("Salva in Mapetite").count()) === 0 && (await txt(cp.getByTestId("salvato-pubblico"))).includes("Tra i posti dove sei stato"), "recensioni (proposta 61): la barra 'Salva in Mapetite' diventa '✓ Tra i posti dove sei stato'");
     await cp.screenshot({ path: `${OUT}/98c-recensioni-segnato.png`, caret: "initial" }); }
 
@@ -10375,7 +10375,8 @@ if (fakeUser) {
   // Con più zone i numeri stanno solo sui chip (revisore 3/11: niente doppione nel titolo).
   const zchips = (await tc.getByTestId("file-zona").allTextContents()).join("|");
   ok(ries === "Trovati 5 posti" && zchips === "Roma · 2|Milano · 1|Dalle liste · 2", `file Takeout: titolo corto, città sui chip ("${ries}" · ${zchips})`);
-  ok((await tp.getByTestId("nessun-tetto").textContent().catch(() => "")).includes("nessun limite, gratis"), "file Takeout (proposta 62): 'Li porti tutti: nessun limite, gratis.' sotto il numero dei posti");
+  { const nt = await tp.getByTestId("nessun-tetto").textContent().catch(() => "");
+    ok(nt === "Nessun tetto al numero di posti, gratis.", `file Takeout (proposta 62): con posti lasciati fuori niente 'Li porti tutti', solo 'Nessun tetto al numero di posti, gratis.' (${nt})`); }
   const scart = await tp.getByTestId("file-scartati").textContent().catch(() => "");
   ok(scart.includes("Lasciati fuori 3 (") && scart.includes("albergo") && scart.includes("museo") && scart.includes("senza nome") && !scart.includes("non sono locali"), `file Takeout: hotel, museo e punto senza nome lasciati fuori, con le ragioni vere ("${scart.slice(0, 80)}")`);
   const liste = await tp.getByTestId("file-liste").textContent();

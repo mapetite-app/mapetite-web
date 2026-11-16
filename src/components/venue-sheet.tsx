@@ -392,17 +392,24 @@ export default function VenueSheet({
     setBookingOpen(true);
   };
   // Variante della scheda da far scegliere (?scheda=b, stile Places); "a" = attuale.
+  const [statoRapido, setStatoRapido] = useState<{ id: string; tag: "Da provare" | "Già visitato" } | null>(null);
+  const quickSaveTag = (tag: "Da provare" | "Già visitato") => { setStatoRapido({ id: venue.id, tag }); onQuickSave?.(tag); };
   const variant = useVariant("scheda");
   // Proposta 61: la sezione recensioni usa il "Ci sono stato" di questa scheda (un solo tasto per schermata).
   // Tasto in vista: nei salvati in "Le tue note"; nei non salvati la fila "Da provare / Ci sono stato"
   // (scheda A sempre, scheda B solo senza barra Salva: altrimenti sta nel menu ⋯).
+  // Revisore 16/11 sera: nell'assistente, dopo "✓ Ci sono stato" della fila rapida, la scheda non riceve i tag
+  // (niente onVisitStatus): si ricorda qui lo stato scelto per quel posto, così la sezione apre subito il modulo.
+  const statoRapidoDi = statoRapido?.id === venue.id ? statoRapido.tag : null;
   const tastoVisitaInVista = isSaved ? onVisitStatus != null && showPersonalBlock : onQuickSave != null && (variant !== "b" || !saveSlot);
   const schedaVisita: SchedaVisita = {
-    visitato: isSaved ? (onVisitStatus ? (personalTags?.includes("Già visitato") ?? false) : null) : onQuickSave ? false : null,
+    visitato: isSaved
+      ? onVisitStatus ? (personalTags?.includes("Già visitato") ?? false) : statoRapidoDi === "Già visitato" ? true : null
+      : onQuickSave ? false : null,
     vai: tastoVisitaInVista
       ? () => document.querySelector(isSaved ? "[data-testid=stato-salvato]" : "[data-testid=stato-rapido]")?.scrollIntoView({ behavior: "smooth", block: "center" })
       : null,
-    segna: !tastoVisitaInVista && !isSaved && onQuickSave ? () => onQuickSave("Già visitato") : null,
+    segna: !tastoVisitaInVista && !isSaved && onQuickSave ? () => quickSaveTag("Già visitato") : null,
   };
   // Locale verificato e "c'è posto" (parola del titolare): spunta accanto al nome e pillola sotto.
   const infoLocale = useInfoLocale(venue.id);
@@ -742,7 +749,7 @@ export default function VenueSheet({
                 <button type="button" aria-label="Chiudi il menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuOpen(false)} />
                 <div role="menu" data-testid="altro-menu" className="absolute right-0 top-full z-30 mt-2 w-64 overflow-hidden rounded-card border border-border bg-surface py-1 shadow-float">
                   {quickVisit && saveSlot && (
-                    <button role="menuitem" type="button" data-testid="altro-ci-sono-stato" onClick={() => { setMenuOpen(false); quickVisit("Già visitato"); }} className={menuItem}>
+                    <button role="menuitem" type="button" data-testid="altro-ci-sono-stato" onClick={() => { setMenuOpen(false); quickSaveTag("Già visitato"); }} className={menuItem}>
                       <Check size={18} className="shrink-0 text-brand" aria-hidden /> Ci sono stato
                     </button>
                   )}
@@ -1043,7 +1050,7 @@ export default function VenueSheet({
                 key={tag}
                 type="button"
                 aria-label={`${e} ${label}`}
-                onClick={() => onQuickSave(tag)}
+                onClick={() => quickSaveTag(tag)}
                 className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-pill text-[14px] font-display font-semibold text-text-muted active:scale-95"
               >
                 <span aria-hidden>{e}</span>
@@ -1469,7 +1476,7 @@ export default function VenueSheet({
             <button
               key={tag}
               type="button"
-              onClick={() => onQuickSave(tag)}
+              onClick={() => quickSaveTag(tag)}
               className="min-h-11 flex-1 rounded-pill border border-border bg-white px-3 text-sm font-display font-semibold text-brand active:scale-95"
             >
               {label}

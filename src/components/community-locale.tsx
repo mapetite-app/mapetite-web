@@ -198,7 +198,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
   // Proposta 61: stelle e commento solo da chi ha segnato "Ci sono stato" (il voto 👍/👎 arriva solo dopo la visita).
   // Dalla mappa vale il tasto della scheda (dato vivo); altrove il server, il voto 👍/👎 o il tasto qui sotto.
   // Se il database ha risposto "serve la visita" (dato vecchio sul telefono), si torna alla riga con il tasto.
-  const visitato = !serveVisita && ((scheda?.visitato ?? null) ?? (c.possoRecensire || voto != null)) || segnato === "ok";
+  const visitato = !serveVisita && ((scheda?.visitato ?? null) ?? (c.possoRecensire || voto != null || segnato === "ok"));
   const formOpen = canWrite && visitato && (editing || !mine);
 
   const publish = async (e: React.FormEvent) => {
@@ -208,6 +208,8 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
     setStatus("saving");
     const esito = await saveReview(userId!, c.placeId!, rating, comment);
     setServeVisita(esito === "serve-visita");
+    // Il database dice che la visita non c'è (revisore 16/11 sera): via la conferma, torna la riga col tasto.
+    if (esito === "serve-visita") setSegnato("no");
     if (esito !== "ok") { setStatus("error"); return; }
     trackFeature("recensione_community", { stato: mine ? "modifica" : "nuova", voto: rating, contesto, fonte: comment.trim() ? "con_commento" : "solo_stelle" });
     setData({ id, c: { ...c, mia: { rating, comment: comment.trim().slice(0, COMMENT_MAX) || null } } });
@@ -357,7 +359,8 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
           {segnato === "errore" && <p role="alert" className="mt-1 text-xs font-sans text-error">Non sono riuscito a segnarlo. Riprova.</p>}
         </div>
       )}
-      {canWrite && segnato === "ok" && (
+      {/* Sulla pagina del locale lo dice già la barra in basso (revisore 16/11 sera: due conferme uguali). */}
+      {canWrite && segnato === "ok" && !serveVisita && contesto !== "locale" && (
         <p role="status" data-testid="recensione-visita-segnata" className="mt-3 text-sm font-display font-semibold text-success">
           ✓ Tra i posti dove sei stato. Com&apos;era?
         </p>

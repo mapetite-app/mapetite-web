@@ -1604,6 +1604,24 @@ export default function MapView({
     rememberPendingSave(place, tags);
     window.location.href = loginToSaveUrl(place.name);
   };
+  // Proposta 61 (revisore 16/11 sera): posto già nel database ma non salvato (id UUID, niente salvataggio rapido):
+  // "✓ Ci sono stato" dalla sezione recensioni lo salva da lì; la mappa lo sa subito (barra, segnalino, scheda).
+  useEffect(() => {
+    const su = (e: Event) => {
+      const id = (e as CustomEvent<{ placeId?: string }>).detail?.placeId;
+      if (!id || !selected || (resolveUuid(selected.id) ?? selected.id) !== id) return;
+      setSavedIds((prev) => new Set(prev).add(id));
+      setSavedPlaces((prev) => {
+        const era = prev.find((p) => p.id === id);
+        const tags = [...(era?.tags ?? []).filter((t) => t !== VISIT_WANT && t !== VISIT_DONE), VISIT_DONE];
+        return [...prev.filter((p) => p.id !== id), { ...(era ?? selected), id, tags, note: era?.note ?? null }];
+      });
+    };
+    window.addEventListener("mapetite:visitato", su);
+    return () => window.removeEventListener("mapetite:visitato", su);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
   const quickSave = async (place: Place, tags: string[] = [VISIT_WANT]) => {
     if (!userId) { askLoginToSave(place, tags); return; }
     if (isPlaceSaved(place.id)) { dispatch({ type: "OPEN_VENUE", placeId: place.id }); return; }
