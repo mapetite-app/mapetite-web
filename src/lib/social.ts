@@ -376,6 +376,9 @@ export async function loadMyGems(userId: string): Promise<{ gemme: number; prova
     return { gemme: me?.gemme ?? 0, provate: me?.gemme_provate ?? 0 };
   }
   const supabase = await createClient();
+  // Proposta 59: anche i posti delle raccolte col lucchetto non contano (come nella vista degli amici).
+  const { data: prof } = await supabase.from("profiles").select("raccolte_private").eq("id", userId).maybeSingle();
+  const privateRacc = ((prof as { raccolte_private?: string[] | null } | null)?.raccolte_private ?? []).filter(Boolean);
   const { data, error } = await supabase
     .from("saved_places")
     .select("tags, places!inner(poco_conosciuto)")
@@ -387,7 +390,7 @@ export async function loadMyGems(userId: string): Promise<{ gemme: number; prova
     console.error(`[social] mie gemme: ${error.code ?? ""} ${error.message} (migrazione 20261016_scopritori non applicata?)`);
     return null;
   }
-  const rows = (data ?? []) as { tags: string[] | null }[];
+  const rows = ((data ?? []) as { tags: string[] | null }[]).filter((r) => !(r.tags ?? []).some((t) => privateRacc.includes(t)));
   return { gemme: rows.length, provate: rows.filter((r) => r.tags?.includes("Già visitato")).length };
 }
 

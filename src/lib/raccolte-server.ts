@@ -91,3 +91,22 @@ export async function withVerdicts(rows: MySavedRow[]): Promise<MySavedRow[]> {
   const byId = new Map((data ?? []).map((d) => [d.place_id as string, (d.verdict as string | null) ?? null]));
   return rows.map((r) => (r.googlePlaceId && byId.get(r.googlePlaceId) ? { ...r, verdict: byId.get(r.googlePlaceId)! } : r));
 }
+
+/** Raccolte col lucchetto "Solo per me" (profiles.raccolte_private, migrazione 20261116). [] se la colonna manca. */
+export async function loadRaccoltePrivate(userId: string): Promise<string[]> {
+  if (dev()) {
+    const raw = (await cookies()).get("e2e_profilo")?.value;
+    try {
+      return raw ? ((JSON.parse(decodeURIComponent(raw)).raccoltePrivate ?? []) as string[]) : [];
+    } catch {
+      return [];
+    }
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("profiles").select("raccolte_private").eq("id", userId).maybeSingle();
+  if (error) {
+    console.error("[raccolte] raccolte_private non letta:", error.message);
+    return [];
+  }
+  return ((data as { raccolte_private?: string[] | null } | null)?.raccolte_private ?? []).filter(Boolean);
+}

@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { cityFromAddress, displayAddress } from "@/lib/city";
 import { replaceTag } from "@/lib/tags";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { useOptIn } from "@/lib/beta";
 import { checkCollectionName, collectionPath, summarizeCollections } from "@/lib/raccolte";
 import { updateTags } from "@/lib/raccolte-write";
+import { proteggiPrima, pulisciDopo } from "@/lib/raccolte-private";
 import { trackFeature } from "@/lib/track";
 import RaccoltaCopertina from "@/components/raccolta-copertina";
 import RaccolteProposte from "@/components/raccolte-proposte";
@@ -88,6 +89,15 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
 
   const withTag = (tag: string) => rows.filter((r) => r.tags.includes(tag));
 
+  // Raccolta col lucchetto (proposta 59): i suoi posti restano privati anche dopo rinomina, unisci o elimina.
+  const privateRef = useRef<string | null>(null);
+  async function protect(from: string, a: string | null): Promise<boolean> {
+    const esito = await proteggiPrima(userId, from, a);
+    if (!esito) setError("Non sono riuscito a tenere privati i posti di questa raccolta: controlla la connessione e riprova.");
+    privateRef.current = esito === "privata" ? from : null;
+    return esito != null;
+  }
+
   // Nome scritto → nome definitivo, oppure messaggio d'errore.
   const checkName = (raw: string, current?: string) => checkCollectionName(raw, allTags, current);
 
@@ -95,21 +105,27 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
     const res = checkName(name, from);
     if ("error" in res) { setError(res.error); return; }
     if (res.tag === from) { setSheet(null); return; }
+    if (!(await protect(from, allTags.includes(res.tag) ? null : res.tag))) return;
     const failed = await apply(withTag(from), (tags) => replaceTag(tags, from, res.tag));
+    if (failed === 0) await pulisciDopo(userId, from);
     if (failed === 0) trackFeature("raccolta_modifica", { contesto: "rinomina" });
     if (failed === 0) setNotice(allTags.includes(res.tag) ? `“${from}” è confluita in “${res.tag}”.` : `Raccolta rinominata in “${res.tag}”.`);
   }
 
   async function merge(from: string, into: string) {
+    if (!(await protect(from, null))) return;
     const failed = await apply(withTag(from), (tags) => replaceTag(tags, from, into));
+    if (failed === 0) await pulisciDopo(userId, from);
     if (failed === 0) trackFeature("raccolta_modifica", { contesto: "unisci" });
-    if (failed === 0) setNotice(`“${from}” è confluita in “${into}”.`);
+    if (failed === 0) setNotice(`“${from}” è confluita in “${into}”.${privateRef.current === from ? " I suoi posti restano solo per te." : ""}`);
   }
 
   async function remove(tag: string) {
+    if (!(await protect(tag, null))) return;
     const failed = await apply(withTag(tag), (tags) => tags.filter((t) => t !== tag));
+    if (failed === 0) await pulisciDopo(userId, tag);
     if (failed === 0) trackFeature("raccolta_modifica", { contesto: "elimina" });
-    if (failed === 0) setNotice(`Raccolta “${tag}” eliminata. I locali restano tra i salvati.`);
+    if (failed === 0) setNotice(`Raccolta “${tag}” eliminata. I locali restano tra i salvati${privateRef.current === tag ? ", solo per te" : ""}.`);
   }
 
   async function create() {

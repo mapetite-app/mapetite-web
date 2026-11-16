@@ -7412,6 +7412,55 @@ else {
     await p.waitForURL(/\/raccolte\/Amici/, { timeout: 6000 }).catch(() => {});
     ok(patches.length === 2 && patches.every((x) => x.body?.tags?.includes("Amici del giovedì") && !x.body.tags.includes("Con amici")) && decodeURIComponent(p.url()).endsWith("/raccolte/Amici del giovedì"), `pagina raccolta: rinomina scrive su tutti e porta alla nuova pagina (${JSON.stringify(patches)})`);
     patches = [];
+    // Proposta 59, resto: lucchetto "Solo per me" sulla raccolta intera (profiles.raccolte_private, funzione
+    // raccolta_privata un nome alla volta; revisore 16/11: interruttore nel menu ⋯, posti letti dal database).
+    { let privateDb = ["Con amici"]; const rpc = [];
+      await p.route("**/rest/v1/profiles**", (r) => {
+        if (new URL(r.request().url()).searchParams.get("select")?.includes("raccolte_private")) return r.fulfill({ json: { raccolte_private: privateDb } });
+        return r.fallback();
+      });
+      await p.route("**/rest/v1/rpc/raccolta_privata", (r) => {
+        const b = r.request().postDataJSON(); rpc.push(`${b.p_on ? "+" : "-"}${b.p_nome}`);
+        privateDb = b.p_on ? [...new Set([...privateDb, b.p_nome])] : privateDb.filter((x) => x !== b.p_nome);
+        return r.fulfill({ json: privateDb });
+      });
+      await setProfilo(rc, { ...profilo, raccoltePrivate: ["Con amici"] });
+      await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
+      ok(await p.getByTestId("raccolta-solo-per-te").isVisible() && (await p.getByTestId("raccolta-solo-per-me").count()) === 0, "raccolta col lucchetto: 'Solo per te' nella testata, nessuna scheda in più sulla pagina");
+      ok((await p.getByTestId("condividi-raccolta-privata").count()) === 0 && (await p.getByTestId("condividi-raccolta").count()) === 0 && (await p.getByTestId("raccolta-privata").count()) === 0, "raccolta col lucchetto: niente Condividi (il link pubblico sarebbe vuoto)");
+      await p.getByTestId("raccolta-pagina-menu").click();
+      const lk = rs.getByTestId("raccolta-solo-per-me");
+      ok(await lk.isVisible() && (await lk.getAttribute("aria-checked")) === "true" && (await lk.textContent()).includes("i posti che aggiungi"), "raccolta col lucchetto: nel menu ⋯ l'interruttore 'Solo per me' acceso");
+      { const b = await lk.boundingBox(); ok(b && b.height >= 44, `raccolta col lucchetto: interruttore toccabile per 44px (${b?.height})`); }
+      await p.screenshot({ path: `${OUT}/44c-raccolta-lucchetto.png`, caret: "initial" });
+      // Rinomina di una raccolta col lucchetto: il lucchetto passa al nome nuovo PRIMA dei tag, poi esce il vecchio.
+      await rs.getByRole("button", { name: /Rinomina/ }).click();
+      await rs.getByLabel("Nuovo nome").fill("Segreti");
+      await rs.getByRole("button", { name: "Salva" }).click();
+      await p.waitForURL(/\/raccolte\/Segreti/, { timeout: 6000 }).catch(() => {});
+      ok(rpc.join() === "+Segreti,-Con amici" && patches.length === 2, `raccolta col lucchetto: rinomina tiene il lucchetto sul nome nuovo (${rpc.join()})`);
+      patches = []; rpc.length = 0; privateDb = ["Con amici"];
+      // Elimina: i posti che hanno ADESSO il tag prendono il lucchetto singolo (filtro sul database, non sulla pagina).
+      await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
+      await p.getByTestId("raccolta-pagina-menu").click();
+      await rs.getByRole("button", { name: /Elimina raccolta/ }).click();
+      ok((await rs.textContent()).includes("e solo per te"), "raccolta col lucchetto: elimina dice che i posti restano solo per te");
+      await rs.getByTestId("raccolta-pagina-elimina").click();
+      await p.waitForURL(/\/profilo/, { timeout: 6000 }).catch(() => {});
+      ok(patches.length >= 3 && patches[0].body?.solo_per_me === true && patches[0].id == null && patches.slice(1).every((x) => !x.body?.tags?.includes("Con amici")) && rpc.join() === "-Con amici", `raccolta col lucchetto: elimina lascia i posti 'Solo per me' (${JSON.stringify(patches[0])} ${rpc.join()})`);
+      patches = []; rpc.length = 0; privateDb = ["Con amici"];
+      // Spegnere il lucchetto dal menu
+      await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
+      await p.getByTestId("raccolta-pagina-menu").click();
+      await rs.getByTestId("raccolta-solo-per-me").click();
+      await p.waitForTimeout(600);
+      // (la pagina si rilegge dal cookie finto, che resta "privata": si controlla la scrittura)
+      ok(rpc.join() === "-Con amici", `raccolta col lucchetto: spento con un tocco dal menu (${rpc.join()})`);
+      await p.keyboard.press("Escape").catch(() => {});
+      patches = [];
+      await p.unroute("**/rest/v1/profiles**");
+      await p.unroute("**/rest/v1/rpc/raccolta_privata");
+      await setProfilo(rc, profilo); }
     await p.goto(`${BASE}/raccolte/Non%20esiste`, { waitUntil: "networkidle" });
     ok(await p.getByTestId("raccolta-vuota").isVisible(), "pagina raccolta: nome sconosciuto → 'Raccolta vuota' con il ritorno al profilo");
     // 360px: titolo e azioni senza uscire dallo schermo

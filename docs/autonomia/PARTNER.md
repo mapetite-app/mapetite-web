@@ -2,7 +2,7 @@
 
 Per ogni partner: chi è, quanti locali raggiunge (con fonte), cosa ci darebbe, cosa ci guadagna lui, se ha un'API o un programma partner pubblico, e una bozza di email pronta per Lorenzo o Roberto.
 **Nessuno è stato contattato.** Le email sono bozze: le manda Lorenzo o Roberto, quando vogliono.
-Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornamento: 14/11/2026.
+Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornamento: 16/11/2026.
 
 ## Ordine consigliato
 1. **Zenchef/CoverManager** e **Zucchetti**: risolvono il no-show vero (la prenotazione entra nell'agenda del locale) e non sono concorrenti sul cliente finale.
@@ -44,6 +44,7 @@ Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornament
 ## Bozze per Lorenzo: "l'assistente che prenota per te" (8/11) — DA DECIDERE LORENZO
 **Nessun contatto è stato fatto. Non inviare senza decisione di Lorenzo.** Richiesta del founder dell'8/11: un assistente che prenota al posto della persona e propone alternative se non c'è posto. Senza accordi non si automatizzano i siti delle piattaforme (termini d'uso, niente scraping): servono le loro API per partner. Nell'app oggi: "Prenota su TheFork/Quandoo" apre il modulo del locale con i dati della persona già copiati, poi "L'hai prenotato?" salva la prenotazione. Link con giorno/ora/persone già impostati: formato dei parametri non verificato (siti non raggiungibili dalla sessione), quindi oggi link semplice.
 **Domanda per Lorenzo:** "Mandiamo (tu o Roberto) queste due richieste, prima Quandoo e poi TheFork?"
+**16/11:** esempio da citare nella bozza: Resy ha portato le prenotazioni dentro Beli, un'app di consigli che non è una piattaforma di prenotazione ([Resy](https://blog.resy.com/newsroom/resy-launches-reservations-in-beli/)). È lo stesso accordo che chiederemmo noi (proposta 63).
 
 - **Bozza a Quandoo (programma partner / affiliate API):**
   > Oggetto: Mapetite × Quandoo: prenotazioni da clienti che hanno già scelto, Roma e Milano
