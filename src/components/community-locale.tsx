@@ -6,7 +6,7 @@ import { Play, Plus } from "lucide-react";
 import Avatar from "@/components/avatar";
 import { personName, profilePath } from "@/lib/handle";
 import { trackFeature } from "@/lib/track";
-import { COMMENT_MAX, addReel, saveReview } from "@/lib/community-write";
+import { COMMENT_MAX, addReel, saveReview, segnaCiSonoStato } from "@/lib/community-write";
 import { reelSourceOf, seenOn, type ReelSource } from "@/lib/reel";
 import type { Community, CommunityReel, CommunityReview } from "@/lib/community";
 import type { Voto } from "@/lib/diario";
@@ -24,6 +24,7 @@ type Props = {
   contesto: "mappa" | "locale" | "assistente";
   loginHref?: string;
   voto?: Voto | null; // "Com'era?" già dato: suggerimento, non si traduce mai da solo in stelle
+  visitato?: boolean; // dalla mappa: "Ci sono stato" acceso adesso nella scheda (vale più del dato del server)
 };
 
 type Preview = { titolo: string | null; autore: string | null; miniatura: string | null };
@@ -82,7 +83,7 @@ function ReviewRow({ r }: { r: CommunityReview }) {
           {r.visita ? (
             <span data-testid="recensione-visita" className="text-xs font-sans text-text-muted">
               <span className="font-display font-semibold text-success">✓ C&apos;è stato</span>
-              {r.visita.mese ? ` a ${meseVisita(r.visita.mese)}` : ` · ${shortDate(r.created_at)}`}
+              {r.visita.mese ? ` a ${meseVisita(r.visita.mese)}` : ""}
             </span>
           ) : (
             <span className="text-xs font-sans text-text-muted">{shortDate(r.created_at)}</span>
@@ -147,8 +148,11 @@ function reelTitle(reels: CommunityReel[]): string {
   return sources.size === 1 ? seenOn([...sources][0]) : "Visto sui social";
 }
 
-export default function CommunityLocale({ id, contesto, loginHref = "/login", voto = null, userId }: Props & { userId: string | null }) {
+export default function CommunityLocale({ id, contesto, loginHref = "/login", voto = null, visitato: visitatoScheda, userId }: Props & { userId: string | null }) {
   const [data, setData] = useState<{ id: string; c: Community } | null>(null);
+  // Proposta 61: "Ci sono stato" segnato da qui (pagina del locale, assistente); errore del database "serve la visita".
+  const [segnato, setSegnato] = useState<"no" | "attendo" | "ok" | "errore">("no");
+  const [serveVisita, setServeVisita] = useState(false);
   const [editing, setEditing] = useState(false);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -188,7 +192,8 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
   const others = showAll ? c.recensioni : c.recensioni.slice(0, 3);
   const canWrite = userId != null && c.placeId != null;
   // Proposta 61: stelle e commento solo da chi ha segnato "Ci sono stato" (il voto 👍/👎 arriva solo dopo la visita).
-  const visitato = c.possoRecensire || voto != null;
+  // Dalla mappa vale il tasto della scheda (dato vivo); altrove il server, il voto 👍/👎 o il tasto qui sotto.
+  const visitato = visitatoScheda ?? (c.possoRecensire || voto != null || segnato === "ok");
   const formOpen = canWrite && visitato && (editing || !mine);
 
   const publish = async (e: React.FormEvent) => {
@@ -196,8 +201,9 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
     if (!canWrite) return;
     if (rating === 0) { setStatus("error"); return; }
     setStatus("saving");
-    const ok = await saveReview(userId!, c.placeId!, rating, comment);
-    if (!ok) { setStatus("error"); return; }
+    const esito = await saveReview(userId!, c.placeId!, rating, comment);
+    setServeVisita(esito === "serve-visita");
+    if (esito !== "ok") { setStatus("error"); return; }
     trackFeature("recensione_community", { stato: mine ? "modifica" : "nuova", voto: rating, contesto, fonte: comment.trim() ? "con_commento" : "solo_stelle" });
     setData({ id, c: { ...c, mia: { rating, comment: comment.trim().slice(0, COMMENT_MAX) || null } } });
     setEditing(false);
@@ -244,9 +250,11 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
         <div data-testid="mia-recensione" className="mt-3 rounded-card border-2 border-accent/30 bg-surface p-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">La tua recensione</p>
-            <button type="button" onClick={() => { setEditing(true); setStatus("idle"); }} className="min-h-10 px-1 text-sm font-display font-semibold text-brand">
-              Modifica
-            </button>
+            {visitato && (
+              <button type="button" onClick={() => { setEditing(true); setStatus("idle"); }} className="min-h-11 px-1 text-sm font-display font-semibold text-brand">
+                Modifica
+              </button>
+            )}
           </div>
           <Stars value={mine.rating} size="text-base" />
           {mine.comment && <p className="mt-1 break-words font-sans text-sm text-text">{mine.comment}</p>}
@@ -276,7 +284,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
             <span className="shrink-0 text-[11px] font-sans text-text-muted">{comment.length}/{COMMENT_MAX}</span>
           </div>
           {status === "error" && (
-            <p className="mt-1 text-xs font-sans text-error">{rating === 0 ? "Scegli da 1 a 5 stelle." : "Non sono riuscito a pubblicarla. Riprova."}</p>
+            <p className="mt-1 text-xs font-sans text-error">{rating === 0 ? "Scegli da 1 a 5 stelle." : serveVisita ? "Prima segna “Ci sono stato”: qui recensisce solo chi c'è stato." : "Non sono riuscito a pubblicarla. Riprova."}</p>
           )}
           <div className="mt-2 flex gap-2">
             <button
@@ -299,10 +307,31 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
           <Link href={loginHref} className="font-display font-semibold text-brand underline underline-offset-2">Accedi</Link>{" "}per dire com&apos;era.
         </p>
       )}
-      {canWrite && !visitato && !mine && (
-        <p data-testid="recensione-serve-visita" className="mt-2 text-sm font-sans text-text-muted">
-          Ci sei stato? Segna <span className="font-display font-semibold text-text">Ci sono stato</span> per dire com&apos;era: qui recensisce solo chi c&apos;è stato.
-        </p>
+      {canWrite && !visitato && (
+        <div data-testid="recensione-serve-visita" className="mt-3 rounded-card border border-border bg-surface p-3">
+          <p className="text-sm font-sans text-text">
+            {mine ? "Per modificarla, segna prima che ci sei stato." : "Qui recensisce solo chi c'è stato."}
+          </p>
+          {contesto === "mappa" ? (
+            <p className="mt-1 text-xs font-sans text-text-muted">Tocca “Ci sono stato” nella scheda, qui sopra.</p>
+          ) : (
+            <button
+              type="button"
+              data-testid="recensione-ci-sono-stato"
+              disabled={segnato === "attendo"}
+              onClick={async () => {
+                setSegnato("attendo");
+                const ok = await segnaCiSonoStato(userId!, c.placeId!);
+                setSegnato(ok ? "ok" : "errore");
+                if (ok) trackFeature("recensione_community", { stato: "ci_sono_stato", contesto });
+              }}
+              className="mt-2 inline-flex min-h-11 items-center rounded-pill border border-brand bg-white px-5 text-sm font-display font-semibold text-brand active:scale-95 disabled:opacity-60"
+            >
+              {segnato === "attendo" ? "Segno…" : "✓ Ci sono stato"}
+            </button>
+          )}
+          {segnato === "errore" && <p role="alert" className="mt-1 text-xs font-sans text-error">Non sono riuscito a segnarlo. Riprova.</p>}
+        </div>
       )}
       {userId != null && c.placeId == null && (
         <p className="mt-2 text-sm font-sans text-text-muted">Salva il locale per lasciare la tua recensione.</p>

@@ -4297,6 +4297,7 @@ export default function MapView({
                   userId={userId}
                   contesto="mappa"
                   voto={votoOf(selected.tags)}
+                  visitato={(selected.tags ?? []).includes(VISIT_DONE)}
                 />
               }
             />

@@ -10219,9 +10219,13 @@ else {
   await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
   { const rr = cp.getByTestId("recensione-community");
     ok((await cp.getByTestId("recensione-form").count()) === 0 && (await txt(cp.getByTestId("recensione-serve-visita"))).includes("Ci sono stato"), "recensioni (proposta 61): senza 'Ci sono stato' niente modulo, una riga dice come fare");
-    ok((await txt(rr.nth(0))).includes("C'è stato a novembre 2026") && (await txt(rr.nth(1))).includes("C'è stato ·"), `recensioni (proposta 61): 'C'è stato a novembre 2026', senza mese solo 'C'è stato' (${await txt(rr.nth(0))})`);
+    ok((await txt(rr.nth(0))).includes("C'è stato a novembre 2026") && (await txt(rr.nth(1))).includes("C'è stato") && !(await txt(rr.nth(1))).includes("ott"), `recensioni (proposta 61): 'C'è stato a novembre 2026', senza mese solo 'C'è stato' (nessuna data che sembri la visita) (${await txt(rr.nth(1))})`);
     await cp.getByTestId("recensione-serve-visita").scrollIntoViewIfNeeded();
-    await cp.screenshot({ path: `${OUT}/98b-recensioni-da-visita.png`, caret: "initial" }); }
+    await cp.screenshot({ path: `${OUT}/98b-recensioni-da-visita.png`, caret: "initial" });
+    // Pagina del locale: "✓ Ci sono stato" direttamente qui (niente vicolo cieco), poi il modulo si apre.
+    await cp.getByTestId("recensione-ci-sono-stato").click();
+    await cp.getByTestId("recensione-form").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await cp.getByTestId("recensione-form").isVisible() && (await cp.getByTestId("recensione-serve-visita").count()) === 0, "recensioni (proposta 61): '✓ Ci sono stato' dalla sezione apre subito il modulo"); }
 
   // 6. Senza accesso: si leggono le recensioni, per scrivere serve "Accedi" (che riporta al locale).
   await setC("e2e_anonimo", 1);
