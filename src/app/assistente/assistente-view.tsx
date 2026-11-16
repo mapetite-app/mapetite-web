@@ -552,6 +552,9 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
   const [input, setInput] = useState("");
   // Salvati (Place ID Google): "Salvato" sulle card dei locali già nella mappa della persona.
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set());
+  // Proposta 61 (revisore 16/11 sera): codice Google → id nel database dopo il salvataggio, così la sezione
+  // recensioni della scheda si rilegge e apre il modulo (prima diceva "Salva il locale" anche dopo il salvataggio).
+  const [uuidDi, setUuidDi] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<Record<string, SaveState>>({});
   const [savedToast, setSavedToast] = useState<{ name: string; uuid: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -592,6 +595,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
     try {
       const { uuid, already } = await quickSavePlace(userId, p, [tag]);
       setSavedIds((prev) => new Set(prev).add(p.id));
+      setUuidDi((m) => ({ ...m, [p.id]: uuid }));
       setSaving((s) => { const next = { ...s }; delete next[p.id]; return next; });
       if (!already) track("salva", { id: uuid, lat: p.lat, lng: p.lng }, { fonte: "assistente", stato: tag });
       setSavedToast({ name: p.name, uuid });
@@ -945,7 +949,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
               onEdit={() => {}}
               onClose={() => setOpenCard(null)}
               saveSlot={null}
-              communitySlot={<CommunityLocale id={openCard.id} userId={userId} contesto="assistente" />}
+              communitySlot={<CommunityLocale id={uuidDi[openCard.id] ?? openCard.id} userId={userId} contesto="assistente" />}
               origin={c.pos}
               userPos={c.pos}
               googlePlaceId={openCard.id}

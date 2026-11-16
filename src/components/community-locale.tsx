@@ -200,6 +200,9 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
   // Se il database ha risposto "serve la visita" (dato vecchio sul telefono), si torna alla riga con il tasto.
   const visitato = !serveVisita && ((scheda?.visitato ?? null) ?? (c.possoRecensire || voto != null || segnato === "ok"));
   const formOpen = canWrite && visitato && (editing || !mine);
+  // Riga "Qui recensisce solo chi c'è stato" con il suo tasto: anche per un posto non ancora nel database
+  // quando la scheda sa segnarlo (revisore 16/11 sera: "Salva il locale" spingeva a un salvataggio che non basta).
+  const rigaVisita = userId != null && !visitato && (c.placeId != null || scheda?.segna != null || scheda?.vai != null);
 
   const publish = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -314,10 +317,12 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
           <Link href={loginHref} className="font-display font-semibold text-brand underline underline-offset-2">Accedi</Link>{" "}per dire com&apos;era.
         </p>
       )}
-      {canWrite && !visitato && (
+      {rigaVisita && (
         <div data-testid="recensione-serve-visita" className="mt-3 rounded-card border border-border bg-surface p-3">
           <p className="text-sm font-sans text-text">
-            {mine ? "Per modificarla, segna prima che ci sei stato." : "Qui recensisce solo chi c'è stato."}
+            {serveVisita
+              ? "La visita non risulta ancora: segnala di nuovo qui sotto."
+              : mine ? "Per modificarla, segna prima che ci sei stato." : "Qui recensisce solo chi c'è stato."}
           </p>
           {scheda?.vai ? (
             // Il tasto della scheda è in vista: niente secondo "Ci sono stato", si porta a quello.
@@ -329,7 +334,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
             >
               Segna «✓ Ci sono stato» qui sopra ↑
             </button>
-          ) : (
+          ) : (scheda?.segna || c.placeId != null) && (
             <button
               type="button"
               data-testid="recensione-ci-sono-stato"
@@ -365,8 +370,8 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
           ✓ Tra i posti dove sei stato. Com&apos;era?
         </p>
       )}
-      {userId != null && c.placeId == null && (
-        <p className="mt-2 text-sm font-sans text-text-muted">Salva il locale per lasciare la tua recensione.</p>
+      {userId != null && c.placeId == null && !rigaVisita && (
+        <p className="mt-2 text-sm font-sans text-text-muted">Segna «✓ Ci sono stato» per lasciare la tua recensione.</p>
       )}
 
       {/* Le tue foto del locale (5.6c): pubbliche come la recensione, mai mescolate a quelle Google. */}
