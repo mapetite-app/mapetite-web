@@ -20,8 +20,8 @@ export const PUBBLICO_VEDONO = [
 export const PUBBLICO_MAI = ["note", "il giudizio “Non fa per me”", "gusti", "prenotazioni", "posizione", "email", "data del diario"] as const;
 
 // Migrazione 20261108_non_fa_per_me_privati applicata l'8/11: i posti "Non fa per me" non si vedono agli altri.
-// Proposta 59 (migrazione 20261115f): anche i posti con il lucchetto "Solo per me" (si mette in Modifica).
-export const NON_FA_PER_ME_NOTA = "I posti segnati “Non fa per me” o con il lucchetto “Solo per me” restano solo tuoi.";
+// Proposta 59 (migrazioni 20261115f e 20261116): anche i posti con il lucchetto "Solo per me" (in Modifica o su tutta la raccolta).
+export const NON_FA_PER_ME_NOTA = "I posti segnati “Non fa per me” o con il lucchetto “Solo per me” (su un posto o su una raccolta intera) restano solo tuoi.";
 
 export const PUBBLICO_REVOCA = "Puoi tornare privato quando vuoi, con un tocco: vale subito.";
 

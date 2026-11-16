@@ -7435,6 +7435,45 @@ else {
     await p.waitForURL(/\/raccolte\/Amici/, { timeout: 6000 }).catch(() => {});
     ok(patches.length === 2 && patches.every((x) => x.body?.tags?.includes("Amici del giovedì") && !x.body.tags.includes("Con amici")) && decodeURIComponent(p.url()).endsWith("/raccolte/Amici del giovedì"), `pagina raccolta: rinomina scrive su tutti e porta alla nuova pagina (${JSON.stringify(patches)})`);
     patches = [];
+    // Proposta 59, resto: lucchetto "Solo per me" sulla raccolta intera (profiles.raccolte_private).
+    { let privateDb = ["Con amici"]; const profPatch = [];
+      await p.route("**/rest/v1/profiles**", (r) => {
+        const req = r.request();
+        if (req.method() === "PATCH") { const b = req.postDataJSON(); profPatch.push(b); if (b?.raccolte_private) privateDb = b.raccolte_private; return r.fulfill({ status: 204, body: "" }); }
+        if (new URL(req.url()).searchParams.get("select")?.includes("raccolte_private")) return r.fulfill({ json: { raccolte_private: privateDb } });
+        return r.fallback();
+      });
+      await setProfilo(rc, { ...profilo, raccoltePrivate: ["Con amici"] });
+      await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
+      const lk = p.getByTestId("raccolta-solo-per-me");
+      ok(await lk.isVisible() && (await lk.getAttribute("aria-checked")) === "true" && (await lk.textContent()).includes("i posti che aggiungi") && await p.getByTestId("raccolta-solo-per-te").isVisible(), "raccolta col lucchetto: interruttore 'Solo per me' acceso");
+      ok((await p.getByTestId("condividi-raccolta-privata").count()) === 0 && (await p.getByTestId("condividi-raccolta").count()) === 0 && (await p.getByTestId("raccolta-privata").count()) === 0, "raccolta col lucchetto: niente Condividi (il link pubblico sarebbe vuoto)");
+      { const b = await lk.boundingBox(); ok(b && b.height >= 44, `raccolta col lucchetto: interruttore toccabile per 44px (${b?.height})`); }
+      await p.screenshot({ path: `${OUT}/44c-raccolta-lucchetto.png`, caret: "initial" });
+      // Rinomina di una raccolta col lucchetto: il lucchetto passa al nome nuovo PRIMA dei tag, poi esce il vecchio.
+      await p.getByTestId("raccolta-pagina-menu").click();
+      await rs.getByRole("button", { name: /Rinomina/ }).click();
+      await rs.getByLabel("Nuovo nome").fill("Segreti");
+      await rs.getByRole("button", { name: "Salva" }).click();
+      await p.waitForURL(/\/raccolte\/Segreti/, { timeout: 6000 }).catch(() => {});
+      ok(JSON.stringify(profPatch.map((x) => x.raccolte_private)) === JSON.stringify([["Con amici", "Segreti"], ["Segreti"]]) && patches.length === 2, `raccolta col lucchetto: rinomina tiene il lucchetto sul nome nuovo (${JSON.stringify(profPatch)})`);
+      patches = []; profPatch.length = 0; privateDb = ["Con amici"];
+      // Elimina una raccolta col lucchetto: ogni suo posto prende il lucchetto singolo prima di uscire dalla raccolta.
+      await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
+      await p.getByTestId("raccolta-pagina-menu").click();
+      await rs.getByRole("button", { name: /Elimina raccolta/ }).click();
+      await rs.getByTestId("raccolta-pagina-elimina").click();
+      await p.waitForURL(/\/profilo/, { timeout: 6000 }).catch(() => {});
+      ok(patches.length >= 3 && patches[0].body?.solo_per_me === true && patches.slice(1).every((x) => !x.body?.tags?.includes("Con amici")) && JSON.stringify(profPatch.map((x) => x.raccolte_private)) === JSON.stringify([[]]), `raccolta col lucchetto: elimina lascia i posti 'Solo per me' (${JSON.stringify(patches)} ${JSON.stringify(profPatch)})`);
+      patches = []; profPatch.length = 0; privateDb = ["Con amici"];
+      // Spegnere il lucchetto
+      await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
+      await p.getByTestId("raccolta-solo-per-me").click();
+      await p.waitForFunction(() => document.querySelector('[data-testid="raccolta-solo-per-me"]')?.getAttribute("aria-checked") === "false", null, { timeout: 4000 }).catch(() => {});
+      ok(JSON.stringify(profPatch.map((x) => x.raccolte_private)) === JSON.stringify([[]]), `raccolta col lucchetto: spento con un tocco (${JSON.stringify(profPatch)})`);
+      patches = [];
+      await p.unroute("**/rest/v1/profiles**");
+      await setProfilo(rc, profilo); }
     await p.goto(`${BASE}/raccolte/Non%20esiste`, { waitUntil: "networkidle" });
     ok(await p.getByTestId("raccolta-vuota").isVisible(), "pagina raccolta: nome sconosciuto → 'Raccolta vuota' con il ritorno al profilo");
     // 360px: titolo e azioni senza uscire dallo schermo
