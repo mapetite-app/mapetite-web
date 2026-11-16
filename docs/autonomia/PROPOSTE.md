@@ -16,6 +16,30 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 16/11/2026 (lunedì, CEO che chiude — tema recensioni vere e prenotazioni)
+
+### 61. "C'è stato davvero": recensione solo da chi ha segnato la visita, entro 30 giorni
+- **Problema:** `PROBLEMI.md` 26: recensioni di chi non c'è stato; le linee guida dell'Antitrust di ottobre 2026 chiedono di verificarlo.
+- **Cosa fa:** stelle e commento della community si lasciano solo dopo "Ci sono stato", con il mese della visita; dopo 30 giorni il tasto diventa "Com'era?" solo per i propri appunti privati. Sulla scheda ogni recensione porta "C'è stato a novembre".
+- **Da dove nasce:** Google e TripAdvisor accettano recensioni senza prova; Beli e Corner non lo dicono. Noi abbiamo già il gesto "Ci sono stato": basta legarlo alla recensione.
+- **Valore per l'utente:** stelle di cui fidarsi. **Per il ristoratore:** "su Mapetite ti giudica solo chi è venuto": è un argomento di vendita del pannello.
+- **Sforzo:** M (vincolo nel database con una funzione di controllo, data della visita già salvata, testi della scheda e della privacy; le recensioni vecchie senza visita restano ma senza la riga "C'è stato"). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
+### 62. "Nessun tetto": tutti i tuoi posti, gratis, detto dove conta
+- **Problema:** il problema dei 500 cuoricini (richiesta di Lorenzo dell'8/11); Mapstr fa pagare oltre 300 posti salvati ([App Store](https://apps.apple.com/ca/app/id917288465)).
+- **Cosa fa:** in Importa da Google e nel primo accesso, una riga sola: "Importa tutti i tuoi N posti: nessun limite, gratis". Nella demo è la risposta a "perché non Mapstr?".
+- **Da dove nasce:** Mapstr Plus oltre 300 posti; Albo con la prova a tempo. Noi senza tetto.
+- **Valore per l'utente:** porta tutto in un colpo, senza paura di un muro a pagamento. **Per il ristoratore:** più salvati = più dati aggregati.
+- **Sforzo:** S (un testo, il numero dei posti trovati già c'è). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA. (Il "Com'era?" il giorno dopo il tavolo, pensato all'inizio come 62, c'è già in `booking-reminder.tsx`: tolto come doppione.)
+
+### 63. Prenota dentro Mapetite con una piattaforma partner (come Resy in Beli)
+- **Problema:** richiesta di Lorenzo dell'8/11 (prenotare dall'app); Resy l'ha fatto con Beli ([Resy](https://blog.resy.com/newsroom/resy-launches-reservations-in-beli/)).
+- **Cosa fa:** disponibilità e prenotazione dentro la scheda, per i locali di una piattaforma partner (Quandoo o TheFork in Italia).
+- **Sforzo:** L, serve un accordo. **Costo:** da definire con il partner.
+- **Stato proposto:** **DA DECIDERE LORENZO** — Mandiamo la bozza a Quandoo citando il caso Resy–Beli come esempio? (bozze già in `PARTNER.md`, voce 10 di `DA-FARE-LORENZO.md`)
+
 ## 15/11/2026 (domenica, CEO che chiude — tema amici, fiducia e privacy)
 
 ### 58. "Te l'ha consigliato Giulia": il consiglio dell'amico resta attaccato al posto

@@ -61,6 +61,9 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
   );
 }
 
+// "2026-11-01" → "novembre 2026" (solo il mese: il giorno della visita non si mostra mai).
+const meseVisita = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("it-IT", { month: "long", year: "numeric" });
+
 function ReviewRow({ r }: { r: CommunityReview }) {
   return (
     <li data-testid="recensione-community" className="flex gap-3 py-2.5">
@@ -76,7 +79,14 @@ function ReviewRow({ r }: { r: CommunityReview }) {
         </p>
         <p className="mt-0.5 flex items-center gap-2">
           <Stars value={r.rating} />
-          <span className="text-xs font-sans text-text-muted">{shortDate(r.created_at)}</span>
+          {r.visita ? (
+            <span data-testid="recensione-visita" className="text-xs font-sans text-text-muted">
+              <span className="font-display font-semibold text-success">✓ C&apos;è stato</span>
+              {r.visita.mese ? ` a ${meseVisita(r.visita.mese)}` : ` · ${shortDate(r.created_at)}`}
+            </span>
+          ) : (
+            <span className="text-xs font-sans text-text-muted">{shortDate(r.created_at)}</span>
+          )}
         </p>
         {r.comment && <p className="mt-1 break-words font-sans text-sm leading-relaxed text-text">{r.comment}</p>}
       </div>
@@ -177,7 +187,9 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
   const avg = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : null;
   const others = showAll ? c.recensioni : c.recensioni.slice(0, 3);
   const canWrite = userId != null && c.placeId != null;
-  const formOpen = canWrite && (editing || !mine);
+  // Proposta 61: stelle e commento solo da chi ha segnato "Ci sono stato" (il voto 👍/👎 arriva solo dopo la visita).
+  const visitato = c.possoRecensire || voto != null;
+  const formOpen = canWrite && visitato && (editing || !mine);
 
   const publish = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,6 +297,11 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
       {userId == null && (
         <p className="mt-2 text-sm font-sans text-text-muted">
           <Link href={loginHref} className="font-display font-semibold text-brand underline underline-offset-2">Accedi</Link>{" "}per dire com&apos;era.
+        </p>
+      )}
+      {canWrite && !visitato && !mine && (
+        <p data-testid="recensione-serve-visita" className="mt-2 text-sm font-sans text-text-muted">
+          Ci sei stato? Segna <span className="font-display font-semibold text-text">Ci sono stato</span> per dire com&apos;era: qui recensisce solo chi c&apos;è stato.
         </p>
       )}
       {userId != null && c.placeId == null && (
