@@ -4603,12 +4603,16 @@ if (!fakeUser) {
   // Proposta 60: la didascalia dice "#adv" → riga neutra sotto il posto salvato; mai indovinare.
   { const { segnataComePubblicita: adv } = await import(new URL("../../src/lib/adv.ts", import.meta.url).href);
     const casi = [["Cena top #adv", true], ["#ad da Mario", true], ["#adorable pasta", false], ["Pubblicità - Trattoria", true], ["in collaborazione con @mario", true], ["adventure food", false], ["ADV | Pizzeria", true], ["la mia adv", false], ["Trattoria Da Enzo a Roma", false],
-      ["non sponsorizzato, pago io", false], ["Non è pubblicità!", false], ["no pubblicità, solo amore", false], ["cena in collaborazione con lo chef Rossi", false], ["evento in collaborazione con @cantinax", true], ["#collaborazione con amici", false], ["Advertising week a Milano", false]];
+      ["non sponsorizzato, pago io", false], ["Non è pubblicità!", false], ["no pubblicità, solo amore", false], ["cena in collaborazione con lo chef Rossi", false], ["evento in collaborazione con @cantinax", true], ["#collaborazione con amici", false], ["Advertising week a Milano", false],
+      // Revisore 2 del 15/11: una parola nella frase non è un'etichetta.
+      ["NO ADV, pago io", false], ["No #adv", false], ["Non è un post sponsorizzato", false], ["senza pubblicità", false], ["La pubblicità di questo posto", false], ["In collaborazione con la Pro Loco", false],
+      ["Niente #adv qui, solo fame", false], ["Questo NON è ADV", false], ["Sponsorizzato da nessuno", false], ["Pubblicità di Barilla ovunque", false], ["La mia pubblicità preferita", false], ["Tutto pagato da me, non sponsorizzato", false],
+      ["(ADV) Carbonara da urlo", true], ["Carbonara da urlo\nADV", true], ["📣 Pubblicità\nTrattoria", true], ["Post sponsorizzato", true], ["Partnership a pagamento con @barilla", true], ["adv: @trattoria", true], ["Carbonara #ADV #roma", true]];
     const sbagliati = casi.filter(([t, e]) => adv(t) !== e).map(([t]) => t);
-    ok(sbagliati.length === 0, `reel adv: solo diciture esplicite (#adv, Pubblicità, in collaborazione con, ADV maiuscolo), niente '#adorable' o 'adventure' (${sbagliati.join(" | ")})`);
+    ok(sbagliati.length === 0, `reel adv: solo diciture esplicite come etichetta (#adv, Pubblicità, in collaborazione con @, ADV), mai una parola nella frase o dopo una negazione, niente '#adorable' o 'adventure' (${sbagliati.join(" | ")})`);
     await mp.evaluate(() => sessionStorage.clear());
     await mp.goto(`${BASE}/importa/condividi?text=${encodeURIComponent("Pizzeria Bella a Roma #adv https://www.instagram.com/reel/ADV777/")}`, { waitUntil: "networkidle" });
-    await mp.getByTestId("reel-conferma").click({ timeout: 6000 }).catch(() => {});
+    await mp.getByTestId("reel-conferma").click({ timeout: 6000 });
     await mp.getByTestId("reel-salvato").waitFor({ timeout: 5000 }).catch(() => {});
     ok(((await mp.getByTestId("reel-adv").textContent().catch(() => "")) ?? "").includes("Il reel è segnato come pubblicità · il verdetto viene dalle recensioni"), "reel adv: con '#adv' nel testo, sotto il posto salvato 'Il reel è segnato come pubblicità · il verdetto viene dalle recensioni'");
     await mp.getByTestId("reel-adv").scrollIntoViewIfNeeded().catch(() => {});
