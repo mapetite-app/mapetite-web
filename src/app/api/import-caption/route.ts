@@ -3,7 +3,6 @@ import { extractPlace, type ImportImage } from "@/lib/import-caption";
 import { allowAi, clientKey, AI_LIMIT_SCREENSHOT_MESSAGE } from "@/lib/ai-limit";
 import { createClient } from "@/lib/supabase/server";
 import { fetchVideoCaption, videoSourceOf } from "@/lib/video-caption";
-import { segnataComePubblicita } from "@/lib/adv";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -32,8 +31,7 @@ export async function POST(request: Request) {
       );
     }
     console.log(`[import-link] ${videoSourceOf(link)} didascalia=${JSON.stringify(text.slice(0, 120))}`);
-    // Proposta 60: la didascalia letta dice da sola "ADV" / "pubblicità"? Solo il sì/no, mai il testo.
-    return NextResponse.json({ ...(await extractPlace({ caption: text })), adv: segnataComePubblicita(text) });
+    return NextResponse.json(await extractPlace({ caption: text }));
   }
 
   const hasCaption = typeof caption === "string" && caption.trim() !== "";
