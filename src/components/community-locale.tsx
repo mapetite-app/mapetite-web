@@ -271,6 +271,13 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
           {status === "done" && <p className="mt-1 text-xs font-sans text-success">Pubblicata ✓</p>}
         </div>
       )}
+      {/* Sulla pagina del locale lo dice già la barra in basso (revisore 16/11 sera: due conferme uguali).
+          Sopra il modulo, così si legge prima delle stelle (revisore 16/11 sera, minore). */}
+      {canWrite && segnato === "ok" && !serveVisita && contesto !== "locale" && (
+        <p role="status" data-testid="recensione-visita-segnata" className="mt-3 text-sm font-display font-semibold text-success">
+          ✓ Tra i posti dove sei stato. Com&apos;era?
+        </p>
+      )}
       {formOpen && (
         <form data-testid="recensione-form" onSubmit={publish} className="mt-3 rounded-card border border-border bg-surface p-3">
           <p className="font-display text-sm font-semibold text-text">{mine ? "Modifica la tua recensione" : "Com'era? Dillo alla community"}</p>
@@ -363,12 +370,6 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
           )}
           {segnato === "errore" && <p role="alert" className="mt-1 text-xs font-sans text-error">Non sono riuscito a segnarlo. Riprova.</p>}
         </div>
-      )}
-      {/* Sulla pagina del locale lo dice già la barra in basso (revisore 16/11 sera: due conferme uguali). */}
-      {canWrite && segnato === "ok" && !serveVisita && contesto !== "locale" && (
-        <p role="status" data-testid="recensione-visita-segnata" className="mt-3 text-sm font-display font-semibold text-success">
-          ✓ Tra i posti dove sei stato. Com&apos;era?
-        </p>
       )}
       {userId != null && c.placeId == null && !rigaVisita && (
         <p className="mt-2 text-sm font-sans text-text-muted">Segna «✓ Ci sono stato» per lasciare la tua recensione.</p>

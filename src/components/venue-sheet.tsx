@@ -552,7 +552,7 @@ export default function VenueSheet({
                     if (tag === "Già visitato" && !on) setVisitAskedAt(Date.now());
                     onVisitStatus(tag);
                   }}
-                  className={`min-h-10 flex-1 rounded-pill border px-3 text-sm font-display font-semibold active:scale-95 ${on ? "border-brand bg-brand text-white" : "border-border bg-white text-brand"}`}
+                  className={`min-h-11 flex-1 rounded-pill border px-3 text-sm font-display font-semibold active:scale-95 ${on ? "border-brand bg-brand text-white" : "border-border bg-white text-brand"}`}
                 >
                   {label}
                 </button>

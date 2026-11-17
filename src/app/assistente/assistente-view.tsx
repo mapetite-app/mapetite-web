@@ -556,7 +556,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
   // recensioni della scheda si rilegge e apre il modulo (prima diceva "Salva il locale" anche dopo il salvataggio).
   const [uuidDi, setUuidDi] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<Record<string, SaveState>>({});
-  const [savedToast, setSavedToast] = useState<{ name: string; uuid: string } | null>(null);
+  const [savedToast, setSavedToast] = useState<{ name: string; uuid: string; visitato?: boolean } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!userId) return;
@@ -598,7 +598,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
       setUuidDi((m) => ({ ...m, [p.id]: uuid }));
       setSaving((s) => { const next = { ...s }; delete next[p.id]; return next; });
       if (!already) track("salva", { id: uuid, lat: p.lat, lng: p.lng }, { fonte: "assistente", stato: tag });
-      setSavedToast({ name: p.name, uuid });
+      setSavedToast({ name: p.name, uuid, visitato: tag === "Già visitato" });
       if (toastTimer.current) clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setSavedToast(null), 5000);
     } catch {
@@ -901,7 +901,12 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
         >
           <BookmarkCheck size={18} aria-hidden className="shrink-0 text-accent" />
           <p className="min-w-0 flex-1 text-sm font-sans leading-snug">
-            <span className="font-display font-semibold">Salvato</span> tra i tuoi “Da provare”
+            {savedToast.visitato ? (
+              // Proposta 61 (revisore 16/11 sera): dopo "Ci sono stato" l'avviso non dice più "Da provare".
+              <><span className="font-display font-semibold">✓ Segnato</span> tra i posti dove sei stato</>
+            ) : (
+              <><span className="font-display font-semibold">Salvato</span> tra i tuoi “Da provare”</>
+            )}
           </p>
           <Link href={`/mappa?salvato=${savedToast.uuid}`} className="shrink-0 text-sm font-display font-semibold text-accent">
             Sulla mappa
