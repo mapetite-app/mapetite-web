@@ -26,6 +26,7 @@ export function frasePrezzo(p: { min?: unknown; max?: unknown; bevande?: unknown
   const v = p ? pulisciPrezzo(p.min, p.max, p.bevande) : null;
   if (!v) return null;
   const base = `${v.min === v.max ? v.min : `${v.min}–${v.max}`} € a testa`;
-  if (breve) return v.bevande ? `${base}, bevande incluse` : base;
+  // Pillola della scheda: solo la cifra (revisore 17/11: la pillola lunga occupava una riga da sola); le bevande nella frase intera.
+  if (breve) return base;
   return `${base}, bevande ${v.bevande ? "incluse" : "escluse"}`;
 }

@@ -72,7 +72,8 @@ export function PrezzoLocale({ info }: { info: InfoLocale | null }) {
   return (
     <span data-testid="prezzo-locale" title={frasePrezzo(info?.prezzo) ?? undefined} className="inline-flex items-center gap-1 rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
       <span aria-hidden>💶</span> {f}
-      <span className="font-sans font-normal text-text-muted">· dice il locale</span>
+      {/* Un solo "· dice il locale" per scheda: con la pillola "c'è posto" accanto lo dice già quella. */}
+      {!frasePosto(info) && <span className="font-sans font-normal text-text-muted">· dice il locale</span>}
     </span>
   );
 }

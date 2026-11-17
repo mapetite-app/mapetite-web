@@ -1720,7 +1720,7 @@ await shot("15-scheda-b");
   await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: REST, sintesi_pendente: null } }));
   await page.route("**/api/places/community**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "R1" ? comm : { ...comm, recensioni: [], mia: null } }));
   // Osteria Bella è verificata, con "c'è posto" e buoni pasto confermati da 3 persone.
-  await page.route("**/api/ristoratore/serate**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "R1" ? { verificato: true, giorni: [0, 1, 2, 3, 4, 5, 6], at: new Date().toISOString() } : new URL(r.request().url()).searchParams.get("id") === "R2" ? { verificato: true, giorni: [], at: null, apertoDal: (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 3); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })(), prezzo: { min: 25, max: 35, bevande: false } } : { verificato: false, giorni: [], at: null, prezzo: { min: 10, max: 20, bevande: true } } }));
+  await page.route("**/api/ristoratore/serate**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "R1" ? { verificato: true, giorni: [0, 1, 2, 3, 4, 5, 6], at: new Date().toISOString(), prezzo: { min: 25, max: 35, bevande: true } } : new URL(r.request().url()).searchParams.get("id") === "R2" ? { verificato: true, giorni: [], at: null, apertoDal: (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 3); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })(), prezzo: { min: 25, max: 35, bevande: false } } : { verificato: false, giorni: [], at: null, prezzo: { min: 10, max: 20, bevande: true } } }));
   await page.route("**/rest/v1/rpc/buoni_pasto_conteggio**", (r) => r.fulfill({ json: r.request().postDataJSON()?.p_place === "R1" ? [{ si: 3, no: 0 }] : [{ si: 0, no: 0 }] }));
   await page.route("**/api/places/tripadvisor**", (r) => {
     const u = new URL(r.request().url()); taChiesti.push(u.searchParams.get("nome"));
@@ -1739,7 +1739,8 @@ await shot("15-scheda-b");
     ok((await page.getByTestId("segnali-scheda").getByText("Verificato", { exact: true }).count()) === 0, "scheda: nessuna pillola 'Verificato' sotto il nome");
     const h = await page.getByTestId("segnali-scheda").evaluate((el) => el.getBoundingClientRect().height);
     ok(await page.getByTestId("posto-stasera").isVisible() && await page.getByTestId("buoni-pasto").isVisible() && h <= 62, `scheda: 'c'è posto' e buoni pasto in un solo blocco di al massimo 2 righe (${Math.round(h)} px)`);
-    ok((await page.getByTestId("prezzo-locale").count()) === 0, "scheda: verificato senza prezzo indicato → nessuna pillola '💶 … a testa'");
+    // Revisore 17/11: con "c'è posto", buoni pasto e prezzo la pillola del prezzo è corta e "dice il locale" compare una volta sola.
+    ok(((await page.getByTestId("prezzo-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim() === "💶 25–35 € a testa" && (((await page.getByTestId("segnali-scheda").textContent()) ?? "").match(/dice il locale/g) ?? []).length === 1, "scheda: 'c'è posto' e prezzo del locale → pillola corta '💶 25–35 € a testa', un solo 'dice il locale'");
     await shot("15c-scheda-segnali"); }
   await apriDettagli(page);
   await page.getByTestId("scheda-tab-recensioni").click();
@@ -7645,7 +7646,7 @@ else {
     { let pz = null;
       try { pz = await import(new URL("../../src/lib/prezzo-locale.ts", import.meta.url).href); } catch (e) { ok(false, `prezzo a testa: modulo src/lib/prezzo-locale.ts importabile (${e.message})`); }
       if (pz) {
-        ok(pz.frasePrezzo({ min: 25, max: 35, bevande: false }) === "25–35 € a testa, bevande escluse" && pz.frasePrezzo({ min: 30, max: 30, bevande: true }) === "30 € a testa, bevande incluse" && pz.frasePrezzo({ min: 25, max: 35, bevande: false }, true) === "25–35 € a testa", "prezzo a testa: '25–35 € a testa, bevande escluse', '30 € a testa, bevande incluse', breve per la pillola");
+        ok(pz.frasePrezzo({ min: 25, max: 35, bevande: false }) === "25–35 € a testa, bevande escluse" && pz.frasePrezzo({ min: 30, max: 30, bevande: true }) === "30 € a testa, bevande incluse" && pz.frasePrezzo({ min: 25, max: 35, bevande: false }, true) === "25–35 € a testa" && pz.frasePrezzo({ min: 25, max: 35, bevande: true }, true) === "25–35 € a testa", "prezzo a testa: '25–35 € a testa, bevande escluse', '30 € a testa, bevande incluse', breve per la pillola (solo la cifra)");
         ok(pz.pulisciPrezzo(40, 30, false) === null && pz.pulisciPrezzo(0, 30, false) === null && pz.pulisciPrezzo(10, 501, false) === null && pz.pulisciPrezzo(12.5, 20, false) === null && pz.pulisciPrezzo("ciao", 20, false) === null && pz.frasePrezzo(null) === null, "prezzo a testa: niente con min > max, fuori da 1–500, decimali, testo o dato assente");
         ok(JSON.stringify(pz.pulisciPrezzo("25", "35", "si")) === '{"min":25,"max":35,"bevande":false}', "prezzo a testa: cifre dai campi del modulo; bevande incluse solo se è proprio sì");
       } }
