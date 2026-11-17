@@ -1,3 +1,4 @@
+import { Lock } from "lucide-react";
 import { collectionColor, placesLabel } from "@/lib/raccolte";
 
 // Copertina "a cartella" di una raccolta (piano 4.1), come le collezioni di Albo e Places:
@@ -12,6 +13,7 @@ export default function RaccoltaCopertina({
   covers = true,
   compact = false,
   riempi = false,
+  privata = false,
 }: {
   name: string;
   count: number;
@@ -20,6 +22,7 @@ export default function RaccoltaCopertina({
   covers?: boolean; // ?beta=-copertine: solo l'iniziale, come prima
   compact?: boolean; // pagina pubblica: cartelle più basse
   riempi?: boolean; // con meno di 4 locali: un'emoji grande al centro invece delle caselle vuote (Importa, revisore 2/11)
+  privata?: boolean; // lucchetto "Solo per me" sulla raccolta (profiles.raccolte_private): come "Solo per te" nella testata
 }) {
   const tiles = emojis.slice(0, 4);
   return (
@@ -54,6 +57,11 @@ export default function RaccoltaCopertina({
       <span className="block min-w-0 flex-1 pb-3 pl-3 pr-8 pt-2.5">
         {/* Parole intere a capo: affiancati a un'icona, a 360-390px i nomi si spezzavano a metà parola. */}
         <span data-testid="raccolta-nome" className="line-clamp-2 font-display text-[15px] font-semibold leading-tight text-text [overflow-wrap:anywhere] [word-break:normal]">
+          {privata && (
+            <span data-testid="raccolta-copertina-lucchetto" role="img" aria-label="Solo per te" title="Solo per te" className="mr-1 inline-flex align-[-1px] text-brand">
+              <Lock size={13} strokeWidth={2.25} aria-hidden />
+            </span>
+          )}
           {name}
         </span>
         {covers && names.length > 0 ? (
