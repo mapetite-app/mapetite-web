@@ -84,7 +84,7 @@ export default function PrezzoMedio({ placeId, iniziale, verificato, demo }: { p
           </span>
         )}
         {stato === "errore" && errore && <span role="alert" className="text-sm font-sans text-error">{errore}</span>}
-        {mostraAvviso && <span role="alert" className="text-sm font-sans text-error">Euro tra 1 e 500, "da" non più alto di "a".</span>}
+        {mostraAvviso && <span role="alert" className="text-sm font-sans text-error">Euro tra 1 e 500, «da» non più alto di «a».</span>}
       </div>
       <p data-testid="prezzo-anteprima" className="mt-3 text-xs font-sans leading-snug text-text-muted">
         {anteprima ? (
