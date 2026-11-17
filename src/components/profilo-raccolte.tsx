@@ -9,7 +9,7 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { useOptIn } from "@/lib/beta";
 import { checkCollectionName, collectionPath, summarizeCollections } from "@/lib/raccolte";
 import { updateTags } from "@/lib/raccolte-write";
-import { proteggiPrima, pulisciDopo } from "@/lib/raccolte-private";
+import { leggiRaccoltePrivate, proteggiPrima, pulisciDopo } from "@/lib/raccolte-private";
 import { trackFeature } from "@/lib/track";
 import RaccoltaCopertina from "@/components/raccolta-copertina";
 import RaccolteProposte from "@/components/raccolte-proposte";
@@ -35,6 +35,19 @@ export default function ProfiloRaccolte({ userId, initialRows, privateIniziali =
   const [rows, setRows] = useState(initialRows);
   // Raccolte col lucchetto (profiles.raccolte_private): il lucchetto sulla copertina, come "Solo per te" nella testata.
   const [privateNomi, setPrivateNomi] = useState<string[]>(privateIniziali);
+  // Revisore 17/11 (minore): un lucchetto messo o tolto da un'altra pagina o da un altro telefono si vede
+  // tornando qui (scheda di nuovo in primo piano), senza ricaricare. Nessuna rilettura mentre un'operazione è in corso.
+  const occupatoRef = useRef(false);
+  useEffect(() => {
+    let vivo = true;
+    const rileggi = () => {
+      if (document.visibilityState !== "visible" || occupatoRef.current) return;
+      void leggiRaccoltePrivate(userId).then((n) => { if (vivo && n && !occupatoRef.current) setPrivateNomi(n); });
+    };
+    document.addEventListener("visibilitychange", rileggi);
+    window.addEventListener("pageshow", rileggi);
+    return () => { vivo = false; document.removeEventListener("visibilitychange", rileggi); window.removeEventListener("pageshow", rileggi); };
+  }, [userId]);
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [name, setName] = useState("");
   const [query, setQuery] = useState("");
@@ -43,6 +56,7 @@ export default function ProfiloRaccolte({ userId, initialRows, privateIniziali =
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const busy = progress !== null;
+  useEffect(() => { occupatoRef.current = busy; }, [busy]);
 
   const covers = useOptIn("copertine");
   // Cartelle: nome, numero di locali e i primi locali (i più recenti) per la copertina.

@@ -18,6 +18,15 @@ export async function lucchettoRaccolta(nome: string, on: boolean): Promise<bool
   return !error;
 }
 
+/** Le raccolte col lucchetto ADESSO (elenco del proprietario), o null se non leggibile (nel dubbio non si cambia niente). */
+export async function leggiRaccoltePrivate(userId: string): Promise<string[] | null> {
+  const supabase = await browserClient().catch(() => null);
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("profiles").select("raccolte_private").eq("id", userId).maybeSingle();
+  if (error) return null;
+  return (data as { raccolte_private?: string[] | null } | null)?.raccolte_private ?? [];
+}
+
 async function eraPrivata(userId: string, da: string): Promise<boolean | null> {
   const supabase = await browserClient().catch(() => null);
   if (!supabase) return null;

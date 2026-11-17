@@ -32,7 +32,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** TheFork mostra il prezzo medio dichiarato dal locale; nessuna app di salvataggio lo affianca a quello vissuto dai clienti.
 - **Valore per l'utente:** due numeri onesti invece di un simbolo. **Per il ristoratore:** controllo della propria presenza, uno dei motivi per cui pagherebbe (`VISIONE.md`).
 - **Sforzo:** S (campo nel pannello già esistente, una riga nella scheda). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **17/11 notte: bocciata due volte (7,5 e 7,5). 17/11 sera: revisore 3 7,8 (prezzo senza fonte accanto a "c'è posto"), corretta (un solo riquadro del titolare con "dice il locale"); revisore 4: 8,5, sicurezza OK, APPROVATA. La spesa di chi c'è stato (64) resta sempre, anche accanto al prezzo del titolare.**
 
 ## 16/11/2026 (lunedì, CEO che chiude — tema recensioni vere e prenotazioni)
 

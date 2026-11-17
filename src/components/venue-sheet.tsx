@@ -25,7 +25,8 @@ import type { BookingDetails } from "@/lib/booking";
 import { VisitaContext } from "@/lib/visita-context";
 import { votoOf, votoTag } from "@/lib/diario";
 import ConfrontoFonti from "@/components/confronto-fonti";
-import { AperturaPillola, PostoPillola, useInfoLocale } from "@/components/posto-locale";
+import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocale } from "@/components/posto-locale";
+import { frasePrezzo } from "@/lib/prezzo-locale";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 import VisiteMapetite from "@/components/visite-mapetite";
@@ -371,7 +372,7 @@ export default function VenueSheet({
   const hasPersonalTags = personalTags != null && personalTags.length > 0;
   const showPersonalBlock =
     isSaved && (hasPersonalTags || personalNote != null || canEdit || onVisitStatus != null);
-  const priceLabel =
+  const priceLabelGoogle =
     priceLevel != null && priceLevel > 0 ? "€".repeat(priceLevel) : null;
   // Come Places: se il locale è raggiungibile a piedi, il pulsante percorso mostra i minuti.
   const walk = userPos ? walkMinutes(userPos, { lat, lng }) : null;
@@ -413,6 +414,8 @@ export default function VenueSheet({
   };
   // Locale verificato e "c'è posto" (parola del titolare): spunta accanto al nome e pillola sotto.
   const infoLocale = useInfoLocale(venue.id);
+  // Se il titolare verificato dichiara il prezzo a testa, niente "€€€€" di Google accanto (due fonti in contrasto, revisore 17/11).
+  const priceLabel = infoLocale?.verificato && frasePrezzo(infoLocale.prezzo) ? null : priceLabelGoogle;
   const emoji = getCategoryEmoji(category, name, venue.types);
   // "A confronto" (Lorenzo 17/10): Mapetite, Google, Tripadvisor, Michelin, TheFork in poche righe.
   const confronto = (onMapetite?: () => void) => (
@@ -961,12 +964,15 @@ export default function VenueSheet({
             )}
             {/* Aperto da poco (PROPOSTE.md, proposta 7): parola del titolare verificato, solo il primo anno. */}
             <AperturaPillola info={infoLocale} />
+            {/* Prezzo a testa detto dal titolare verificato (PROPOSTE.md 65), separato dai € di Google. */}
+            <PrezzoLocale info={infoLocale} />
+            {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1).
+                Subito dopo il prezzo: le due frasi del titolare vicine, un solo "· dice il locale" (revisore 17/11). */}
+            <PostoPillola info={infoLocale} conPrezzo />
             {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
             <BuoniPastoRiga venueId={venue.id} category={category} />
-            {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1). */}
-            <PostoPillola info={infoLocale} />
             {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3), con quanto ha speso a testa
-                (PROPOSTE.md 64, da 5 risposte, fascia scelta da almeno 2 senza pareggi) nella stessa pillola. */}
+                (PROPOSTE.md 64, da 5 risposte, fascia scelta da almeno 2 senza pareggi) nella stessa pillola, anche se il locale dichiara il suo prezzo (due fonti, mai nascoste l'una dall'altra). */}
             <VisiteMapetite venueId={googlePlaceId ?? venue.id} spesaId={venue.id} />
           </div>
 
@@ -1404,7 +1410,7 @@ export default function VenueSheet({
           {priceLabel && (
             <>
               <span aria-hidden>·</span>
-              <span className="font-display text-text">{priceLabel}</span>
+              <span data-testid="fascia-google" className="font-display text-text">{priceLabel}</span>
             </>
           )}
           {openNow != null && (

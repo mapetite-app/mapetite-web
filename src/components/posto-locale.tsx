@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { frasePosto } from "@/lib/serate";
 import { fraseApertura } from "@/lib/aperto-dal";
+import { frasePrezzo } from "@/lib/prezzo-locale";
 
 // Parola del titolare nella scheda (POSIZIONAMENTO.md: "al massimo un badge e una riga"):
 // se il titolare l'ha detto, "🌙 Martedì c'è posto". Solo locali verificati; per tutti gli altri
 // non compare niente (nemmeno uno spazio vuoto). Dati da /api/ristoratore/serate.
 // Il badge "Verificato" non sta qui: la scheda lo mette come spunta accanto al nome (Semplificare,
 // 20/10), la pagina pubblica del locale ha il suo.
-export type InfoLocale = { verificato: boolean; giorni: number[]; at: string | null; apertoDal?: string | null; omaggio?: { testo?: unknown; soglia?: unknown } | null };
+export type InfoLocale = { verificato: boolean; giorni: number[]; at: string | null; apertoDal?: string | null; prezzo?: { min?: unknown; max?: unknown; bevande?: unknown } | null; omaggio?: { testo?: unknown; soglia?: unknown } | null };
 
 // Una sola richiesta per locale anche se la scheda la chiede da più punti (pillole e omaggio):
 // la risposta resta in memoria 60 secondi, poi si rilegge (il titolare può averla cambiata).
@@ -41,9 +42,10 @@ export function useInfoLocale(venueId: string): InfoLocale | null {
 }
 
 /** Pillola "🌙 … c'è posto · dice il locale", o niente. */
-export function PostoPillola({ info }: { info: InfoLocale | null }) {
+export function PostoPillola({ info, conPrezzo = false }: { info: InfoLocale | null; conPrezzo?: boolean }) {
   const posto = frasePosto(info);
-  if (!posto) return null;
+  // Nella scheda, con il prezzo del locale, "c'è posto" sta già nel riquadro del prezzo (PrezzoLocale).
+  if (!posto || (conPrezzo && info?.verificato && frasePrezzo(info.prezzo))) return null;
   return (
     <span data-testid="posto-stasera" className="inline-flex items-center gap-1 rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
       🌙 {posto}
@@ -59,6 +61,23 @@ export function AperturaPillola({ info }: { info: InfoLocale | null }) {
   return (
     <span data-testid="aperto-da-poco" className="inline-flex items-center gap-1 rounded-pill bg-brand/10 px-2.5 py-0.5 text-xs font-display font-semibold text-brand">
       <span aria-hidden>🆕</span> {f}
+    </span>
+  );
+}
+
+/** "💶 25–35 € a testa · dice il locale" (parola del titolare verificato, PROPOSTE.md 65), o niente.
+ *  Mai mescolata con la fascia € di Google: è un'altra fonte e lo dice.
+ *  Revisore 3 (17/11): con anche "c'è posto" le due frasi del titolare stanno in UN solo riquadro che finisce
+ *  con "· dice il locale" (prima il prezzo restava senza fonte e i segnali andavano su 3–4 righe). */
+export function PrezzoLocale({ info }: { info: InfoLocale | null }) {
+  const f = info?.verificato ? frasePrezzo(info.prezzo, true) : null;
+  if (!f) return null;
+  const posto = frasePosto(info);
+  return (
+    <span data-testid="parola-locale" title={frasePrezzo(info?.prezzo) ?? undefined} className={`inline-flex flex-wrap items-center gap-x-1 ${posto ? "rounded-btn py-1" : "rounded-pill py-0.5"} bg-accent-light px-2.5 text-xs font-display font-semibold text-accent`}>
+      <span data-testid="prezzo-locale"><span aria-hidden>💶</span> {f}</span>
+      {posto && (<><span aria-hidden className="font-sans font-normal text-text-muted">·</span><span data-testid="posto-stasera">🌙 {posto}</span></>)}
+      <span className="font-sans font-normal text-text-muted">· dice il locale</span>
     </span>
   );
 }
