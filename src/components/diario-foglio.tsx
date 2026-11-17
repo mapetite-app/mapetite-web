@@ -10,6 +10,8 @@ import { cambiaVisibilita } from "@/lib/foto-utenti-write";
 import { trackFeature } from "@/lib/track";
 import { FotoMieEditor } from "@/components/foto-utenti";
 import { buoniPertinenti, miaRispostaBuoni, rispondiBuoni } from "@/lib/buoni-pasto";
+import { FASCE_SPESA, type FasciaSpesa } from "@/lib/spesa-testa";
+import { miaSpesa, rispondiSpesa } from "@/lib/spesa-testa-write";
 
 // Foglio leggero "Com'è andata?" (piano 4.4): dopo "Ci sono stato" (o da "Modifica" nel diario)
 // chiede quando, il voto (👍/👎, lo stesso "Com'era?" della scheda) e una nota privata.
@@ -90,6 +92,33 @@ export default function DiarioFoglio({
     const ok = await rispondiBuoni(buoniUser, buoniPlace, next);
     if (!ok) { setBuoni(prima); setBuoniErr(true); return; }
     if (next !== null) trackFeature("buoni_pasto", { stato: next ? "si" : "no", contesto: foto?.contesto ?? "diario" });
+  };
+  // Quanto si spende a testa (PROPOSTE.md 64): facoltativo, sul proprio salvato, si salva subito come i buoni.
+  // spesaPronta false = colonna non ancora nel database (migrazione 20261117b): la riga non si mostra.
+  const spesaUser = buoniProp?.userId ?? foto?.userId ?? null;
+  const spesaPlace = buoniPlace;
+  const [spesa, setSpesa] = useState<FasciaSpesa | null>(null);
+  const [spesaPronta, setSpesaPronta] = useState(false);
+  const [spesaErr, setSpesaErr] = useState(false);
+  useEffect(() => {
+    if (!spesaUser || !spesaPlace) return;
+    let vivo = true;
+    void miaSpesa(spesaUser, spesaPlace).then((r) => {
+      if (!vivo) return;
+      setSpesaPronta(r.pronta);
+      if (r.fascia !== null) setSpesa(r.fascia);
+    });
+    return () => { vivo = false; };
+  }, [spesaUser, spesaPlace]);
+  const scegliSpesa = async (v: FasciaSpesa) => {
+    if (!spesaUser || !spesaPlace) return;
+    const prima = spesa;
+    const next = spesa === v ? null : v;
+    setSpesa(next);
+    setSpesaErr(false);
+    const ok = await rispondiSpesa(spesaUser, spesaPlace, next);
+    if (!ok) { setSpesa(prima); setSpesaErr(true); return; }
+    if (next !== null) trackFeature("spesa_testa", { stato: String(next), contesto: foto?.contesto ?? "diario" });
   };
 
   useEffect(() => {
@@ -226,6 +255,22 @@ export default function DiarioFoglio({
           </div>
         )}
         {buoniErr && <p role="alert" className="text-xs text-error">Non sono riuscito a salvarlo. Riprova.</p>}
+
+        {spesaUser && spesaPlace && spesaPronta && (
+          <div data-testid="diario-spesa" className="mt-4">
+            <p className="text-sm font-display font-semibold text-text">
+              Quanto a testa?
+            </p>
+            <div role="group" aria-label="Quanto hai speso a testa" className="mt-2 grid grid-cols-4 gap-2">
+              {FASCE_SPESA.map((f) => (
+                <button key={f.v} type="button" aria-pressed={spesa === f.v} aria-label={`A testa: ${f.nome}`} onClick={() => void scegliSpesa(f.v)} className={`${chip(spesa === f.v)} min-h-11 min-w-0 whitespace-nowrap`}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {spesaErr && <p role="alert" className="text-xs text-error">Non sono riuscito a salvarlo. Riprova.</p>}
 
         {foto && fotoPronte && fotoList && (
           <div data-testid="diario-foto" className="mt-4">
