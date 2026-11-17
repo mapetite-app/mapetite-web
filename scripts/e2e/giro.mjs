@@ -1740,7 +1740,7 @@ await shot("15-scheda-b");
     const h = await page.getByTestId("segnali-scheda").evaluate((el) => el.getBoundingClientRect().height);
     ok(await page.getByTestId("posto-stasera").isVisible() && await page.getByTestId("buoni-pasto").isVisible() && h <= 62, `scheda: 'c'è posto' e buoni pasto in un solo blocco di al massimo 2 righe (${Math.round(h)} px)`);
     // Revisore 17/11: con "c'è posto", buoni pasto e prezzo la pillola del prezzo è corta e "dice il locale" compare una volta sola.
-    ok(((await page.getByTestId("prezzo-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim() === "💶 25–35 € a testa" && (((await page.getByTestId("segnali-scheda").textContent()) ?? "").match(/dice il locale/g) ?? []).length === 1, "scheda: 'c'è posto' e prezzo del locale → pillola corta '💶 25–35 € a testa', un solo 'dice il locale'");
+    ok(((await page.getByTestId("prezzo-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim() === "💶 25–35 € a testa · bevande incl." && (((await page.getByTestId("segnali-scheda").textContent()) ?? "").match(/dice il locale/g) ?? []).length === 1, "scheda: 'c'è posto' e prezzo del locale → pillola corta '💶 25–35 € a testa · bevande incl.', un solo 'dice il locale'");
     await shot("15c-scheda-segnali"); }
   await apriDettagli(page);
   await page.getByTestId("scheda-tab-recensioni").click();
@@ -7646,7 +7646,7 @@ else {
     { let pz = null;
       try { pz = await import(new URL("../../src/lib/prezzo-locale.ts", import.meta.url).href); } catch (e) { ok(false, `prezzo a testa: modulo src/lib/prezzo-locale.ts importabile (${e.message})`); }
       if (pz) {
-        ok(pz.frasePrezzo({ min: 25, max: 35, bevande: false }) === "25–35 € a testa, bevande escluse" && pz.frasePrezzo({ min: 30, max: 30, bevande: true }) === "30 € a testa, bevande incluse" && pz.frasePrezzo({ min: 25, max: 35, bevande: false }, true) === "25–35 € a testa" && pz.frasePrezzo({ min: 25, max: 35, bevande: true }, true) === "25–35 € a testa", "prezzo a testa: '25–35 € a testa, bevande escluse', '30 € a testa, bevande incluse', breve per la pillola (solo la cifra)");
+        ok(pz.frasePrezzo({ min: 25, max: 35, bevande: false }) === "25–35 € a testa, bevande escluse" && pz.frasePrezzo({ min: 30, max: 30, bevande: true }) === "30 € a testa, bevande incluse" && pz.frasePrezzo({ min: 25, max: 35, bevande: false }, true) === "25–35 € a testa" && pz.frasePrezzo({ min: 25, max: 35, bevande: true }, true) === "25–35 € a testa · bevande incl.", "prezzo a testa: '25–35 € a testa, bevande escluse', '30 € a testa, bevande incluse', breve per la pillola (bevande solo se incluse)");
         ok(pz.pulisciPrezzo(40, 30, false) === null && pz.pulisciPrezzo(0, 30, false) === null && pz.pulisciPrezzo(10, 501, false) === null && pz.pulisciPrezzo(12.5, 20, false) === null && pz.pulisciPrezzo("ciao", 20, false) === null && pz.frasePrezzo(null) === null, "prezzo a testa: niente con min > max, fuori da 1–500, decimali, testo o dato assente");
         ok(JSON.stringify(pz.pulisciPrezzo("25", "35", "si")) === '{"min":25,"max":35,"bevande":false}', "prezzo a testa: cifre dai campi del modulo; bevande incluse solo se è proprio sì");
       } }
@@ -7816,9 +7816,11 @@ else {
       const j5 = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
       const storto = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, prezzo: { min: 40, max: 30, bevande: false } } });
       const troppo = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, prezzo: { min: 10, max: 900, bevande: false } } });
-      ok(JSON.stringify(j5.prezzo) === '{"min":25,"max":35,"bevande":true}' && JSON.stringify(j5.giorni) === "[5]" && ant.includes("25–35 € a testa, bevande incluse") && storto.status() === 400 && troppo.status() === 400, `pannello ristoratore: 'Prezzo a testa' salvato e riletto dalla scheda, senza toccare le serate; da > a o oltre 500 € rifiutati (${JSON.stringify(j5.prezzo)} / ${ant} / ${storto.status()} ${troppo.status()})`);
+      ok(JSON.stringify(j5.prezzo) === '{"min":25,"max":35,"bevande":true}' && JSON.stringify(j5.giorni) === "[5]" && ant.includes("25–35 € a testa · bevande incl.") && storto.status() === 400 && troppo.status() === 400, `pannello ristoratore: 'Prezzo a testa' salvato e riletto dalla scheda, senza toccare le serate; da > a o oltre 500 € rifiutati (${JSON.stringify(j5.prezzo)} / ${ant} / ${storto.status()} ${troppo.status()})`);
       await pm.getByTestId("prezzo-da").fill("50");
-      ok(await pm.getByTestId("prezzo-salva").isDisabled() && await pm.getByRole("alert").isVisible(), "pannello ristoratore: 'da' più alto di 'a' → Salva spento e avviso");
+      const zittoMentreScrivi = (await pm.getByRole("alert").count()) === 0;
+      await pm.getByTestId("prezzo-da").blur();
+      ok(await pm.getByTestId("prezzo-salva").isDisabled() && zittoMentreScrivi && await pm.getByRole("alert").isVisible(), "pannello ristoratore: 'da' più alto di 'a' → Salva spento; l'avviso solo uscendo dal campo, non mentre si scrive");
       await rp.getByTestId("pannello-prezzo").screenshot({ path: `${OUT}/71b-pannello-prezzo.png` }); }
     // "Omaggio a chi torna" (PROPOSTE 12): niente denaro, si salva, codice del giorno uguale a quello del cliente.
     { const om = rp.getByTestId("pannello-omaggio");
@@ -7908,7 +7910,7 @@ else {
       const ant = ((await pm.getByTestId("prezzo-anteprima").textContent()) ?? "").replace(/\s+/g, " ");
       const alto = await pm.getByTestId("prezzo-da").evaluate((el) => el.getBoundingClientRect().height);
       await pm.getByTestId("prezzo-salva").click();
-      ok(/non compare niente/.test(vuota) && ant.includes("Nella tua scheda: 💶 25–35 € a testa, bevande escluse") && alto >= 44 && await pm.getByText("Fatto (esempio: non si salva)").isVisible(), `pannello demo: prezzo a testa 25–35 €, anteprima della pillola, campi da 44px e salvataggio finto (${ant} / ${Math.round(alto)}px)`); }
+      ok(/non compare niente/.test(vuota) && ant.includes("Nella tua scheda: 💶 25–35 € a testa ·") && !ant.includes("bevande") && alto >= 44 && await pm.getByText("Fatto (esempio: non si salva)").isVisible(), `pannello demo: prezzo a testa 25–35 €, anteprima della pillola, campi da 44px e salvataggio finto (${ant} / ${Math.round(alto)}px)`); }
     await rp.getByRole("tab", { name: "Panoramica" }).click();
     const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello demo: niente scorrimento orizzontale (${w}px)`); }
   await rp.screenshot({ path: `${OUT}/75-pannello-demo.png`, caret: "initial" });
