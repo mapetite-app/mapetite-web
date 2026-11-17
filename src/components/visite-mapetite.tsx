@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { fraseSpesa } from "@/lib/spesa-testa";
-import { frasePrezzo } from "@/lib/prezzo-locale";
 import { leggiInfoLocale } from "@/components/posto-locale";
 import { leggiSpesa } from "@/lib/spesa-testa-write";
 
@@ -11,7 +10,8 @@ import { leggiSpesa } from "@/lib/spesa-testa-write";
 type Visite = { persone: number; piaciuto: number };
 
 // Proposta 64 (revisori 17/11): una sola pillola "chi c'è stato" con voti e spesa a testa insieme
-// ("👍 5 su 6 · 15–30 € a testa · chi c'è stato"); la spesa no se il locale dichiara il suo prezzo (niente due "€ a testa").
+// ("👍 5 su 6 · 15–30 € a testa · chi c'è stato"). Revisore 4 (17/11): la spesa di chi c'è stato resta ANCHE quando il
+// locale dichiara il suo prezzo: la parola di parte non deve mai nascondere quella indipendente (VISIONE.md).
 // Si disegna solo quando sono arrivate tutte e tre le risposte (voti, spesa, info del locale): niente lampi né cambi di colore.
 export default function VisiteMapetite({ venueId, spesaId }: { venueId: string; spesaId?: string }) {
   const idSpesa = spesaId ?? venueId;
@@ -28,8 +28,8 @@ export default function VisiteMapetite({ venueId, spesaId }: { venueId: string; 
     const info = leggiInfoLocale(idSpesa).catch(() => null);
     void Promise.all([visite, spesa, info]).then(([v, sp, inf]) => {
       if (!vivo) return;
-      const prezzoDelLocale = frasePrezzo(inf?.prezzo) != null;
-      setDati({ k: chiave, v, spesa: prezzoDelLocale ? null : fraseSpesa(sp, true) });
+      void inf; // si aspetta anche l'info del locale: la pillola arriva insieme al riquadro del titolare, senza lampi
+      setDati({ k: chiave, v, spesa: fraseSpesa(sp, true) });
     });
     return () => { vivo = false; ctrl.abort(); };
   }, [venueId, idSpesa, chiave]);
