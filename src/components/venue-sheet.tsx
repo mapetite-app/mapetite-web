@@ -26,6 +26,7 @@ import { VisitaContext } from "@/lib/visita-context";
 import { votoOf, votoTag } from "@/lib/diario";
 import ConfrontoFonti from "@/components/confronto-fonti";
 import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocale } from "@/components/posto-locale";
+import { frasePrezzo } from "@/lib/prezzo-locale";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 import VisiteMapetite from "@/components/visite-mapetite";
@@ -371,7 +372,7 @@ export default function VenueSheet({
   const hasPersonalTags = personalTags != null && personalTags.length > 0;
   const showPersonalBlock =
     isSaved && (hasPersonalTags || personalNote != null || canEdit || onVisitStatus != null);
-  const priceLabel =
+  const priceLabelGoogle =
     priceLevel != null && priceLevel > 0 ? "€".repeat(priceLevel) : null;
   // Come Places: se il locale è raggiungibile a piedi, il pulsante percorso mostra i minuti.
   const walk = userPos ? walkMinutes(userPos, { lat, lng }) : null;
@@ -413,6 +414,8 @@ export default function VenueSheet({
   };
   // Locale verificato e "c'è posto" (parola del titolare): spunta accanto al nome e pillola sotto.
   const infoLocale = useInfoLocale(venue.id);
+  // Se il titolare verificato dichiara il prezzo a testa, niente "€€€€" di Google accanto (due fonti in contrasto, revisore 17/11).
+  const priceLabel = infoLocale?.verificato && frasePrezzo(infoLocale.prezzo) ? null : priceLabelGoogle;
   const emoji = getCategoryEmoji(category, name, venue.types);
   // "A confronto" (Lorenzo 17/10): Mapetite, Google, Tripadvisor, Michelin, TheFork in poche righe.
   const confronto = (onMapetite?: () => void) => (
@@ -1407,7 +1410,7 @@ export default function VenueSheet({
           {priceLabel && (
             <>
               <span aria-hidden>·</span>
-              <span className="font-display text-text">{priceLabel}</span>
+              <span data-testid="fascia-google" className="font-display text-text">{priceLabel}</span>
             </>
           )}
           {openNow != null && (

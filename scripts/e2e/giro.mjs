@@ -1742,6 +1742,9 @@ await shot("15-scheda-b");
     ok((await page.getByTestId("segnali-scheda").getByText("Verificato", { exact: true }).count()) === 0, "scheda: nessuna pillola 'Verificato' sotto il nome");
     const h = await page.getByTestId("segnali-scheda").evaluate((el) => el.getBoundingClientRect().height);
     ok(await page.getByTestId("posto-stasera").isVisible() && await page.getByTestId("buoni-pasto").isVisible() && h <= 62, `scheda: 'c'è posto' e buoni pasto in un solo blocco di al massimo 2 righe (${Math.round(h)} px)`);
+    // Revisore 17/11 (3): con il prezzo del titolare verificato, niente "€€" di Google accanto (due fonti in contrasto).
+    await page.getByTestId("prezzo-locale").waitFor({ timeout: 5000 }).catch(() => {});
+    ok((await page.getByTestId("fascia-google").count()) === 0, "scheda: locale verificato con il suo prezzo → niente fascia € di Google nell'intestazione");
     // Revisore 17/11: con "c'è posto", buoni pasto e prezzo la pillola del prezzo è corta e "dice il locale" compare una volta sola.
     ok(((await page.getByTestId("prezzo-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim() === "💶 25–35 € a testa · bevande incl." && (((await page.getByTestId("segnali-scheda").textContent()) ?? "").match(/dice il locale/g) ?? []).length === 1, "scheda: 'c'è posto' e prezzo del locale → pillola corta '💶 25–35 € a testa · bevande incl.', un solo 'dice il locale'");
     ok(spesaChiesta && (await page.getByTestId("spesa-vissuta").count()) === 0, `spesa a testa: con 4 risposte di chi c'è stato nessuna pillola (chiesta: ${spesaChiesta})`);
