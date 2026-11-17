@@ -1592,7 +1592,9 @@ ok(((await page.getByTestId("per-te-scheda").textContent()) ?? "").replace(/\s+/
   await rq.getByRole("button", { name: /rooftop/ }).click(); }
 ok(await page.getByTestId("scheda-altro-info").getAttribute("aria-expanded") === "false" && !(await page.getByTestId("scheda-dettagli").isVisible()), "scheda (mockup A): Info, Recensioni e In breve dietro 'Orari, contatti, recensioni ›'");
 ok((await page.getByText("Ha una vera terrazza.").count()) >= 1 && (await page.getByText("tramonto", { exact: true }).count()) >= 1, "scheda B: il perché e i tag usciti dalla card sono nella scheda (nessuna informazione persa)");
-{ const k = ((await page.getByTestId("scheda-categoria").textContent()) ?? "").split("·").map((t) => t.trim());
+{ // La fascia € di Google arriva dopo la risposta del locale (niente lampo accanto al prezzo del titolare): si aspetta.
+  await page.getByTestId("scheda-categoria").filter({ hasText: "€" }).waitFor({ timeout: 5000 }).catch(() => {});
+  const k = ((await page.getByTestId("scheda-categoria").textContent()) ?? "").split("·").map((t) => t.trim());
   const caps = await page.getByTestId("scheda-categoria").evaluate((el) => getComputedStyle(el).textTransform);
   ok(k.join(" · ") === "Bar · €€ · Roma" && caps === "uppercase", `scheda (mockup A): riga di categoria in maiuscoletto tipo · prezzo · città (${k.join(" · ")})`);
   const parts = ((await page.getByTestId("scheda-fatti").textContent()) ?? "").split("·").map((t) => t.trim());
@@ -6172,7 +6174,8 @@ else {
   const iso = (minAgo) => new Date(Date.now() - minAgo * 60_000).toISOString();
   const U = "00000000-0000-0000-0000-00000000000b";
   await setFake([
-    { created_at: iso(3 * 1440), type: "sessione_inizio", user_id: U, anon_id: null, session_id: "s0", props: { prima_volta: 1 } },
+    // 3 giorni e 2 ore fa: dopo mezzanotte gli eventi "30 minuti fa" cadono nel giorno prima e il ritorno a 3 giorni diventava a 2 (giro del 18/11 alle 00:10).
+    { created_at: iso(3 * 1440 + 120), type: "sessione_inizio", user_id: U, anon_id: null, session_id: "s0", props: { prima_volta: 1 } },
     { created_at: iso(30), type: "sessione_inizio", user_id: U, anon_id: null, session_id: "s1", props: { giorni: 3 } },
     { created_at: iso(29), type: "pagina", user_id: U, anon_id: null, session_id: "s1", props: { pagina: "mappa" } },
     { created_at: iso(28), type: "ricerca", user_id: U, anon_id: null, session_id: "s1", props: { modo: "ai", tipo: "bar", zona: "Trastevere", requisiti: ["rooftop"], risultati: 9 } },
@@ -7806,6 +7809,19 @@ else {
     const t = (await rp.getByTestId("posto-stasera").textContent().catch(() => "")) ?? "";
     ok(t.includes("Stasera c'è posto") && t.includes("dice il locale") && (await rp.getByTestId("posto-locale").getByText("Verificato").count()) === 0, `locale verificato con serate tranquille: 'Stasera c'è posto · dice il locale', senza un secondo badge (${t})`);
     await rp.screenshot({ path: `${OUT}/70b-locale-serate.png`, caret: "initial" });
+    // Prezzo a testa del titolare anche sulla pagina pubblica (PROPOSTE.md 65): nello stesso riquadro di "c'è posto",
+    // e senza la fascia € di Google accanto (che resta per i locali senza prezzo del titolare).
+    await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z", price_level: 3 } });
+    await rp.reload({ waitUntil: "networkidle" });
+    const conGoogle = ((await rp.locator("main").textContent().catch(() => "")) ?? "").includes("€€€");
+    await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: true, giorni: [g], at: new Date().toISOString(), prezzo: { min: 25, max: 35, bevande: false } });
+    await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z", price_level: 3, prezzo_min: 25, prezzo_max: 35 } });
+    await rp.reload({ waitUntil: "networkidle" });
+    await rp.getByTestId("parola-locale").getByTestId("posto-stasera").waitFor({ timeout: 5000 }).catch(() => {});
+    { const pl = ((await rp.getByTestId("posto-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
+      const main = ((await rp.locator("main").textContent().catch(() => "")) ?? "");
+      ok(conGoogle && pl.includes("💶 25–35 € a testa, bevande escluse") && pl.includes("Stasera c'è posto") && (pl.match(/dice il locale/g) ?? []).length === 1 && !main.includes("€€€"), `pagina del locale: prezzo del titolare e 'c'è posto' in un riquadro, senza la fascia € di Google (che senza prezzo c'è: ${conGoogle}) (${pl})`); }
+    await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z" } });
     await rctx.clearCookies({ name: "e2e_serate" }); }
   await rp.screenshot({ path: `${OUT}/70-locale-verificato.png`, caret: "initial" });
   await setCookie("e2e_locale", locR);

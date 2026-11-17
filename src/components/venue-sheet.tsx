@@ -25,7 +25,7 @@ import type { BookingDetails } from "@/lib/booking";
 import { VisitaContext } from "@/lib/visita-context";
 import { votoOf, votoTag } from "@/lib/diario";
 import ConfrontoFonti from "@/components/confronto-fonti";
-import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocale } from "@/components/posto-locale";
+import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocaleStato } from "@/components/posto-locale";
 import { frasePrezzo } from "@/lib/prezzo-locale";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
@@ -413,9 +413,10 @@ export default function VenueSheet({
     segna: !tastoVisitaInVista && !isSaved && onQuickSave ? () => quickSaveTag("Già visitato") : null,
   };
   // Locale verificato e "c'è posto" (parola del titolare): spunta accanto al nome e pillola sotto.
-  const infoLocale = useInfoLocale(venue.id);
+  const { info: infoLocale, pronto: infoPronta } = useInfoLocaleStato(venue.id);
   // Se il titolare verificato dichiara il prezzo a testa, niente "€€€€" di Google accanto (due fonti in contrasto, revisore 17/11).
-  const priceLabel = infoLocale?.verificato && frasePrezzo(infoLocale.prezzo) ? null : priceLabelGoogle;
+  // Finché la risposta del locale non arriva la fascia non si mostra: prima compariva e poi spariva (revisore 4).
+  const priceLabel = !infoPronta || (infoLocale?.verificato && frasePrezzo(infoLocale.prezzo)) ? null : priceLabelGoogle;
   const emoji = getCategoryEmoji(category, name, venue.types);
   // "A confronto" (Lorenzo 17/10): Mapetite, Google, Tripadvisor, Michelin, TheFork in poche righe.
   const confronto = (onMapetite?: () => void) => (
