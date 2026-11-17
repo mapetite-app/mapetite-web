@@ -1741,7 +1741,9 @@ await shot("15-scheda-b");
     ok(await v.isVisible() && (await v.getAttribute("aria-label")) === "Verificato dal titolare", "scheda: locale verificato → spunta accanto al nome (non più una pillola in più)");
     ok((await page.getByTestId("segnali-scheda").getByText("Verificato", { exact: true }).count()) === 0, "scheda: nessuna pillola 'Verificato' sotto il nome");
     const h = await page.getByTestId("segnali-scheda").evaluate((el) => el.getBoundingClientRect().height);
-    ok(await page.getByTestId("posto-stasera").isVisible() && await page.getByTestId("buoni-pasto").isVisible() && h <= 62, `scheda: 'c'è posto' e buoni pasto in un solo blocco di al massimo 2 righe (${Math.round(h)} px)`);
+    // Con anche il prezzo del locale (proposta 65) "c'è posto" sta nel riquadro del titolare: riquadro al massimo 2 righe, blocco al massimo 3.
+    { const hp = await page.getByTestId("parola-locale").evaluate((el) => el.getBoundingClientRect().height).catch(() => 999);
+      ok(await page.getByTestId("posto-stasera").isVisible() && await page.getByTestId("buoni-pasto").isVisible() && hp <= 46 && h <= 80, `scheda: prezzo e 'c'è posto' in un riquadro di al massimo 2 righe, con i buoni pasto al massimo 3 righe (${Math.round(hp)} / ${Math.round(h)} px)`); }
     // Revisore 17/11 (3): con il prezzo del titolare verificato, niente "€€" di Google accanto (due fonti in contrasto).
     await page.getByTestId("prezzo-locale").waitFor({ timeout: 5000 }).catch(() => {});
     { const kl = ((await page.getByTestId("scheda-categoria").textContent().catch(() => "")) ?? "") + ((await page.getByTestId("fascia-google").textContent().catch(() => "")) ?? "");
