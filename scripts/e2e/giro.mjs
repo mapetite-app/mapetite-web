@@ -7487,6 +7487,13 @@ else {
       await p.goto(`${BASE}/profilo?lucchetto=1#raccolte`, { waitUntil: "networkidle" });
       { const card = p.getByTestId("raccolta").filter({ hasText: "Con amici" });
         ok((await card.getByTestId("raccolta-copertina-lucchetto").count()) === 1 && (await card.getByRole("img", { name: "Solo per te" }).count()) === 1, "raccolta col lucchetto: il lucchetto 'Solo per te' sulla copertina in 'Gestisci le raccolte'"); }
+      // Minore del revisore (17/11): lucchetto tolto altrove → tornando sulla pagina "Gestisci" si riallinea senza ricaricare.
+      { const card = p.getByTestId("raccolta").filter({ hasText: "Con amici" });
+        privateDb = [];
+        await p.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+        await card.getByTestId("raccolta-copertina-lucchetto").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
+        ok((await card.getByTestId("raccolta-copertina-lucchetto").count()) === 0, "raccolta col lucchetto: tolto da un altro telefono, tornando sulla pagina il lucchetto sparisce senza ricaricare");
+        privateDb = ["Con amici"]; }
       await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
       ok(await p.getByTestId("raccolta-solo-per-te").isVisible() && (await p.getByTestId("raccolta-solo-per-me").count()) === 0, "raccolta col lucchetto: 'Solo per te' nella testata, nessuna scheda in più sulla pagina");
       ok((await p.getByTestId("condividi-raccolta-privata").count()) === 0 && (await p.getByTestId("condividi-raccolta").count()) === 0 && (await p.getByTestId("raccolta-privata").count()) === 0, "raccolta col lucchetto: niente Condividi (il link pubblico sarebbe vuoto)");
