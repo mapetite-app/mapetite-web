@@ -19,7 +19,8 @@ const cache = new Map<string, { at: number; p: Promise<InfoLocale | null> }>();
 export function leggiInfoLocale(venueId: string): Promise<InfoLocale | null> {
   const c = cache.get(venueId);
   if (c && Date.now() - c.at < 60_000) return c.p;
-  const p = fetch(`/api/ristoratore/serate?id=${encodeURIComponent(venueId)}`)
+  // Al massimo 3 secondi (revisore 17/11): la fascia € di Google della scheda aspetta questa risposta.
+  const p = fetch(`/api/ristoratore/serate?id=${encodeURIComponent(venueId)}`, { signal: AbortSignal.timeout(3000) })
     .then((r) => (r.ok ? (r.json() as Promise<InfoLocale>) : null))
     .then((j) => (j?.verificato ? j : null))
     .catch(() => { cache.delete(venueId); return null; /* senza rete: niente riga */ });
@@ -88,8 +89,10 @@ export function PrezzoLocale({ info }: { info: InfoLocale | null }) {
   );
 }
 
-export default function PostoLocale({ venueId }: { venueId: string }) {
-  const info = useInfoLocale(venueId);
+export default function PostoLocale({ venueId, prezzo = null }: { venueId: string; prezzo?: InfoLocale["prezzo"] }) {
+  const letta = useInfoLocale(venueId);
+  // Pagina pubblica: il prezzo arriva già dal server (niente salto della pagina, e resta anche se la richiesta fallisce).
+  const info: InfoLocale | null = prezzo ? { verificato: true, giorni: letta?.giorni ?? [], at: letta?.at ?? null, prezzo } : letta;
   // Pagina pubblica del locale: anche il prezzo a testa del titolare (PROPOSTE.md 65), nello stesso riquadro di "c'è posto".
   const conPrezzo = !!(info?.verificato && frasePrezzo(info.prezzo));
   if (!frasePosto(info) && !conPrezzo) return null;

@@ -18,7 +18,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const data = await loadPublicPlace(id);
   const name = data?.place.name ?? "Mapetite";
   const context = data
-    ? [cityFromAddress(data.place.address), categoryLabel(data.place.category), priceLabel(data.place.price_level), ratingLabel(data.place.rating)]
+    ? [cityFromAddress(data.place.address), categoryLabel(data.place.category), priceLabel(data.place.verified_at && data.place.prezzo_min != null ? null : data.place.price_level), ratingLabel(data.place.rating)]
         .filter(Boolean)
         .join(" · ")
     : "I locali giusti per te, non quelli di tutti.";

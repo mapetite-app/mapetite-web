@@ -1592,7 +1592,9 @@ ok(((await page.getByTestId("per-te-scheda").textContent()) ?? "").replace(/\s+/
   await rq.getByRole("button", { name: /rooftop/ }).click(); }
 ok(await page.getByTestId("scheda-altro-info").getAttribute("aria-expanded") === "false" && !(await page.getByTestId("scheda-dettagli").isVisible()), "scheda (mockup A): Info, Recensioni e In breve dietro 'Orari, contatti, recensioni ›'");
 ok((await page.getByText("Ha una vera terrazza.").count()) >= 1 && (await page.getByText("tramonto", { exact: true }).count()) >= 1, "scheda B: il perché e i tag usciti dalla card sono nella scheda (nessuna informazione persa)");
-{ const k = ((await page.getByTestId("scheda-categoria").textContent()) ?? "").split("·").map((t) => t.trim());
+{ // La fascia € di Google arriva dopo la risposta del locale (niente lampo accanto al prezzo del titolare): si aspetta.
+  await page.getByTestId("scheda-categoria").filter({ hasText: "€" }).waitFor({ timeout: 5000 }).catch(() => {});
+  const k = ((await page.getByTestId("scheda-categoria").textContent()) ?? "").split("·").map((t) => t.trim());
   const caps = await page.getByTestId("scheda-categoria").evaluate((el) => getComputedStyle(el).textTransform);
   ok(k.join(" · ") === "Bar · €€ · Roma" && caps === "uppercase", `scheda (mockup A): riga di categoria in maiuscoletto tipo · prezzo · città (${k.join(" · ")})`);
   const parts = ((await page.getByTestId("scheda-fatti").textContent()) ?? "").split("·").map((t) => t.trim());
@@ -7814,7 +7816,7 @@ else {
     await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: true, giorni: [g], at: new Date().toISOString(), prezzo: { min: 25, max: 35, bevande: false } });
     await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z", price_level: 3, prezzo_min: 25, prezzo_max: 35 } });
     await rp.reload({ waitUntil: "networkidle" });
-    await rp.getByTestId("parola-locale").waitFor({ timeout: 5000 }).catch(() => {});
+    await rp.getByTestId("parola-locale").getByTestId("posto-stasera").waitFor({ timeout: 5000 }).catch(() => {});
     { const pl = ((await rp.getByTestId("posto-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
       const main = ((await rp.locator("main").textContent().catch(() => "")) ?? "");
       ok(conGoogle && pl.includes("💶 25–35 € a testa, bevande escluse") && pl.includes("Stasera c'è posto") && (pl.match(/dice il locale/g) ?? []).length === 1 && !main.includes("€€€"), `pagina del locale: prezzo del titolare e 'c'è posto' in un riquadro, senza la fascia € di Google (che senza prezzo c'è: ${conGoogle}) (${pl})`); }

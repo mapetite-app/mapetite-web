@@ -138,7 +138,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
             Verificato dal titolare
           </p>
         )}
-        {place.verified_at && <PostoLocale venueId={place.id} />}
+        {place.verified_at && <PostoLocale venueId={place.id} prezzo={place.prezzo_min != null ? { min: place.prezzo_min, max: place.prezzo_max, bevande: place.prezzo_bevande } : null} />}
       </div>
 
       {/* Passaparola: quanti amici (persone che segui) ci sono stati o vogliono provarlo. */}

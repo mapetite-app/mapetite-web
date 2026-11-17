@@ -22,6 +22,7 @@ export type PublicPlace = {
   // Prezzo a testa detto dal titolare (migrazione 20261117_prezzo_medio.sql, PROPOSTE.md 65): con questo, niente € di Google.
   prezzo_min?: number | null;
   prezzo_max?: number | null;
+  prezzo_bevande?: boolean | null;
 };
 
 export type PublicSynthesis = {
@@ -75,7 +76,7 @@ export const loadPublicPlace = cache(async (id: string): Promise<PublicPlaceData
 
   const supabase = await createClient();
   const read = (cols: string) => supabase.from("places").select(cols).eq("id", id).maybeSingle<PublicPlace>();
-  let { data: place, error } = await read(noVerifiedColumn ? PLACE_COLUMNS : noPrezzoColumns ? `${PLACE_COLUMNS}, verified_at` : `${PLACE_COLUMNS}, verified_at, prezzo_min, prezzo_max`);
+  let { data: place, error } = await read(noVerifiedColumn ? PLACE_COLUMNS : noPrezzoColumns ? `${PLACE_COLUMNS}, verified_at` : `${PLACE_COLUMNS}, verified_at, prezzo_min, prezzo_max, prezzo_bevande`);
   // 42703 = colonna inesistente: prima si rinuncia al prezzo del titolare (20261117_prezzo_medio.sql), poi a verified_at (20261015_ristoratori.sql).
   if (error?.code === "42703" && !noVerifiedColumn && !noPrezzoColumns) {
     noPrezzoColumns = true;
