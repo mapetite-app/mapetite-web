@@ -1796,7 +1796,7 @@ await shot("15-scheda-b");
     await page.getByTestId("aperto-da-poco").waitFor({ timeout: 5000 }).catch(() => {});
     ok(((await page.getByTestId("aperto-da-poco").textContent().catch(() => "")) ?? "").includes("Aperto da 3 mesi"), "scheda: locale verificato aperto da 3 mesi → '🆕 Aperto da 3 mesi' tra i segnali");
     // "Fascia di prezzo confermata dal locale" (PROPOSTE.md 65): parola del titolare verificato, separata dai € di Google.
-    { const t = ((await page.getByTestId("prezzo-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
+    { const t = ((await page.getByTestId("parola-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
       ok(t.includes("💶") && t.includes("25–35 € a testa") && t.includes("dice il locale") && !t.includes("incluse") && !!(await page.getByTestId("segnali-scheda").getByTestId("prezzo-locale").count()), `scheda: locale verificato con prezzo → '💶 25–35 € a testa · dice il locale' tra i segnali (${t})`); }
     ok((await page.getByTestId("posto-stasera").count()) === 0 && await page.locator("h2", { hasText: "Trattoria Senza Voto" }).getByTestId("verificato-scheda").isVisible(), "scheda: verificato senza serate → spunta, nessuna pillola 'c'è posto'");
     await page.getByTestId("scheda-tab-info").click();
@@ -8011,7 +8011,7 @@ else {
       const ant = ((await pm.getByTestId("prezzo-anteprima").textContent()) ?? "").replace(/\s+/g, " ");
       const alto = await pm.getByTestId("prezzo-da").evaluate((el) => el.getBoundingClientRect().height);
       await pm.getByTestId("prezzo-salva").click();
-      ok(/non compare niente/.test(vuota) && ant.includes("Nella tua scheda: 💶 25–35 € a testa ·") && !ant.includes("bevande") && alto >= 44 && await pm.getByText("Fatto (esempio: non si salva)").isVisible(), `pannello demo: prezzo a testa 25–35 €, anteprima della pillola, campi da 44px e salvataggio finto (${ant} / ${Math.round(alto)}px)`); }
+      ok(/non compare niente/.test(vuota) && ant.includes("Nella tua scheda: 💶 25–35 € a testa, bevande escluse · dice il locale") && alto >= 44 && await pm.getByText("Fatto (esempio: non si salva)").isVisible(), `pannello demo: prezzo a testa 25–35 €, anteprima della pillola, campi da 44px e salvataggio finto (${ant} / ${Math.round(alto)}px)`); }
     await rp.getByRole("tab", { name: "Panoramica" }).click();
     const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello demo: niente scorrimento orizzontale (${w}px)`); }
   await rp.screenshot({ path: `${OUT}/75-pannello-demo.png`, caret: "initial" });
