@@ -6174,7 +6174,8 @@ else {
   const iso = (minAgo) => new Date(Date.now() - minAgo * 60_000).toISOString();
   const U = "00000000-0000-0000-0000-00000000000b";
   await setFake([
-    { created_at: iso(3 * 1440), type: "sessione_inizio", user_id: U, anon_id: null, session_id: "s0", props: { prima_volta: 1 } },
+    // 3 giorni e 2 ore fa: dopo mezzanotte gli eventi "30 minuti fa" cadono nel giorno prima e il ritorno a 3 giorni diventava a 2 (giro del 18/11 alle 00:10).
+    { created_at: iso(3 * 1440 + 120), type: "sessione_inizio", user_id: U, anon_id: null, session_id: "s0", props: { prima_volta: 1 } },
     { created_at: iso(30), type: "sessione_inizio", user_id: U, anon_id: null, session_id: "s1", props: { giorni: 3 } },
     { created_at: iso(29), type: "pagina", user_id: U, anon_id: null, session_id: "s1", props: { pagina: "mappa" } },
     { created_at: iso(28), type: "ricerca", user_id: U, anon_id: null, session_id: "s1", props: { modo: "ai", tipo: "bar", zona: "Trastevere", requisiti: ["rooftop"], risultati: 9 } },
