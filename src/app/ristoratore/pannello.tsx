@@ -607,7 +607,7 @@ export default function Pannello({
         <ApertoDal placeId={locale.id} iniziale={demo ? null : serate.apertoDal ?? null} verificato={verificato} demo={demo} />
       </Sezione>
       {/* "Fascia di prezzo confermata dal locale" (PROPOSTE.md, proposta 65): la cifra vera, non i € di Google. */}
-      <Sezione titolo="Prezzo a testa" nota="Quanto si spende a persona. Compare sulla tua scheda (un solo campo = prezzo fisso)." piano="Verified" testId="pannello-prezzo">
+      <Sezione titolo="Prezzo a testa" nota="Quanto si spende a persona. Compare sulla tua scheda. Se il prezzo è fisso, riempi un campo solo." piano="Verified" testId="pannello-prezzo">
         <PrezzoMedio placeId={locale.id} iniziale={demo ? null : serate.prezzo ?? null} verificato={verificato} demo={demo} />
       </Sezione>
       {evidenza}

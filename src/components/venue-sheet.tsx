@@ -968,7 +968,7 @@ export default function VenueSheet({
             <PrezzoLocale info={infoLocale} />
             {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1).
                 Subito dopo il prezzo: le due frasi del titolare vicine, un solo "· dice il locale" (revisore 17/11). */}
-            <PostoPillola info={infoLocale} />
+            <PostoPillola info={infoLocale} conPrezzo />
             {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
             <BuoniPastoRiga venueId={venue.id} category={category} />
             {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3), con quanto ha speso a testa

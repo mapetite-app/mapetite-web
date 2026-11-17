@@ -21,12 +21,12 @@ export function pulisciPrezzo(min: unknown, max: unknown, bevande: unknown): Pre
 }
 
 /** "25–35 € a testa, bevande escluse" (o "30 € a testa, bevande incluse"), o null.
- *  Con breve (pillola della scheda e anteprima del pannello): "25–35 € a testa", più " · bevande incl." solo se lo sono. */
+ *  Con breve (pillola della scheda e anteprima del pannello): "25–35 € a testa", più ", bevande incluse" solo se lo sono (niente abbreviazioni, revisore 3). */
 export function frasePrezzo(p: { min?: unknown; max?: unknown; bevande?: unknown } | null | undefined, breve = false): string | null {
   const v = p ? pulisciPrezzo(p.min, p.max, p.bevande) : null;
   if (!v) return null;
   const base = `${v.min === v.max ? v.min : `${v.min}–${v.max}`} € a testa`;
   // Pillola corta (revisore 17/11: quella lunga occupava una riga da sola), ma le bevande incluse si vedono (revisore 2).
-  if (breve) return v.bevande ? `${base} · bevande incl.` : base;
+  if (breve) return v.bevande ? `${base}, bevande incluse` : base;
   return `${base}, bevande ${v.bevande ? "incluse" : "escluse"}`;
 }

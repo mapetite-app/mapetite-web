@@ -67,6 +67,8 @@ export async function POST(request: Request) {
   const conPrezzo = body != null && typeof body === "object" && "prezzo" in body;
   // prezzo: { min, max, bevande } valido (euro interi 1..500, min ≤ max) oppure null per toglierlo.
   const prezzo = conPrezzo ? pulisciPrezzo(body.prezzo?.min, body.prezzo?.max, body.prezzo?.bevande) : null;
+  // Revisore 3 (17/11): "bevande" deve essere proprio sì/no (una stringa "true" non diventa "escluse" in silenzio).
+  if (conPrezzo && body.prezzo != null && body.prezzo?.bevande !== undefined && typeof body.prezzo?.bevande !== "boolean") return NextResponse.json({ error: "Bevande incluse: sì o no." }, { status: 400 });
   if (conPrezzo && body.prezzo != null && !prezzo) return NextResponse.json({ error: "Scrivi due cifre in euro tra 1 e 500, la prima non più alta della seconda." }, { status: 400 });
   // omaggio: { testo, soglia } valido oppure null per spegnerlo; un testo non valido (vuoto, denaro) è un errore.
   const omaggio = conOmaggio ? pulisciOmaggio(body.omaggio?.testo, body.omaggio?.soglia) : null;
