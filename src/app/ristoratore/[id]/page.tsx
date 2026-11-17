@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { puoGestireLocale } from "@/lib/ristoratore-accesso";
 import { cityFromAddress } from "@/lib/city";
-import { computeRistoratore, STATO_VISITATO, type RistEvento, type RistLocale, type RistSalvataggio } from "@/lib/ristoratore";
+import { computeRistoratore, passaparolaDa, STATO_VISITATO, type RistEvento, type RistLocale, type RistSalvataggio } from "@/lib/ristoratore";
 import { pulisciGiorni } from "@/lib/serate";
 import { pulisciApertoDal } from "@/lib/aperto-dal";
 import { pulisciPrezzo, type Prezzo } from "@/lib/prezzo-locale";
@@ -29,6 +29,8 @@ const MAX_ROWS = 50_000;
 
 type Serate = { giorni: number[]; at: string | null; apertoDal: string | null; prezzo?: Prezzo | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
 type Prenotazioni = { tavoli: number; diParola: number; persone: number; personeParola: number };
+// Riga di saved_places letta col lucchetto del posto (solo_per_me, 20261115f): la pagina ne ricava "privato".
+type RigaLucchetto = RistSalvataggio & { solo_per_me?: boolean | null };
 type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null; serate: Serate; prenotazioni: Prenotazioni | null; passaparola?: number };
 
 // Tavoli chiesti da Mapetite nel periodo (dalla data della richiesta, come gli altri numeri).
@@ -106,11 +108,18 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
   }
 
   // Salvataggi veri (anche quelli fatti prima che esistesse il segnale "salva").
-  const salvati: RistSalvataggio[] = [];
+  // "solo_per_me" (20261115f): senza la colonna si rilegge senza (nessun posto ha il lucchetto).
+  const salvatiGrezzi: RigaLucchetto[] = [];
   const ids = simili.map((p) => p.id);
+  let colsSalvati = "place_id,user_id,created_at,tags,solo_per_me";
   for (let i = 0; i < ids.length; i += 200) {
-    const { data } = await db.from("saved_places").select("place_id,user_id,created_at,tags").in("place_id", ids.slice(i, i + 200)).gte("created_at", since);
-    salvati.push(...((data ?? []) as RistSalvataggio[]));
+    let { data, error: sErr } = await db.from("saved_places").select(colsSalvati).in("place_id", ids.slice(i, i + 200)).gte("created_at", since).returns<RigaLucchetto[]>();
+    if (sErr?.code === "42703" && colsSalvati.includes("solo_per_me")) {
+      colsSalvati = "place_id,user_id,created_at,tags";
+      ({ data, error: sErr } = await db.from("saved_places").select(colsSalvati).in("place_id", ids.slice(i, i + 200)).gte("created_at", since).returns<RigaLucchetto[]>());
+    }
+    if (sErr) console.error("[ristoratore] lettura salvataggi dei locali simili:", sErr.message);
+    salvatiGrezzi.push(...(data ?? []));
   }
   // Tutti i salvataggi del locale, anche vecchi (non solo del periodo): chi lo vuole ancora provare.
   // "visite" (posti fissi, 20261020b_visite.sql): senza la colonna si rilegge senza.
@@ -123,10 +132,12 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
   // Revisore 16/11: "Ti vogliono provare" non conta le righe col lucchetto, come le viste pubbliche: "Solo per me"
   // sul posto o il posto in una raccolta col lucchetto (profiles.raccolte_private, 20261116). Se l'elenco delle
   // raccolte private non si legge (errore diverso da colonna mancante), nel dubbio la riga è privata.
-  const righe = (tutti ?? []) as (RistSalvataggio & { solo_per_me?: boolean | null })[];
+  // Decisione del team 17/11: il lucchetto vale per TUTTI i numeri del pannello, anche quelli del periodo e del
+  // confronto con i locali simili (salvati), non solo "Ti vogliono provare".
+  const righe = (tutti ?? []) as RigaLucchetto[];
   const privateDi = new Map<string, string[]>();
   let privateIgnote = false;
-  const utenti = [...new Set(righe.map((r) => r.user_id))];
+  const utenti = [...new Set([...righe, ...salvatiGrezzi].map((r) => r.user_id))];
   for (let i = 0; i < utenti.length && !privateIgnote; i += 200) {
     const { data: pr, error: prErr } = await db.from("profiles").select("id, raccolte_private").in("id", utenti.slice(i, i + 200));
     if (prErr) {
@@ -137,10 +148,12 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
     }
     for (const p of (pr ?? []) as { id: string; raccolte_private: string[] | null }[]) privateDi.set(p.id, p.raccolte_private ?? []);
   }
-  const attesa: RistSalvataggio[] = righe.map(({ solo_per_me, ...r }) => ({
+  const segna = ({ solo_per_me, ...r }: RigaLucchetto): RistSalvataggio => ({
     ...r,
     privato: privateIgnote || solo_per_me === true || (r.tags ?? []).some((t) => (privateDi.get(r.user_id) ?? []).includes(t)),
-  }));
+  });
+  const attesa = righe.map(segna);
+  const salvati = salvatiGrezzi.map(segna);
   // Serate tranquille (migrazione 20261018_serate_tranquille.sql): senza colonne, nessun giorno.
   // "Aperto da poco" (20261020_aperto_dal.sql): senza la colonna si rilegge senza.
   // "Omaggio a chi torna" (20261030b_omaggio.sql): senza colonne, si rilegge senza.
@@ -173,10 +186,12 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
     } else if (!pErr) prenotazioni = { tavoli: 0, diParola: 0, persone: 0, personeParola: 0 };
   }
   // Proposta 58: tra chi ti vuole provare (salvato, non ancora visitato), quanti su consiglio di un amico.
-  // Si conta e basta: il nome non esce dal database.
-  const { count: passaparola, error: ppErr } = await db.from("saved_places").select("place_id", { count: "exact", head: true }).eq("place_id", id).not("consigliato_da", "is", null).not("tags", "cs", `{"${STATO_VISITATO}"}`);
+  // Si conta e basta: il nome non esce dal database. Decisione del team 17/11: solo le persone che contano anche in
+  // "Ti vogliono provare" (niente lucchetto), così il passaparola non lo supera mai.
+  const { data: consigliati, error: ppErr } = await db.from("saved_places").select("user_id").eq("place_id", id).not("consigliato_da", "is", null).not("tags", "cs", `{"${STATO_VISITATO}"}`).limit(5000);
   if (ppErr && ppErr.code !== "42703") console.error("[ristoratore] conteggio passaparola:", ppErr.message);
-  return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso, serate, prenotazioni, passaparola: ppErr ? 0 : passaparola ?? 0 };
+  const passaparola = ppErr ? 0 : passaparolaDa(attesa, (consigliati ?? []).map((r) => r.user_id as string), id);
+  return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso, serate, prenotazioni, passaparola };
 }
 
 // "Tavoli da Mapetite" (PROPOSTE.md 3, passo 3): bocciata due volte il 31/10 notte, rifatta e approvata
