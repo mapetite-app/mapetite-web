@@ -35,7 +35,14 @@ export default function SalvaLocale({
   // Proposta 58: nome di chi l'ha consigliato, dal link (?da=Giulia), già ripulito dalla pagina.
   consigliatoDa?: string | null;
 }) {
-  const [state, setState] = useState<"idle" | "saving" | "saved" | "already" | "error">("idle");
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "already" | "visitato" | "error">("idle");
+  // Proposta 61: "✓ Ci sono stato" dalla sezione recensioni salva il posto come visitato: la barra lo dice
+  // (revisore 16/11: restava "Salva in Mapetite" dopo un salvataggio già fatto).
+  useEffect(() => {
+    const su = (e: Event) => { if ((e as CustomEvent<{ placeId?: string }>).detail?.placeId === placeId) setState("visitato"); };
+    window.addEventListener("mapetite:visitato", su);
+    return () => window.removeEventListener("mapetite:visitato", su);
+  }, [placeId]);
   // È la nota di chi salva: può toglierlo o cambiarlo prima di salvare.
   const [da, setDa] = useState<string | null>(consigliatoDa);
   const [daBozza, setDaBozza] = useState<string | null>(null);
@@ -104,7 +111,7 @@ export default function SalvaLocale({
     else setState("saved");
   };
 
-  const done = state === "saved" || state === "already";
+  const done = state === "saved" || state === "already" || state === "visitato";
 
   return (
     <>
@@ -126,7 +133,7 @@ export default function SalvaLocale({
         {done ? (
           <div role="status" data-testid="salvato-pubblico" className="flex flex-col gap-2 rounded-card bg-brand p-3 shadow-float">
             <p className="text-center text-sm font-display font-semibold text-white">
-              {state === "saved" ? "✓ Salvato tra i tuoi “Da provare”" : "✓ È già tra i tuoi salvati"}
+              {state === "saved" ? "✓ Salvato tra i tuoi “Da provare”" : state === "visitato" ? "✓ Tra i posti dove sei stato" : "✓ È già tra i tuoi salvati"}
             </p>
             <Link
               href={`/mappa?salvato=${placeId}`}

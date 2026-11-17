@@ -16,6 +16,24 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 17/11/2026 (martedì, CEO che chiude — tema prezzo vero e app concorrenti)
+
+### 64. "Quanto si spende davvero" (detto da chi c'è stato)
+- **Problema:** `PROBLEMI.md` 27: il prezzo si scopre al conto; il simbolo € di Google non basta.
+- **Cosa fa:** dopo "Ci sono stato", nel foglio "Com'è andata?", una riga facoltativa: "A testa: meno di 15 · 15–30 · 30–50 · oltre 50 €". Dalla terza risposta la scheda mostra "Chi c'è stato: 15–30 € a testa" (la fascia più scelta, mai i singoli).
+- **Da dove nasce:** Google dà solo €–€€€€; Mapstr, Corner e Beli non lo chiedono. Lo leghiamo alla visita vera (proposta 61), quindi vale di più.
+- **Valore per l'utente:** sa prima quanto spende, sceglie senza sorprese. **Per il ristoratore:** sa come viene percepito il suo prezzo nella zona (dato del pannello).
+- **Sforzo:** S/M (una colonna sulla visita, una vista aggregata da 3 in su, una riga nel foglio e nella scheda). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA (dopo la 61).
+
+### 65. "Fascia di prezzo confermata dal locale"
+- **Problema:** `PROBLEMI.md` 27, lato ristoratore: recensioni "caro" per un prezzo che il cliente non conosceva.
+- **Cosa fa:** nel pannello del ristoratore un campo "Prezzo medio a testa" (con o senza bevande); sulla scheda "Il locale dice: 25–35 €, bevande escluse", accanto a quello di chi c'è stato (64), mai mescolati.
+- **Da dove nasce:** TheFork mostra il prezzo medio dichiarato dal locale; nessuna app di salvataggio lo affianca a quello vissuto dai clienti.
+- **Valore per l'utente:** due numeri onesti invece di un simbolo. **Per il ristoratore:** controllo della propria presenza, uno dei motivi per cui pagherebbe (`VISIONE.md`).
+- **Sforzo:** S (campo nel pannello già esistente, una riga nella scheda). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
 ## 16/11/2026 (lunedì, CEO che chiude — tema recensioni vere e prenotazioni)
 
 ### 61. "C'è stato davvero": recensione solo da chi ha segnato la visita, entro 30 giorni
@@ -24,7 +42,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google e TripAdvisor accettano recensioni senza prova; Beli e Corner non lo dicono. Noi abbiamo già il gesto "Ci sono stato": basta legarlo alla recensione.
 - **Valore per l'utente:** stelle di cui fidarsi. **Per il ristoratore:** "su Mapetite ti giudica solo chi è venuto": è un argomento di vendita del pannello.
 - **Sforzo:** M (vincolo nel database con una funzione di controllo, data della visita già salvata, testi della scheda e della privacy; le recensioni vecchie senza visita restano ma senza la riga "C'è stato"). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA. **16/11 notte: costruita, bocciata due volte sull'interfaccia (7 e 7,5, sicurezza OK), non unita; commit `7ff18844`.**
+- **Stato proposto:** PRONTA. **16/11 notte: costruita, bocciata due volte sull'interfaccia (7 e 7,5, sicurezza OK), non unita; commit `7ff18844`.** **16/11 sera: rifatta (un solo "Ci sono stato" per schermata), di nuovo bocciata due volte (7,5 e 7,5), corretta sul branch `claude/busy-mendel-19zrny`, non unita.**
 
 ### 62. "Nessun tetto": tutti i tuoi posti, gratis, detto dove conta
 - **Problema:** il problema dei 500 cuoricini (richiesta di Lorenzo dell'8/11); Mapstr fa pagare oltre 300 posti salvati ([App Store](https://apps.apple.com/ca/app/id917288465)).
@@ -32,7 +50,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Mapstr Plus oltre 300 posti; Albo con la prova a tempo. Noi senza tetto.
 - **Valore per l'utente:** porta tutto in un colpo, senza paura di un muro a pagamento. **Per il ristoratore:** più salvati = più dati aggregati.
 - **Sforzo:** S (un testo, il numero dei posti trovati già c'è). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA. (Il "Com'era?" il giorno dopo il tavolo, pensato all'inizio come 62, c'è già in `booking-reminder.tsx`: tolto come doppione.)
+- **Stato:** FATTA il 16/11 sera, in produzione (PR #154, revisore 8,5). (Il "Com'era?" il giorno dopo il tavolo, pensato all'inizio come 62, c'è già in `booking-reminder.tsx`: tolto come doppione.)
 
 ### 63. Prenota dentro Mapetite con una piattaforma partner (come Resy in Beli)
 - **Problema:** richiesta di Lorenzo dell'8/11 (prenotare dall'app); Resy l'ha fatto con Beli ([Resy](https://blog.resy.com/newsroom/resy-launches-reservations-in-beli/)).

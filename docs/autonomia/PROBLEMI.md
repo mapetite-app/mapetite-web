@@ -263,3 +263,10 @@ Ultimo aggiornamento: 15/11/2026.
 - **DAVVERO, in futuro:** la recensione Mapetite si scrive solo da "Ci sono stato", con la data della visita, ed entro 30 giorni ("C'è stato a novembre"); il ristoratore vede nel pannello che ogni giudizio viene da una visita segnata (proposta 61). Più avanti, con i locali partner, la prova vera (QR sul tavolo o codice nella conferma della prenotazione).
 - **Primo passo:** contare nel database quante recensioni community oggi non hanno un "Ci sono stato" sullo stesso posto (team, sola lettura).
 
+## 27. "Quanto spendo davvero?": il prezzo si scopre al conto — 17/11
+- **Chi lo ha:** il cliente (scontrino più alto del previsto, coperto e "extra" non detti) e il ristoratore (recensioni arrabbiate "caro" che pesano più del cibo).
+- **Quanto pesa:** i prezzi vanno esposti in sala (TULPS), ma online il dato è solo il simbolo € di Google; le associazioni dei consumatori contestano i menu solo col QR ([Il Fatto Alimentare](https://ilfattoalimentare.it/menu-qr-code-ristoranti-legale-elenco-piatti-deve-essere-accessibile.html)); consigli per "evitare scontrini esagerati" sono un genere a sé ([Trend Online](https://www.trend-online.com/risparmio/come-evitare-scontrini-esagerati-al-ristorante/)). Fipe ha un rapporto 2026 sui prezzi dei pubblici esercizi ([Gazzetta del Gusto](https://www.gazzettadelgusto.it/?p=98960), letto solo dall'estratto). Quante persone si lamentano del conto: dato non trovato.
+- **OGGI nell'app:** si vede solo la fascia di prezzo di Google (€–€€€€), spesso assente o vaga.
+- **DAVVERO, in futuro:** chi ha segnato "Ci sono stato" dice in un tocco quanto ha speso a testa; dalla terza risposta la scheda mostra "Chi c'è stato: 25–35 € a testa" (proposta 64); il ristoratore può confermare la sua fascia dal pannello (proposta 65).
+- **Primo passo:** proposta 64 (zero chiamate Google).
+

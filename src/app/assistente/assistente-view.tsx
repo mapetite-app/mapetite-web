@@ -552,8 +552,11 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
   const [input, setInput] = useState("");
   // Salvati (Place ID Google): "Salvato" sulle card dei locali già nella mappa della persona.
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set());
+  // Proposta 61 (revisore 16/11 sera): codice Google → id nel database dopo il salvataggio, così la sezione
+  // recensioni della scheda si rilegge e apre il modulo (prima diceva "Salva il locale" anche dopo il salvataggio).
+  const [uuidDi, setUuidDi] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<Record<string, SaveState>>({});
-  const [savedToast, setSavedToast] = useState<{ name: string; uuid: string } | null>(null);
+  const [savedToast, setSavedToast] = useState<{ name: string; uuid: string; visitato?: boolean } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!userId) return;
@@ -592,9 +595,10 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
     try {
       const { uuid, already } = await quickSavePlace(userId, p, [tag]);
       setSavedIds((prev) => new Set(prev).add(p.id));
+      setUuidDi((m) => ({ ...m, [p.id]: uuid }));
       setSaving((s) => { const next = { ...s }; delete next[p.id]; return next; });
       if (!already) track("salva", { id: uuid, lat: p.lat, lng: p.lng }, { fonte: "assistente", stato: tag });
-      setSavedToast({ name: p.name, uuid });
+      setSavedToast({ name: p.name, uuid, visitato: tag === "Già visitato" });
       if (toastTimer.current) clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setSavedToast(null), 5000);
     } catch {
@@ -893,11 +897,16 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
         <div
           role="status"
           data-testid="assistente-salvato-avviso"
-          className="fixed inset-x-3 bottom-[calc(var(--nav-height-mobile)+var(--nav-sporgenza)+4.25rem)] z-40 mx-auto flex max-w-lg items-center gap-3 rounded-card bg-brand px-4 py-3 text-white shadow-float"
+          className="fixed inset-x-3 bottom-[calc(var(--nav-height-mobile)+var(--nav-sporgenza)+4.25rem)] z-[70] mx-auto flex max-w-lg items-center gap-3 rounded-card bg-brand px-4 py-3 text-white shadow-float"
         >
           <BookmarkCheck size={18} aria-hidden className="shrink-0 text-accent" />
           <p className="min-w-0 flex-1 text-sm font-sans leading-snug">
-            <span className="font-display font-semibold">Salvato</span> tra i tuoi “Da provare”
+            {savedToast.visitato ? (
+              // Proposta 61 (revisore 16/11 sera): dopo "Ci sono stato" l'avviso non dice più "Da provare".
+              <><span className="font-display font-semibold">✓ Segnato</span> tra i posti dove sei stato</>
+            ) : (
+              <><span className="font-display font-semibold">Salvato</span> tra i tuoi “Da provare”</>
+            )}
           </p>
           <Link href={`/mappa?salvato=${savedToast.uuid}`} className="shrink-0 text-sm font-display font-semibold text-accent">
             Sulla mappa
@@ -945,7 +954,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
               onEdit={() => {}}
               onClose={() => setOpenCard(null)}
               saveSlot={null}
-              communitySlot={<CommunityLocale id={openCard.id} userId={userId} contesto="assistente" />}
+              communitySlot={<CommunityLocale id={uuidDi[openCard.id] ?? openCard.id} userId={userId} contesto="assistente" />}
               origin={c.pos}
               userPos={c.pos}
               googlePlaceId={openCard.id}

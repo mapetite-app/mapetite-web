@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { Play, Plus } from "lucide-react";
 import Avatar from "@/components/avatar";
 import { personName, profilePath } from "@/lib/handle";
-import { trackFeature } from "@/lib/track";
-import { COMMENT_MAX, addReel, saveReview } from "@/lib/community-write";
+import { track, trackFeature } from "@/lib/track";
+import { COMMENT_MAX, addReel, saveReview, segnaCiSonoStato } from "@/lib/community-write";
 import { reelSourceOf, seenOn, type ReelSource } from "@/lib/reel";
 import type { Community, CommunityReel, CommunityReview } from "@/lib/community";
 import type { Voto } from "@/lib/diario";
 import type { FotoUtente } from "@/lib/foto-utenti";
 import { FotoCommunityStrip, FotoMieEditor } from "@/components/foto-utenti";
+import { SchedaVisitaContext } from "@/components/scheda-visita";
 
 // "Dalla community Mapetite" (piani 5.6c e 5.6d) nella scheda della mappa e nella pagina pubblica
 // del locale: la tua recensione (stelle + due righe), quelle degli altri (prima chi segui) e i reel
@@ -61,6 +62,12 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
   );
 }
 
+// "2026-11-01" → "novembre" (anno solo se non è quello in corso): solo il mese, il giorno della visita non si mostra mai.
+const meseVisita = (iso: string) => {
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
+  return d.toLocaleDateString("it-IT", d.getFullYear() === new Date().getFullYear() ? { month: "long" } : { month: "long", year: "numeric" });
+};
+
 function ReviewRow({ r }: { r: CommunityReview }) {
   return (
     <li data-testid="recensione-community" className="flex gap-3 py-2.5">
@@ -76,7 +83,14 @@ function ReviewRow({ r }: { r: CommunityReview }) {
         </p>
         <p className="mt-0.5 flex items-center gap-2">
           <Stars value={r.rating} />
-          <span className="text-xs font-sans text-text-muted">{shortDate(r.created_at)}</span>
+          {r.visita ? (
+            <span data-testid="recensione-visita" className="text-xs font-sans text-text-muted">
+              <span className="font-display font-semibold text-success">✓ Visitato</span>
+              {r.visita.mese ? ` a ${meseVisita(r.visita.mese)}` : ""}
+            </span>
+          ) : (
+            <span className="text-xs font-sans text-text-muted">{shortDate(r.created_at)}</span>
+          )}
         </p>
         {r.comment && <p className="mt-1 break-words font-sans text-sm leading-relaxed text-text">{r.comment}</p>}
       </div>
@@ -139,6 +153,10 @@ function reelTitle(reels: CommunityReel[]): string {
 
 export default function CommunityLocale({ id, contesto, loginHref = "/login", voto = null, userId }: Props & { userId: string | null }) {
   const [data, setData] = useState<{ id: string; c: Community } | null>(null);
+  const scheda = useContext(SchedaVisitaContext);
+  // Proposta 61: "Ci sono stato" segnato da qui (pagina del locale, assistente); errore del database "serve la visita".
+  const [segnato, setSegnato] = useState<"no" | "attendo" | "ok" | "errore">("no");
+  const [serveVisita, setServeVisita] = useState(false);
   const [editing, setEditing] = useState(false);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -177,15 +195,25 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
   const avg = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : null;
   const others = showAll ? c.recensioni : c.recensioni.slice(0, 3);
   const canWrite = userId != null && c.placeId != null;
-  const formOpen = canWrite && (editing || !mine);
+  // Proposta 61: stelle e commento solo da chi ha segnato "Ci sono stato" (il voto 👍/👎 arriva solo dopo la visita).
+  // Dalla mappa vale il tasto della scheda (dato vivo); altrove il server, il voto 👍/👎 o il tasto qui sotto.
+  // Se il database ha risposto "serve la visita" (dato vecchio sul telefono), si torna alla riga con il tasto.
+  const visitato = !serveVisita && ((scheda?.visitato ?? null) ?? (c.possoRecensire || voto != null || segnato === "ok"));
+  const formOpen = canWrite && visitato && (editing || !mine);
+  // Riga "Qui recensisce solo chi c'è stato" con il suo tasto: anche per un posto non ancora nel database
+  // quando la scheda sa segnarlo (revisore 16/11 sera: "Salva il locale" spingeva a un salvataggio che non basta).
+  const rigaVisita = userId != null && !visitato && (c.placeId != null || scheda?.segna != null || scheda?.vai != null);
 
   const publish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canWrite) return;
     if (rating === 0) { setStatus("error"); return; }
     setStatus("saving");
-    const ok = await saveReview(userId!, c.placeId!, rating, comment);
-    if (!ok) { setStatus("error"); return; }
+    const esito = await saveReview(userId!, c.placeId!, rating, comment);
+    setServeVisita(esito === "serve-visita");
+    // Il database dice che la visita non c'è (revisore 16/11 sera): via la conferma, torna la riga col tasto.
+    if (esito === "serve-visita") setSegnato("no");
+    if (esito !== "ok") { setStatus("error"); return; }
     trackFeature("recensione_community", { stato: mine ? "modifica" : "nuova", voto: rating, contesto, fonte: comment.trim() ? "con_commento" : "solo_stelle" });
     setData({ id, c: { ...c, mia: { rating, comment: comment.trim().slice(0, COMMENT_MAX) || null } } });
     setEditing(false);
@@ -232,14 +260,23 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
         <div data-testid="mia-recensione" className="mt-3 rounded-card border-2 border-accent/30 bg-surface p-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">La tua recensione</p>
-            <button type="button" onClick={() => { setEditing(true); setStatus("idle"); }} className="min-h-10 px-1 text-sm font-display font-semibold text-brand">
-              Modifica
-            </button>
+            {visitato && (
+              <button type="button" onClick={() => { setEditing(true); setStatus("idle"); }} className="min-h-11 px-1 text-sm font-display font-semibold text-brand">
+                Modifica
+              </button>
+            )}
           </div>
           <Stars value={mine.rating} size="text-base" />
           {mine.comment && <p className="mt-1 break-words font-sans text-sm text-text">{mine.comment}</p>}
           {status === "done" && <p className="mt-1 text-xs font-sans text-success">Pubblicata ✓</p>}
         </div>
+      )}
+      {/* Sulla pagina del locale lo dice già la barra in basso (revisore 16/11 sera: due conferme uguali).
+          Sopra il modulo, così si legge prima delle stelle (revisore 16/11 sera, minore). */}
+      {canWrite && segnato === "ok" && !serveVisita && contesto !== "locale" && (
+        <p role="status" data-testid="recensione-visita-segnata" className="mt-3 text-sm font-display font-semibold text-success">
+          ✓ Tra i posti dove sei stato. Com&apos;era?
+        </p>
       )}
       {formOpen && (
         <form data-testid="recensione-form" onSubmit={publish} className="mt-3 rounded-card border border-border bg-surface p-3">
@@ -264,7 +301,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
             <span className="shrink-0 text-[11px] font-sans text-text-muted">{comment.length}/{COMMENT_MAX}</span>
           </div>
           {status === "error" && (
-            <p className="mt-1 text-xs font-sans text-error">{rating === 0 ? "Scegli da 1 a 5 stelle." : "Non sono riuscito a pubblicarla. Riprova."}</p>
+            <p className="mt-1 text-xs font-sans text-error">{rating === 0 ? "Scegli da 1 a 5 stelle." : serveVisita ? "Prima segna “Ci sono stato”: qui recensisce solo chi c'è stato." : "Non sono riuscito a pubblicarla. Riprova."}</p>
           )}
           <div className="mt-2 flex gap-2">
             <button
@@ -287,8 +324,55 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
           <Link href={loginHref} className="font-display font-semibold text-brand underline underline-offset-2">Accedi</Link>{" "}per dire com&apos;era.
         </p>
       )}
-      {userId != null && c.placeId == null && (
-        <p className="mt-2 text-sm font-sans text-text-muted">Salva il locale per lasciare la tua recensione.</p>
+      {rigaVisita && (
+        <div data-testid="recensione-serve-visita" className="mt-3 rounded-card border border-border bg-surface p-3">
+          <p className="text-sm font-sans text-text">
+            {serveVisita
+              ? "La visita non risulta ancora: segnala di nuovo qui sotto."
+              : mine ? "Per modificarla, segna prima che ci sei stato." : "Qui recensisce solo chi c'è stato."}
+          </p>
+          {scheda?.vai ? (
+            // Il tasto della scheda è in vista: niente secondo "Ci sono stato", si porta a quello.
+            <button
+              type="button"
+              data-testid="recensione-vai-visita"
+              onClick={scheda.vai}
+              className="mt-1 inline-flex min-h-11 items-center text-sm font-display font-semibold text-brand underline underline-offset-2"
+            >
+              Segnalo qui sopra ↑
+            </button>
+          ) : (scheda?.segna || c.placeId != null) && (
+            <button
+              type="button"
+              data-testid="recensione-ci-sono-stato"
+              disabled={segnato === "attendo"}
+              onClick={async () => {
+                if (scheda?.segna) {
+                  // Lo stesso "Ci sono stato" della scheda (salva il posto come visitato, stesso evento e foglio).
+                  scheda.segna();
+                  setServeVisita(false);
+                  return;
+                }
+                setSegnato("attendo");
+                const ok = await segnaCiSonoStato(userId!, c.placeId!);
+                setSegnato(ok ? "ok" : "errore");
+                if (!ok) return;
+                setServeVisita(false);
+                setStatus("idle");
+                track("ci_sono_stato", { id: c.placeId! }, { fonte: "recensioni", contesto });
+                // La barra "Salva in Mapetite" della pagina del locale si aggiorna (salva-locale.tsx).
+                window.dispatchEvent(new CustomEvent("mapetite:visitato", { detail: { placeId: c.placeId } }));
+              }}
+              className="mt-2 inline-flex min-h-11 items-center rounded-pill border border-brand bg-white px-5 text-sm font-display font-semibold text-brand active:scale-95 disabled:opacity-60"
+            >
+              {segnato === "attendo" ? "Segno…" : "✓ Ci sono stato"}
+            </button>
+          )}
+          {segnato === "errore" && <p role="alert" className="mt-1 text-xs font-sans text-error">Non sono riuscito a segnarlo. Riprova.</p>}
+        </div>
+      )}
+      {userId != null && c.placeId == null && !rigaVisita && (
+        <p className="mt-2 text-sm font-sans text-text-muted">Segna «✓ Ci sono stato» per lasciare la tua recensione.</p>
       )}
 
       {/* Le tue foto del locale (5.6c): pubbliche come la recensione, mai mescolate a quelle Google. */}
