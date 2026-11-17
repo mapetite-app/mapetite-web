@@ -965,8 +965,9 @@ export default function VenueSheet({
             <BuoniPastoRiga venueId={venue.id} category={category} />
             {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1). */}
             <PostoPillola info={infoLocale} />
-            {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3). */}
-            <VisiteMapetite venueId={googlePlaceId ?? venue.id} />
+            {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3), con quanto ha speso a testa
+                (PROPOSTE.md 64, da 5 risposte, fascia scelta da almeno 2 senza pareggi) nella stessa pillola. */}
+            <VisiteMapetite venueId={googlePlaceId ?? venue.id} spesaId={venue.id} />
           </div>
 
           {/* IL VERDETTO MAPETITE: in corsivo tra due filetti, come una citazione di rivista.
