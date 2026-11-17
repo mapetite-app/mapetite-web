@@ -5535,6 +5535,22 @@ else {
   await sp.goto(`${BASE}/profilo?singolare=1`, { waitUntil: "networkidle" }); // indirizzo diverso: il "#profilo-pubblico" dopo ricarica davvero
   { const g = ((await sp.getByTestId("guida-contatori").innerText()) ?? "").replace(/\s+/g, " ");
     ok(g.includes("1 salvato") && g.includes("1 provato") && (await sp.getByTestId("vedono-tipo").innerText()).includes("Pizzerie"), `profilo: singolare con un posto, tipo al plurale (${g.trim()})`); }
+  // Revisore 16/11 (lucchetto sulla raccolta, minore 2): "Come ti vedono" conta solo quello che vedono gli amici:
+  // niente "Solo per me", niente posti in una raccolta col lucchetto, niente "Non fa per me". I numeri in testa restano tutti.
+  { const pz = (n, name, category, address) => ({ id: `00000000-0000-4000-8000-00000000079${n}`, name, category, address, lat: 41.9, lng: 12.5 });
+    await soctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", reviews: [], raccoltePrivate: ["Segreti"], saved: [
+      { created_at: "2026-10-01", tags: ["Già visitato"], note: null, places: pz(1, "Pizzeria Sola", "pizza_restaurant", "Via del Moro 12, 00153 Roma RM, Italy") },
+      { created_at: "2026-10-02", tags: ["Già visitato"], note: null, solo_per_me: true, places: pz(2, "Bar Nascosto", "bar", "Corso Como 1, 20154 Milano MI, Italy") },
+      { created_at: "2026-10-03", tags: ["Già visitato", "Segreti"], note: null, places: pz(3, "Bar Segreto", "bar", "Via Tortona 3, 20144 Milano MI, Italy") },
+      { created_at: "2026-10-04", tags: ["Segreti"], note: null, places: pz(4, "Bar Tre", "bar", "Via Torino 5, 20123 Milano MI, Italy") },
+      { created_at: "2026-10-05", tags: ["Già visitato", "Non fa per me"], note: null, places: pz(5, "Bar Brutto", "bar", "Via Po 9, 10124 Torino TO, Italy") },
+    ] })), url: BASE }]);
+    await sp.goto(`${BASE}/profilo?lucchetto=1`, { waitUntil: "networkidle" });
+    const g = ((await sp.getByTestId("guida-contatori").innerText()) ?? "").replace(/\s+/g, " ");
+    const pr = ((await sp.getByTestId("vedono-provati").innerText()) ?? "").replace(/\s+/g, " ");
+    const ci = ((await sp.getByTestId("vedono-citta").innerText()) ?? "").replace(/\s+/g, " ");
+    const ti = ((await sp.getByTestId("vedono-tipo").innerText().catch(() => "")) ?? "");
+    ok(g.includes("4 provati") && /^1\b/.test(pr.trim()) && /^1\b/.test(ci.trim()) && ti.includes("Pizzerie"), `profilo: 'Come ti vedono' senza i posti col lucchetto, sul posto o sulla raccolta (testa: ${g.trim()} · vedono: ${pr} / ${ci} / ${ti.replace(/\s+/g, " ")})`); }
   await soctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
   // Da Amici "Fatti trovare" porta qui: la riga "Profilo pubblico" di "Altro" si apre da sola.
   await sp.goto(`${BASE}/profilo#profilo-pubblico`, { waitUntil: "networkidle" });
@@ -7456,7 +7472,18 @@ else {
         privateDb = b.p_on ? [...new Set([...privateDb, b.p_nome])] : privateDb.filter((x) => x !== b.p_nome);
         return r.fulfill({ json: privateDb });
       });
+      // Minore 4 del revisore (16/11): il nome vecchio esce dall'elenco con UNA funzione (controllo e scrittura insieme).
+      const vuota = [];
+      await p.route("**/rest/v1/rpc/raccolta_privata_se_vuota", (r) => {
+        const b = r.request().postDataJSON(); vuota.push(b.p_nome); rpc.push(`-${b.p_nome}`);
+        privateDb = privateDb.filter((x) => x !== b.p_nome);
+        return r.fulfill({ json: true });
+      });
       await setProfilo(rc, { ...profilo, raccoltePrivate: ["Con amici"] });
+      // Minore 1 del revisore (16/11): il lucchetto anche sulla copertina in "Gestisci le raccolte".
+      await p.goto(`${BASE}/profilo?lucchetto=1#raccolte`, { waitUntil: "networkidle" });
+      { const card = p.getByTestId("raccolta").filter({ hasText: "Con amici" });
+        ok((await card.getByTestId("raccolta-copertina-lucchetto").count()) === 1 && (await card.getByRole("img", { name: "Solo per te" }).count()) === 1, "raccolta col lucchetto: il lucchetto 'Solo per te' sulla copertina in 'Gestisci le raccolte'"); }
       await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
       ok(await p.getByTestId("raccolta-solo-per-te").isVisible() && (await p.getByTestId("raccolta-solo-per-me").count()) === 0, "raccolta col lucchetto: 'Solo per te' nella testata, nessuna scheda in più sulla pagina");
       ok((await p.getByTestId("condividi-raccolta-privata").count()) === 0 && (await p.getByTestId("condividi-raccolta").count()) === 0 && (await p.getByTestId("raccolta-privata").count()) === 0, "raccolta col lucchetto: niente Condividi (il link pubblico sarebbe vuoto)");
@@ -7471,6 +7498,7 @@ else {
       await rs.getByRole("button", { name: "Salva" }).click();
       await p.waitForURL(/\/raccolte\/Segreti/, { timeout: 6000 }).catch(() => {});
       ok(rpc.join() === "+Segreti,-Con amici" && patches.length === 2, `raccolta col lucchetto: rinomina tiene il lucchetto sul nome nuovo (${rpc.join()})`);
+      ok(vuota.join() === "Con amici", `raccolta col lucchetto: il nome vecchio esce solo con raccolta_privata_se_vuota, niente conta e poi scrivi (${vuota.join()})`);
       patches = []; rpc.length = 0; privateDb = ["Con amici"];
       // Elimina: i posti che hanno ADESSO il tag prendono il lucchetto singolo (filtro sul database, non sulla pagina).
       await p.goto(`${BASE}/raccolte/Con%20amici`, { waitUntil: "networkidle" });
@@ -7492,7 +7520,10 @@ else {
       patches = [];
       await p.unroute("**/rest/v1/profiles**");
       await p.unroute("**/rest/v1/rpc/raccolta_privata");
-      await setProfilo(rc, profilo); }
+      await p.unroute("**/rest/v1/rpc/raccolta_privata_se_vuota");
+      await setProfilo(rc, profilo);
+      await p.goto(`${BASE}/profilo?lucchetto=0#raccolte`, { waitUntil: "networkidle" });
+      ok((await p.getByTestId("raccolta").count()) >= 1 && (await p.getByTestId("raccolta-copertina-lucchetto").count()) === 0, "raccolta senza lucchetto: nessun lucchetto sulle copertine"); }
     await p.goto(`${BASE}/raccolte/Non%20esiste`, { waitUntil: "networkidle" });
     ok(await p.getByTestId("raccolta-vuota").isVisible(), "pagina raccolta: nome sconosciuto → 'Raccolta vuota' con il ritorno al profilo");
     // 360px: titolo e azioni senza uscire dallo schermo
@@ -7614,7 +7645,10 @@ else {
     // Domanda latente (18/10): chi ha salvato il locale e non ci è stato, con le occasioni; voti e stati non sono occasioni.
     { const sv = (u, tags, place = L.id) => ({ place_id: place, user_id: u, created_at: at(10), tags });
       const a = rs.inAttesa([sv("u1", ["Da provare", "Romantico"]), sv("u2", ["Romantico", "👍 Mi è piaciuto"]), sv("u3", ["Già visitato", "Romantico"]), sv("u4", ["Da provare"]), sv("u5", ["Romantico"], "altro")], L.id);
-      ok(a.persone === 3 && a.occasioni.length === 1 && a.occasioni[0].chiave === "Romantico" && a.occasioni[0].persone === 2, `ristoratore: 'Ti vogliono provare' conta chi ha salvato e non è andato, con le occasioni (${JSON.stringify(a)})`); }
+      ok(a.persone === 3 && a.occasioni.length === 1 && a.occasioni[0].chiave === "Romantico" && a.occasioni[0].persone === 2, `ristoratore: 'Ti vogliono provare' conta chi ha salvato e non è andato, con le occasioni (${JSON.stringify(a)})`);
+      // Revisore 16/11 (lucchetto, minore 3): le righe col lucchetto (Solo per me o raccolta privata) non contano, né le loro raccolte.
+      const b = rs.inAttesa([sv("u1", ["Da provare", "Romantico"]), { ...sv("u6", ["Segreti"]), privato: true }, { ...sv("u7", ["Segreti"]), privato: true }, { ...sv("u8", ["Segreti"]), privato: true }], L.id);
+      ok(b.persone === 1 && !b.occasioni.some((o) => o.chiave === "Segreti"), `ristoratore: 'Ti vogliono provare' senza le righe col lucchetto né i nomi delle raccolte private (${JSON.stringify(b)})`); }
     // Visite vere (POSIZIONAMENTO proposta 4, 18/10): chi ha segnato "Ci sono stato" nel periodo (data della visita), con il voto.
     { const v = (u, tags, visited, place = L.id) => ({ place_id: place, user_id: u, created_at: at(1), tags, visited_at: visited });
       const today = Math.floor(Date.UTC(2026, 9, 15) / 86_400_000);

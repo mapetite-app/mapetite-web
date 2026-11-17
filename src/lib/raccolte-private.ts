@@ -46,11 +46,25 @@ export async function proteggiPrima(userId: string, da: string, a: string | null
   return error ? null : "privata";
 }
 
-/** Dopo rinomina, unisci o elimina: il nome vecchio esce dall'elenco solo se nessun posto ha ancora quel tag. */
+/**
+ * Dopo rinomina, unisci o elimina: il nome vecchio esce dall'elenco solo se nessun posto ha ancora quel tag.
+ * Revisore 16/11 (minore 4): contare e poi togliere erano due richieste; se in mezzo un altro telefono metteva un
+ * posto nella raccolta, quel posto restava senza lucchetto. Con la migrazione 20261117c controllo e scrittura sono
+ * una sola istruzione nel database (raccolta_privata_se_vuota). Senza la migrazione: si conta, si toglie, si
+ * riconta e, se nel frattempo è arrivato un posto con quel tag, il lucchetto torna subito.
+ */
 export async function pulisciDopo(userId: string, da: string): Promise<void> {
   const supabase = await browserClient().catch(() => null);
   if (!supabase) return;
-  const { count, error } = await supabase.from("saved_places").select("place_id", { count: "exact", head: true }).eq("user_id", userId).contains("tags", [da]);
-  if (error || (count ?? 0) > 0) return; // nel dubbio il nome resta privato
-  await lucchettoRaccolta(da, false);
+  const { error: fnErr } = await supabase.rpc("raccolta_privata_se_vuota", { p_nome: da });
+  if (!fnErr) return;
+  // Funzione assente (migrazione non applicata): PGRST202 da PostgREST, 42883 da Postgres. Altri errori: nel dubbio resta privato.
+  if (fnErr.code !== "PGRST202" && fnErr.code !== "42883") return;
+  const conta = async () => {
+    const { count, error } = await supabase.from("saved_places").select("place_id", { count: "exact", head: true }).eq("user_id", userId).contains("tags", [da]);
+    return error ? null : count ?? 0;
+  };
+  if ((await conta()) !== 0) return; // nel dubbio il nome resta privato
+  if (!(await lucchettoRaccolta(da, false))) return;
+  if ((await conta()) !== 0) await lucchettoRaccolta(da, true);
 }

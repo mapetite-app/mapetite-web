@@ -115,10 +115,32 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
   // Tutti i salvataggi del locale, anche vecchi (non solo del periodo): chi lo vuole ancora provare.
   // "visite" (posti fissi, 20261020b_visite.sql): senza la colonna si rilegge senza.
   const leggiTutti = (cols: string) => db.from("saved_places").select(cols).eq("place_id", id).limit(5000).returns<RistSalvataggio[]>();
-  let { data: tutti, error: aErr } = await leggiTutti("place_id,user_id,created_at,tags,visited_at,visite");
+  // "solo_per_me" (20261115f): senza la colonna si rilegge senza (nessun posto ha il lucchetto).
+  let { data: tutti, error: aErr } = await leggiTutti("place_id,user_id,created_at,tags,visited_at,visite,solo_per_me");
+  if (aErr?.code === "42703") ({ data: tutti, error: aErr } = await leggiTutti("place_id,user_id,created_at,tags,visited_at,visite"));
   if (aErr?.code === "42703") ({ data: tutti, error: aErr } = await leggiTutti("place_id,user_id,created_at,tags,visited_at"));
   if (aErr) console.error("[ristoratore] lettura salvataggi del locale:", aErr.message);
-  const attesa = (tutti ?? []) as RistSalvataggio[];
+  // Revisore 16/11: "Ti vogliono provare" non conta le righe col lucchetto, come le viste pubbliche: "Solo per me"
+  // sul posto o il posto in una raccolta col lucchetto (profiles.raccolte_private, 20261116). Se l'elenco delle
+  // raccolte private non si legge (errore diverso da colonna mancante), nel dubbio la riga è privata.
+  const righe = (tutti ?? []) as (RistSalvataggio & { solo_per_me?: boolean | null })[];
+  const privateDi = new Map<string, string[]>();
+  let privateIgnote = false;
+  const utenti = [...new Set(righe.map((r) => r.user_id))];
+  for (let i = 0; i < utenti.length && !privateIgnote; i += 200) {
+    const { data: pr, error: prErr } = await db.from("profiles").select("id, raccolte_private").in("id", utenti.slice(i, i + 200));
+    if (prErr) {
+      if (prErr.code === "42703") break; // migrazione 20261116 non applicata: nessuna raccolta privata
+      console.error("[ristoratore] lettura raccolte private:", prErr.message);
+      privateIgnote = true;
+      break;
+    }
+    for (const p of (pr ?? []) as { id: string; raccolte_private: string[] | null }[]) privateDi.set(p.id, p.raccolte_private ?? []);
+  }
+  const attesa: RistSalvataggio[] = righe.map(({ solo_per_me, ...r }) => ({
+    ...r,
+    privato: privateIgnote || solo_per_me === true || (r.tags ?? []).some((t) => (privateDi.get(r.user_id) ?? []).includes(t)),
+  }));
   // Serate tranquille (migrazione 20261018_serate_tranquille.sql): senza colonne, nessun giorno.
   // "Aperto da poco" (20261020_aperto_dal.sql): senza la colonna si rilegge senza.
   // "Omaggio a chi torna" (20261030b_omaggio.sql): senza colonne, si rilegge senza.
