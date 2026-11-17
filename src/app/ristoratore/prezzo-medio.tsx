@@ -16,10 +16,16 @@ export default function PrezzoMedio({ placeId, iniziale, verificato, demo }: { p
   const [salvato, setSalvato] = useState<Prezzo | null>(iniziale);
   const [stato, setStato] = useState<"fermo" | "salvo" | "fatto" | "errore">("fermo");
   const [errore, setErrore] = useState<string | null>(null);
+  // L'avviso compare solo con i due campi pieni o uscendo da un campo (revisore 17/11: sgridava mentre si scriveva).
+  const [uscito, setUscito] = useState(false);
   const vuoto = da.trim() === "" && a.trim() === "";
-  const pulito = vuoto ? null : pulisciPrezzo(da, a, bevande);
+  // Un solo campo pieno = prezzo unico (menu fisso da 30 €: "30 € a testa").
+  const pulito = vuoto ? null : pulisciPrezzo(da.trim() || a, a.trim() || da, bevande);
   const valido = vuoto || pulito != null;
   const cambiato = valido && chiave(pulito) !== chiave(salvato);
+  const mostraAvviso = !valido && ((da.trim() !== "" && a.trim() !== "") || uscito);
+  // Solo cifre (su "number" la virgola di "25,5" diventava "255").
+  const cifre = (v: string) => v.replace(/[^0-9]/g, "").slice(0, 3);
 
   const salva = async () => {
     if (demo) { setSalvato(pulito); setStato("fatto"); return; }
@@ -50,15 +56,15 @@ export default function PrezzoMedio({ placeId, iniziale, verificato, demo }: { p
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm font-sans text-text">
           Da
-          <input type="number" inputMode="numeric" min={1} max={500} step={1} data-testid="prezzo-da" aria-label="Prezzo a testa, da (euro)" value={da} onChange={(e) => { setDa(e.target.value); setStato("fermo"); }} className={campo} />
+          <input type="text" inputMode="numeric" pattern="[0-9]*" data-testid="prezzo-da" aria-label="Prezzo a testa, da (euro)" value={da} onChange={(e) => { setDa(cifre(e.target.value)); setStato("fermo"); setUscito(false); }} onBlur={() => setUscito(true)} className={campo} />
         </label>
         <label className="flex items-center gap-2 text-sm font-sans text-text">
           a
-          <input type="number" inputMode="numeric" min={1} max={500} step={1} data-testid="prezzo-a" aria-label="Prezzo a testa, a (euro)" value={a} onChange={(e) => { setA(e.target.value); setStato("fermo"); }} className={campo} />
+          <input type="text" inputMode="numeric" pattern="[0-9]*" data-testid="prezzo-a" aria-label="Prezzo a testa, a (euro)" value={a} onChange={(e) => { setA(cifre(e.target.value)); setStato("fermo"); setUscito(false); }} onBlur={() => setUscito(true)} className={campo} />
           €
         </label>
         <label className="flex min-h-11 items-center gap-2 text-sm font-sans text-text">
-          <input type="checkbox" role="switch" data-testid="prezzo-bevande" checked={bevande} onChange={(e) => { setBevande(e.target.checked); setStato("fermo"); }} className="h-5 w-5 accent-brand" />
+          <input type="checkbox" data-testid="prezzo-bevande" checked={bevande} onChange={(e) => { setBevande(e.target.checked); setStato("fermo"); }} className="h-5 w-5 accent-brand" />
           Bevande incluse
         </label>
         <button
@@ -76,7 +82,7 @@ export default function PrezzoMedio({ placeId, iniziale, verificato, demo }: { p
           </span>
         )}
         {stato === "errore" && errore && <span role="alert" className="text-sm font-sans text-error">{errore}</span>}
-        {!valido && <span role="alert" className="text-sm font-sans text-error">Due cifre in euro tra 1 e 500, la prima non più alta della seconda.</span>}
+        {mostraAvviso && <span role="alert" className="text-sm font-sans text-error">Euro tra 1 e 500, "da" non più alto di "a".</span>}
       </div>
       <p data-testid="prezzo-anteprima" className="mt-3 text-xs font-sans leading-snug text-text-muted">
         {anteprima ? (
