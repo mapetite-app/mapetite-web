@@ -1720,7 +1720,7 @@ await shot("15-scheda-b");
   await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: REST, sintesi_pendente: null } }));
   await page.route("**/api/places/community**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "R1" ? comm : { ...comm, recensioni: [], mia: null } }));
   // Osteria Bella è verificata, con "c'è posto" e buoni pasto confermati da 3 persone.
-  await page.route("**/api/ristoratore/serate**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "R1" ? { verificato: true, giorni: [0, 1, 2, 3, 4, 5, 6], at: new Date().toISOString() } : new URL(r.request().url()).searchParams.get("id") === "R2" ? { verificato: true, giorni: [], at: null, apertoDal: (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 3); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })() } : { verificato: false, giorni: [], at: null } }));
+  await page.route("**/api/ristoratore/serate**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "R1" ? { verificato: true, giorni: [0, 1, 2, 3, 4, 5, 6], at: new Date().toISOString() } : new URL(r.request().url()).searchParams.get("id") === "R2" ? { verificato: true, giorni: [], at: null, apertoDal: (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 3); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })(), prezzo: { min: 25, max: 35, bevande: false } } : { verificato: false, giorni: [], at: null, prezzo: { min: 10, max: 20, bevande: true } } }));
   await page.route("**/rest/v1/rpc/buoni_pasto_conteggio**", (r) => r.fulfill({ json: r.request().postDataJSON()?.p_place === "R1" ? [{ si: 3, no: 0 }] : [{ si: 0, no: 0 }] }));
   await page.route("**/api/places/tripadvisor**", (r) => {
     const u = new URL(r.request().url()); taChiesti.push(u.searchParams.get("nome"));
@@ -1739,6 +1739,7 @@ await shot("15-scheda-b");
     ok((await page.getByTestId("segnali-scheda").getByText("Verificato", { exact: true }).count()) === 0, "scheda: nessuna pillola 'Verificato' sotto il nome");
     const h = await page.getByTestId("segnali-scheda").evaluate((el) => el.getBoundingClientRect().height);
     ok(await page.getByTestId("posto-stasera").isVisible() && await page.getByTestId("buoni-pasto").isVisible() && h <= 62, `scheda: 'c'è posto' e buoni pasto in un solo blocco di al massimo 2 righe (${Math.round(h)} px)`);
+    ok((await page.getByTestId("prezzo-locale").count()) === 0, "scheda: verificato senza prezzo indicato → nessuna pillola '💶 … a testa'");
     await shot("15c-scheda-segnali"); }
   await apriDettagli(page);
   await page.getByTestId("scheda-tab-recensioni").click();
@@ -1783,6 +1784,9 @@ await shot("15-scheda-b");
     ok((((await page.getByTestId("scheda-fatti").textContent()) ?? "").match(/Chiuso/g) ?? []).length === 1, "scheda: 'Chiuso ora' non è ripetuto nella riga dei fatti");
     await page.getByTestId("aperto-da-poco").waitFor({ timeout: 5000 }).catch(() => {});
     ok(((await page.getByTestId("aperto-da-poco").textContent().catch(() => "")) ?? "").includes("Aperto da 3 mesi"), "scheda: locale verificato aperto da 3 mesi → '🆕 Aperto da 3 mesi' tra i segnali");
+    // "Fascia di prezzo confermata dal locale" (PROPOSTE.md 65): parola del titolare verificato, separata dai € di Google.
+    { const t = ((await page.getByTestId("prezzo-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
+      ok(t.includes("💶") && t.includes("25–35 € a testa") && t.includes("dice il locale") && !t.includes("incluse") && !!(await page.getByTestId("segnali-scheda").getByTestId("prezzo-locale").count()), `scheda: locale verificato con prezzo → '💶 25–35 € a testa · dice il locale' tra i segnali (${t})`); }
     ok((await page.getByTestId("posto-stasera").count()) === 0 && await page.locator("h2", { hasText: "Trattoria Senza Voto" }).getByTestId("verificato-scheda").isVisible(), "scheda: verificato senza serate → spunta, nessuna pillola 'c'è posto'");
     await page.getByTestId("scheda-tab-info").click();
     const o = ((await page.getByTestId("orari-oggi").textContent().catch(() => "")) ?? "");
@@ -7637,6 +7641,14 @@ else {
         ok(ad.fraseApertura("2025-10", oggi) === null && ad.fraseApertura("2026-11", oggi) === null && ad.fraseApertura("2026-13", oggi) === null && ad.fraseApertura(null, oggi) === null && ad.fraseApertura("ciao", oggi) === null, "aperto da poco: niente oltre 12 mesi, nel futuro, mese sbagliato o dato assente");
         ok(ad.fraseApertura("2025-11", oggi) === "Aperto da 11 mesi" && ad.pulisciApertoDal("2026-07-01") === "2026-07", "aperto da poco: 11 mesi ancora sì; data del database letta come mese");
       } }
+    // "Fascia di prezzo confermata dal locale" (PROPOSTE.md 65): due cifre in euro e le bevande, mai dedotte.
+    { let pz = null;
+      try { pz = await import(new URL("../../src/lib/prezzo-locale.ts", import.meta.url).href); } catch (e) { ok(false, `prezzo a testa: modulo src/lib/prezzo-locale.ts importabile (${e.message})`); }
+      if (pz) {
+        ok(pz.frasePrezzo({ min: 25, max: 35, bevande: false }) === "25–35 € a testa, bevande escluse" && pz.frasePrezzo({ min: 30, max: 30, bevande: true }) === "30 € a testa, bevande incluse" && pz.frasePrezzo({ min: 25, max: 35, bevande: false }, true) === "25–35 € a testa", "prezzo a testa: '25–35 € a testa, bevande escluse', '30 € a testa, bevande incluse', breve per la pillola");
+        ok(pz.pulisciPrezzo(40, 30, false) === null && pz.pulisciPrezzo(0, 30, false) === null && pz.pulisciPrezzo(10, 501, false) === null && pz.pulisciPrezzo(12.5, 20, false) === null && pz.pulisciPrezzo("ciao", 20, false) === null && pz.frasePrezzo(null) === null, "prezzo a testa: niente con min > max, fuori da 1–500, decimali, testo o dato assente");
+        ok(JSON.stringify(pz.pulisciPrezzo("25", "35", "si")) === '{"min":25,"max":35,"bevande":false}', "prezzo a testa: cifre dai campi del modulo; bevande incluse solo se è proprio sì");
+      } }
     { let cs = null;
       try { cs = await import(new URL("../../src/lib/chiedi-salvati.ts", import.meta.url).href); } catch (e) { ok(false, `chiedi ai tuoi posti: modulo importabile (${e.message})`); }
       if (cs) {
@@ -7792,6 +7804,21 @@ else {
       const futuro = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, apertoDal: "2999-01" } });
       ok(j2.apertoDal === due && JSON.stringify(j2.giorni) === "[5]" && futuro.status() === 400 && ((await ap.getByTestId("aperto-dal-anteprima").textContent()) ?? "").includes("🆕"), `pannello ristoratore: 'Aperto da' salvato e riletto dalla scheda, senza toccare le serate; mese futuro rifiutato (${JSON.stringify(j2)} / ${futuro.status()})`);
       await rp.screenshot({ path: `${OUT}/71-pannello-aperto-dal.png`, caret: "initial" }); }
+    // "Prezzo a testa" (PROPOSTE.md 65) nello stesso pannello: si salva e la scheda lo rilegge; le serate restano.
+    { const pm = rp.getByTestId("prezzo-medio");
+      await pm.getByTestId("prezzo-da").fill("25");
+      await pm.getByTestId("prezzo-a").fill("35");
+      await pm.getByTestId("prezzo-bevande").check();
+      const ant = ((await pm.getByTestId("prezzo-anteprima").textContent()) ?? "").replace(/\s+/g, " ");
+      await pm.getByTestId("prezzo-salva").click();
+      await pm.getByText("Salvato").waitFor({ timeout: 5000 }).catch(() => {});
+      const j5 = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
+      const storto = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, prezzo: { min: 40, max: 30, bevande: false } } });
+      const troppo = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, prezzo: { min: 10, max: 900, bevande: false } } });
+      ok(JSON.stringify(j5.prezzo) === '{"min":25,"max":35,"bevande":true}' && JSON.stringify(j5.giorni) === "[5]" && ant.includes("25–35 € a testa, bevande incluse") && storto.status() === 400 && troppo.status() === 400, `pannello ristoratore: 'Prezzo a testa' salvato e riletto dalla scheda, senza toccare le serate; da > a o oltre 500 € rifiutati (${JSON.stringify(j5.prezzo)} / ${ant} / ${storto.status()} ${troppo.status()})`);
+      await pm.getByTestId("prezzo-da").fill("50");
+      ok(await pm.getByTestId("prezzo-salva").isDisabled() && await pm.getByRole("alert").isVisible(), "pannello ristoratore: 'da' più alto di 'a' → Salva spento e avviso");
+      await rp.getByTestId("pannello-prezzo").screenshot({ path: `${OUT}/71b-pannello-prezzo.png` }); }
     // "Omaggio a chi torna" (PROPOSTE 12): niente denaro, si salva, codice del giorno uguale a quello del cliente.
     { const om = rp.getByTestId("pannello-omaggio");
       await om.getByTestId("omaggio-testo").fill("10% di sconto");
@@ -7818,6 +7845,10 @@ else {
       const j4 = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
       ok(j4.omaggio === null && (await om.getByTestId("omaggio-codice-oggi").count()) === 0, `omaggio pannello: 'Spegni' lo toglie dalla scheda (${JSON.stringify(j4.omaggio)})`); }
     ok(await st.getByText("Salvato").isVisible() && JSON.stringify(j.giorni) === "[5]" && j.verificato === true && !!j.at && vietato.status() === 403, `pannello ristoratore: serate tranquille salvate e rilette dalla scheda; un altro locale è vietato (${JSON.stringify(j)} / ${vietato.status()})`);
+    // Locale non verificato: anche con un prezzo scritto, la scheda non riceve niente.
+    { await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: false, giorni: [], prezzo: { min: 25, max: 35, bevande: false } });
+      const j6 = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
+      ok(j6.verificato === false && j6.prezzo == null, `prezzo a testa: locale non verificato → la scheda non riceve il prezzo (${JSON.stringify(j6)})`); }
     await rctx.clearCookies({ name: "e2e_serate" }); }
 
   // Esempio dimostrativo: etichetta in cima, numeri pieni, periodo 7/30 giorni.
@@ -7868,6 +7899,15 @@ else {
       await salva.click();
       ok(premuti.join() === "martedì,mercoledì" && primaDis && /c'è posto/.test(ant) && (/giovedì/i.test(ant) || (new Date().toLocaleDateString("it-IT", { weekday: "long", timeZone: "Europe/Rome" }) === "giovedì" && /stasera/i.test(ant))) && /* di giovedì (ora di Roma) la riga dice 'Stasera' */ await st.getByText("Fatto (esempio: non si salva)").isVisible(), `pannello demo: serate tranquille, giorni da toccare, anteprima della riga e salvataggio finto (${premuti.join()} → ${ant.slice(0, 80)})`);
       await rp.getByTestId("pannello-serate").screenshot({ path: `${OUT}/76b-pannello-serate.png` }); }
+    // "Prezzo a testa" (PROPOSTE.md 65) nell'esempio: si prova, non si salva.
+    { const pm = rp.getByTestId("prezzo-medio");
+      const vuota = ((await pm.getByTestId("prezzo-anteprima").textContent()) ?? "");
+      await pm.getByTestId("prezzo-da").fill("25");
+      await pm.getByTestId("prezzo-a").fill("35");
+      const ant = ((await pm.getByTestId("prezzo-anteprima").textContent()) ?? "").replace(/\s+/g, " ");
+      const alto = await pm.getByTestId("prezzo-da").evaluate((el) => el.getBoundingClientRect().height);
+      await pm.getByTestId("prezzo-salva").click();
+      ok(/non compare niente/.test(vuota) && ant.includes("Nella tua scheda: 💶 25–35 € a testa, bevande escluse") && alto >= 44 && await pm.getByText("Fatto (esempio: non si salva)").isVisible(), `pannello demo: prezzo a testa 25–35 €, anteprima della pillola, campi da 44px e salvataggio finto (${ant} / ${Math.round(alto)}px)`); }
     await rp.getByRole("tab", { name: "Panoramica" }).click();
     const w = await rp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `pannello demo: niente scorrimento orizzontale (${w}px)`); }
   await rp.screenshot({ path: `${OUT}/75-pannello-demo.png`, caret: "initial" });

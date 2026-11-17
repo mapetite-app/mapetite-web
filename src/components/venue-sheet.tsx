@@ -24,7 +24,7 @@ import type { BookingDetails } from "@/lib/booking";
 import { VisitaContext } from "@/lib/visita-context";
 import { votoOf, votoTag } from "@/lib/diario";
 import ConfrontoFonti from "@/components/confronto-fonti";
-import { AperturaPillola, PostoPillola, useInfoLocale } from "@/components/posto-locale";
+import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocale } from "@/components/posto-locale";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 import VisiteMapetite from "@/components/visite-mapetite";
@@ -942,6 +942,8 @@ export default function VenueSheet({
             )}
             {/* Aperto da poco (PROPOSTE.md, proposta 7): parola del titolare verificato, solo il primo anno. */}
             <AperturaPillola info={infoLocale} />
+            {/* Prezzo a testa detto dal titolare verificato (PROPOSTE.md 65), separato dai € di Google. */}
+            <PrezzoLocale info={infoLocale} />
             {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
             <BuoniPastoRiga venueId={venue.id} category={category} />
             {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1). */}

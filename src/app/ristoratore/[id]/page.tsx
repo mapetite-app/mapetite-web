@@ -7,6 +7,7 @@ import { cityFromAddress } from "@/lib/city";
 import { computeRistoratore, STATO_VISITATO, type RistEvento, type RistLocale, type RistSalvataggio } from "@/lib/ristoratore";
 import { pulisciGiorni } from "@/lib/serate";
 import { pulisciApertoDal } from "@/lib/aperto-dal";
+import { pulisciPrezzo, type Prezzo } from "@/lib/prezzo-locale";
 import { giornoItalia, pulisciOmaggio, OMAGGIO_OGNI_GIORNI, type Omaggio } from "@/lib/omaggio";
 import { codiceDelGiorno } from "@/lib/omaggio-server";
 import { dateKey, prenotazioniAlLocale, type BookingRequest } from "@/lib/booking";
@@ -26,7 +27,7 @@ const TIPI = ["ricerca", "apri_scheda", "salva", "ci_sono_stato", "percorso", "c
 const PAGE = 1000;
 const MAX_ROWS = 50_000;
 
-type Serate = { giorni: number[]; at: string | null; apertoDal: string | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
+type Serate = { giorni: number[]; at: string | null; apertoDal: string | null; prezzo?: Prezzo | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
 type Prenotazioni = { tavoli: number; diParola: number; persone: number; personeParola: number };
 type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null; serate: Serate; prenotazioni: Prenotazioni | null; passaparola?: number };
 
@@ -52,7 +53,7 @@ async function e2eDati(id: string): Promise<Dati | null> {
     let finte: unknown = null;
     try { finte = JSON.parse(decodeURIComponent((await cookies()).get("e2e_prenotazioni")?.value ?? "null")); } catch { /* niente */ }
     const prenotazioni = Array.isArray(finte) ? contaPrenotazioni(finte, v.locale, giorni) : null;
-    return { prenotazioni, locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, passaparola: Number(v.passaparola) || 0, serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal), omaggio: pulisciOmaggio(v.serate?.omaggio?.testo, v.serate?.omaggio?.soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: Number(v.serate?.omaggiMostrati) || 0 } };
+    return { prenotazioni, locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, passaparola: Number(v.passaparola) || 0, serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal), prezzo: pulisciPrezzo(v.serate?.prezzo?.min, v.serate?.prezzo?.max, v.serate?.prezzo?.bevande), omaggio: pulisciOmaggio(v.serate?.omaggio?.testo, v.serate?.omaggio?.soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: Number(v.serate?.omaggiMostrati) || 0 } };
   } catch {
     return null;
   }
@@ -121,15 +122,17 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
   // Serate tranquille (migrazione 20261018_serate_tranquille.sql): senza colonne, nessun giorno.
   // "Aperto da poco" (20261020_aperto_dal.sql): senza la colonna si rilegge senza.
   // "Omaggio a chi torna" (20261030b_omaggio.sql): senza colonne, si rilegge senza.
-  type Sr = { giorni_tranquilli: number[] | null; giorni_tranquilli_at: string | null; aperto_dal?: string | null; omaggio_testo?: string | null; omaggio_soglia?: number | null };
-  let { data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at, aperto_dal, omaggio_testo, omaggio_soglia").eq("id", id).maybeSingle<Sr>();
+  // "Prezzo a testa" (20261117_prezzo_medio.sql): senza colonne, si rilegge senza.
+  type Sr = { giorni_tranquilli: number[] | null; giorni_tranquilli_at: string | null; aperto_dal?: string | null; omaggio_testo?: string | null; omaggio_soglia?: number | null; prezzo_min?: number | null; prezzo_max?: number | null; prezzo_bevande?: boolean | null };
+  let { data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at, aperto_dal, omaggio_testo, omaggio_soglia, prezzo_min, prezzo_max, prezzo_bevande").eq("id", id).maybeSingle<Sr>();
+  if (srErr?.code === "42703") ({ data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at, aperto_dal, omaggio_testo, omaggio_soglia").eq("id", id).maybeSingle<Sr>());
   if (srErr?.code === "42703") ({ data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at, aperto_dal").eq("id", id).maybeSingle<Sr>());
   if (srErr?.code === "42703") ({ data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at").eq("id", id).maybeSingle<Sr>());
   if (srErr) console.error("[ristoratore] lettura serate:", srErr.message);
   // Omaggi mostrati negli ultimi 30 giorni: la fedeltà misurata (senza tabella: 0).
   const daOmaggi = new Date(Date.now() - OMAGGIO_OGNI_GIORNI * 86_400_000).toISOString().slice(0, 10);
   const { count: omaggiMostrati } = await db.from("omaggi_usati").select("user_id", { count: "exact", head: true }).eq("place_id", id).gte("giorno", daOmaggi);
-  const serate = { giorni: pulisciGiorni(sr?.giorni_tranquilli), at: sr?.giorni_tranquilli_at ?? null, apertoDal: pulisciApertoDal(sr?.aperto_dal), omaggio: pulisciOmaggio(sr?.omaggio_testo, sr?.omaggio_soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: omaggiMostrati ?? 0 };
+  const serate = { giorni: pulisciGiorni(sr?.giorni_tranquilli), at: sr?.giorni_tranquilli_at ?? null, apertoDal: pulisciApertoDal(sr?.aperto_dal), prezzo: pulisciPrezzo(sr?.prezzo_min, sr?.prezzo_max, sr?.prezzo_bevande), omaggio: pulisciOmaggio(sr?.omaggio_testo, sr?.omaggio_soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: omaggiMostrati ?? 0 };
   // "Cliente di parola", passo 3 (PROPOSTE.md 3): tavoli chiesti da Mapetite, solo dalle prenotazioni
   // che le persone tengono sull'account (con il loro consenso: senza, le righe non esistono). Poi tutte
   // le prenotazioni di quelle persone, per sapere se sono di parola. Al telefono arrivano solo numeri.

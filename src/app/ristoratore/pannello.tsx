@@ -8,8 +8,10 @@ import TracciaFunzione from "@/components/traccia-funzione";
 import Schede from "./schede";
 import SerateTranquille from "./serate";
 import ApertoDal from "./aperto-dal";
+import PrezzoMedio from "./prezzo-medio";
 import OmaggioRitorno from "./omaggio";
 import type { Omaggio } from "@/lib/omaggio";
+import type { Prezzo } from "@/lib/prezzo-locale";
 
 // Pannello del ristoratore (piano 8.2): stessa grafica per i dati veri (/ristoratore/[id]) e per
 // l'esempio dimostrativo (/ristoratore/demo). Solo numeri aggregati; le etichette dei piani
@@ -374,7 +376,7 @@ export default function Pannello({
   demo?: boolean;
   avviso?: string | null;
   vista?: string;
-  serate?: { giorni: number[]; at: string | null; apertoDal?: string | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
+  serate?: { giorni: number[]; at: string | null; apertoDal?: string | null; prezzo?: Prezzo | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
   prenotazioni?: { tavoli: number; diParola: number; persone: number; personeParola: number } | null;
   // Proposta 58: tra chi ti vuole provare, quanti l'hanno salvato su consiglio di un amico. Solo il numero, mai chi.
   passaparola?: number;
@@ -603,6 +605,10 @@ export default function Pannello({
       {/* "Aperto da poco" (PROPOSTE.md, proposta 7): i primi mesi sono i più fragili. */}
       <Sezione titolo="Aperto da poco" nota="Il mese in cui hai aperto. Per il primo anno la tua scheda lo dice: chi ama il tuo genere ti scopre prima." piano="Verified" testId="pannello-aperto-dal">
         <ApertoDal placeId={locale.id} iniziale={demo ? null : serate.apertoDal ?? null} verificato={verificato} demo={demo} />
+      </Sezione>
+      {/* "Fascia di prezzo confermata dal locale" (PROPOSTE.md, proposta 65): la cifra vera, non i € di Google. */}
+      <Sezione titolo="Prezzo a testa" nota="Quanto si spende di solito da te, a persona. La tua scheda lo dice con le tue parole." piano="Verified" testId="pannello-prezzo">
+        <PrezzoMedio placeId={locale.id} iniziale={demo ? null : serate.prezzo ?? null} verificato={verificato} demo={demo} />
       </Sezione>
       {evidenza}
     </>
