@@ -1724,7 +1724,7 @@ await shot("15-scheda-b");
   await page.route("**/rest/v1/rpc/buoni_pasto_conteggio**", (r) => r.fulfill({ json: r.request().postDataJSON()?.p_place === "R1" ? [{ si: 3, no: 0 }] : [{ si: 0, no: 0 }] }));
   // Spesa a testa (proposta 64): su Osteria Bella solo 2 risposte → nessuna pillola (anche se la funzione sbagliasse).
   let spesaChiesta = false;
-  await page.route("**/rest/v1/rpc/spesa_testa_fascia**", (r) => { if (r.request().postDataJSON()?.p_place === "R1") spesaChiesta = true; return r.fulfill({ json: r.request().postDataJSON()?.p_place === "R1" ? [{ fascia: 2, risposte: 2 }] : [] }); });
+  await page.route("**/rest/v1/rpc/spesa_testa_fascia**", (r) => { if (r.request().postDataJSON()?.p_place === "R1") spesaChiesta = true; return r.fulfill({ json: r.request().postDataJSON()?.p_place === "R1" ? [{ fascia: 2, risposte: 4 }] : [] }); });
   await page.route("**/api/places/tripadvisor**", (r) => {
     const u = new URL(r.request().url()); taChiesti.push(u.searchParams.get("nome"));
     if (u.searchParams.get("nome") !== "Osteria Bella") return r.fulfill({ json: { stato: "nessuno" } });
@@ -1744,7 +1744,7 @@ await shot("15-scheda-b");
     ok(await page.getByTestId("posto-stasera").isVisible() && await page.getByTestId("buoni-pasto").isVisible() && h <= 62, `scheda: 'c'è posto' e buoni pasto in un solo blocco di al massimo 2 righe (${Math.round(h)} px)`);
     // Revisore 17/11: con "c'è posto", buoni pasto e prezzo la pillola del prezzo è corta e "dice il locale" compare una volta sola.
     ok(((await page.getByTestId("prezzo-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim() === "💶 25–35 € a testa · bevande incl." && (((await page.getByTestId("segnali-scheda").textContent()) ?? "").match(/dice il locale/g) ?? []).length === 1, "scheda: 'c'è posto' e prezzo del locale → pillola corta '💶 25–35 € a testa · bevande incl.', un solo 'dice il locale'");
-    ok(spesaChiesta && (await page.getByTestId("spesa-vissuta").count()) === 0, `spesa a testa: con 2 risposte di chi c'è stato nessuna pillola (chiesta: ${spesaChiesta})`);
+    ok(spesaChiesta && (await page.getByTestId("spesa-vissuta").count()) === 0, `spesa a testa: con 4 risposte di chi c'è stato nessuna pillola (chiesta: ${spesaChiesta})`);
     await shot("15c-scheda-segnali"); }
   await apriDettagli(page);
   await page.getByTestId("scheda-tab-recensioni").click();
@@ -2776,7 +2776,7 @@ else {
     return r.fulfill({ json: [] });
   });
   // Spesa a testa (proposta 64): pillola da 3 risposte; la risposta nel foglio va sul proprio salvato (PATCH spesa_testa).
-  await p.route("**/rest/v1/rpc/spesa_testa_fascia**", (r) => r.fulfill({ json: [{ fascia: 2, risposte: 3 }] }));
+  await p.route("**/rest/v1/rpc/spesa_testa_fascia**", (r) => r.fulfill({ json: [{ fascia: 2, risposte: 5 }] }));
   const spesaScritte = [];
   await p.route("**/rest/v1/saved_places**", (r) => {
     const b = r.request().method() === "PATCH" ? r.request().postDataJSON() : null;
@@ -2793,7 +2793,7 @@ else {
   ok(await p.getByTestId("buoni-pasto").waitFor({ timeout: 4000 }).then(async () => (await p.getByTestId("buoni-pasto").textContent())?.includes("Buoni pasto: sì · 3 persone"), () => false), "buoni pasto: riga in scheda quando almeno 2 persone concordano");
   { const t = await p.getByTestId("spesa-vissuta").waitFor({ timeout: 4000 }).then(async () => ((await p.getByTestId("spesa-vissuta").textContent()) ?? "").replace(/\s+/g, " ").trim(), () => "(assente)");
     const seg = (await p.getByTestId("segnali-scheda").textContent().catch(() => "")) ?? "";
-    ok(t === "15–30 € a testa" && !/dice il locale/.test(seg) && !t.includes("€€"), `spesa a testa: con 3 risposte '15–30 € a testa', a parte dal prezzo del locale (${t})`);
+    ok(t === "15–30 € a testa" && !/dice il locale/.test(seg) && !t.includes("€€"), `spesa a testa: con 5 risposte '15–30 € a testa', a parte dal prezzo del locale (${t})`);
     // Revisore 17/11: voti e spesa nella stessa pillola, un solo "chi c'è stato".
     ok((await p.getByTestId("segnali-scheda").getByTestId("spesa-vissuta").count()) === 1 && (seg.match(/chi c'è stato/g) ?? []).length === 1, "spesa a testa: tra i segnali della scheda, un solo 'chi c'è stato'"); }
   { const t = await p.getByTestId("visite-mapetite").waitFor({ timeout: 6000 }).then(async () => (await p.getByTestId("visite-mapetite").textContent()) ?? "", () => "(assente)");
@@ -7681,8 +7681,8 @@ else {
     { let st = null;
       try { st = await import(new URL("../../src/lib/spesa-testa.ts", import.meta.url).href); } catch (e) { ok(false, `spesa a testa: modulo src/lib/spesa-testa.ts importabile (${e.message})`); }
       if (st) {
-        ok(st.fraseSpesa({ fascia: 2, risposte: 3 }) === "15–30 € a testa · chi c'è stato" && st.fraseSpesa({ fascia: 2, risposte: 3 }, true) === "15–30 € a testa" && st.fraseSpesa({ fascia: 1, risposte: 5 }) === "meno di 15 € a testa · chi c'è stato" && st.fraseSpesa({ fascia: "4", risposte: 3 }) === "oltre 50 € a testa · chi c'è stato", "spesa a testa: '15–30 € a testa · chi c'è stato', 'meno di 15 €', 'oltre 50 €'");
-        ok(st.fraseSpesa({ fascia: 2, risposte: 2 }) === null && st.fraseSpesa({ fascia: 5, risposte: 9 }) === null && st.fraseSpesa({ fascia: 0, risposte: 9 }) === null && st.fraseSpesa(null) === null && st.fraseSpesa({ fascia: 2 }) === null, "spesa a testa: niente sotto le 3 risposte, fascia fuori da 1–4 o dato assente");
+        ok(st.fraseSpesa({ fascia: 2, risposte: 5 }) === "15–30 € a testa · chi c'è stato" && st.fraseSpesa({ fascia: 2, risposte: 5 }, true) === "15–30 € a testa" && st.fraseSpesa({ fascia: 1, risposte: 5 }) === "meno di 15 € a testa · chi c'è stato" && st.fraseSpesa({ fascia: "4", risposte: 5 }) === "oltre 50 € a testa · chi c'è stato", "spesa a testa: '15–30 € a testa · chi c'è stato', 'meno di 15 €', 'oltre 50 €'");
+        ok(st.fraseSpesa({ fascia: 2, risposte: 4 }) === null && st.fraseSpesa({ fascia: 5, risposte: 9 }) === null && st.fraseSpesa({ fascia: 0, risposte: 9 }) === null && st.fraseSpesa(null) === null && st.fraseSpesa({ fascia: 2 }) === null, "spesa a testa: niente sotto le 5 risposte, fascia fuori da 1–4 o dato assente");
         ok(st.FASCE_SPESA.map((f) => f.label).join("|") === "< 15 €|15–30|30–50|> 50 €" && st.pulisciFascia(2.5) === null && st.pulisciFascia("3") === 3, "spesa a testa: 4 scelte corte nel foglio; solo valori interi 1–4");
       } }
     { let cs = null;

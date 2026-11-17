@@ -4,7 +4,7 @@ import { browserClient } from "@/lib/supabase/client-lazy";
 import { pulisciFascia, pulisciSpesa, type FasciaSpesa, type SpesaVissuta } from "@/lib/spesa-testa";
 
 // Letture e scritture della proposta 64 (spesa-testa.ts). La risposta sta sul proprio salvato (RLS: solo il
-// proprietario la legge e la cambia); l'aggregato arriva dalla funzione spesa_testa_fascia (da 3 risposte in su).
+// proprietario la legge e la cambia); l'aggregato arriva dalla funzione spesa_testa_fascia (da 5 risposte in su).
 
 const colonnaAssente = (e: { code?: string; message?: string } | null) =>
   !!e && (e.code === "42703" || e.code === "PGRST204" || /spesa_testa/.test(e.message ?? ""));

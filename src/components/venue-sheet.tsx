@@ -29,7 +29,6 @@ import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocale } from "@/co
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 import VisiteMapetite from "@/components/visite-mapetite";
-import { frasePrezzo } from "@/lib/prezzo-locale";
 
 // Riquadri della barra azioni teal (mockup A "Editoriale", 21/10): icona e parola su una riga, 50px.
 // La stessa classe la usa il pulsante Salva della mappa (SaveButton in map-view, prop `tile`).
@@ -971,7 +970,7 @@ export default function VenueSheet({
             <BuoniPastoRiga venueId={venue.id} category={category} />
             {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3), con quanto ha speso a testa
                 (PROPOSTE.md 64, da 3 risposte concordi) nella stessa pillola; la spesa no se il locale dichiara il prezzo. */}
-            <VisiteMapetite venueId={googlePlaceId ?? venue.id} spesaId={venue.id} senzaSpesa={frasePrezzo(infoLocale?.prezzo) != null} />
+            <VisiteMapetite venueId={googlePlaceId ?? venue.id} spesaId={venue.id} />
           </div>
 
           {/* IL VERDETTO MAPETITE: in corsivo tra due filetti, come una citazione di rivista.
