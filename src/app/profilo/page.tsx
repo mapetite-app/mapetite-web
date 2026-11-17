@@ -9,6 +9,7 @@ import BookingReminder from "@/components/booking-reminder";
 import ProfiloPrenotazioni from "@/components/profilo-prenotazioni";
 import ProfiloRaccolte, { type RaccoltaRow } from "@/components/profilo-raccolte";
 import { summarizeCollections } from "@/lib/raccolte";
+import { loadRaccoltePrivate } from "@/lib/raccolte-server";
 import VisitPrompt, { type VisitCandidate } from "@/components/visit-prompt";
 import { zoneDeiSalvati } from "@/lib/salvati-zone";
 import { isWanted } from "@/lib/tags";
@@ -36,6 +37,7 @@ type SavedPlaceRow = {
   created_at: string;
   rank_score?: number | null; // solo nei dati finti del giro (la colonna si legge a parte)
   visite?: number | null; // idem (posti fissi, letta a parte)
+  solo_per_me?: boolean | null; // idem (lucchetto "Solo per me", letto a parte)
   tags: string[] | null;
   note: string | null;
   places: {
@@ -227,7 +229,16 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
   const pillole = pilloleGusto(gustoRow);
   // "I miei gusti" (5/11): i tipi di locale scelti dal catalogo ampio, dentro profiles.gusto.
   const amati = amatiValidi(pulisciMappa(gustoRow?.gusto, () => true).amati);
-  const [social, gems, codiceInvito] = await Promise.all([socialPromise, gemsPromise, mioInvito()]);
+  // Lucchetto "Solo per me" (proposta 59): i posti col lucchetto singolo (letti a parte: senza la colonna
+  // solo_per_me, migrazione 20261115f, nessuno) e le raccolte col lucchetto (20261116). Servono al lucchetto
+  // sulle copertine e a "Come ti vedono", che deve contare solo quello che vedono davvero gli altri.
+  const soloPromise: Promise<Set<string>> = fake
+    ? Promise.resolve(new Set(fake.saved.flatMap((r) => (r.places && r.solo_per_me === true ? [r.places.id] : []))))
+    : Promise.resolve(supabase.from("saved_places").select("place_id").eq("user_id", user.id).eq("solo_per_me", true)).then(({ data, error }) => {
+        if (error && !/solo_per_me/.test(error.message ?? "")) console.error("[profilo] lettura 'Solo per me' fallita:", error.message);
+        return new Set((data ?? []).map((r) => r.place_id as string));
+      });
+  const [social, gems, codiceInvito, soloPerMe, raccoltePrivate] = await Promise.all([socialPromise, gemsPromise, mioInvito(), soloPromise, loadRaccoltePrivate(user.id)]);
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
   const initial = (user.email ?? "?").charAt(0).toUpperCase();
@@ -280,12 +291,16 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
     .sort((a, b) => b.visite - a.visite || a.name.localeCompare(b.name, "it"));
 
   // "Come ti vedono" (8/11): gli stessi numeri che legge chi apre /u/<nome> (provati, città, tipo che salvi di più).
-  const citta = new Set(saved.flatMap((r) => (r.places && r.tags?.includes(STATE_DONE) ? [cityFromAddress(r.places.address)] : [])).filter(Boolean)).size;
-  const tipoTop = topTypes(saved.flatMap((r) => (r.places ? [{ category: r.places.category }] : [])), (c) => categoryLabel(c), 1, 1)[0]?.tipo ?? null;
+  // Revisore 16/11: solo i salvati che vedono davvero gli altri, come la vista salvati_pubblici: niente "Non fa per
+  // me", niente lucchetto "Solo per me", niente posti in una raccolta col lucchetto.
+  const visibili = saved.filter((r) => r.places && !r.tags?.includes("Non fa per me") && !soloPerMe.has(r.places.id) && !(r.tags ?? []).some((t) => raccoltePrivate.includes(t)));
+  const doneVisibili = visibili.filter((r) => r.tags?.includes(STATE_DONE)).length;
+  const citta = new Set(visibili.flatMap((r) => (r.places && r.tags?.includes(STATE_DONE) ? [cityFromAddress(r.places.address)] : [])).filter(Boolean)).size;
+  const tipoTop = topTypes(visibili.flatMap((r) => (r.places ? [{ category: r.places.category }] : [])), (c) => categoryLabel(c), 1, 1)[0]?.tipo ?? null;
   const pubblico = !("stato" in social) && social.is_public && social.handle ? social.handle : null;
   const vedonoNumeri = [
     // Stesse parole dei numeri del profilo pubblico ("Provati"); il tipo al plurale come negli scaffali dei Salvati.
-    { id: "provati", value: String(doneCount), label: doneCount === 1 ? "Provato" : "Provati" },
+    { id: "provati", value: String(doneVisibili), label: doneVisibili === 1 ? "Provato" : "Provati" },
     { id: "citta", value: String(citta), label: "Città" },
     ...(tipoTop ? [{ id: "tipo", value: tipoPlurale(tipoTop), label: "Salvi di più" }] : []),
   ];
@@ -435,7 +450,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
       {/* Raccolte e classifica: pannelli chiusi (non si vedono). Le raccolte si aprono da "Gestisci le
           raccolte" in Impostazioni, da /profilo#raccolte o da "Nuova" nei Salvati; la classifica dalla sua tessera. */}
       <ProfiloSezione id="raccolte" pannello aperta={nuovaRaccolta} icon={<FolderHeart {...icon} />} title="Le tue raccolte" hint="Per occasione o per viaggio">
-        <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} />
+        <ProfiloRaccolte userId={user.id} initialRows={raccoltaRows} privateIniziali={raccoltePrivate} />
       </ProfiloSezione>
       {ranks ? (
         <ProfiloSezione id="classifica" pannello icon={<Trophy {...icon} />} title="La tua classifica" hint="I posti dove sei stato, dal preferito">

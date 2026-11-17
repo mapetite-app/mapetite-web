@@ -30,9 +30,11 @@ const plural = (n: number) => `${n} ${n === 1 ? "locale" : "locali"}`;
 // mostrate come cartelle (piano 4.1) che aprono la pagina della raccolta (/raccolte/<nome>).
 // Qui si possono rinominare, unire, eliminare e crearne di nuove scegliendo tra i salvati.
 // Ogni modifica è un update per riga su saved_places con la sessione dell'utente (come la scheda).
-export default function ProfiloRaccolte({ userId, initialRows }: { userId: string; initialRows: RaccoltaRow[] }) {
+export default function ProfiloRaccolte({ userId, initialRows, privateIniziali = [] }: { userId: string; initialRows: RaccoltaRow[]; privateIniziali?: string[] }) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
+  // Raccolte col lucchetto (profiles.raccolte_private): il lucchetto sulla copertina, come "Solo per te" nella testata.
+  const [privateNomi, setPrivateNomi] = useState<string[]>(privateIniziali);
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [name, setName] = useState("");
   const [query, setQuery] = useState("");
@@ -108,6 +110,7 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
     if (!(await protect(from, allTags.includes(res.tag) ? null : res.tag))) return;
     const failed = await apply(withTag(from), (tags) => replaceTag(tags, from, res.tag));
     if (failed === 0) await pulisciDopo(userId, from);
+    if (failed === 0 && privateRef.current === from && !allTags.includes(res.tag)) setPrivateNomi((p) => [...p.filter((x) => x !== from), res.tag]);
     if (failed === 0) trackFeature("raccolta_modifica", { contesto: "rinomina" });
     if (failed === 0) setNotice(allTags.includes(res.tag) ? `“${from}” è confluita in “${res.tag}”.` : `Raccolta rinominata in “${res.tag}”.`);
   }
@@ -197,6 +200,7 @@ export default function ProfiloRaccolte({ userId, initialRows }: { userId: strin
                 covers={covers}
                 emojis={c.preview.map((row) => getCategoryEmoji(row.category ?? null, row.name))}
                 names={c.preview.slice(0, 3).map((row) => row.name)}
+                privata={privateNomi.includes(c.name)}
               />
             </Link>
             <button

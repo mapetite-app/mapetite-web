@@ -28,7 +28,8 @@ export type RistLocale = {
   google_place_id: string | null;
 };
 
-export type RistSalvataggio = { place_id: string; user_id: string; created_at: string; tags: string[] | null; visited_at?: string | null; visite?: number | null };
+// privato: salvato col lucchetto "Solo per me" o in una raccolta col lucchetto (proposta 59): calcolato dalla pagina.
+export type RistSalvataggio = { place_id: string; user_id: string; created_at: string; tags: string[] | null; visited_at?: string | null; visite?: number | null; privato?: boolean };
 
 export type Voce = { chiave: string; volte: number; persone: number };
 export type Azione = { tipo: AzioneTipo; etichetta: string; persone: number; volte: number; prima: number };
@@ -340,7 +341,9 @@ export function inAttesa(rows: RistSalvataggio[], placeId: string): { persone: n
   const occ = tally();
   for (const r of rows) {
     const tags = r.tags ?? [];
-    if (r.place_id !== placeId || tags.includes(STATO_VISITATO)) continue;
+    // Revisore 16/11: le righe col lucchetto non contano (come nelle viste pubbliche): i nomi delle raccolte
+    // private non devono uscire come "occasioni".
+    if (r.place_id !== placeId || tags.includes(STATO_VISITATO) || r.privato) continue;
     chi.add(r.user_id);
     for (const t of tags) if (!STATI.has(t) && !/^(👍|👎)/u.test(t)) occ.add(t, r.user_id);
   }
