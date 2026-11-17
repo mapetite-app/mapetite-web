@@ -969,7 +969,7 @@ export default function VenueSheet({
             {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
             <BuoniPastoRiga venueId={venue.id} category={category} />
             {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3), con quanto ha speso a testa
-                (PROPOSTE.md 64, da 3 risposte concordi) nella stessa pillola; la spesa no se il locale dichiara il prezzo. */}
+                (PROPOSTE.md 64, da 5 risposte, fascia scelta da almeno 2 senza pareggi) nella stessa pillola; la spesa no se il locale dichiara il prezzo. */}
             <VisiteMapetite venueId={googlePlaceId ?? venue.id} spesaId={venue.id} />
           </div>
 
