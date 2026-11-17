@@ -153,7 +153,11 @@ export function computeRistoratore(
   const start = today - giorni + 1;
   const prevStart = start - giorni;
   const ev = eventi.map((r) => ({ r, actor: actorOf(r), day: dayIndex(dayKey(r.created_at)), t: Date.parse(r.created_at) }));
-  const sv = salvati.map((s) => ({ s, actor: `u:${s.user_id}`, day: dayIndex(dayKey(s.created_at)) }));
+  // Lucchetto "Solo per me" (decisione del team 17/11): chi ha il locale col lucchetto non entra in nessun numero
+  // del pannello. Le sue righe non contano e nemmeno i suoi segnali "salva" e "Ci sono stato" su quel locale.
+  const privatiDi = new Map<string, Set<string>>();
+  for (const s of [...salvati, ...(input.attesa ?? [])]) if (s.privato) (privatiDi.get(s.place_id) ?? privatiDi.set(s.place_id, new Set()).get(s.place_id)!).add(`u:${s.user_id}`);
+  const sv = salvati.filter((s) => !s.privato).map((s) => ({ s, actor: `u:${s.user_id}`, day: dayIndex(dayKey(s.created_at)) }));
 
   // Un evento appartiene a un locale per UUID o per Place ID Google (le schede dai risultati
   // della ricerca hanno spesso solo il secondo).
@@ -173,8 +177,10 @@ export function computeRistoratore(
   function persone(placeId: string, tipo: AzioneTipo, from: number, to: number): { persone: Set<string>; volte: number } {
     const set = new Set<string>();
     let volte = 0;
+    const privati = tipo === "salva" || tipo === "ci_sono_stato" ? privatiDi.get(placeId) : undefined;
     for (const e of evPerLocale.get(placeId) ?? []) {
       if (e.r.type !== tipo || e.day < from || e.day > to) continue;
+      if (privati && e.actor && privati.has(e.actor)) continue;
       volte++;
       if (e.actor) set.add(e.actor);
     }
@@ -319,7 +325,7 @@ export function visiteVere(rows: RistSalvataggio[], placeId: string, from: numbe
   const giu = new Set<string>();
   for (const r of rows) {
     const tags = r.tags ?? [];
-    if (r.place_id !== placeId || !tags.includes(STATO_VISITATO)) continue;
+    if (r.place_id !== placeId || !tags.includes(STATO_VISITATO) || r.privato) continue; // lucchetto: non conta
     const d = dayIndex(dayKey(r.visited_at ?? r.created_at));
     if (d < from || d > to) continue;
     chi.add(r.user_id);
@@ -331,7 +337,15 @@ export function visiteVere(rows: RistSalvataggio[], placeId: string, from: numbe
 
 // Clienti che tornano: saved_places.visite >= 2 (migrazione 20261020b_visite). Una persona = una riga.
 export function tornati(rows: RistSalvataggio[], placeId: string): number {
-  return new Set(rows.filter((r) => r.place_id === placeId && (r.visite ?? 0) >= 2).map((r) => r.user_id)).size;
+  return new Set(rows.filter((r) => r.place_id === placeId && (r.visite ?? 0) >= 2 && !r.privato).map((r) => r.user_id)).size;
+}
+
+// Passaparola (proposta 58): tra chi ti vuole provare, quanti su consiglio di un amico. "consigliati" sono le
+// persone con consigliato_da sul locale; contano solo se la loro riga è tra quelle di "Ti vogliono provare"
+// (non visitato, senza lucchetto). Riga assente o col lucchetto: non conta, così non supera mai "Ti vogliono provare".
+export function passaparolaDa(rows: RistSalvataggio[], consigliati: Iterable<string>, placeId: string): number {
+  const ok = new Set(rows.filter((r) => r.place_id === placeId && !r.privato && !(r.tags ?? []).includes(STATO_VISITATO)).map((r) => r.user_id));
+  return new Set([...consigliati].filter((u) => ok.has(u))).size;
 }
 
 // Stati e voti del salvataggio: non sono occasioni.

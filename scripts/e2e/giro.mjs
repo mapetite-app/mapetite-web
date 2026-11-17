@@ -7643,7 +7643,16 @@ else {
       ok(a.persone === 3 && a.occasioni.length === 1 && a.occasioni[0].chiave === "Romantico" && a.occasioni[0].persone === 2, `ristoratore: 'Ti vogliono provare' conta chi ha salvato e non è andato, con le occasioni (${JSON.stringify(a)})`);
       // Revisore 16/11 (lucchetto, minore 3): le righe col lucchetto (Solo per me o raccolta privata) non contano, né le loro raccolte.
       const b = rs.inAttesa([sv("u1", ["Da provare", "Romantico"]), { ...sv("u6", ["Segreti"]), privato: true }, { ...sv("u7", ["Segreti"]), privato: true }, { ...sv("u8", ["Segreti"]), privato: true }], L.id);
-      ok(b.persone === 1 && !b.occasioni.some((o) => o.chiave === "Segreti"), `ristoratore: 'Ti vogliono provare' senza le righe col lucchetto né i nomi delle raccolte private (${JSON.stringify(b)})`); }
+      ok(b.persone === 1 && !b.occasioni.some((o) => o.chiave === "Segreti"), `ristoratore: 'Ti vogliono provare' senza le righe col lucchetto né i nomi delle raccolte private (${JSON.stringify(b)})`);
+      // Decisione del team 17/11: il lucchetto vale per tutti i numeri del pannello (visite, clienti fissi, passaparola).
+      const today = Math.floor(Date.UTC(2026, 9, 15) / 86_400_000);
+      const vv = rs.visiteVere([{ ...sv("u1", ["Già visitato", "Mi è piaciuto"]), visited_at: at(14) }, { ...sv("u2", ["Già visitato", "Mi è piaciuto"]), visited_at: at(14), privato: true }], L.id, today - 6, today);
+      ok(vv.persone === 1 && vv.piaciuto === 1, `ristoratore: visite vere senza le righe col lucchetto (${JSON.stringify(vv)})`);
+      const tt = rs.tornati([{ place_id: L.id, user_id: "u1", visite: 3 }, { place_id: L.id, user_id: "u2", visite: 4, privato: true }], L.id);
+      ok(tt === 1, `ristoratore: clienti fissi senza le righe col lucchetto (${tt})`);
+      const righePp = [sv("u1", ["Da provare"]), { ...sv("u6", ["Da provare"]), privato: true }, sv("u3", ["Già visitato"])];
+      const pp = rs.passaparolaDa(righePp, ["u1", "u6", "u3", "u9"], L.id);
+      ok(pp === 1 && pp <= rs.inAttesa(righePp, L.id).persone, `ristoratore: passaparola solo tra chi conta in 'Ti vogliono provare' (niente lucchetto, visitati o righe assenti): ${pp}`); }
     // Visite vere (POSIZIONAMENTO proposta 4, 18/10): chi ha segnato "Ci sono stato" nel periodo (data della visita), con il voto.
     { const v = (u, tags, visited, place = L.id) => ({ place_id: place, user_id: u, created_at: at(1), tags, visited_at: visited });
       const today = Math.floor(Date.UTC(2026, 9, 15) / 86_400_000);
@@ -7679,6 +7688,14 @@ else {
     const p = rs.computeRistoratore({ locale: L, citta: "Roma", simili: [L, peer(1), peer(2)], eventi, salvati }, 7, now);
     const az = Object.fromEntries(p.azioni.map((a) => [a.tipo, a.persone]));
     ok(az.apri_scheda === 3 && az.salva === 2 && az.ci_sono_stato === 1 && az.percorso === 1, `ristoratore: persone per azione, con Place ID Google e salvataggi veri (${JSON.stringify(az)})`);
+    // Decisione del team 17/11: chi ha il locale col lucchetto non entra nei numeri del periodo, né con la riga né col segnale.
+    { const c2 = "00000000-0000-0000-0000-0000000000c2";
+      const riga = { place_id: L.id, user_id: c2, created_at: at(13), tags: ["Già visitato"], visite: 2 };
+      const ev2 = [...eventi, e("salva", 13, "a20", { u: c2, pid: L.id }), e("ci_sono_stato", 13, "a20", { u: c2, pid: L.id })];
+      const conta = (privato) => { const q = rs.computeRistoratore({ locale: L, citta: "Roma", simili: [L, peer(1), peer(2)], eventi: ev2, salvati: [...salvati, { ...riga, privato }], attesa: [{ ...riga, privato }] }, 7, now); return { ...Object.fromEntries(q.azioni.map((a) => [a.tipo, a.persone])), visite: q.visite.persone, tornati: q.tornati }; };
+      const aperto = conta(false), chiuso = conta(true);
+      ok(aperto.salva === 3 && aperto.ci_sono_stato === 2 && aperto.visite === 1 && aperto.tornati === 1, `ristoratore: senza lucchetto la persona conta (${JSON.stringify(aperto)})`);
+      ok(chiuso.salva === 2 && chiuso.ci_sono_stato === 1 && chiuso.visite === 0 && chiuso.tornati === 0, `ristoratore: col lucchetto la persona non entra in nessun numero del periodo (${JSON.stringify(chiuso)})`); }
     ok(p.daRicerca.ricerche === 1 && p.daRicerca.tipi[0]?.chiave === "trattoria" && p.daRicerca.richieste.some((r) => r.chiave === "tavoli all'aperto") && p.daRicerca.zone[0]?.chiave === "Pigneto", `ristoratore: 'come ti trovano' dalla ricerca della stessa visita (${JSON.stringify(p.daRicerca.richieste)})`);
     ok(p.zona.ricerche === 2 && !p.zona.richieste.some((r) => r.persone > 1) && p.zona.fasce.find((f) => f.chiave === "pranzo")?.persone === 1, `ristoratore: ricerche in zona (città o quartiere nell'indirizzo), non quelle di Milano (${p.zona.ricerche})`);
     ok(p.confronto.simili === 2 && p.confronto.mediaViste === null, "ristoratore: con meno di 3 locali simili niente media (non rivelerebbe il singolo)");
