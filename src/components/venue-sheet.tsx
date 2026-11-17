@@ -28,8 +28,8 @@ import ConfrontoFonti from "@/components/confronto-fonti";
 import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocale } from "@/components/posto-locale";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
-import SpesaVissuta from "@/components/spesa-vissuta";
 import VisiteMapetite from "@/components/visite-mapetite";
+import { frasePrezzo } from "@/lib/prezzo-locale";
 
 // Riquadri della barra azioni teal (mockup A "Editoriale", 21/10): icona e parola su una riga, 50px.
 // La stessa classe la usa il pulsante Salva della mappa (SaveButton in map-view, prop `tile`).
@@ -969,11 +969,9 @@ export default function VenueSheet({
             <PostoPillola info={infoLocale} />
             {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
             <BuoniPastoRiga venueId={venue.id} category={category} />
-            {/* Quanto si spende a testa secondo chi c'è stato (PROPOSTE.md 64): solo da 3 risposte in su,
-                pillola a parte, mai mescolata con i € di Google né con "💶 … · dice il locale". */}
-            <SpesaVissuta venueId={venue.id} />
-            {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3). */}
-            <VisiteMapetite venueId={googlePlaceId ?? venue.id} />
+            {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3), con quanto ha speso a testa
+                (PROPOSTE.md 64, da 3 risposte concordi) nella stessa pillola; la spesa no se il locale dichiara il prezzo. */}
+            <VisiteMapetite venueId={googlePlaceId ?? venue.id} spesaId={venue.id} senzaSpesa={frasePrezzo(infoLocale?.prezzo) != null} />
           </div>
 
           {/* IL VERDETTO MAPETITE: in corsivo tra due filetti, come una citazione di rivista.

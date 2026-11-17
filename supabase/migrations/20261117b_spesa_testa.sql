@@ -14,7 +14,7 @@ alter table public.saved_places add constraint saved_places_spesa_testa_check
 -- Fascia più scelta e numero di risposte per la scheda (UUID del locale o Place ID Google, come buoni_pasto_conteggio).
 -- Contano solo i salvati con la visita ("Già visitato") e non nascosti agli altri: niente "Solo per me" (20261115f),
 -- niente salvati che stanno in una raccolta col lucchetto (20261116). Sotto le 3 risposte nessuna riga.
--- A parità di voti vince la fascia più bassa (scelta fissa: la stessa situazione dà sempre la stessa riga).
+-- La fascia esce solo se l'hanno scelta almeno 2 persone e nessun'altra fascia la pareggia (revisore 17/11): altrimenti niente.
 create or replace function public.spesa_testa_fascia(p_place text)
 returns table (fascia smallint, risposte integer)
 language sql
@@ -34,7 +34,13 @@ as $$
       and not (coalesce(s.tags, '{}') && coalesce(pr.raccolte_private, '{}'))
   ),
   tot as (select count(*)::integer as n from r),
-  top as (select r.f, count(*) as c from r group by r.f order by count(*) desc, r.f asc limit 1)
+  -- Revisore 17/11: con risposte tutte diverse (1, 3, 4) non si mostra niente. La fascia esce solo se l'hanno
+  -- scelta almeno 2 persone ed è davanti a tutte le altre (nessun pareggio): mai la scelta di una persona sola.
+  conta as (select r.f, count(*)::integer as c from r group by r.f),
+  top as (
+    select c1.f, c1.c from conta c1
+    where c1.c >= 2 and not exists (select 1 from conta c2 where c2.f <> c1.f and c2.c >= c1.c)
+  )
   select top.f, tot.n from top, tot where tot.n >= 3;
 $$;
 revoke all on function public.spesa_testa_fascia(text) from public;

@@ -259,7 +259,7 @@ export default function DiarioFoglio({
         {spesaUser && spesaPlace && spesaPronta && (
           <div data-testid="diario-spesa" className="mt-4">
             <p className="text-sm font-display font-semibold text-text">
-              👥 A testa <span className="font-sans font-normal text-text-muted">· facoltativo</span>
+              Quanto a testa?
             </p>
             <div role="group" aria-label="Quanto hai speso a testa" className="mt-2 grid grid-cols-4 gap-2">
               {FASCE_SPESA.map((f) => (

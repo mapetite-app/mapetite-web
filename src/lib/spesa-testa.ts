@@ -31,8 +31,9 @@ export function pulisciSpesa(row: { fascia?: unknown; risposte?: unknown } | nul
 }
 
 /** "15–30 € a testa · chi c'è stato", o null sotto le 3 risposte. */
-export function fraseSpesa(s: { fascia?: unknown; risposte?: unknown } | null | undefined): string | null {
+export function fraseSpesa(s: { fascia?: unknown; risposte?: unknown } | null | undefined, breve = false): string | null {
   const v = pulisciSpesa(s);
   const f = v ? FASCE_SPESA.find((x) => x.v === v.fascia) : null;
-  return f ? `${f.nome} a testa · chi c'è stato` : null;
+  if (!f) return null;
+  return breve ? `${f.nome} a testa` : `${f.nome} a testa · chi c'è stato`;
 }
