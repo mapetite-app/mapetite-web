@@ -1722,6 +1722,9 @@ await shot("15-scheda-b");
   // Osteria Bella è verificata, con "c'è posto" e buoni pasto confermati da 3 persone.
   await page.route("**/api/ristoratore/serate**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "R1" ? { verificato: true, giorni: [0, 1, 2, 3, 4, 5, 6], at: new Date().toISOString(), prezzo: { min: 25, max: 35, bevande: true } } : new URL(r.request().url()).searchParams.get("id") === "R2" ? { verificato: true, giorni: [], at: null, apertoDal: (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 3); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })(), prezzo: { min: 25, max: 35, bevande: false } } : { verificato: false, giorni: [], at: null, prezzo: { min: 10, max: 20, bevande: true } } }));
   await page.route("**/rest/v1/rpc/buoni_pasto_conteggio**", (r) => r.fulfill({ json: r.request().postDataJSON()?.p_place === "R1" ? [{ si: 3, no: 0 }] : [{ si: 0, no: 0 }] }));
+  // Spesa a testa (proposta 64): su Osteria Bella solo 2 risposte → nessuna pillola (anche se la funzione sbagliasse).
+  let spesaChiesta = false;
+  await page.route("**/rest/v1/rpc/spesa_testa_fascia**", (r) => { if (r.request().postDataJSON()?.p_place === "R1") spesaChiesta = true; return r.fulfill({ json: r.request().postDataJSON()?.p_place === "R1" ? [{ fascia: 2, risposte: 2 }] : [] }); });
   await page.route("**/api/places/tripadvisor**", (r) => {
     const u = new URL(r.request().url()); taChiesti.push(u.searchParams.get("nome"));
     if (u.searchParams.get("nome") !== "Osteria Bella") return r.fulfill({ json: { stato: "nessuno" } });
@@ -1741,6 +1744,7 @@ await shot("15-scheda-b");
     ok(await page.getByTestId("posto-stasera").isVisible() && await page.getByTestId("buoni-pasto").isVisible() && h <= 62, `scheda: 'c'è posto' e buoni pasto in un solo blocco di al massimo 2 righe (${Math.round(h)} px)`);
     // Revisore 17/11: con "c'è posto", buoni pasto e prezzo la pillola del prezzo è corta e "dice il locale" compare una volta sola.
     ok(((await page.getByTestId("prezzo-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim() === "💶 25–35 € a testa · bevande incl." && (((await page.getByTestId("segnali-scheda").textContent()) ?? "").match(/dice il locale/g) ?? []).length === 1, "scheda: 'c'è posto' e prezzo del locale → pillola corta '💶 25–35 € a testa · bevande incl.', un solo 'dice il locale'");
+    ok(spesaChiesta && (await page.getByTestId("spesa-vissuta").count()) === 0, `spesa a testa: con 2 risposte di chi c'è stato nessuna pillola (chiesta: ${spesaChiesta})`);
     await shot("15c-scheda-segnali"); }
   await apriDettagli(page);
   await page.getByTestId("scheda-tab-recensioni").click();
@@ -1796,7 +1800,7 @@ await shot("15-scheda-b");
     ok((await page.getByTestId("orari-settimana").locator("li").count()) === 7, "scheda, Info: un tocco su 'Oggi' apre gli orari dei 7 giorni");
     ok(await page.evaluate(() => document.documentElement.dataset.schedaAperta === "1" && getComputedStyle(document.querySelector("[data-app-nav]")).display === "none"), "scheda aperta: la barra dell'app si nasconde (scheda a tutto spazio, come Places)"); }
   await page.unroute("**/api/search"); await page.unroute("**/api/places/community**"); await page.unroute("**/api/places/tripadvisor**");
-  await page.unroute("**/api/ristoratore/serate**"); await page.unroute("**/rest/v1/rpc/buoni_pasto_conteggio**");
+  await page.unroute("**/api/ristoratore/serate**"); await page.unroute("**/rest/v1/rpc/buoni_pasto_conteggio**"); await page.unroute("**/rest/v1/rpc/spesa_testa_fascia**");
 }
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 ok(await page.evaluate(() => document.documentElement.dataset.scheda === "b"), "scheda B: la scelta resta senza parametro");
@@ -2771,6 +2775,15 @@ else {
     if (r.request().method() === "DELETE") { buoniScritti.push("tolta"); return r.fulfill({ status: 204, body: "" }); }
     return r.fulfill({ json: [] });
   });
+  // Spesa a testa (proposta 64): pillola da 3 risposte; la risposta nel foglio va sul proprio salvato (PATCH spesa_testa).
+  await p.route("**/rest/v1/rpc/spesa_testa_fascia**", (r) => r.fulfill({ json: [{ fascia: 2, risposte: 3 }] }));
+  const spesaScritte = [];
+  await p.route("**/rest/v1/saved_places**", (r) => {
+    const b = r.request().method() === "PATCH" ? r.request().postDataJSON() : null;
+    if (b && "spesa_testa" in b) { spesaScritte.push(b.spesa_testa); return r.fulfill({ status: 204, body: "" }); }
+    if (r.request().method() === "GET" && r.request().url().includes("select=spesa_testa")) return r.fulfill({ json: [] });
+    return r.fallback();
+  });
   await p.getByLabel("Cerca tra i salvati").fill("");
   // Le card seguono l'ordine della lista (Recenti: Caffè Milano prima): si apre Terrazza Uno per nome.
   // Con la posizione a Milano è accesa Milano (4/11): si passa a Roma.
@@ -2778,6 +2791,10 @@ else {
   await p.locator("ul.snap-x li").filter({ hasText: "Terrazza Uno" }).first().locator("button").last().click();
   await p.getByTestId("stato-salvato").waitFor({ timeout: 3000 });
   ok(await p.getByTestId("buoni-pasto").waitFor({ timeout: 4000 }).then(async () => (await p.getByTestId("buoni-pasto").textContent())?.includes("Buoni pasto: sì · 3 persone"), () => false), "buoni pasto: riga in scheda quando almeno 2 persone concordano");
+  { const t = await p.getByTestId("spesa-vissuta").waitFor({ timeout: 4000 }).then(async () => ((await p.getByTestId("spesa-vissuta").textContent()) ?? "").replace(/\s+/g, " ").trim(), () => "(assente)");
+    const seg = (await p.getByTestId("segnali-scheda").textContent().catch(() => "")) ?? "";
+    ok(t === "👥 15–30 € a testa · chi c'è stato" && !/dice il locale/.test(t) && !t.includes("€€"), `spesa a testa: con 3 risposte la pillola '👥 15–30 € a testa · chi c'è stato', a parte dal prezzo del locale (${t})`);
+    ok((await p.getByTestId("segnali-scheda").getByTestId("spesa-vissuta").count()) === 1 && seg.includes("chi c'è stato"), "spesa a testa: la pillola sta tra i segnali della scheda"); }
   { const t = await p.getByTestId("visite-mapetite").waitFor({ timeout: 6000 }).then(async () => (await p.getByTestId("visite-mapetite").textContent()) ?? "", () => "(assente)");
     ok(t.includes("👍 5 su 6 · chi c'è stato"), `scheda: chi ci è stato su Mapetite e com'era (${t})`); }
   await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).click();
@@ -2789,6 +2806,15 @@ else {
     if (vis) { await sb.getByRole("button", { name: "Buoni pasto: Sì" }).click(); await p.waitForTimeout(400); }
     await p.getByTestId("diario-foglio").screenshot({ path: `${OUT}/51b-diario-buoni.png` }).catch(() => {});
     ok(vis && buoniScritti.some((b) => (Array.isArray(b) ? b[0] : b)?.accetta === true) && (await sb.getByRole("button", { name: "Buoni pasto: Sì" }).getAttribute("aria-pressed")) === "true", `buoni pasto: nel 'Com'è andata?' un tocco su Sì lo salva (${JSON.stringify(buoniScritti)})`); }
+  { const sp = p.getByTestId("diario-spesa");
+    const vis = await sp.waitFor({ timeout: 3000 }).then(() => true, () => false);
+    const b = sp.getByRole("button", { name: "A testa: 15–30 €" });
+    const alti = vis ? await sp.getByRole("button").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height))) : [];
+    if (vis) { await b.click(); await p.waitForTimeout(400); }
+    await p.getByTestId("diario-foglio").screenshot({ path: `${OUT}/51c-diario-spesa.png` }).catch(() => {});
+    ok(vis && alti.length === 4 && alti.every((h) => h >= 44) && spesaScritte.at(-1) === 2 && (await b.getAttribute("aria-pressed")) === "true", `spesa a testa: nel 'Com'è andata?' 4 scelte da almeno 44 px, un tocco su 15–30 la salva (${JSON.stringify(spesaScritte)}, ${JSON.stringify(alti)})`);
+    if (vis) { await b.click(); await p.waitForTimeout(400); }
+    ok(vis && spesaScritte.at(-1) === null && (await b.getAttribute("aria-pressed")) === "false", `spesa a testa: un secondo tocco toglie la risposta (${JSON.stringify(spesaScritte)})`); }
   await p.getByTestId("diario-salta").click().catch(() => {});
   await p.waitForTimeout(500);
   ok(JSON.stringify(patched?.tags ?? []).includes("Già visitato") && (await p.getByTestId("stato-salvato").getByRole("button", { name: "✓ Ci sono stato" }).getAttribute("aria-pressed")) === "true", "scheda salvato: 'Ci sono stato' con un tocco");
@@ -7649,6 +7675,14 @@ else {
         ok(pz.frasePrezzo({ min: 25, max: 35, bevande: false }) === "25–35 € a testa, bevande escluse" && pz.frasePrezzo({ min: 30, max: 30, bevande: true }) === "30 € a testa, bevande incluse" && pz.frasePrezzo({ min: 25, max: 35, bevande: false }, true) === "25–35 € a testa" && pz.frasePrezzo({ min: 25, max: 35, bevande: true }, true) === "25–35 € a testa · bevande incl.", "prezzo a testa: '25–35 € a testa, bevande escluse', '30 € a testa, bevande incluse', breve per la pillola (bevande solo se incluse)");
         ok(pz.pulisciPrezzo(40, 30, false) === null && pz.pulisciPrezzo(0, 30, false) === null && pz.pulisciPrezzo(10, 501, false) === null && pz.pulisciPrezzo(12.5, 20, false) === null && pz.pulisciPrezzo("ciao", 20, false) === null && pz.frasePrezzo(null) === null, "prezzo a testa: niente con min > max, fuori da 1–500, decimali, testo o dato assente");
         ok(JSON.stringify(pz.pulisciPrezzo("25", "35", "si")) === '{"min":25,"max":35,"bevande":false}', "prezzo a testa: cifre dai campi del modulo; bevande incluse solo se è proprio sì");
+      } }
+    // "Quanto si spende davvero" (PROPOSTE.md 64): fascia di chi c'è stato, solo da 3 risposte vere.
+    { let st = null;
+      try { st = await import(new URL("../../src/lib/spesa-testa.ts", import.meta.url).href); } catch (e) { ok(false, `spesa a testa: modulo src/lib/spesa-testa.ts importabile (${e.message})`); }
+      if (st) {
+        ok(st.fraseSpesa({ fascia: 2, risposte: 3 }) === "15–30 € a testa · chi c'è stato" && st.fraseSpesa({ fascia: 1, risposte: 5 }) === "meno di 15 € a testa · chi c'è stato" && st.fraseSpesa({ fascia: "4", risposte: 3 }) === "oltre 50 € a testa · chi c'è stato", "spesa a testa: '15–30 € a testa · chi c'è stato', 'meno di 15 €', 'oltre 50 €'");
+        ok(st.fraseSpesa({ fascia: 2, risposte: 2 }) === null && st.fraseSpesa({ fascia: 5, risposte: 9 }) === null && st.fraseSpesa({ fascia: 0, risposte: 9 }) === null && st.fraseSpesa(null) === null && st.fraseSpesa({ fascia: 2 }) === null, "spesa a testa: niente sotto le 3 risposte, fascia fuori da 1–4 o dato assente");
+        ok(st.FASCE_SPESA.map((f) => f.label).join("|") === "< 15 €|15–30|30–50|> 50 €" && st.pulisciFascia(2.5) === null && st.pulisciFascia("3") === 3, "spesa a testa: 4 scelte corte nel foglio; solo valori interi 1–4");
       } }
     { let cs = null;
       try { cs = await import(new URL("../../src/lib/chiedi-salvati.ts", import.meta.url).href); } catch (e) { ok(false, `chiedi ai tuoi posti: modulo importabile (${e.message})`); }

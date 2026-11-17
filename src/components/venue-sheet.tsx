@@ -28,6 +28,7 @@ import ConfrontoFonti from "@/components/confronto-fonti";
 import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocale } from "@/components/posto-locale";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
+import SpesaVissuta from "@/components/spesa-vissuta";
 import VisiteMapetite from "@/components/visite-mapetite";
 
 // Riquadri della barra azioni teal (mockup A "Editoriale", 21/10): icona e parola su una riga, 50px.
@@ -968,6 +969,9 @@ export default function VenueSheet({
             <PostoPillola info={infoLocale} />
             {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
             <BuoniPastoRiga venueId={venue.id} category={category} />
+            {/* Quanto si spende a testa secondo chi c'è stato (PROPOSTE.md 64): solo da 3 risposte in su,
+                pillola a parte, mai mescolata con i € di Google né con "💶 … · dice il locale". */}
+            <SpesaVissuta venueId={venue.id} />
             {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3). */}
             <VisiteMapetite venueId={googlePlaceId ?? venue.id} />
           </div>
