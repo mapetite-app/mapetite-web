@@ -23,7 +23,8 @@ export default function PrezzoMedio({ placeId, iniziale, verificato, demo }: { p
   const pulito = vuoto ? null : pulisciPrezzo(da.trim() || a, a.trim() || da, bevande);
   const valido = vuoto || pulito != null;
   const cambiato = valido && chiave(pulito) !== chiave(salvato);
-  const mostraAvviso = !valido && ((da.trim() !== "" && a.trim() !== "") || uscito);
+  // Solo uscendo dal campo: con "25" e il primo "3" di "35" l'avviso scattava mentre si scriveva (revisore 2, 17/11).
+  const mostraAvviso = !valido && uscito;
   // Solo cifre (su "number" la virgola di "25,5" diventava "255").
   const cifre = (v: string) => v.replace(/[^0-9]/g, "").slice(0, 3);
 
@@ -50,17 +51,18 @@ export default function PrezzoMedio({ placeId, iniziale, verificato, demo }: { p
   if (!verificato) return <p className="text-sm font-sans text-text-muted">Si accende quando il locale è verificato.</p>;
 
   const campo = "min-h-11 w-20 rounded-card border border-border bg-white px-3 text-sm font-sans text-text";
-  const anteprima = frasePrezzo(cambiato ? pulito : salvato);
+  // La stessa frase corta della pillola vera della scheda (revisore 2, 17/11: l'anteprima prometteva un'altra cosa).
+  const anteprima = frasePrezzo(cambiato ? pulito : salvato, true);
   return (
     <div data-testid="prezzo-medio">
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm font-sans text-text">
           Da
-          <input type="text" inputMode="numeric" pattern="[0-9]*" data-testid="prezzo-da" aria-label="Prezzo a testa, da (euro)" value={da} onChange={(e) => { setDa(cifre(e.target.value)); setStato("fermo"); setUscito(false); }} onBlur={() => setUscito(true)} className={campo} />
+          <input type="text" inputMode="numeric" pattern="[0-9]*" data-testid="prezzo-da" aria-label="Prezzo a testa, da (euro)" value={da} onChange={(e) => { const v = cifre(e.target.value); setDa(v); if (v === "" && a.trim() === "") setBevande(false); setStato("fermo"); setUscito(false); }} onBlur={() => setUscito(true)} className={campo} />
         </label>
         <label className="flex items-center gap-2 text-sm font-sans text-text">
           a
-          <input type="text" inputMode="numeric" pattern="[0-9]*" data-testid="prezzo-a" aria-label="Prezzo a testa, a (euro)" value={a} onChange={(e) => { setA(cifre(e.target.value)); setStato("fermo"); setUscito(false); }} onBlur={() => setUscito(true)} className={campo} />
+          <input type="text" inputMode="numeric" pattern="[0-9]*" data-testid="prezzo-a" aria-label="Prezzo a testa, a (euro)" value={a} onChange={(e) => { const v = cifre(e.target.value); setA(v); if (v === "" && da.trim() === "") setBevande(false); setStato("fermo"); setUscito(false); }} onBlur={() => setUscito(true)} className={campo} />
           €
         </label>
         <label className="flex min-h-11 items-center gap-2 text-sm font-sans text-text">

@@ -944,10 +944,11 @@ export default function VenueSheet({
             <AperturaPillola info={infoLocale} />
             {/* Prezzo a testa detto dal titolare verificato (PROPOSTE.md 65), separato dai € di Google. */}
             <PrezzoLocale info={infoLocale} />
+            {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1).
+                Subito dopo il prezzo: le due frasi del titolare vicine, un solo "· dice il locale" (revisore 17/11). */}
+            <PostoPillola info={infoLocale} />
             {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
             <BuoniPastoRiga venueId={venue.id} category={category} />
-            {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1). */}
-            <PostoPillola info={infoLocale} />
             {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3). */}
             <VisiteMapetite venueId={googlePlaceId ?? venue.id} />
           </div>
