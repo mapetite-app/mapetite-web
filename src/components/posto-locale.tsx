@@ -29,6 +29,12 @@ export function leggiInfoLocale(venueId: string): Promise<InfoLocale | null> {
 
 /** Info del titolare per un locale (UUID o Place ID Google); null finché non arriva o se non è verificato. */
 export function useInfoLocale(venueId: string): InfoLocale | null {
+  return useInfoLocaleStato(venueId).info;
+}
+
+/** Come useInfoLocale, più "pronto": la risposta è arrivata (anche vuota o fallita). Serve a non far lampeggiare
+ *  la fascia € di Google che va nascosta accanto al prezzo del titolare (revisore 4, 17/11). */
+export function useInfoLocaleStato(venueId: string): { info: InfoLocale | null; pronto: boolean } {
   const [info, setInfo] = useState<{ id: string; info: InfoLocale | null } | null>(null);
 
   useEffect(() => {
@@ -38,7 +44,7 @@ export function useInfoLocale(venueId: string): InfoLocale | null {
   }, [venueId]);
 
   // Scheda passata a un altro locale: niente dati del precedente.
-  return info?.id === venueId ? info.info : null;
+  return info?.id === venueId ? { info: info.info, pronto: true } : { info: null, pronto: false };
 }
 
 /** Pillola "🌙 … c'è posto · dice il locale", o niente. */
@@ -84,10 +90,13 @@ export function PrezzoLocale({ info }: { info: InfoLocale | null }) {
 
 export default function PostoLocale({ venueId }: { venueId: string }) {
   const info = useInfoLocale(venueId);
-  if (!frasePosto(info)) return null;
+  // Pagina pubblica del locale: anche il prezzo a testa del titolare (PROPOSTE.md 65), nello stesso riquadro di "c'è posto".
+  const conPrezzo = !!(info?.verificato && frasePrezzo(info.prezzo));
+  if (!frasePosto(info) && !conPrezzo) return null;
   return (
     <p data-testid="posto-locale" className="mt-2 flex flex-wrap items-center gap-1.5">
-      <PostoPillola info={info} />
+      <PrezzoLocale info={info} />
+      <PostoPillola info={info} conPrezzo />
     </p>
   );
 }

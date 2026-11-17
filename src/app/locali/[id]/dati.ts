@@ -19,6 +19,9 @@ export type PublicPlace = {
   google_place_id: string | null;
   // Badge "Verificato" (migrazione 20261015_ristoratori.sql): null finché non è applicata.
   verified_at?: string | null;
+  // Prezzo a testa detto dal titolare (migrazione 20261117_prezzo_medio.sql, PROPOSTE.md 65): con questo, niente € di Google.
+  prezzo_min?: number | null;
+  prezzo_max?: number | null;
 };
 
 export type PublicSynthesis = {
@@ -34,6 +37,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const PLACE_COLUMNS = "id, name, address, lat, lng, category, rating, price_level, google_place_id";
 // Senza la colonna verified_at (migrazione non applicata) si rilegge senza: la pagina non si rompe.
 let noVerifiedColumn = false;
+let noPrezzoColumns = false;
 
 const dev = () => process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER;
 
@@ -71,8 +75,12 @@ export const loadPublicPlace = cache(async (id: string): Promise<PublicPlaceData
 
   const supabase = await createClient();
   const read = (cols: string) => supabase.from("places").select(cols).eq("id", id).maybeSingle<PublicPlace>();
-  let { data: place, error } = await read(noVerifiedColumn ? PLACE_COLUMNS : `${PLACE_COLUMNS}, verified_at`);
-  // 42703 = colonna inesistente: verified_at arriva con 20261015_ristoratori.sql.
+  let { data: place, error } = await read(noVerifiedColumn ? PLACE_COLUMNS : noPrezzoColumns ? `${PLACE_COLUMNS}, verified_at` : `${PLACE_COLUMNS}, verified_at, prezzo_min, prezzo_max`);
+  // 42703 = colonna inesistente: prima si rinuncia al prezzo del titolare (20261117_prezzo_medio.sql), poi a verified_at (20261015_ristoratori.sql).
+  if (error?.code === "42703" && !noVerifiedColumn && !noPrezzoColumns) {
+    noPrezzoColumns = true;
+    ({ data: place, error } = await read(`${PLACE_COLUMNS}, verified_at`));
+  }
   if (error?.code === "42703" && !noVerifiedColumn) {
     noVerifiedColumn = true;
     ({ data: place, error } = await read(PLACE_COLUMNS));

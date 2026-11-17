@@ -7806,6 +7806,19 @@ else {
     const t = (await rp.getByTestId("posto-stasera").textContent().catch(() => "")) ?? "";
     ok(t.includes("Stasera c'è posto") && t.includes("dice il locale") && (await rp.getByTestId("posto-locale").getByText("Verificato").count()) === 0, `locale verificato con serate tranquille: 'Stasera c'è posto · dice il locale', senza un secondo badge (${t})`);
     await rp.screenshot({ path: `${OUT}/70b-locale-serate.png`, caret: "initial" });
+    // Prezzo a testa del titolare anche sulla pagina pubblica (PROPOSTE.md 65): nello stesso riquadro di "c'è posto",
+    // e senza la fascia € di Google accanto (che resta per i locali senza prezzo del titolare).
+    await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z", price_level: 3 } });
+    await rp.reload({ waitUntil: "networkidle" });
+    const conGoogle = ((await rp.locator("main").textContent().catch(() => "")) ?? "").includes("€€€");
+    await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: true, giorni: [g], at: new Date().toISOString(), prezzo: { min: 25, max: 35, bevande: false } });
+    await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z", price_level: 3, prezzo_min: 25, prezzo_max: 35 } });
+    await rp.reload({ waitUntil: "networkidle" });
+    await rp.getByTestId("parola-locale").waitFor({ timeout: 5000 }).catch(() => {});
+    { const pl = ((await rp.getByTestId("posto-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
+      const main = ((await rp.locator("main").textContent().catch(() => "")) ?? "");
+      ok(conGoogle && pl.includes("💶 25–35 € a testa, bevande escluse") && pl.includes("Stasera c'è posto") && (pl.match(/dice il locale/g) ?? []).length === 1 && !main.includes("€€€"), `pagina del locale: prezzo del titolare e 'c'è posto' in un riquadro, senza la fascia € di Google (che senza prezzo c'è: ${conGoogle}) (${pl})`); }
+    await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z" } });
     await rctx.clearCookies({ name: "e2e_serate" }); }
   await rp.screenshot({ path: `${OUT}/70-locale-verificato.png`, caret: "initial" });
   await setCookie("e2e_locale", locR);

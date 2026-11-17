@@ -35,6 +35,10 @@ type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
+// Con il prezzo a testa detto dal titolare verificato (PROPOSTE.md 65) la fascia € di Google non compare: due fonti in contrasto.
+const fasciaGoogle = (p: { price_level: number | null; verified_at?: string | null; prezzo_min?: number | null }) =>
+  p.verified_at && p.prezzo_min != null ? null : p.price_level;
+
 function kindLine(category: string | null, price: number | null, rating: number | null): string {
   return [categoryLabel(category), priceLabel(price), ratingLabel(rating)].filter(Boolean).join(" · ");
 }
@@ -47,7 +51,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const city = cityFromAddress(place.address);
   const title = `${place.name}${city ? ` · ${city}` : ""} · Mapetite`;
   const verdict = synthesis?.verdict?.trim() || null;
-  const context = kindLine(place.category, place.price_level, place.rating);
+  const context = kindLine(place.category, fasciaGoogle(place), place.rating);
   const description = verdict
     ? `Il verdetto Mapetite: ${verdict}`
     : `${context ? `${context}. ` : ""}Salvalo in Mapetite per ritrovarlo quando serve.`;
@@ -83,7 +87,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
 
   const emoji = getCategoryEmoji(place.category, place.name);
   const city = cityFromAddress(place.address);
-  const kind = kindLine(place.category, place.price_level, place.rating);
+  const kind = kindLine(place.category, fasciaGoogle(place), place.rating);
   const verdict = synthesis?.verdict?.trim() || null;
   const synthText = synthesis?.synthesis?.trim() || null;
   const goFor = cleanList(synthesis?.go_for);
