@@ -339,7 +339,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
               onClick={scheda.vai}
               className="mt-1 inline-flex min-h-11 items-center text-sm font-display font-semibold text-brand underline underline-offset-2"
             >
-              Segna «✓ Ci sono stato» qui sopra ↑
+              Segnalo qui sopra ↑
             </button>
           ) : (scheda?.segna || c.placeId != null) && (
             <button

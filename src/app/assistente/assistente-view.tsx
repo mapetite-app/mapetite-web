@@ -897,7 +897,7 @@ export default function AssistenteView({ userId }: { userId: string | null }) {
         <div
           role="status"
           data-testid="assistente-salvato-avviso"
-          className="fixed inset-x-3 bottom-[calc(var(--nav-height-mobile)+var(--nav-sporgenza)+4.25rem)] z-40 mx-auto flex max-w-lg items-center gap-3 rounded-card bg-brand px-4 py-3 text-white shadow-float"
+          className="fixed inset-x-3 bottom-[calc(var(--nav-height-mobile)+var(--nav-sporgenza)+4.25rem)] z-[70] mx-auto flex max-w-lg items-center gap-3 rounded-card bg-brand px-4 py-3 text-white shadow-float"
         >
           <BookmarkCheck size={18} aria-hidden className="shrink-0 text-accent" />
           <p className="min-w-0 flex-1 text-sm font-sans leading-snug">
