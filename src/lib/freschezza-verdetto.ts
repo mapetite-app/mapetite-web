@@ -4,7 +4,6 @@
 // salvati con il verdetto. Mai date relative salvate ("2 settimane fa" invecchia): mese e anno nel fuso
 // di Roma, calcolati quando si mostra. Nessun import: il giro automatico carica questo file con Node.
 
-const UN_ANNO_MS = 365 * 24 * 60 * 60 * 1000;
 
 function meseAnnoRoma(d: Date): { mese: string; anno: string } | null {
   const parti = new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", month: "long", year: "numeric" }).formatToParts(d);
@@ -22,11 +21,14 @@ export function fraseFreschezza(
   if (typeof n !== "number" || !Number.isInteger(n) || n <= 0) return null;
   if (typeof dati.ultima !== "string" || dati.ultima.trim() === "") return null;
   const ultima = new Date(dati.ultima);
-  const t = ultima.getTime();
-  const adesso = now.getTime();
-  if (!Number.isFinite(t) || !Number.isFinite(adesso) || t > adesso) return null;
-
-  if (adesso - t > UN_ANNO_MS) {
+  if (!Number.isFinite(ultima.getTime()) || !Number.isFinite(now.getTime())) return null;
+  // A mesi di calendario nel fuso di Roma (revisore 18/11): si salva solo il mese, quindi "futuro" e "oltre un anno"
+  // si decidono sul mese, mai su un giorno inventato. "Oltre un anno" solo da 13 mesi di distanza: sempre vero.
+  const mu = meseNumeroRoma(ultima), mo = meseNumeroRoma(now);
+  if (!mu || !mo) return null;
+  const distanza = (Number(mo.anno) * 12 + Number(mo.mese)) - (Number(mu.anno) * 12 + Number(mu.mese));
+  if (distanza < 0) return null;
+  if (distanza >= 13) {
     return n === 1
       ? "Recensione di oltre un anno fa: potrebbe essere cambiato"
       : "Recensioni di oltre un anno fa: potrebbe essere cambiato";
@@ -55,7 +57,7 @@ export function freschezzaDa(
     if (Number.isFinite(ms) && ms > ultimaMs) { ultimaMs = ms; ultima = new Date(ms).toISOString(); }
   }
   // Prudenza con i termini Google (3.2.3(b), "No Caching"): si salva solo mese e anno, non la data esatta.
-  // A metà mese e a mezzogiorno UTC, così il mese resta lo stesso in ogni fuso. La riga mostra solo il mese.
+  // A metà mese e a mezzogiorno UTC, così il mese resta lo stesso in ogni fuso; la riga ragiona solo sul mese.
   if (ultima) {
     const m = meseNumeroRoma(new Date(ultima));
     ultima = m ? `${m.anno}-${m.mese}-15T12:00:00.000Z` : null;

@@ -11592,6 +11592,7 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
       const t = ((await riga.first().textContent({ timeout: 3000 }).catch(() => "")) ?? "").trim();
       ok(atteso != null && t === atteso && /^Da 3 recensioni Google, la più recente di [a-zà-ù]+( \d{4})?$/.test(t), `scheda: riga 'da quando parla il verdetto' sotto il verdetto (${t || "assente"})`);
       ok(await p.locator("[data-testid=verdetto-box] [data-testid=verdetto-freschezza]").count() === 1, "scheda: la riga della freschezza sta dentro il riquadro del verdetto"); }
+    if (process.env.PERCHE_SHOT) await p.screenshot({ path: process.env.PERCHE_SHOT });
     await p.screenshot({ path: `${OUT}/91-perche-ti-piacera.png` });
     await p.getByRole("button", { name: /chiudi/i }).first().click().catch(() => {});
     await p.keyboard.press("Escape").catch(() => {});
@@ -11615,6 +11616,10 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
   chk(f({ n: null, ultima: "2026-10-12T09:00:00Z" }, ora), null, "numero mancante: nessuna riga");
   chk(f({ n: 3, ultima: null }, ora), null, "data mancante: nessuna riga");
   chk(f({ n: 3, ultima: "ieri" }, ora), null, "data non valida: nessuna riga");
+  // Revisore 18/11: si salva solo il mese (giorno 15): la riga del mese in corso c'è anche il giorno 10; "oltre un anno" solo da 13 mesi.
+  { const cor = fv.freschezzaDa(["x", "y", "z"], ["2026-11-03T08:00:00Z", "2026-10-01T00:00:00Z", "2026-09-01T00:00:00Z"]);
+    chk(f(cor, new Date("2026-11-10T10:00:00Z")), "Da 3 recensioni Google, la più recente di novembre", "recensione del mese in corso vista il giorno 10");
+    chk(f(fv.freschezzaDa(["x"], ["2025-11-28T08:00:00Z"]), new Date("2026-11-18T10:00:00Z")), "Da 1 recensione Google, di novembre 2025", "11 mesi e mezzo non sono 'oltre un anno'"); }
   const fd = fv.freschezzaDa(["buono", "ottimo", "  "], ["2026-09-01T10:00:00Z", "2026-10-05T10:00:00Z", "2026-11-01T10:00:00Z"]);
   ok(fd.n === 2 && fd.ultima === "2026-10-15T12:00:00.000Z", `freschezza verdetto: conta solo le recensioni con testo, prende la più recente tra quelle e salva solo il mese (termini Google) (${JSON.stringify(fd)})`);
   const fd0 = fv.freschezzaDa(null, null);
