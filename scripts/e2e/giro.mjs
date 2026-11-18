@@ -5121,6 +5121,21 @@ else {
     await sd.waitForTimeout(500);
     ok(patchD.length === 1 && patchD[0].solo_per_me === true, `solo per me: acceso e salvato (${JSON.stringify(patchD)})`);
     ok(((await sd.getByTestId("solo-per-me-scheda").textContent().catch(() => "")) ?? "").includes("Solo per te"), "solo per me: nella scheda 'Solo per te: non lo vedono gli amici'"); }
+  // Proposta 66: "Non contarlo nei miei gusti" in Modifica, poi la riga nella scheda.
+  { patchD.length = 0;
+    ok((await sd.getByTestId("fuori-gusti-scheda").count()) === 0, "fuori dai gusti: spento, nessuna riga nella scheda");
+    await sd.getByTestId("tue-note").getByRole("button", { name: "Modifica", exact: true }).click().catch(() => {});
+    const sw = sd.getByTestId("fuori-gusti");
+    await sw.waitFor({ timeout: 4000 }).catch(() => {});
+    const bx = await sw.boundingBox().catch(() => null);
+    ok((await sw.getAttribute("aria-checked")) === "false" && bx != null && bx.height >= 44 && (await sd.getByTestId("solo-per-me").getAttribute("aria-checked")) === "true", `fuori dai gusti: in Modifica spento, alto 44px, e il lucchetto resta acceso (${bx?.height})`);
+    await sw.click().catch(() => {});
+    await sw.scrollIntoViewIfNeeded().catch(() => {});
+    await sd.screenshot({ path: `${OUT}/57c-fuori-gusti-modifica.png`, caret: "initial" });
+    await sd.getByRole("button", { name: /^(Salva|Fatto)$/ }).last().click().catch(() => {});
+    await sd.waitForTimeout(500);
+    ok(patchD.length === 1 && patchD[0].fuori_gusti === true && !("solo_per_me" in patchD[0]), `fuori dai gusti: acceso e salvato, il lucchetto non si riscrive (${JSON.stringify(patchD)})`);
+    ok(((await sd.getByTestId("fuori-gusti-scheda").textContent().catch(() => "")) ?? "").includes("Non conta nei tuoi gusti"), "fuori dai gusti: nella scheda 'Non conta nei tuoi gusti'"); }
   // Profilo privato e nessun amico: il link esce senza nome e senza riga.
   mioProfilo2 = { display_name: "Luca Bianchi", is_public: false }; amici2 = [];
   rowsD = rowsD.map((x) => ({ ...x, consigliato_da: null }));
@@ -8925,6 +8940,9 @@ else {
     { tags: ["Da provare"], places: { category: "Trattoria", lat: 41.91, lng: 12.48, google_place_id: "GT2" } },
     { tags: ["Da provare"], places: { category: "Trattoria", lat: 41.89, lng: 12.47, google_place_id: "S2" } },
     { tags: ["Non fa per me"], places: { category: "pizza_restaurant", lat: 41.9, lng: 12.5, google_place_id: "GT3" } },
+    // Proposta 66: due 👍 "Non contarlo nei miei gusti" (peso 6) non devono battere le trattorie (peso 5).
+    { tags: ["Mi è piaciuto", "Già visitato"], fuori_gusti: true, places: { category: "sushi_restaurant", lat: 41.9, lng: 12.49, google_place_id: "GT8" } },
+    { tags: ["Mi è piaciuto", "Già visitato"], fuori_gusti: true, places: { category: "sushi_restaurant", lat: 41.9, lng: 12.49, google_place_id: "GT9" } },
   ];
   let surpSearches = 0, surpBody = null, surpSynth = [], surpAdd = null, surpInsert = null;
   const surpEvents = [];
@@ -8967,7 +8985,7 @@ else {
   const card = sp.getByTestId("sorpresa-card");
   await card.waitFor({ timeout: 8000 }).catch(() => {});
   ok(surpSearches === 1 && surpBody?.searchIntent === "structured" && surpBody?.phase === "fast" && surpBody?.source === "world" && surpBody?.query === "Trattoria" && surpBody?.lat === 41.9 && surpBody?.radius === 3000,
-    `sorprendimi: UNA ricerca, con i filtri (senza AI), dal tipo che salvi di più e dalla zona della mappa (${JSON.stringify(surpBody)})`);
+    `sorprendimi: UNA ricerca, con i filtri (senza AI), dal tipo che salvi di più (non dai 👍 fuori dai gusti, proposta 66) e dalla zona della mappa (${JSON.stringify(surpBody)})`);
   ok(await sp.getByRole("heading", { name: "Trattoria Gemma" }).isVisible(), "sorprendimi: prima proposta il 💎 poco conosciuto aperto ora, non il più famoso");
   const why1 = await sp.getByTestId("sorpresa-perche").textContent().catch(() => "");
   ok(why1.includes("Ti è piaciuto un posto così (trattoria)") && why1.includes("💎 Poco conosciuto") && why1.includes("Aperto ora"), `sorprendimi: il perché è fatto di dati veri (${why1})`);
@@ -11489,6 +11507,9 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
   chk(f(P("t", "Trattoria da Lucia", "Trattoria", null, { lat: null, lng: null }), [P("u", "Da Enzo al 29", "Trattoria", L, { lat: null, lng: null })]), null, "senza coordinate niente 'stessa zona' e niente riga");
   chk(pp.nomeCorto("Pizzeria (Da Remo)"), "Pizzeria (Da Remo)", "nome corto: mai il solo tipo prima della parentesi");
   chk(pp.nomeCorto("Pane · Vino"), "Pane · Vino", "nome corto: il punto in mezzo fa parte del nome");
+  // Proposta 66: un 👍 "Non contarlo nei miei gusti" non si cita mai.
+  chk(f(P("t", "Trattoria da Lucia", "Trattoria", null), [P("u", "Da Enzo al 29", "Trattoria", L, { fuoriGusti: true })]), null, "un 👍 fuori dai gusti non si cita (proposta 66)");
+  chk(f(P("t", "Trattoria da Lucia", "Trattoria", null), [P("u", "Da Enzo al 29", "Trattoria", L, { fuoriGusti: true }), P("v", "Da Cesare", "Trattoria", L)]), "Come Da Cesare, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", "con un 👍 fuori dai gusti si cita l'altro (proposta 66)");
   chk(f(P("p", "Pizzeria Nuova", "pizza_restaurant", null), [P("s", "Seu Pizza Illuminati", "pizza_restaurant", L, { lat: 41.8915, lng: 12.469 }), P("r", "Da Remo", "pizza_restaurant", L, { lat: 41.878, lng: 12.476, priceLevel: 1 })]), "Come Seu Pizza Illuminati, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", "il secondo nome solo con gli stessi legami del primo");
   chk(f(P("p", "Hasekura", "japanese_restaurant", null), [P("k", "Antica Trattoria Giapponese dei Fiori", "japanese_restaurant", L), P("k2", "Ginza Sushi Bar", "japanese_restaurant", L)]), "Come Ginza Sushi Bar, tra i posti che ti sono piaciuti: prezzi simili, stessa zona".replace("Ginza Sushi Bar", f(P("p", "Hasekura", "japanese_restaurant", null), [P("k", "Antica Trattoria Giapponese dei Fiori", "japanese_restaurant", L), P("k2", "Ginza Sushi Bar", "japanese_restaurant", L)])?.match(/^Come (.+?), tra/)?.[1] ?? "?"), "due nomi di cui uno tagliato → uno solo");
   ok(!/ e /.test(f(P("p", "Hasekura", "japanese_restaurant", null), [P("k", "Antica Trattoria Giapponese dei Fiori", "japanese_restaurant", L), P("k2", "Ginza Sushi Bar", "japanese_restaurant", L)]) ?? " e "), "perché ti piacerà: con un nome tagliato si cita un posto solo");
