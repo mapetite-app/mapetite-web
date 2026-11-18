@@ -8489,7 +8489,7 @@ else {
       // Profilo da collegato: in fondo feedback ed Esci (prima erano nella barra).
       await bp.goto(`${BASE}/profilo#altro`, { waitUntil: "networkidle" });
       const acc = bp.getByTestId("profilo-account");
-      ok(await acc.getByRole("link", { name: /Dai un feedback/ }).isVisible() && await acc.getByRole("button", { name: "Esci" }).isVisible(), "profilo da collegato: in Impostazioni 'Dai un feedback' ed 'Esci'");
+      ok(await acc.getByRole("button", { name: /Dai un feedback/ }).isVisible() && await acc.getByRole("link", { name: /Dai un feedback/ }).count() === 0 && await acc.getByRole("button", { name: "Esci" }).isVisible(), "profilo da collegato: in Impostazioni 'Dai un feedback' (apre il foglio, proposta 54) ed 'Esci'");
       // Pagine che nascono dai salvati, profili delle persone e home: accese le voci giuste.
       for (const [path, voce] of [["/raccolte/Prova", "Salvati"], ["/u/nessuno", "Amici"], ["/", null]]) {
         await bp.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
@@ -11644,10 +11644,12 @@ else {
   await q.locator("#altro > summary").click().catch(() => {});
   const riga = q.getByTestId("profilo-qualcosa-non-va");
   await riga.waitFor({ timeout: 4000 }).catch(() => {});
-  ok(await riga.isVisible() && ((await riga.textContent()) ?? "").includes("Qualcosa non va?") && await q.getByTestId("profilo-altro").getByTestId("profilo-qualcosa-non-va").count() === 1, "qualcosa non va: riga in Impostazioni del Profilo");
+  ok(await riga.isVisible() && ((await riga.textContent()) ?? "").includes("Dai un feedback") && await q.getByTestId("profilo-qualcosa-non-va").count() === 1 && await q.getByRole("link", { name: /Dai un feedback/ }).count() === 0, "qualcosa non va: una sola riga 'Dai un feedback' in Impostazioni, che apre il foglio (niente doppione col mailto)");
   { const h = (await riga.boundingBox())?.height ?? 0; ok(h >= 44, `qualcosa non va: riga alta almeno 44px (${Math.round(h)})`); }
   await riga.click().catch(() => {});
   const foglio = q.getByTestId("segnalazione-foglio");
+  await foglio.waitFor({ timeout: 4000 }).catch(() => {});
+  ok(((await q.getByTestId("segnalazione-email").getAttribute("href").catch(() => "")) ?? "").startsWith("mailto:") || await q.getByTestId("segnalazione-email").isVisible().catch(() => false), "qualcosa non va: nel foglio resta l'email, discreta ('Preferisci l'email?')");
   await foglio.waitFor({ timeout: 3000 }).catch(() => {});
   ok(await foglio.isVisible(), "qualcosa non va: il foglio si apre");
   const campo = q.getByTestId("segnalazione-testo");

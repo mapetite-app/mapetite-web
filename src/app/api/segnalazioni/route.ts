@@ -38,7 +38,8 @@ export async function POST(request: Request) {
 
   // Anti-spam: si contano le ultime 24 ore con la chiave di servizio (gli utenti non leggono la tabella).
   const da = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { count, error: errConto } = await createAdminClient()
+  const admin = createAdminClient();
+  const { count, error: errConto } = await admin
     .from("segnalazioni")
     .select("id", { count: "exact", head: true })
     .eq("user_id", user.id)
@@ -52,7 +53,9 @@ export async function POST(request: Request) {
   }
 
   const ua = request.headers.get("user-agent");
-  const { error } = await supabase.from("segnalazioni").insert({
+  // Revisore 18/11: scrive solo il server (nessuna policy di insert per gli utenti), così il limite non si aggira
+  // scrivendo direttamente sul database dal browser. L'utente è quello verificato qui sopra.
+  const { error } = await admin.from("segnalazioni").insert({
     user_id: user.id,
     testo,
     pagina: soloPercorso(body?.pagina),

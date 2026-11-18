@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronRight, LifeBuoy } from "lucide-react";
+import { ChevronRight, MessageCircle } from "lucide-react";
 import { trackFeature } from "@/lib/track";
+import { feedbackMailto } from "@/lib/feedback";
 
-// "Qualcosa non va?" (proposta 54): una riga nelle Impostazioni del Profilo che apre un foglio
+// "Qualcosa non va?" (proposta 54). Revisore 18/11: era un doppione di "Dai un feedback" (mailto) nello stesso
+// pannello. Ora è una riga sola, "Dai un feedback", che per chi ha l'accesso apre questo foglio (l'email resta
+// come link discreto dentro il foglio). Prima: una riga nelle Impostazioni del Profilo che apre un foglio
 // dal basso per segnalare un difetto. Il testo va a /api/segnalazioni con la pagina (solo il
 // percorso) e la larghezza dello schermo; lo legge Lorenzo in /admin/numeri. Niente screenshot.
 const MIN = 5;
@@ -69,14 +72,14 @@ export default function QualcosaNonVa({ rowClass }: { rowClass: string }) {
         type="button"
         data-testid="profilo-qualcosa-non-va"
         onClick={() => { setOpen(true); setGrazie(false); }}
-        className={`${rowClass} w-full text-left`}
+        className={`${rowClass} w-full text-left text-text`}
       >
-        <LifeBuoy size={18} strokeWidth={1.75} aria-hidden className="shrink-0 text-brand" />
-        <span className="min-w-0 flex-1">
-          <span className="block font-sans text-[15px] font-medium text-text">Qualcosa non va?</span>
-          <span className="block truncate text-xs text-text-muted">Scrivici cosa è successo</span>
+        <MessageCircle aria-hidden className="h-5 w-5 text-brand" strokeWidth={1.75} />
+        <span className="flex-1">
+          Dai un feedback
+          <span className="block text-xs font-sans font-normal text-text-muted">Cosa ti piace, cosa non va, cosa ti manca</span>
         </span>
-        <ChevronRight aria-hidden size={16} className="text-text-muted" />
+        <ChevronRight aria-hidden className="h-4 w-4 text-text-muted" />
       </button>
       {grazie && (
         <p role="status" data-testid="segnalazione-grazie" className="fixed inset-x-4 bottom-[calc(88px+env(safe-area-inset-bottom))] z-[60] mx-auto max-w-md rounded-pill bg-brand px-4 py-3 text-center text-sm font-display font-semibold text-white shadow-float">
@@ -93,8 +96,8 @@ export default function QualcosaNonVa({ rowClass }: { rowClass: string }) {
             className="relative flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-y-auto rounded-t-[24px] bg-white px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3 shadow-float"
           >
             <span aria-hidden className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
-            <h3 id="segnalazione-titolo" className="font-title text-lg font-semibold text-brand">Qualcosa non va?</h3>
-            <p className="mt-1 text-sm text-text-muted">Dicci cosa è successo e dove: ci aiuti a sistemarlo.</p>
+            <h3 id="segnalazione-titolo" className="font-title text-lg font-semibold text-brand">Dai un feedback</h3>
+            <p className="mt-1 text-sm text-text-muted">Cosa non va, cosa ti piace, cosa ti manca. Se è un errore, dicci dove.</p>
             <textarea
               data-testid="segnalazione-testo"
               value={testo}
@@ -107,6 +110,8 @@ export default function QualcosaNonVa({ rowClass }: { rowClass: string }) {
               className="mt-3 w-full resize-none rounded-card border border-border bg-surface px-3 py-2.5 text-[16px] text-text placeholder:text-text-muted focus:border-brand focus:outline-none"
             />
             <p className="mt-1 text-right text-xs tabular-nums text-text-muted">{testo.length}/{MAX}</p>
+            {/* Revisore 18/11: l'errore sopra il tasto, così con la tastiera aperta resta in vista. */}
+            {errore && <p role="alert" data-testid="segnalazione-errore" className="mt-1 text-sm text-error">{errore}</p>}
             <button
               type="button"
               data-testid="segnalazione-invia"
@@ -116,7 +121,14 @@ export default function QualcosaNonVa({ rowClass }: { rowClass: string }) {
             >
               {busy ? "Invio…" : "Invia"}
             </button>
-            {errore && <p role="alert" data-testid="segnalazione-errore" className="mt-3 text-sm text-error">{errore}</p>}
+            <a
+              href="mailto:"
+              data-testid="segnalazione-email"
+              onClick={(e) => { e.currentTarget.href = feedbackMailto(); }}
+              className="mt-3 flex min-h-11 items-center justify-center text-sm font-sans text-text-muted underline underline-offset-2"
+            >
+              Preferisci l&apos;email?
+            </a>
           </div>
         </div>
       )}
