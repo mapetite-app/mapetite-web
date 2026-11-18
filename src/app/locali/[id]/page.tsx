@@ -13,6 +13,7 @@ import AmiciQui from "./amici-qui";
 import CommunityLocale from "@/components/community-locale";
 import { safeNext } from "@/lib/next-path";
 import { pulisciConsigliatoDa } from "@/lib/consigliato-da";
+import { fraseFreschezza } from "@/lib/freschezza-verdetto";
 import {
   cleanList,
   currentUserId,
@@ -92,6 +93,8 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
   const synthText = synthesis?.synthesis?.trim() || null;
   const goFor = cleanList(synthesis?.go_for);
   const dontExpect = cleanList(synthesis?.dont_expect);
+  // "Da 3 recensioni Google, la più recente di ottobre" (proposta 67): solo se il verdetto le ha salvate.
+  const freschezza = verdict ? fraseFreschezza({ n: synthesis?.recensioni_n, ultima: synthesis?.recensione_ultima }) : null;
   const hasVerdict = verdict != null || synthText != null || goFor.length > 0 || dontExpect.length > 0;
 
   const directions = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
@@ -155,6 +158,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
               </p>
               {verdict && <p className={`${SERIF} mt-2 text-[22px] italic leading-[1.24] tracking-[-0.005em] text-[#141414]`}>{verdict}</p>}
               {synthText && <p className="mt-2 font-sans text-[15px] leading-relaxed text-[#3d4248]">{synthText}</p>}
+              {freschezza && <p data-testid="verdetto-freschezza" className="mt-2 font-sans text-[12px] leading-snug text-text-muted">{freschezza}</p>}
             </>
           )}
           {goFor.length > 0 && (

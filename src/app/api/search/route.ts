@@ -673,7 +673,7 @@ ESEMPI (input → output atteso):
   const risultatiFinali = risultati.filter((p) => !esclusi.includes(p.id)).map((p) => {
     const s = sintesi[p.id];
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { reviewTexts, reviewItems, attributes, openingPeriods, regularPeriods, ...rest } = p;
+    const { reviewTexts, reviewItems, reviewTimes, attributes, openingPeriods, regularPeriods, ...rest } = p;
     return {
       ...rest,
       // Orari compatti per il foglio Prenota ("a quell'ora risulta chiuso"): dati Google solo da mostrare.
@@ -689,6 +689,8 @@ ESEMPI (input → output atteso):
       // "✓ terrazza": solo quelli confermati dall'AI (ricerca con i filtri, verdetti subito); nel
       // primo tempo arrivano con i verdetti, da /api/search/synthesis.
       requisiti: s?.requisiti?.length ? s.requisiti : null,
+      // Da quante recensioni parla il verdetto (proposta 67): solo se c'è il verdetto.
+      ...(s?.verdict && s.recensioniN ? { recensioniN: s.recensioniN, recensioneUltima: s.recensioneUltima } : {}),
       // Dati Google firmati per il catalogo condiviso: /api/places/add accetta solo questi
       // (src/lib/catalog-sig.ts). Nel ramo saved i locali sono già nel catalogo: niente firma.
       ...(source === "world" ? { firma: signCatalogEntry(p) } : {}),

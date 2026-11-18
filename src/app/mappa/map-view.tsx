@@ -855,6 +855,9 @@ type VenueDetails = {
   photoAuthor?: string | null;
   editorialSummary?: string | null;
   orari?: Orari | null;
+  // Proposta 67: da quante recensioni Google parla il verdetto e la data della più recente (ISO).
+  recensioniN?: number | null;
+  recensioneUltima?: string | null;
 };
 
 const REFINEMENTS = ["+ economico", "+ con tavoli all'aperto", "+ aperto adesso", "+ poco turistico", "+ per un gruppo"];
@@ -1812,10 +1815,14 @@ export default function MapView({
       const googleIds = Object.keys(uuidMap);
       if (googleIds.length === 0) { setSynthSalvatiLetti(true); return; }
 
-      const { data: synthRows, error: synthError } = await supabase
+      const SYNTH_COLS = "place_id, synthesis, tags, verdict, go_for, dont_expect";
+      const leggiSynth = (conFreschezza: boolean) => supabase
         .from("place_synthesis")
-        .select("place_id, synthesis, tags, verdict, go_for, dont_expect")
+        .select((conFreschezza ? `${SYNTH_COLS}, recensioni_n, recensione_ultima` : SYNTH_COLS) as typeof SYNTH_COLS)
         .in("place_id", googleIds);
+      // recensioni_n / recensione_ultima (proposta 67) con la migrazione 20261118b: senza (42703) si rilegge senza.
+      let { data: synthRows, error: synthError } = await leggiSynth(true);
+      if (synthError?.code === "42703") ({ data: synthRows, error: synthError } = await leggiSynth(false));
 
       if (synthError) {
         console.error("[map-view] lettura place_synthesis (salvati) fallita:", synthError);
@@ -1838,6 +1845,8 @@ export default function MapView({
           verdict: (row.verdict as string | null) ?? null,
           goFor: (row.go_for as string[] | null) ?? null,
           dontExpect: (row.dont_expect as string[] | null) ?? null,
+          recensioniN: typeof (row as Record<string, unknown>).recensioni_n === "number" ? (row as Record<string, unknown>).recensioni_n as number : null,
+          recensioneUltima: typeof (row as Record<string, unknown>).recensione_ultima === "string" ? (row as Record<string, unknown>).recensione_ultima as string : null,
           // matchReason è query-dependent: non esiste in place_synthesis, sempre null sui salvati.
           matchReason: null,
         };
@@ -1878,6 +1887,7 @@ export default function MapView({
           phone: d.phone ?? null, selectedReviews: d.selectedReviews ?? null, synthesis: d.synthesis ?? null,
           tags: d.tags ?? null, verdict: d.verdict, goFor: d.goFor ?? null, dontExpect: d.dontExpect ?? null,
           matchReason: null, photoRef: d.photoRef ?? null, photoAuthor: d.photoAuthor ?? null,
+          recensioniN: d.recensioniN ?? null, recensioneUltima: d.recensioneUltima ?? null,
         };
         savedSynthRef.current = { ...savedSynthRef.current, [selectedSavedId]: det };
         setVenueDetails((prev) => ({ ...prev, [selectedSavedId]: { ...det, ...Object.fromEntries(Object.entries(prev[selectedSavedId] ?? {}).filter(([, v]) => v != null)) } }));
@@ -2071,7 +2081,7 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null;
+        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null; recensioniN?: number | null; recensioneUltima?: string | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
       const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null, types: p.types ?? null }));
@@ -2095,6 +2105,8 @@ export default function MapView({
           photoRef: p.photoRef ?? null,
           photoAuthor: p.photoAuthor ?? null,
           editorialSummary: p.editorialSummary ?? null,
+          recensioniN: p.recensioniN ?? null,
+          recensioneUltima: p.recensioneUltima ?? null,
         };
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null, id: ticket });
@@ -2716,7 +2728,7 @@ export default function MapView({
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null; recensioniN?: number | null; recensioneUltima?: string | null;
         };
         // "Altri come questo": il posto di partenza non torna tra i risultati (stesso id o stesso nome).
         const fuori = new Set(opts.simile?.escludi ?? []);
@@ -2757,6 +2769,8 @@ export default function MapView({
             photoRef: p.photoRef ?? null,
             photoAuthor: p.photoAuthor ?? null,
             editorialSummary: p.editorialSummary ?? null,
+            recensioniN: p.recensioniN ?? null,
+            recensioneUltima: p.recensioneUltima ?? null,
           };
         }
         const id = ticket;

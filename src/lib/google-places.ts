@@ -35,7 +35,7 @@ type GooglePlace = {
   types?: string[];
   websiteUri?: string;
   editorialSummary?: { text?: string };
-  reviews?: { text?: { text?: string }; rating?: number; relativePublishTimeDescription?: string }[];
+  reviews?: { text?: { text?: string }; rating?: number; relativePublishTimeDescription?: string; publishTime?: string }[];
   nationalPhoneNumber?: string;
   photos?: { name: string; authorAttributions?: { displayName?: string }[] }[];
 } & Partial<Record<GoogleAttribute, boolean>>;
@@ -61,6 +61,9 @@ export type PlaceResult = {
   // OPERATIONAL, CLOSED_TEMPORARILY, CLOSED_PERMANENTLY (o null se Google non lo dice).
   businessStatus?: string | null;
   reviewTexts: string[] | null;   // solo i testi, max 5, già estratti
+  // Data di ciascuna di quelle recensioni (publishTime ISO di Google, stesso ordine di reviewTexts; null se
+  // Google non la dà). Serve alla riga "Da 3 recensioni Google, la più recente di ottobre" (proposta 67).
+  reviewTimes?: (string | null)[] | null;
   // Le stesse recensioni con il voto (per la riga di ripiego della card: mai una stroncatura). Solo server.
   reviewItems?: { text: string; rating: number | null }[] | null;
   phone: string | null;
@@ -311,6 +314,13 @@ function mapGooglePlace(place: GooglePlace): PlaceResult {
         .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
         .slice(0, 5);
       return texts.length > 0 ? texts : null;
+    })(),
+    reviewTimes: (() => {
+      const times = (place.reviews ?? [])
+        .filter((r) => typeof r.text?.text === "string" && r.text.text.trim().length > 0)
+        .slice(0, 5)
+        .map((r) => (typeof r.publishTime === "string" ? r.publishTime : null));
+      return times.length > 0 ? times : null;
     })(),
     reviewItems: (() => {
       const items = (place.reviews ?? [])

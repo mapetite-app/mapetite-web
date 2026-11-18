@@ -48,6 +48,7 @@ export async function POST(request: Request) {
     websiteUri: null,
     editorialSummary: p.editorialSummary,
     reviewTexts: p.reviewTexts,
+    reviewTimes: Array.isArray(p.reviewTimes) ? p.reviewTimes : null,
     phone: null,
     photoRef: null,
   }));
@@ -80,6 +81,8 @@ export async function POST(request: Request) {
       perTe: s.perTe || null,
       // "✓ terrazza" confermati dall'AI tra le frasi firmate dal primo tempo (mai scritte dall'AI).
       ...(s.requisiti?.length ? { requisiti: s.requisiti } : {}),
+      // "Da 3 recensioni Google, la più recente di ottobre" (proposta 67): solo se il verdetto le ha salvate.
+      ...(s.verdict && s.recensioniN ? { recensioniN: s.recensioniN, recensioneUltima: s.recensioneUltima } : {}),
     };
   }
   // Quanto ogni locale è adatto alla richiesta secondo Haiku: il telefono mette in cima gli "alto"

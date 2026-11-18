@@ -10,6 +10,7 @@ import { exclusionNotAsked, wantsOffTheBeatenPath } from "@/lib/mainstream";
 import type { PlaceResult } from "@/lib/google-places";
 import type { Candidato, Requisito } from "@/lib/prova-requisito";
 import { confermaProve } from "@/lib/conferma-prove";
+import { freschezzaDa } from "@/lib/freschezza-verdetto";
 
 // Verdetti: chi guarda aspetta. Al massimo un nuovo tentativo (l'SDK ne fa 2) e 25 s di attesa
 // (l'SDK ne concede 10 minuti): una risposta a freddo per 12 locali richiede ~15 s.
@@ -69,6 +70,10 @@ export type PlaceSynthesis = {
   match: MatchLevel;
   // "✓ terrazza" confermati: frasi copiate dalle recensioni (primo tempo), scelte qui dall'AI.
   requisiti?: Requisito[];
+  // Proposta 67: quante recensioni con testo ha letto l'AI per questo verdetto e la data (ISO) della più
+  // recente. Null per i verdetti in cache scritti prima (nessuna riga: non si inventa).
+  recensioniN?: number | null;
+  recensioneUltima?: string | null;
 };
 export type MatchLevel = "alto" | "medio" | "basso";
 
@@ -79,6 +84,8 @@ type CachedSynthesis = {
   verdict: string;
   goFor: string[];
   dontExpect: string[];
+  recensioniN?: number | null;
+  recensioneUltima?: string | null;
 };
 
 const SYNTHESIS_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Le recensioni in input sono in inglese: NON copiare parole inglesi, NON usare calchi, NON inventare parole. Ogni singola parola di synthesis, tags, verdict, go_for e dont_expect deve essere una parola italiana esistente. Se un concetto è espresso in inglese nelle recensioni, traducilo. Esempi di errori da non fare: "vibe" → atmosfera, "food" → cibo, "view" o "breathtaking" → vista mozzafiato, "handmade" → fatto a mano, "chill" → rilassato, "food pairing" → abbinamenti. Ammessi solo i prestiti entrati nell'italiano: cocktail, drink, staff, brunch, rooftop, lounge, location.
@@ -465,14 +472,17 @@ export async function getSynthesis(
   const stale = new Set<string>();
   try {
     const supabase = createAdminClient();
-    const { data, error } = await supabase
+    const leggi = (conFreschezza: boolean) => supabase
       .from("place_synthesis")
-      .select("place_id, synthesis, tags, verdict, go_for, dont_expect, generated_at")
+      .select(`place_id, synthesis, tags, verdict, go_for, dont_expect, generated_at${conFreschezza ? ", recensioni_n, recensione_ultima" : ""}`)
       .in("place_id", ids);
+    let { data, error } = await leggi(true);
+    // 42703 = migrazione 20261118b non applicata: si rilegge senza le colonne della freschezza.
+    if (error?.code === "42703") ({ data, error } = await leggi(false));
     if (error) {
       console.error("[haiku-synthesis] cache read error:", error);
     } else {
-      for (const row of data ?? []) {
+      for (const row of (data ?? []) as unknown as Record<string, unknown>[]) {
         // Verdetto vuoto in cache (risposta dell'AI incompleta): conta come mancante e si rigenera,
         // altrimenti quel locale resterebbe senza verdetto per sempre (VISIONE: verdetto SEMPRE).
         if (typeof row.verdict !== "string" || row.verdict.trim() === "") continue;
@@ -487,6 +497,8 @@ export async function getSynthesis(
           verdict: (row.verdict as string) ?? "",
           goFor: (row.go_for as string[] | null) ?? [],
           dontExpect: (row.dont_expect as string[] | null) ?? [],
+          recensioniN: typeof row.recensioni_n === "number" ? row.recensioni_n : null,
+          recensioneUltima: typeof row.recensione_ultima === "string" ? row.recensione_ultima : null,
         });
       }
     }
@@ -577,6 +589,12 @@ export async function getSynthesis(
               // Il prompt non li produce ancora (arriva in un commit successivo): default "".
               goFor: normalizeChips(o.go_for, 3),
               dontExpect: normalizeChips(o.dont_expect, 2),
+              // Le stesse recensioni passate all'AI qui sopra (stesso taglio): numero e data della più recente.
+              ...(() => {
+                const p = batch.find((x) => x.id === o.id);
+                const f = freschezzaDa((p?.reviewTexts ?? []).slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS), (p?.reviewTimes ?? []).slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS));
+                return { recensioniN: f.n, recensioneUltima: f.ultima };
+              })(),
             });
           }
         } catch (err) {
@@ -608,10 +626,19 @@ export async function getSynthesis(
           dont_expect: s.dontExpect,
           // L'upsert non riscrive il default: senza, un verdetto rinnovato resterebbe "vecchio".
           generated_at: new Date().toISOString(),
+          // Proposta 67 (migrazione 20261118b): da quante recensioni parla il verdetto.
+          recensioni_n: s.recensioniN ?? null,
+          recensione_ultima: s.recensioneUltima ?? null,
         }));
-        const { error } = rows.length === 0 ? { error: null } : await supabase
+        let { error } = rows.length === 0 ? { error: null } : await supabase
           .from("place_synthesis")
           .upsert(rows, { onConflict: "place_id" });
+        // Colonne della freschezza assenti (PGRST204/42703, migrazione non applicata): si salva il verdetto senza.
+        if (error && (error.code === "PGRST204" || error.code === "42703")) {
+          ({ error } = await supabase
+            .from("place_synthesis")
+            .upsert(rows.map((r) => ({ place_id: r.place_id, synthesis: r.synthesis, tags: r.tags, verdict: r.verdict, go_for: r.go_for, dont_expect: r.dont_expect, generated_at: r.generated_at })), { onConflict: "place_id" }));
+        }
         if (error) console.error("[haiku-synthesis] upsert error:", error);
       } catch (err) {
         console.error("[haiku-synthesis] upsert exception:", err);
@@ -649,6 +676,8 @@ export async function getSynthesis(
       verdict: s.verdict,
       goFor: s.goFor,
       dontExpect: s.dontExpect,
+      recensioniN: s.recensioniN ?? null,
+      recensioneUltima: s.recensioneUltima ?? null,
       matchReason: matchReasons.get(id) ?? "",
       perTe: perTes.get(id) ?? "",
       // Nel dubbio il locale resta: fit mancante = true.
