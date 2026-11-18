@@ -3225,10 +3225,11 @@ else {
     { const rs = await import(new URL("../../src/lib/ricordo-salvato.ts", import.meta.url).href);
       const now = new Date("2026-11-18T22:00:00+01:00");
       const casi = [
-        [{ savedAt: "2026-03-10T10:00:00Z", note: "per il compleanno di Sara, prenotare il tavolo in terrazza" }, "Salvato a marzo · la tua nota: «per il compleanno di Sara, prenotare…»"],
-        [{ savedAt: "2025-07-10T10:00:00Z", reel: { fonte: "TikTok", url: "https://www.tiktok.com/@mangiaroma/video/123" } }, "Salvato a luglio 2025 · dal video di @mangiaroma su TikTok"],
-        [{ savedAt: "2026-11-02T10:00:00Z", reel: { fonte: "Instagram", url: "https://www.instagram.com/reel/abc/" } }, "Salvato questo mese · da un reel Instagram"],
-        [{ savedAt: "2026-09-02T10:00:00Z", consigliatoDa: "Giulia" }, "Salvato a settembre · te l'ha consigliato Giulia"],
+        [{ savedAt: "2026-03-10T10:00:00Z", note: "per il compleanno di Sara, prenotare il tavolo in terrazza" }, "«per il compleanno di Sara, prenotare…» · marzo"],
+        [{ savedAt: "2025-07-10T10:00:00Z", reel: { fonte: "TikTok", url: "https://www.tiktok.com/@mangiaroma/video/123" } }, "Dal video di @mangiaroma su TikTok · luglio 2025"],
+        [{ savedAt: "2026-11-02T10:00:00Z", reel: { fonte: "Instagram", url: "https://www.instagram.com/reel/abc/" } }, "Da un reel Instagram · questo mese"],
+        [{ savedAt: "2026-09-02T10:00:00Z", consigliatoDa: "Giulia" }, "Te l'ha consigliato Giulia · settembre"],
+        [{ savedAt: "2025-12-31T23:30:00Z", note: "capodanno" }, "«capodanno» · gennaio"],
         [{ savedAt: "2026-09-02T10:00:00Z" }, null],
         [{ savedAt: "2026-09-02T10:00:00Z", note: "   " }, null],
       ];
