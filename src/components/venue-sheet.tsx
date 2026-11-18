@@ -78,6 +78,9 @@ export type Venue = {
   photoAuthor?: string | null;
   // "Per te" dai gusti (mappa del gusto): scritto dall'AI solo con i gusti veri (vedi haiku-synthesis).
   perTe?: string | null;
+  // Proposta 48 "Perché ti piacerà": "Come Roscioli, che ti è piaciuto: trattoria, prezzi simili", dai tuoi 👍
+  // (src/lib/perche-piacera.ts). Più concreto del "Per te" dell'AI: se c'è, prende il suo posto.
+  percheTiPiacera?: string | null;
   // Requisiti della ricerca confermati, con la frase della recensione che li prova (proposta 18).
   requisiti?: { r: string; prova: string }[] | null;
   // Frase di Google sul locale: si mostra, dichiarata, solo se il verdetto manca.
@@ -684,7 +687,8 @@ export default function VenueSheet({
     const showSynthesisBelow = verdictText != null && synthesis != null && synthesis.trim() !== "";
     // "Per te": prima il perché dai gusti (mappa del gusto, scritto dall'AI solo con i gusti veri),
     // altrimenti il perché per questa ricerca. Se ci sono tutti e due, il secondo va in "In breve".
-    const perTeText = venue.perTe?.trim() || null;
+    const daiTuoiPosti = venue.percheTiPiacera?.trim() || null;
+    const perTeText = daiTuoiPosti ?? (venue.perTe?.trim() || null);
     const perTeLine = perTeText ?? matchReasonText;
     const matchReasonBelow = perTeText != null && matchReasonText != null;
     // Senza verdetto (né in arrivo): la frase di Google o una recensione, dichiarate come tali.
@@ -1010,7 +1014,7 @@ export default function VenueSheet({
           {perTeLine && (
             // Designer 6/11: senza il cerchio con la scintilla (sembrava un pulsante, terza ✦ dello schermo): una riga
             // che continua il verdetto, come la descrizione sotto il nome in Places.
-            <p data-testid="per-te-scheda" className="mt-3 text-[13.5px] font-sans leading-snug text-[#3d4248]">
+            <p data-testid="per-te-scheda" data-fonte={daiTuoiPosti ? "salvati" : perTeText ? "gusti" : "ricerca"} className="mt-3 text-[13.5px] font-sans leading-snug text-[#3d4248]">
               <span className="min-w-0">
                 <b className="font-display font-semibold text-accent">{perTeText ? "Per te" : "Perché qui"}</b> · {perTeLine}
               </span>

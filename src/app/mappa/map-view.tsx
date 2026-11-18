@@ -33,6 +33,7 @@ import { mioNome } from "@/lib/share-place";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, tipoGoogleSconosciuto } from "@/lib/category-label";
+import { percheTiPiacera } from "@/lib/perche-piacera";
 import { momentSuggestion, fetchWeather, type Weather } from "@/lib/moment";
 import { momentoDi, type Momento } from "@/lib/home-proposte";
 import { contestoIdee, IDEE_MAX, percheMomento, titoloMomento, titoloBreve } from "@/lib/idee";
@@ -1410,6 +1411,12 @@ export default function MapView({
       ? { ...base, tags: savedVersion.tags, note: savedVersion.note, consigliatoDa: savedVersion.consigliatoDa ?? null, rating: base.rating ?? savedVersion.rating, priceLevel: base.priceLevel ?? savedVersion.priceLevel }
       : base;
   }, [overlay, places, displayedPlaces, savedPlaces, placeUuids]);
+  // Proposta 48 "Perché ti piacerà": il legame con i salvati che ti sono piaciuti (stesso tipo, poi prezzo e zona).
+  // Zero chiamate: solo i salvati già in memoria. L'id del salvato (UUID) serve a non citare il posto stesso.
+  const percheSelezionato = useMemo(() => {
+    if (!selected || savedPlaces.length === 0) return null;
+    return percheTiPiacera({ ...selected, id: placeUuids[selected.id] ?? selected.id }, savedPlaces, categoryLabel, nomeLeggibile);
+  }, [selected, savedPlaces, placeUuids]);
   // Scheda aperta: la barra dell'app si nasconde (globals.css, html[data-scheda-aperta]).
   const schedaAperta = selected != null;
   useEffect(() => {
@@ -4254,6 +4261,7 @@ export default function MapView({
                 consigliatoDa: selected.consigliatoDa ?? null,
                 soloPerMe: selected.soloPerMe === true,
                 businessStatus: selected.businessStatus ?? null,
+                percheTiPiacera: percheSelezionato,
                 ...(venueDetails[selected.id] ?? {
                   userRatingCount: null, openNow: null, websiteUri: null, phone: null,
                   selectedReviews: null, synthesis: null, tags: null, verdict: null,

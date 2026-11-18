@@ -11447,6 +11447,69 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
     await c.close();
   }
 }
+// Proposta 48 "Perché ti piacerà" (18/11): nella scheda "Per te · Come X e Y, che ti sono piaciuti: trattoria, …"
+// dai salvati con 👍. Solo stesso tipo (mai generico), mai i 👎, mai il posto stesso; prezzo e zona solo se veri per tutti.
+{
+  const pp = await import(new URL("../../src/lib/perche-piacera.ts", import.meta.url).href);
+  const cl = await import(new URL("../../src/lib/category-label.ts", import.meta.url).href);
+  const nl = await import(new URL("../../src/lib/nome-leggibile.ts", import.meta.url).href);
+  const f = (t, s) => pp.percheTiPiacera(t, s, cl.categoryLabel, nl.nomeLeggibile);
+  const P = (id, name, category, tags, extra = {}) => ({ id, name, category, priceLevel: 2, lat: 41.889, lng: 12.469, tags, ...extra });
+  const T = P("T", "Trattoria da Lucia", "seafood_restaurant", null);
+  const S = [
+    P("a", "Da Enzo al 29", "Trattoria", ["Già visitato", "Mi è piaciuto"]),
+    P("b", "TRATTORIA MARCO - TRASTEVERE", "restaurant", ["Mi è piaciuto"], { lat: 41.89, lng: 12.47 }),
+    P("c", "Trattoria Lontana", "Trattoria", ["Mi è piaciuto"], { lat: 45.46, lng: 9.19, priceLevel: 3 }),
+    P("d", "Trattoria No", "Trattoria", ["Già visitato", "Non fa per me"]),
+    P("e", "Trattoria Da Provare", "Trattoria", ["Da provare"]),
+    P("f", "Bar Piaciuto", "bar", ["Mi è piaciuto"]),
+    P("g", "Trattoria Chiusa", "Trattoria", ["Mi è piaciuto"], { businessStatus: "CLOSED_PERMANENTLY" }),
+  ];
+  ok(f(T, S) === "Come Da Enzo al 29 e Trattoria Marco, che ti sono piaciuti: trattoria, prezzi simili, stessa zona", `perché ti piacerà: due 👍 dello stesso tipo, nome leggibile e corto, prezzo e zona veri (${f(T, S)})`);
+  ok(f(T, [S[2]]) === "Come Trattoria Lontana, che ti è piaciuto: trattoria", `perché ti piacerà: uno solo, a Milano e più caro → solo il tipo (${f(T, [S[2]])})`);
+  ok(f(T, [S[3], S[4], S[5], S[6]]) === null, "perché ti piacerà: niente riga con 👎, da provare, altro tipo o chiusi per sempre");
+  ok(f(P("x", "Ristorante Qualsiasi", "italian_restaurant", null), [P("y", "Altro Ristorante", "italian_restaurant", ["Mi è piaciuto"])]) === null, "perché ti piacerà: 'Ristorante italiano' è generico, nessun legame");
+  ok(f({ ...S[0] }, S) === null && f({ ...T, tags: ["Mi è piaciuto"] }, S) === null && f({ ...T, id: "a" }, [S[0]]) === null && f({ ...T, name: "Da Enzo al 29", id: "zz" }, [S[0]]) === null, "perché ti piacerà: mai sul posto che ti è già piaciuto, mai citando il posto stesso");
+  ok(f(P("s", "Sushi Ko", "sushi_restaurant", null), [P("k", "Zen", "sushi_restaurant", ["Mi è piaciuto"], { priceLevel: null })]) === "Come Zen, che ti è piaciuto: sushi, stessa zona"
+    && f(P("j", "Hasekura", "japanese_restaurant", null), [P("k", "Ginza", "japanese_restaurant", ["Mi è piaciuto"])]) === "Come Ginza, che ti è piaciuto: cucina giapponese, prezzi simili, stessa zona", `perché ti piacerà: cucine scritte per intero ('cucina giapponese') (${f(P("j", "Hasekura", "japanese_restaurant", null), [P("k", "Ginza", "japanese_restaurant", ["Mi è piaciuto"])])})`);
+  ok(pp.nomeCorto("Antica Trattoria della Pesa dal Mille e Cinquecento") === "Antica Trattoria della Pesa…", `perché ti piacerà: nomi lunghi tagliati a parola (${pp.nomeCorto("Antica Trattoria della Pesa dal Mille e Cinquecento")})`);
+
+  if (!fakeUser) console.log("SKIP  perché ti piacerà nella scheda: dev server senza E2E_FAKE_USER");
+  else {
+    const mkT = (id, name, extra = {}) => mk(id, name, 41.893, 12.468, { category: "italian_restaurant", types: ["italian_restaurant"], rating: 4.7, userRatingCount: 259, ...extra });
+    const RIS = [mkT("Q1", "Trattoria da Lucia", { category: "seafood_restaurant", rating: 4.6, userRatingCount: 300 }), mkT("Q3", "Osteria Piccola", { rating: 4.8, userRatingCount: 120 })];
+    const SY = { dettagli: {
+      Q1: { synthesis: "Trattoria di quartiere.", tags: [], verdict: "I romani ci tornano per la gricia.", goFor: [], dontExpect: [], matchReason: "È in un vicolo.", perTe: "il tipo di trattoria che ami" },
+      Q3: { synthesis: "x", tags: [], verdict: "Piccola e vera.", goFor: [], dontExpect: [], matchReason: "Pochi tavoli." },
+    }, esclusi: [] };
+    const riga = (id, name, category, tags) => ({ tags, note: null, created_at: "2026-10-01T10:00:00Z", consigliato_da: null, solo_per_me: false, places: { id: `00000000-0000-4000-8000-0000000048${id}`, name, category, address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.8935, lng: 12.4685, google_place_id: `GP48${id}`, rating: 4.6, price_level: 2, business_status: null } });
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await c.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    await c.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"/>' }));
+    await c.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: r.request().url().includes("select=place_id") ? [] : [riga("01", "Da Enzo al 29", "Trattoria", ["Già visitato", "Mi è piaciuto"]), riga("02", "Trattoria Mai Più", "Trattoria", ["Già visitato", "Non fa per me"])] }));
+    for (const t of ["place_synthesis", "profiles"]) await c.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+    await c.route("**/api/search", (r) => r.fulfill({ json: { risultati: RIS, filtri_usati: { categoria: "restaurant", parole_chiave: ["trattoria"], vicino_a_me: false, zona: "Trastevere" }, sintesi_pendente: { places: RIS.map((x) => ({ id: x.id })), token: "t48" } } }));
+    await c.route("**/api/search/synthesis", (r) => r.fulfill({ json: SY }));
+    const p = await c.newPage();
+    p.on("pageerror", (e) => errors.push(e.message));
+    await p.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
+    await p.goto(`${BASE}/mappa?q=${encodeURIComponent("trattoria a Trastevere")}`, { waitUntil: "networkidle" });
+    await p.getByText("I romani ci tornano per la gricia.").first().waitFor({ timeout: 8000 });
+    await p.locator("li[data-id=Q1] [data-testid=card-risultato]").first().click();
+    await p.locator("h2", { hasText: "Trattoria da Lucia" }).waitFor({ timeout: 6000 });
+    const pt = p.getByTestId("per-te-scheda");
+    await pt.waitFor({ timeout: 4000 }).catch(() => {});
+    const testo = ((await pt.textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim();
+    ok(testo === "Per te · Come Da Enzo al 29, che ti è piaciuto: trattoria, prezzi simili, stessa zona" && (await pt.getAttribute("data-fonte")) === "salvati", `scheda: 'Per te' dai tuoi 👍 al posto della frase dell'AI, mai il 👎 (${testo})`);
+    const b = await pt.boundingBox();
+    ok(b != null && b.y + b.height < 844 - 80, `scheda: la riga 'Per te' sta nella prima schermata a 390×844 (${Math.round((b?.y ?? 0) + (b?.height ?? 0))} px)`);
+    if (process.env.PERCHE_SHOT) await p.screenshot({ path: process.env.PERCHE_SHOT });
+    await p.screenshot({ path: `${OUT}/91-perche-ti-piacera.png` });
+    await p.getByRole("button", { name: /chiudi/i }).first().click().catch(() => {});
+    await p.keyboard.press("Escape").catch(() => {});
+    await c.close();
+  }
+}
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);
