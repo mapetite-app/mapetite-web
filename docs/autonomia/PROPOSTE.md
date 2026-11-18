@@ -24,7 +24,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google Maps dal 22/10 usa salvati e ricerche per i consigli di Gemini e si può spegnere solo tutto insieme ("Consigli personalizzati", [Guida Google Maps](https://support.google.com/maps/answer/16833938)); Beli e Corner non lo prevedono. Noi lo diamo posto per posto.
 - **Valore per l'utente:** i consigli restano suoi anche se salva per altri; capisce che "Per te" nasce dai suoi gesti. **Per il ristoratore:** dati di gusto più puliti, quindi domanda più qualificata nel pannello.
 - **Sforzo:** S (una colonna sul salvato, un filtro nelle funzioni che leggono i gusti, una riga nel foglio). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **FATTA il 18/11 sera** (approvata 8,5; vedi BACKLOG).
 
 ### 67. "Da 5 recensioni, la più recente di 2 settimane fa": da quando parla il verdetto
 - **Problema:** `PROBLEMI.md` 28: solo il 4% sa riconoscere sempre una recensione falsa (Altroconsumo, 5/3/2026); un giudizio da recensioni di due anni fa vale meno, ma oggi non si vede.
