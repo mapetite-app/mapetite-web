@@ -188,7 +188,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Beli (punteggio), Mapstr Plus ("AI sui tuoi gusti", a pagamento). Noi: il motivo in parole, gratis, dal primo 👍.
 - **Valore per l'utente:** capisce perché quel posto è per lui. **Per il ristoratore:** clienti già affini al suo locale.
 - **Sforzo:** S. **Costo Google/Haiku:** zero (dati già salvati).
-- **Stato proposto:** PRONTA dal 9/11.
+- **Stato proposto:** PRONTA dal 9/11. **18/11 notte: costruita, bocciata due volte (8,0 e 8,2), corretta sul branch `claude/busy-mendel-6x97h8`, non unita; serve un revisore nuovo.**
 
 ### 49. "Il tuo anno a tavola": la mappa di dove sei stato
 - **Problema:** i "Ci sono stato" restano una lista; manca il motivo per tornare nell'app a fine anno (`PROBLEMI.md`, 9).
@@ -527,7 +527,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per il ristoratore:** il verdetto onesto è ciò che i locali verificati potranno arricchire (foto, serate) nel piano a pagamento.
 - **Sforzo:** S. Riusa `/api/places/verdetto` (lo stesso della scheda dei salvati).
 - **Costo Google/Haiku:** per i locali senza verdetto in cache: 1 Place Details + 1 Haiku, dentro il tetto di 25 al giorno già esistente.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **Già coperta (verificato il 18/11): `reel-save.tsx` chiede il verdetto a `/api/places/verdetto` subito dopo il salvataggio.**
 
 ## 20/10/2026 (sessione delle 05:00, CEO che chiude)
 
