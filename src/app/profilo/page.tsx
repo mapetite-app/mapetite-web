@@ -21,6 +21,7 @@ import ProfiloClassifica, { type ClassificaRow } from "@/components/profilo-clas
 import { isMissingColumn } from "@/lib/classifica";
 import { isMissingVisitedAt, POSTO_FISSO, visiteDi } from "@/lib/diario";
 import ProfiloAccount from "@/components/profilo-account";
+import QualcosaNonVa from "@/components/qualcosa-non-va";
 import PostiFissi, { type PostoFisso } from "@/components/posti-fissi";
 import ProfiloGusti from "@/components/profilo-gusti";
 import ProfiloAmati from "@/components/profilo-amati";
@@ -470,7 +471,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
       {/* Impostazioni: tutto il resto, chiuso. Ogni riga si apre al tocco; i link "#…" da altre
           pagine (es. #cosa-so-di-te, #profilo-pubblico) aprono sia "Impostazioni" sia la riga. */}
       <div className="mt-2 overflow-hidden rounded-card border border-border bg-white">
-        <ProfiloSezione id="altro" testId="profilo-altro" icon={<Settings {...icon} />} title="Impostazioni" hint="Gusti, raccolte, inviti, account">
+        <ProfiloSezione id="altro" testId="profilo-altro" icon={<Settings {...icon} />} title="Impostazioni" hint="Gusti, raccolte, account, segnalazioni">
           <div className="-mx-4 -mb-4">
             <Link href="/me" data-testid="profilo-gusti-link" className={row}>
               <SlidersHorizontal {...icon} aria-hidden className="shrink-0 text-brand" />
@@ -554,6 +555,8 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
                 <ProfiloRicerche />
               </ProfiloSezione>
             )}
+            {/* Segnalazioni dei tester (proposta 54): solo qui, non su ogni schermata. */}
+            <QualcosaNonVa rowClass={row} />
             {/* Premium (piano 8b) non compare finché è solo "in arrivo" (revisore 1/11): la pagina /premium resta. */}
             {/* Lato ristoratori (piano 8). */}
             <Link href="/per-i-ristoratori" data-testid="profilo-ristoratori" className={row}>
