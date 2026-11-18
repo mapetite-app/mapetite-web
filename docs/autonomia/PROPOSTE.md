@@ -152,7 +152,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** nessuna delle app viste lo offre in chiaro; serve a noi per il test.
 - **Valore per l'utente:** si sente ascoltato. **Per il ristoratore:** nessuno diretto.
 - **Sforzo:** S. **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA dal 9/11.
+- **Stato proposto:** PRONTA dal 9/11. **FATTA il 18/11 notte** (approvata 8,7: la riga "Dai un feedback" apre il foglio; vedi BACKLOG).
 
 ## 7/11/2026 (sabato, CEO che chiude — tema scheda, primo accesso e demo). Fino all'8/11 restano ferme (piano di Lorenzo): si fanno dopo.
 
