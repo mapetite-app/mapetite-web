@@ -32,7 +32,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google, TripAdvisor e TheFork mostrano le date recensione per recensione, ma nessuno dice da quando parla il riassunto dell'AI. Collegata alla 18 ("Come lo sai?") ma diversa: là la frase dietro un ✓, qui la freschezza dell'intero verdetto.
 - **Valore per l'utente:** sa quanto fidarsi del verdetto in un colpo d'occhio; un posto cambiato di gestione non lo sorprende. **Per il ristoratore:** se ha cambiato cucina, le recensioni nuove contano subito di più di quelle vecchie, visibilmente.
 - **Sforzo:** S (il campo arriva già nella risposta Google; salvarlo accanto al verdetto e una riga nella scheda). **Costo Google/Haiku:** zero (nessuna chiamata in più, FIELD_MASK invariato).
-- **Stato proposto:** PRONTA. Attenzione per chi la costruisce: il testo è relativo al momento della ricerca ("2 settimane fa"), quindi va salvato con la data del controllo o convertito in mese, mai mostrato vecchio come se fosse di oggi.
+- **Stato proposto:** PRONTA. **FATTA il 18/11 sera** (approvata 8,6; vedi BACKLOG). Attenzione per chi la costruisce: il testo è relativo al momento della ricerca ("2 settimane fa"), quindi va salvato con la data del controllo o convertito in mese, mai mostrato vecchio come se fosse di oggi.
 
 ### 68. "L'avevi salvato perché…": il motivo originale torna con il posto
 - **Problema:** il cuore di `VISIONE.md` (il ricordo si disperde: bandierine su Maps senza contesto) e `PROBLEMI.md` 28 (non si sa perché un posto viene riproposto). Quando un salvato riaffiora ("Sei vicino", "Da provare da mesi", "Dai tuoi salvati"), oggi si vede il nome ma non il motivo per cui la persona l'aveva salvato.
@@ -40,7 +40,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google Maps (lista "Tutti i salvati" in prova, [Android Authority](https://androidauthority.com/google-maps-list-hide-apk-teardown-3697285)), Mapstr e Corner mostrano il posto, non il perché te l'eri segnato. Noi abbiamo il reel e la nota fin dal salvataggio.
 - **Valore per l'utente:** il posto torna con il suo ricordo: "ah sì, quello della carbonara", e si decide subito. **Per il ristoratore:** il motivo per cui viene salvato (in forma aggregata, mai il singolo) è il dato che vorrebbe nel pannello: "ti salvano per la carbonara".
 - **Sforzo:** S (dati già nel database; una riga nella card, testo tagliato a una riga). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA. Il pezzo per il ristoratore (motivi aggregati nel pannello) è un secondo passo, da fare solo con almeno 3 salvataggi per non rivelare il singolo.
+- **Stato proposto:** PRONTA. **FATTA il 18/11 sera** (approvata 8,6; vedi BACKLOG). Il pezzo per il ristoratore (motivi aggregati nel pannello) è un secondo passo, da fare solo con almeno 3 salvataggi per non rivelare il singolo.
 
 ## 17/11/2026 (martedì, CEO che chiude — tema prezzo vero e app concorrenti)
 
@@ -188,7 +188,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Beli (punteggio), Mapstr Plus ("AI sui tuoi gusti", a pagamento). Noi: il motivo in parole, gratis, dal primo 👍.
 - **Valore per l'utente:** capisce perché quel posto è per lui. **Per il ristoratore:** clienti già affini al suo locale.
 - **Sforzo:** S. **Costo Google/Haiku:** zero (dati già salvati).
-- **Stato proposto:** PRONTA dal 9/11. **18/11 notte: costruita, bocciata due volte (8,0 e 8,2), corretta sul branch `claude/busy-mendel-6x97h8`, non unita; serve un revisore nuovo.**
+- **Stato proposto:** PRONTA dal 9/11. **18/11 notte: costruita, bocciata due volte (8,0 e 8,2), corretta sul branch `claude/busy-mendel-6x97h8`, non unita; serve un revisore nuovo.** **18/11 sera: approvata dal revisore 4 (8,5), in produzione con la PR #165.**
 
 ### 49. "Il tuo anno a tavola": la mappa di dove sei stato
 - **Problema:** i "Ci sono stato" restano una lista; manca il motivo per tornare nell'app a fine anno (`PROBLEMI.md`, 9).
