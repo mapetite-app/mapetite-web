@@ -11447,37 +11447,42 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
     await c.close();
   }
 }
-// Proposta 48 "Perché ti piacerà" (18/11): nella scheda "Per te · Come X e Y, che ti sono piaciuti: trattoria, …"
-// dai salvati con 👍. Solo stesso tipo (mai generico), mai i 👎, mai il posto stesso; prezzo e zona solo se veri per tutti.
+// Proposta 48 "Perché ti piacerà" (18/11): nella scheda "Per te · Come X, tra i posti che ti sono piaciuti: prezzi simili, stessa zona"
+// dai salvati con 👍. Solo stesso tipo noto (mai generico), mai i 👎, mai il posto stesso né un'altra sede; prezzo e zona solo se veri.
 {
   const pp = await import(new URL("../../src/lib/perche-piacera.ts", import.meta.url).href);
   const cl = await import(new URL("../../src/lib/category-label.ts", import.meta.url).href);
   const nl = await import(new URL("../../src/lib/nome-leggibile.ts", import.meta.url).href);
-  const f = (t, s) => pp.percheTiPiacera(t, s, (c, n) => (cl.tipoGoogleSconosciuto(c) ? null : cl.categoryLabel(c, n)), nl.nomeLeggibile);
+  const f = (t, s) => pp.percheTiPiacera(t, s, cl.etichettaNota, nl.nomeLeggibile);
   const P = (id, name, category, tags, extra = {}) => ({ id, name, category, priceLevel: 2, lat: 41.889, lng: 12.469, tags, ...extra });
+  const L = ["Mi è piaciuto"];
   const T = P("T", "Trattoria da Lucia", "seafood_restaurant", null);
   const S = [
     P("a", "Da Enzo al 29", "Trattoria", ["Già visitato", "Mi è piaciuto"]),
-    P("b", "TRATTORIA MARCO - TRASTEVERE", "restaurant", ["Mi è piaciuto"], { lat: 41.89, lng: 12.47 }),
-    P("c", "Trattoria Lontana", "Trattoria", ["Mi è piaciuto"], { lat: 45.46, lng: 9.19, priceLevel: 3 }),
+    P("b", "TRATTORIA MARCO - TRASTEVERE", "restaurant", L, { lat: 41.89, lng: 12.47 }),
+    P("c", "Trattoria Lontana", "Trattoria", L, { lat: 45.46, lng: 9.19, priceLevel: 3 }),
     P("d", "Trattoria No", "Trattoria", ["Già visitato", "Non fa per me"]),
     P("e", "Trattoria Da Provare", "Trattoria", ["Da provare"]),
-    P("f", "Bar Piaciuto", "bar", ["Mi è piaciuto"]),
-    P("g", "Trattoria Chiusa", "Trattoria", ["Mi è piaciuto"], { businessStatus: "CLOSED_PERMANENTLY" }),
+    P("f", "Bar Piaciuto", "bar", L),
+    P("g", "Trattoria Chiusa", "Trattoria", L, { businessStatus: "CLOSED_PERMANENTLY" }),
   ];
-  ok(f(T, S) === "Come Da Enzo al 29 e Trattoria Marco, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", `perché ti piacerà: due 👍 dello stesso tipo, nome leggibile e corto, prezzo e zona veri (${f(T, S)})`);
-  ok(f(T, [S[2]]) === "Come Trattoria Lontana, tra i posti che ti sono piaciuti: trattoria", `perché ti piacerà: uno solo, a Milano e più caro → solo il tipo (${f(T, [S[2]])})`);
-  ok(f(T, [S[3], S[4], S[5], S[6]]) === null, "perché ti piacerà: niente riga con 👎, da provare, altro tipo o chiusi per sempre");
-  ok(f(P("x", "Ristorante Qualsiasi", "italian_restaurant", null), [P("y", "Altro Ristorante", "italian_restaurant", ["Mi è piaciuto"])]) === null, "perché ti piacerà: 'Ristorante italiano' è generico, nessun legame");
-  ok(f({ ...S[0] }, S) === null && f({ ...T, tags: ["Mi è piaciuto"] }, S) === null && f({ ...T, id: "a" }, [S[0]]) === null && f({ ...T, name: "Da Enzo al 29", id: "zz" }, [S[0]]) === null, "perché ti piacerà: mai sul posto che ti è già piaciuto, mai citando il posto stesso");
-  ok(f(P("s", "Sushi Ko", "sushi_restaurant", null), [P("k", "Zen", "sushi_restaurant", ["Mi è piaciuto"], { priceLevel: null })]) === "Come Zen, tra i posti che ti sono piaciuti: stessa zona"
-    && f(P("j", "Hasekura", "japanese_restaurant", null), [P("k", "Ginza", "japanese_restaurant", ["Mi è piaciuto"])]) === "Come Ginza, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", `perché ti piacerà: cucine scritte per intero ('cucina giapponese') (${f(P("j", "Hasekura", "japanese_restaurant", null), [P("k", "Ginza", "japanese_restaurant", ["Mi è piaciuto"])])})`);
-  // Revisore 18/11 (8,0): stessa insegna con nomi diversi, tagli su "e", tipi inglesi, bar generici.
-  ok(f(P("z", "Zen - Prati", "sushi_restaurant", null), [P("z2", "Zen - Centro Storico", "sushi_restaurant", ["Mi è piaciuto"], { lat: 45.46, lng: 9.19 })]) === null, "perché ti piacerà: mai la stessa insegna con un altro quartiere nel nome ('Zen - Prati' / 'Zen - Centro Storico')");
-  ok(pp.nomeCorto("Il Marchese Bar Amari e Liquori") === "Il Marchese Bar Amari…", `perché ti piacerà: il taglio non finisce su 'e' (${pp.nomeCorto("Il Marchese Bar Amari e Liquori")})`);
-  ok(f(P("k1", "Karaoke Uno", "karaoke", null), [P("k2", "Karaoke Due", "karaoke", ["Mi è piaciuto"])]) === null && f(P("b1", "Bar Uno", "bar", null), [P("b2", "Bar Sport", "bar", ["Mi è piaciuto"])]) === null, "perché ti piacerà: niente tipi Google in inglese né 'bar' come legame di gusto");
-  ok(f(P("t9", "Trattoria Monti", "Trattoria", null, { lat: 41.895, lng: 12.495 }), [P("t8", "Trattoria Trastevere", "Trattoria", ["Mi è piaciuto"], { lat: 41.889, lng: 12.47, priceLevel: 3 })]) === "Come Trattoria Trastevere, tra i posti che ti sono piaciuti: trattoria", "perché ti piacerà: Trastevere e Monti non sono 'stessa zona'");
-  ok(pp.nomeCorto("Antica Trattoria della Pesa dal Mille e Cinquecento") === "Antica Trattoria…", `perché ti piacerà: nomi lunghi tagliati a parola (${pp.nomeCorto("Antica Trattoria della Pesa dal Mille e Cinquecento")})`);
+  const chk = (got, want, msg) => ok(got === want, `perché ti piacerà: ${msg} (${got})`);
+  chk(f(T, S), "Come Da Enzo al 29 e Trattoria Marco, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", "due 👍 con gli stessi legami, nome leggibile e corto");
+  chk(f(T, [S[2]]), null, "uno solo, a Milano e più caro → nessuna riga (solo il tipo, altra città)");
+  chk(f(T, [P("r", "Trattoria Monti", "Trattoria", L, { lat: 41.895, lng: 12.495, priceLevel: 3 })]), "Come Trattoria Monti, tra i posti che ti sono piaciuti", "solo il tipo nella stessa città: niente tipo ripetuto in coda; Monti non è 'stessa zona' di Trastevere");
+  chk(f(T, [S[3], S[4], S[5], S[6]]), null, "niente riga con 👎, da provare, bar o chiusi per sempre");
+  chk(f(P("x", "Ristorante Qualsiasi", "italian_restaurant", null), [P("y", "Altro Ristorante", "italian_restaurant", L)]), null, "'Ristorante italiano' è generico");
+  chk(f(P("x", "Posto A", "Cena romantica", null), [P("y", "Posto B", "Cena romantica", L)]), null, "una categoria scritta a mano non è un tipo");
+  chk(f(P("k1", "Karaoke Uno", "karaoke", null), [P("k2", "Karaoke Due", "karaoke", L)]), null, "niente tipi Google in inglese");
+  ok(f({ ...S[0] }, S) === null && f({ ...T, tags: L }, S) === null && f({ ...T, id: "a" }, [S[0]]) === null, "perché ti piacerà: mai sul posto che ti è già piaciuto, mai citando il posto stesso");
+  // Stessa insegna scritta in modi diversi (revisori 18/11).
+  const ins = [["Zen - Prati", "Zen - Centro Storico"], ["Zen-Prati", "Zen-Centro"], ["Rifugio Romano (Termini)", "Rifugio Romano (Prati)"], ["Pizzeria Ai Marmi, Trastevere", "Pizzeria Ai Marmi, Monti"], ["Sushiko Prati", "Sushiko"], ["Panificio Bonci Roma", "Panificio Bonci"], ["Da Enzo", "Trattoria Da Enzo"]];
+  const insFalliti = ins.filter(([x, y]) => f(P("t", x, "Trattoria", null), [P("u", y, "Trattoria", L)]) !== null).map((c) => c.join(" / "));
+  ok(insFalliti.length === 0, `perché ti piacerà: mai un'altra sede della stessa insegna (${insFalliti.join("; ") || "tutte riconosciute"})`);
+  chk(f(P("p", "Pizzeria Nuova", "pizza_restaurant", null), [P("s", "Seu Pizza Illuminati", "pizza_restaurant", L, { lat: 41.8915, lng: 12.469 }), P("r", "Da Remo", "pizza_restaurant", L, { lat: 41.878, lng: 12.476, priceLevel: 1 })]), "Come Seu Pizza Illuminati, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", "il secondo nome solo con gli stessi legami del primo");
+  chk(f(P("p", "Hasekura", "japanese_restaurant", null), [P("k", "Antica Trattoria Giapponese dei Fiori", "japanese_restaurant", L), P("k2", "Ginza Sushi Bar", "japanese_restaurant", L)]), "Come Ginza Sushi Bar, tra i posti che ti sono piaciuti: prezzi simili, stessa zona".replace("Ginza Sushi Bar", f(P("p", "Hasekura", "japanese_restaurant", null), [P("k", "Antica Trattoria Giapponese dei Fiori", "japanese_restaurant", L), P("k2", "Ginza Sushi Bar", "japanese_restaurant", L)])?.match(/^Come (.+?), tra/)?.[1] ?? "?"), "due nomi di cui uno tagliato → uno solo");
+  ok(!/ e /.test(f(P("p", "Hasekura", "japanese_restaurant", null), [P("k", "Antica Trattoria Giapponese dei Fiori", "japanese_restaurant", L), P("k2", "Ginza Sushi Bar", "japanese_restaurant", L)]) ?? " e "), "perché ti piacerà: con un nome tagliato si cita un posto solo");
+  for (const [n, w] of [["Antica Trattoria della Pesa dal Mille e Cinquecento", "Antica Trattoria…"], ["Il Marchese Bar Amari e Liquori", "Il Marchese Bar Amari…"], ["Pastificio Guerra dal 1918 Roma", "Pastificio Guerra…"], ["Bar del Fico, Piazza del Fico", "Bar del Fico"], ["L'Elementare - Trastevere", "L'Elementare"]]) chk(pp.nomeCorto(n), w, `nome corto di '${n}'`);
 
   if (!fakeUser) console.log("SKIP  perché ti piacerà nella scheda: dev server senza E2E_FAKE_USER");
   else {

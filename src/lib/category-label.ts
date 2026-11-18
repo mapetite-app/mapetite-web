@@ -105,3 +105,12 @@ export function categoryLabel(category: string | null | undefined, name?: string
   const t = category.replace(/_/g, " ");
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
+
+// Proposta 48 (revisore 18/11): un tipo vero per dire "come X", mai una categoria scritta a mano libera
+// ("Cena romantica"): solo le etichette italiane note (tipi Google o tipi dal nome del locale).
+const NOTE = new Set([...Object.values(LABELS), ...DAL_NOME.map(([, l]) => l)].map((l) => l.toLowerCase()));
+export function etichettaNota(category: string | null | undefined, name?: string | null): string | null {
+  if (tipoGoogleSconosciuto(category)) return null;
+  const l = categoryLabel(category, name);
+  return l && NOTE.has(l.toLowerCase()) ? l : null;
+}

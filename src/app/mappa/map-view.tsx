@@ -32,7 +32,7 @@ import { CONSIGLIATO_MAX, NOME_NON_VALIDO, leggiCampoNome } from "@/lib/consigli
 import { mioNome } from "@/lib/share-place";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
-import { categoryLabel, tipoGoogleSconosciuto } from "@/lib/category-label";
+import { categoryLabel, etichettaNota, tipoGoogleSconosciuto } from "@/lib/category-label";
 import { percheTiPiacera } from "@/lib/perche-piacera";
 import { momentSuggestion, fetchWeather, type Weather } from "@/lib/moment";
 import { momentoDi, type Momento } from "@/lib/home-proposte";
@@ -1415,7 +1415,7 @@ export default function MapView({
   // Zero chiamate: solo i salvati già in memoria. L'id del salvato (UUID) serve a non citare il posto stesso.
   const percheSelezionato = useMemo(() => {
     if (!selected || savedPlaces.length === 0) return null;
-    return percheTiPiacera({ ...selected, id: placeUuids[selected.id] ?? selected.id }, savedPlaces, (c, n) => (tipoGoogleSconosciuto(c) ? null : categoryLabel(c, n)), nomeLeggibile);
+    return percheTiPiacera({ ...selected, id: placeUuids[selected.id] ?? selected.id }, savedPlaces, etichettaNota, nomeLeggibile);
   }, [selected, savedPlaces, placeUuids]);
   // Scheda aperta: la barra dell'app si nasconde (globals.css, html[data-scheda-aperta]).
   const schedaAperta = selected != null;

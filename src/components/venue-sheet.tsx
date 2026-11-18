@@ -78,7 +78,7 @@ export type Venue = {
   photoAuthor?: string | null;
   // "Per te" dai gusti (mappa del gusto): scritto dall'AI solo con i gusti veri (vedi haiku-synthesis).
   perTe?: string | null;
-  // Proposta 48 "Perché ti piacerà": "Come Roscioli, che ti è piaciuto: trattoria, prezzi simili", dai tuoi 👍
+  // Proposta 48 "Perché ti piacerà": "Come Roscioli, tra i posti che ti sono piaciuti: prezzi simili", dai tuoi 👍
   // (src/lib/perche-piacera.ts). Più concreto del "Per te" dell'AI: se c'è, prende il suo posto.
   percheTiPiacera?: string | null;
   // Requisiti della ricerca confermati, con la frase della recensione che li prova (proposta 18).

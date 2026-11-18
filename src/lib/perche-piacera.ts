@@ -1,5 +1,5 @@
 // Proposta 48 "Perché ti piacerà": il motivo personale scritto in parole, mai un punteggio.
-// "Come Roscioli e Armando, tra i posti che ti sono piaciuti: prezzi simili, stessa zona".
+// "Come Roscioli, tra i posti che ti sono piaciuti: prezzi simili, stessa zona".
 // Solo dati già salvati dall'utente (tipo, fascia di prezzo e posizione dei suoi 👍): zero chiamate.
 // Mai inventato: senza un legame vero (stesso tipo, non generico) la riga non c'è.
 // Non premia la popolarità: il legame è con i TUOI posti, non con quanti ne parlano.
@@ -42,19 +42,12 @@ function tipo(p: { category: string | null; name: string }, etichetta: Etichetta
   return k && !GENERICHE.has(k) ? k : null;
 }
 
-// "Pesce" o "Giapponese" da soli non sono un tipo di posto: nella frase diventano "cucina di pesce", "cucina giapponese".
-const CUCINE = new Set(["giapponese", "cinese", "indiano", "thailandese", "messicano", "greco", "spagnolo", "francese", "americano", "mediorientale", "vegano", "vegetariano", "coreano", "vietnamita", "turco", "libanese", "brasiliano", "peruviano", "africano", "asiatico"]);
-function inFrase(t: string): string {
-  if (t === "pesce") return "cucina di pesce";
-  if (CUCINE.has(t)) return `cucina ${t.replace(/o$/, "a")}`;
-  return t;
-}
 
-// Nome corto per la frase: "L'Elementare - Trastevere" → "L'Elementare"; mai più di 24 caratteri, tagliato a parola
-// e mai su una parola vuota ("Bar Amari e…", revisore 18/11).
-const VUOTE_FINE = new Set(["e", "ed", "&", "di", "da", "del", "della", "dei", "al", "alla", "ai", "a", "in", "con", "per", "la", "il", "lo", "le", "i", "gli", "the", "of", "and"]);
+// Nome corto per la frase: "L'Elementare - Trastevere" → "L'Elementare", "Bar del Fico, Piazza del Fico" → "Bar del Fico";
+// mai più di 24 caratteri, tagliato a parola e mai su una parola vuota ("Bar Amari e…", "Guerra dal…": revisori 18/11).
+const VUOTE_FINE = new Set(["e", "ed", "&", "di", "da", "dal", "dallo", "dalla", "dai", "dagli", "dalle", "del", "dello", "della", "dei", "degli", "delle", "al", "allo", "alla", "ai", "agli", "alle", "a", "in", "nel", "nello", "nella", "nei", "su", "sul", "sullo", "sulla", "con", "per", "la", "il", "lo", "le", "i", "gli", "the", "of", "and"]);
 export function nomeCorto(name: string, leggibile: (n: string) => string = (n) => n): string {
-  const base = leggibile(name).split(/\s+[-–—|·]\s+/)[0].trim();
+  const base = leggibile(name).split(/\s+[-–—|·]\s+|,|\s+\(/)[0].trim();
   if (base.length <= 24) return base;
   const parole = base.slice(0, 24).replace(/\s+\S*$/, "").split(/\s+/);
   while (parole.length > 1 && VUOTE_FINE.has(parole[parole.length - 1].toLowerCase())) parole.pop();
@@ -62,40 +55,67 @@ export function nomeCorto(name: string, leggibile: (n: string) => string = (n) =
   return `${cut || base.slice(0, 23)}…`;
 }
 
+// L'insegna, per riconoscere lo stesso posto scritto in modi diversi (revisore 18/11): senza parentesi, senza il pezzo
+// dopo la virgola o il trattino, senza "Roma"/"Milano" in fondo, senza la parola del tipo in testa
+// ("Trattoria Da Enzo" = "Da Enzo", "Zen-Prati" = "Zen", "Panificio Bonci Roma" = "Panificio Bonci").
+const TIPO_IN_TESTA = /^(?:trattoria|osteria|hostaria|pizzeria|ristorante|bar|caff[eè]|enoteca|forno|panificio|pasticceria|gelateria|braceria|taverna|bistrot|sushi)\s+/;
+function insegna(n: string): string {
+  let k = n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/\([^)]*\)/g, " ").split(/,|\s[-–—|·]\s|(?<=\S)-(?=\S)/)[0]
+    .replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim()
+    .replace(/\s+(?:roma|milano)$/, "");
+  const senzaTipo = k.replace(TIPO_IN_TESTA, "");
+  if (senzaTipo.length >= 3) k = senzaTipo;
+  return k;
+}
+function stessaInsegna(a: string, b: string): boolean {
+  const x = insegna(a), y = insegna(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const [corto, lungo] = x.length <= y.length ? [x, y] : [y, x];
+  return corto.length >= 3 && lungo.startsWith(`${corto} `);
+}
+
+// Oltre questa distanza un esempio dello stesso tipo e basta non dice niente (altra città, un viaggio).
+const CITTA_M = 30000;
+
 /**
  * La riga "Per te" dai salvati che ti sono piaciuti, o null se non c'è un legame vero.
- * - Solo i salvati con "Mi è piaciuto" (mai con "Non fa per me"), diversi dal locale aperto.
- * - Legame obbligatorio: stesso tipo, non generico. Prezzo e zona si aggiungono solo se valgono per tutti gli esempi.
- * - Al massimo 2 nomi: prima quelli con lo stesso prezzo, poi i più vicini.
+ * - Solo i salvati con "Mi è piaciuto" (mai con "Non fa per me"), diversi dal locale aperto e da un'altra sede della stessa insegna.
+ * - Legame obbligatorio: stesso tipo, non generico. Prezzo e zona si scrivono solo se veri per ogni nome citato.
+ * - Il secondo nome solo se ha gli stessi legami del primo e se nessuno dei due nomi è tagliato (riga corta).
+ * - Solo il tipo: la riga c'è solo nella stessa città, e senza ripetere il tipo (è già sopra il nome).
  * - Nessuna riga se il locale aperto ti è già piaciuto o non fa per te (la sai già).
  */
 export function percheTiPiacera(target: PostoSimile, salvati: PostoSimile[], etichetta: Etichetta, leggibile?: (n: string) => string): string | null {
   if (target.tags?.includes(MI_E_PIACIUTO) || target.tags?.includes(NON_FA_PER_ME)) return null;
   const t = tipo(target, etichetta);
   if (!t) return null;
-  // Confronto sul nome che si mostra: "Zen - Prati" e "Zen - Centro Storico" sono la stessa insegna (revisore 18/11).
-  const corto = (n: string) => nomeCorto(n, leggibile).replace(/…$/, "").trim().toLowerCase();
-  const nomeTarget = corto(target.name);
   const vicino = (p: PostoSimile) => distanceMeters(p, target);
   const candidati = salvati.filter((p) =>
     p.id !== target.id
-    && corto(p.name) !== nomeTarget
+    && !stessaInsegna(p.name, target.name)
     && p.tags?.includes(MI_E_PIACIUTO) && !p.tags?.includes(NON_FA_PER_ME)
     && p.businessStatus !== "CLOSED_PERMANENTLY"
     && tipo(p, etichetta) === t);
   if (candidati.length === 0) return null;
   const prezzoUguale = (p: PostoSimile) => target.priceLevel != null && target.priceLevel > 0 && p.priceLevel === target.priceLevel;
-  const scelti = [...candidati]
-    .sort((a, b) => Number(prezzoUguale(b)) - Number(prezzoUguale(a)) || vicino(a) - vicino(b) || a.name.localeCompare(b.name, "it"))
-    .slice(0, 2);
-  const nomi = scelti.map((p) => nomeCorto(p.name, leggibile));
-  if (nomi.length === 2 && nomi[0].toLowerCase() === nomi[1].toLowerCase()) nomi.pop();
+  const inZona = (p: PostoSimile) => vicino(p) <= ZONA_M;
+  const forza = (p: PostoSimile) => Number(prezzoUguale(p)) + Number(inZona(p));
+  const ordinati = [...candidati].sort((a, b) => forza(b) - forza(a) || Number(prezzoUguale(b)) - Number(prezzoUguale(a)) || vicino(a) - vicino(b) || a.name.localeCompare(b.name, "it"));
+  const primo = ordinati[0];
+  if (forza(primo) === 0 && vicino(primo) > CITTA_M) return null;
+  const scelti = [primo];
+  const secondo = ordinati[1];
+  if (secondo && prezzoUguale(secondo) === prezzoUguale(primo) && inZona(secondo) === inZona(primo) && !stessaInsegna(secondo.name, primo.name)) scelti.push(secondo);
+  let nomi = scelti.map((p) => nomeCorto(p.name, leggibile));
+  if (nomi.length === 2 && (nomi.some((n) => n.endsWith("…")) || `${nomi[0]} e ${nomi[1]}`.length > 34)) nomi = nomi.slice(0, 1);
   // Forma neutra (revisore 18/11: "La Gatta Mangiona, che ti è piaciuto" era sgrammaticato).
   const chi = nomi.length === 2 ? `${nomi[0]} e ${nomi[1]}` : nomi[0];
-  // Il tipo è già scritto sopra il nome: si ripete solo se è l'unico legame (revisore 18/11: "trattoria" tre volte).
   const pezzi: string[] = [];
-  if (scelti.slice(0, nomi.length).every(prezzoUguale)) pezzi.push("prezzi simili");
-  if (scelti.slice(0, nomi.length).every((p) => vicino(p) <= ZONA_M)) pezzi.push("stessa zona");
-  if (pezzi.length === 0) pezzi.push(inFrase(t));
-  return `Come ${chi}, tra i posti che ti sono piaciuti: ${pezzi.join(", ")}`;
+  if (prezzoUguale(primo)) pezzi.push("prezzi simili");
+  if (inZona(primo)) pezzi.push("stessa zona");
+  // Il tipo è già scritto sopra il nome (revisori 18/11: "trattoria" ripetuta, ": colazione" poco italiano):
+  // con il solo tipo la frase finisce col nome.
+  return pezzi.length > 0 ? `Come ${chi}, tra i posti che ti sono piaciuti: ${pezzi.join(", ")}` : `Come ${chi}, tra i posti che ti sono piaciuti`;
 }
