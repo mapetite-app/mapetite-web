@@ -1604,7 +1604,7 @@ export default function MapView({
   // "La mia posizione" e un suo "Da provare" è a due passi. Ritrova il locale nel momento giusto.
   const [nearbySaved, setNearbySaved] = useState<{ place: Place; meters: number } | null>(null);
   const nearbyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Proposta 68: il ricordo del salvato che riaffiora ("Salvato a marzo · la tua nota: «…»"). Nota e consiglio
+  // Proposta 68: il ricordo del salvato che riaffiora ("«per il compleanno di Sara» · marzo"). Nota e consiglio
   // sono già in memoria; il reel collegato si legge solo se servono (una lettura, solo i propri).
   const [ricordoVicino, setRicordoVicino] = useState<{ id: string; testo: string } | null>(null);
   const leggiRicordo = (place: Place): Promise<void> => {
@@ -4449,7 +4449,7 @@ export default function MapView({
             <span className="min-w-0 flex-1 text-sm font-sans">
               <span className="font-semibold">📌 A {distanceLabel(userPos ?? nearbySaved.place, nearbySaved.place)}</span> c&apos;è {nearbySaved.place.name}, che volevi provare
               {ricordoVicino?.id === nearbySaved.place.id && (
-                <span data-testid="vicino-ricordo" className="mt-0.5 line-clamp-2 block text-xs text-white/80">{ricordoVicino.testo}</span>
+                <span data-testid="vicino-ricordo" className="mt-0.5 line-clamp-2 text-xs text-white/80">{ricordoVicino.testo}</span>
               )}
             </span>
             <button
