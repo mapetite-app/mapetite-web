@@ -59,7 +59,8 @@ const CUISINE_QUERY: Record<string, string> = {
   street_food: "street food",
 };
 
-export type SavedForTaste = { googlePlaceId: string | null; category: string | null; tags: string[] };
+// fuoriGusti (proposta 66): "Non contarlo nei miei gusti": resta tra i già salvati, ma non sceglie il tipo.
+export type SavedForTaste = { googlePlaceId: string | null; category: string | null; tags: string[]; fuoriGusti?: boolean };
 export type Prefs = { cuisines: string[]; priceRange: string | null } | null;
 
 export type SurprisePlan = {
@@ -77,7 +78,7 @@ export function planSurprise(saved: SavedForTaste[], prefs: Prefs, now: Date): S
   const maxPriceLevel = prefs?.priceRange === "€" ? 2 : undefined;
   const score = new Map<string, { w: number; n: number; liked: number }>();
   for (const s of saved) {
-    if (s.tags.includes(OPINION_DISLIKE)) continue;
+    if (s.tags.includes(OPINION_DISLIKE) || s.fuoriGusti === true) continue;
     const label = categoryLabel(s.category);
     if (!label || label === "Negozio") continue;
     const liked = s.tags.includes(OPINION_LIKE);

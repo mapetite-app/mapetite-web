@@ -27,6 +27,8 @@ export type PostoSimile = {
   tags?: string[] | null;
   // Proposta 45: i posti chiusi per sempre non si citano come esempio.
   businessStatus?: string | null;
+  // Proposta 66: "Non contarlo nei miei gusti": resta salvato ma non si cita mai come esempio.
+  fuoriGusti?: boolean;
 };
 
 // Etichette che non dicono niente sul gusto ("Ristorante" come un altro "Ristorante"): nessun legame.
@@ -100,6 +102,7 @@ export function percheTiPiacera(target: PostoSimile, salvati: PostoSimile[], eti
     && !stessaInsegna(p.name, target.name)
     && p.tags?.includes(MI_E_PIACIUTO) && !p.tags?.includes(NON_FA_PER_ME)
     && p.businessStatus !== "CLOSED_PERMANENTLY"
+    && p.fuoriGusti !== true
     && tipo(p, etichetta) === t);
   if (candidati.length === 0) return null;
   const prezzoUguale = (p: PostoSimile) => target.priceLevel != null && target.priceLevel > 0 && p.priceLevel === target.priceLevel;
