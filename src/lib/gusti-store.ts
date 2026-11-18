@@ -73,9 +73,14 @@ export const dimenticaGusto = (userId: string | null, id: string) => salvaGusti(
 export async function caricaZonaAbituale(userId: string | null): Promise<Zona | null> {
   if (!userId) return null;
   try {
-    const { data, error } = await (await browserClient()).from("saved_places").select("places(lat, lng)").eq("user_id", userId);
+    // Proposta 66: i posti "Non contarlo nei miei gusti" non fanno la zona abituale (senza la colonna si rilegge senza).
+    const client = await browserClient();
+    const leggi = (conGusti: boolean) => client.from("saved_places").select(conGusti ? "fuori_gusti, places(lat, lng)" : "places(lat, lng)").eq("user_id", userId);
+    let { data, error } = await leggi(true);
+    if (error?.code === "42703") ({ data, error } = await leggi(false));
     if (error || !Array.isArray(data)) return null;
-    const points = (data as { places?: { lat?: number | null; lng?: number | null } | null }[])
+    const points = (data as { fuori_gusti?: boolean | null; places?: { lat?: number | null; lng?: number | null } | null }[])
+      .filter((r) => r.fuori_gusti !== true)
       .flatMap((r) => (typeof r.places?.lat === "number" && typeof r.places?.lng === "number" ? [{ lat: r.places.lat, lng: r.places.lng }] : []));
     return zonaAbituale(points);
   } catch {

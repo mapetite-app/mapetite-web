@@ -7,7 +7,7 @@ Continua `RICERCA-RISTORATORI.md` (base di Lorenzo del 17/10). Qui ogni problema
 - **DAVVERO, in futuro:** cosa serve (partner, integrazioni, pagamenti, accordi, norme).
 - **Primo passo** e **chi lo fa**: "team" (sessioni di sviluppo) oppure "Lorenzo/Roberto" (contatti, contratti, soldi).
 
-Ultimo aggiornamento: 15/11/2026.
+Ultimo aggiornamento: 18/11/2026.
 
 ---
 
@@ -270,3 +270,9 @@ Ultimo aggiornamento: 15/11/2026.
 - **DAVVERO, in futuro:** chi ha segnato "Ci sono stato" dice in un tocco quanto ha speso a testa; dalla terza risposta la scheda mostra "Chi c'è stato: 25–35 € a testa" (proposta 64); il ristoratore può confermare la sua fascia dal pannello (proposta 65).
 - **Primo passo:** proposta 64 (zero chiamate Google).
 
+## 28. "Perché proprio questo, e di chi mi fido?": consigli che non dicono il motivo, recensioni che non si sa riconoscere — 18/11 (CEO che chiude)
+- **Chi lo ha:** il cliente (gli arriva un "consigliato per te" senza sapere da cosa nasce; legge stelle e recensioni senza sapere se sono vere o vecchie) e il ristoratore onesto (le sue recensioni vere valgono quanto quelle comprate degli altri).
+- **Quanto pesa:** per Altroconsumo (notizia del 5/3/2026) solo il **4%** degli italiani è sicuro di saper sempre riconoscere una recensione falsa; il **79%** dice che le recensioni false minano la fiducia in tutte le recensioni; il **65%** le consulta prima di comprare e il **78%** le ritiene determinanti ([Altroconsumo](https://www.altroconsumo.it/vita-privata-famiglia/servizi-e-contratti/news/recensioni-online), riguarda le recensioni in generale, non solo i ristoranti; campione non letto). Per TheFork (aprile 2026) le recensioni sono il fattore che pesa di più per il 43% degli over 25 (`PROBLEMI.md` 25). Dal 22/10/2026 Gemini consiglia posti leggendo i salvati e le ricerche su Maps ([9to5Google](https://9to5google.com/2026/10/22/gemini-personal-intelligence-maps/)), ma la guida di Google elenca quali dati usa senza dire il motivo del singolo consiglio ([Guida Google Maps](https://support.google.com/maps/answer/16833938)). Quante persone ignorano un consiglio perché non ne capiscono il motivo: dato non trovato. Quanto sono vecchie in media le recensioni che si leggono prima di scegliere: dato non trovato.
+- **OGGI nell'app:** il verdetto nasce dalle recensioni Google (fino a 5 per locale, nel FIELD_MASK c'è già quanto sono recenti: `relativePublishTimeDescription` in `src/lib/google-places.ts`), ma non diciamo da quando sono; "Perché ti piacerà" (proposta 48) spiega il motivo personale; ogni posto salvato conta nei gusti, anche quello salvato per qualcun altro.
+- **DAVVERO, in futuro:** ogni verdetto dice su cosa si basa e da quando ("da 5 recensioni, la più recente di 2 settimane fa", proposta 67); la persona decide cosa conta nei suoi gusti (proposta 66); il posto salvato ricorda perché l'avevi salvato (proposta 68). Per il ristoratore, più avanti: recensioni Mapetite solo da visite segnate (proposta 61).
+- **Primo passo:** proposta 67 (zero chiamate Google, il dato arriva già).

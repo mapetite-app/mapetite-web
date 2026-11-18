@@ -38,11 +38,15 @@ type Phase = "carico" | "pronto" | "vuoto" | "errore";
 // Gusti della persona: salvati (tipo e stato) e preferenze dell'onboarding. Solo letture Supabase.
 async function loadTaste(userId: string): Promise<{ saved: (SavedForTaste & { lat: number | null; lng: number | null })[]; prefs: Prefs }> {
   const supabase = await browserClient();
-  const [s, p] = await Promise.all([
-    supabase.from("saved_places").select("tags, places(category, lat, lng, google_place_id)").eq("user_id", userId),
+  // Proposta 66: i posti "Non contarlo nei miei gusti" non guidano la scelta (restano esclusi solo come già salvati).
+  // Senza la colonna (migrazione 20261118_fuori_gusti) si rilegge senza.
+  const leggi = (conGusti: boolean) => supabase.from("saved_places").select(conGusti ? "fuori_gusti, tags, places(category, lat, lng, google_place_id)" : "tags, places(category, lat, lng, google_place_id)").eq("user_id", userId);
+  const [s0, p] = await Promise.all([
+    leggi(true),
     supabase.from("profiles").select("cuisines, price_range").eq("id", userId).maybeSingle(),
   ]);
-  const saved = (s.data ?? []).map((row) => {
+  const s = s0.error?.code === "42703" ? await leggi(false) : s0;
+  const saved = ((s.data ?? []) as unknown as { fuori_gusti?: boolean | null; tags: unknown; places: unknown }[]).map((row) => {
     const pl = row.places as unknown as { category: string | null; lat: number | null; lng: number | null; google_place_id: string | null } | null;
     return {
       googlePlaceId: pl?.google_place_id ?? null,
@@ -50,6 +54,7 @@ async function loadTaste(userId: string): Promise<{ saved: (SavedForTaste & { la
       lat: pl?.lat ?? null,
       lng: pl?.lng ?? null,
       tags: ((row.tags as string[] | null) ?? []).filter((t) => typeof t === "string"),
+      fuoriGusti: row.fuori_gusti === true,
     };
   });
   const prof = (Array.isArray(p.data) ? p.data[0] : p.data) as { cuisines?: string[] | null; price_range?: string | null } | null;
