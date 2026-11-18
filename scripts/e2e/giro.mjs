@@ -3275,6 +3275,15 @@ else {
       ok((await p3s.getByTestId("suggerimento-salvati").getAttribute("aria-label")) === "✨ Dai tuoi salvati: Bar a Roma, fuori dai soliti giri", "fatti suggerire: proposta dal tipo e dalla città dei tuoi salvati");
     }, () => ok(false, "fatti suggerire: proposta dal tipo e dalla città dei tuoi salvati"));
     await p3s.close();
+    // Proposta 66: i due bar segnati "Fuori dai miei gusti" non suggeriscono niente.
+    { const rows3f = rows3.map((x, i) => i === 1 || x.places.category === "bar" ? { ...x, fuori_gusti: true } : x);
+      const p3f = await sctx.newPage();
+      await p3f.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rows3f.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rows3f }));
+      await p3f.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+      await p3f.waitForTimeout(1200);
+      const sug = await p3f.getByTestId("suggerimento-salvati").getAttribute("aria-label").catch(() => null);
+      ok(!/Bar a Roma/.test(sug ?? ""), `fatti suggerire: i bar fuori dai gusti non suggeriscono 'Bar a Roma' (proposta 66) (${sug})`);
+      await p3f.close(); }
     ok((await p.getByTestId("suggerimento-salvati").count()) === 0, "fatti suggerire: niente proposta se i salvati sono tutti di tipo diverso");
   }
 
@@ -3298,6 +3307,17 @@ else {
   { const sim = await p.locator("ul.snap-x li[data-id=P2]").getByTestId("simile-a").evaluate((el) => ({ vis: [...el.childNodes].filter((n) => !n.classList?.contains("sr-only")).map((n) => n.textContent).join("").trim(), txt: el.textContent, title: el.title, intera: el.scrollWidth <= el.clientWidth + 1 }));
     ok(sim.vis === "✨ Come un tuo salvato" && sim.txt.includes("Terrazza Uno") && sim.title === "Come Terrazza Uno, che hai salvato" && sim.intera, `per te: 'Come un tuo salvato' intera su un bar simile, il nome nel lettore di schermo (${sim.vis} | ${sim.title})`); }
   ok((await p.locator("ul.snap-x li[data-id=P3]").getByTestId("simile-a").count()) === 0, "per te: niente indicazione se il tipo è diverso (cocktail bar)");
+  // Proposta 66: Terrazza Uno "Fuori dai miei gusti" non fa da esempio sulle card.
+  { const rowsF = rows.map((x) => x.places.name === "Terrazza Uno" ? { ...x, fuori_gusti: true } : x);
+    const pf = await sctx.newPage();
+    await pf.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: rowsF.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: rowsF }));
+    await pf.route("**/api/search/synthesis", (r) => r.fulfill({ json: { dettagli: {}, esclusi: [] } }));
+    await pf.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+    await (await esempio(pf)).click();
+    const visto = await pf.locator("ul.snap-x li[data-id=P2]").waitFor({ timeout: 5000 }).then(() => true, () => false);
+    await pf.waitForTimeout(500);
+    ok(visto && (await pf.locator("ul.snap-x li[data-id=P2]").getByTestId("simile-a").count()) === 0, "per te: un salvato fuori dai gusti non fa 'Come un tuo salvato' (proposta 66)");
+    await pf.close(); }
   ok((await p.locator("ul.snap-x").getByTestId("simile-a").count()) <= 2, "per te: 'Come un tuo salvato' al massimo su 2 card (4/11: prima su tutte, non diceva niente)");
   await p.screenshot({ path: `${OUT}/28-per-te-simile.png`, caret: "initial" });
   await p.unroute("**/api/search/synthesis");
