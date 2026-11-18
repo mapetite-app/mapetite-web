@@ -55,7 +55,8 @@ const VUOTE_FINE = new Set(["e", "ed", "&", "di", "da", "dal", "dallo", "dalla",
 export function nomeCorto(name: string, leggibile: (n: string) => string = (n) => n, taglia = true): string {
   const intero = leggibile(name).trim();
   const primo = intero.split(/\s+[-–—|]\s+|,|\s+\(/)[0].trim();
-  const base = primo.length >= 3 && !SOLO_TIPO.test(primo) ? primo : intero;
+  // Revisore 4: "Pane, Vino e San Daniele" non diventa "Pane": un pezzo di una parola sola prima della virgola resta col resto.
+  const base = primo.length >= 3 && !SOLO_TIPO.test(primo) && (primo.includes(" ") || !/^[^,]+,/.test(intero)) ? primo : intero;
   if (!taglia || base.length <= 24) return base;
   const parole = base.slice(0, 24).replace(/\s+\S*$/, "").split(/\s+/);
   while (parole.length > 1 && VUOTE_FINE.has(parole[parole.length - 1].toLowerCase())) parole.pop();
@@ -78,7 +79,7 @@ function insegna(n: string): string {
   return k;
 }
 // Parole che non bastano a dire "stessa insegna" (articoli, tipi, aggettivi e cibi comuni).
-const COMUNI = new Set(["da", "dal", "dai", "del", "della", "dei", "di", "la", "il", "lo", "le", "gli", "i", "l", "al", "alla", "e", "the", "antica", "antico", "vecchia", "vecchio", "nuova", "nuovo", "piccola", "piccolo", "grande", "buona", "bella", "casa", "mamma", "nonna", "sora", "sor", "zia", "zio", "trattoria", "osteria", "hostaria", "pizzeria", "ristorante", "bar", "caffe", "enoteca", "forno", "panificio", "pasticceria", "gelateria", "braceria", "taverna", "bistrot", "sushi", "locanda", "vineria", "cucina", "pane", "vino", "pizza", "pasta", "birra", "gelato", "roma", "romana", "romano", "milano", "milanese", "italia", "italiano", "italiana"]);
+const COMUNI = new Set(["da", "dal", "dai", "del", "della", "dei", "di", "la", "il", "lo", "le", "gli", "i", "l", "al", "alla", "e", "the", "antica", "antico", "vecchia", "vecchio", "nuova", "nuovo", "piccola", "piccolo", "grande", "buona", "bella", "casa", "mamma", "nonna", "sora", "sor", "zia", "zio", "trattoria", "osteria", "hostaria", "pizzeria", "ristorante", "bar", "caffe", "enoteca", "forno", "panificio", "pasticceria", "gelateria", "braceria", "taverna", "bistrot", "sushi", "locanda", "vineria", "cucina", "pane", "vino", "pizza", "pasta", "birra", "gelato", "roma", "romana", "romano", "milano", "milanese", "italia", "italiano", "italiana", "dar", "der", "san", "santa", "sant", "santo", "ramen", "birreria", "pub"]);
 function primaParola(k: string): string | null {
   for (const w of k.split(" ")) {
     const p = w.replace(/^(?:l|d|un|dell|all|sull|nell)'/, "").replace(/'/g, "");
@@ -95,6 +96,8 @@ function stessaInsegna(a: string, b: string): boolean {
   if (x === y) return true;
   const [corto, lungo] = x.length <= y.length ? [x, y] : [y, x];
   if (corto.length >= 3 && lungo.startsWith(`${corto} `)) return true;
+  // Revisore 4 (18/11): "Pizzarium" in "Bonci Pizzarium", "50 Kalò" in "Ciro Salvo 50 Kalò": contenuto come parole intere.
+  if (corto.length >= 4 && ` ${lungo} `.includes(` ${corto} `)) return true;
   const px = primaParola(x), py = primaParola(y);
   return px != null && px === py;
 }
@@ -131,7 +134,8 @@ export function percheTiPiacera(target: PostoSimile, salvati: PostoSimile[], eti
   const forza = (p: PostoSimile) => Number(prezzoUguale(p)) + Number(inZona(p));
   const ordinati = [...candidati].sort((a, b) => forza(b) - forza(a) || Number(prezzoUguale(b)) - Number(prezzoUguale(a)) || vicino(a) - vicino(b) || a.name.localeCompare(b.name, "it"));
   const primo = ordinati[0];
-  if (forza(primo) === 0 && vicino(primo) > CITTA_M) return null;
+  // Mai un esempio di un'altra città, nemmeno con il prezzo uguale (revisore 4: legame troppo debole).
+  if (vicino(primo) > CITTA_M) return null;
   const scelti = [primo];
   const secondo = ordinati[1];
   if (secondo && prezzoUguale(secondo) === prezzoUguale(primo) && inZona(secondo) === inZona(primo) && !stessaInsegna(secondo.name, primo.name)) scelti.push(secondo);
@@ -139,7 +143,7 @@ export function percheTiPiacera(target: PostoSimile, salvati: PostoSimile[], eti
   if (nomi.length === 2 && (nomi.some((n) => n.endsWith("…")) || `${nomi[0]} e ${nomi[1]}`.length > 34)) nomi = [nomeCorto(primo.name, leggibile, false)];
   else if (nomi.length === 1) nomi = [nomeCorto(primo.name, leggibile, false)];
   // Forma neutra (revisore 18/11: "La Gatta Mangiona, che ti è piaciuto" era sgrammaticato).
-  const chi = nomi.length === 2 ? `${nomi[0]} e ${nomi[1]}` : nomi[0];
+  const chi = nomi.length === 2 ? `${nomi[0]} ${/^[eE]/.test(nomi[1]) ? "ed" : "e"} ${nomi[1]}` : nomi[0];
   const pezzi: string[] = [];
   if (prezzoUguale(primo)) pezzi.push("prezzi simili");
   if (inZona(primo)) pezzi.push("stessa zona");

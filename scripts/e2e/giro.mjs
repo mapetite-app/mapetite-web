@@ -11498,7 +11498,7 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
   const insFalliti = ins.filter(([x, y]) => f(P("t", x, "Trattoria", null), [P("u", y, "Trattoria", L)]) !== null).map((c) => c.join(" / "));
   ok(insFalliti.length === 0, `perché ti piacerà: mai un'altra sede della stessa insegna (${insFalliti.join("; ") || "tutte riconosciute"})`);
   // Revisore 3 (18/11): sedi senza separatore, apostrofo tipografico, "&".
-  const ins3 = [["Trapizzino Ponte Milvio", "Trapizzino Testaccio"], ["Sushiko Prati", "Sushiko Monti"], ["Berberè Isola", "Berberè Navigli"], ["L'Elementare", "L’Elementare"], ["L'Elementare Trastevere", "L’Elementare - Monti"], ["180g Pizzeria Romana Centocelle", "180g Pizzeria Romana Ostiense"], ["Fatamorgana Trastevere", "Gelateria Fatamorgana Monti"], ["Romeo Chef & Baker Prati", "Romeo Chef e Baker Testaccio"]];
+  const ins3 = [["Trapizzino Ponte Milvio", "Trapizzino Testaccio"], ["Sushiko Prati", "Sushiko Monti"], ["Berberè Isola", "Berberè Navigli"], ["L'Elementare", "L’Elementare"], ["L'Elementare Trastevere", "L’Elementare - Monti"], ["180g Pizzeria Romana Centocelle", "180g Pizzeria Romana Ostiense"], ["Fatamorgana Trastevere", "Gelateria Fatamorgana Monti"], ["Romeo Chef & Baker Prati", "Romeo Chef e Baker Testaccio"], ["Pizzarium", "Bonci Pizzarium"], ["Pizza Illuminati", "Seu Pizza Illuminati"], ["Ciro Salvo 50 Kalò", "50 Kalò"]];
   const ins3Falliti = ins3.filter(([x, y]) => f(P("t", x, "Trattoria", null), [P("u", y, "Trattoria", L)]) !== null).map((c) => c.join(" / "));
   ok(ins3Falliti.length === 0, `perché ti piacerà: stessa insegna anche senza separatore e con l'apostrofo tipografico (${ins3Falliti.join("; ") || "tutte riconosciute"})`);
   chk(f(P("t", "Trattoria da Lucia", "Trattoria", null), [P("u", "Da Enzo al 29", "Trattoria", L)]), "Come Da Enzo al 29, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", "insegne diverse restano diverse");
@@ -11507,6 +11507,9 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
   chk(f(P("t", "Trattoria da Lucia", "Trattoria", null, { lat: null, lng: null }), [P("u", "Da Enzo al 29", "Trattoria", L, { lat: null, lng: null })]), null, "senza coordinate niente 'stessa zona' e niente riga");
   chk(pp.nomeCorto("Pizzeria (Da Remo)"), "Pizzeria (Da Remo)", "nome corto: mai il solo tipo prima della parentesi");
   chk(pp.nomeCorto("Pane · Vino"), "Pane · Vino", "nome corto: il punto in mezzo fa parte del nome");
+  chk(pp.nomeCorto("Pane, Vino e San Daniele"), "Pane, Vino e San Daniele", "nome corto: una parola sola prima della virgola resta col resto");
+  chk(f(T, [P("u", "Da Remo", "Trattoria", L), P("v", "Emma", "Trattoria", L)]), "Come Da Remo ed Emma, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", "'ed' davanti a vocale");
+  chk(f(T, [P("u", "Da Remo", "Trattoria", L, { lat: 45.46, lng: 9.19 })]), null, "mai un esempio di un'altra città, nemmeno col prezzo uguale");
   // Proposta 66: un 👍 "Non contarlo nei miei gusti" non si cita mai.
   chk(f(P("t", "Trattoria da Lucia", "Trattoria", null), [P("u", "Da Enzo al 29", "Trattoria", L, { fuoriGusti: true })]), null, "un 👍 fuori dai gusti non si cita (proposta 66)");
   chk(f(P("t", "Trattoria da Lucia", "Trattoria", null), [P("u", "Da Enzo al 29", "Trattoria", L, { fuoriGusti: true }), P("v", "Da Cesare", "Trattoria", L)]), "Come Da Cesare, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", "con un 👍 fuori dai gusti si cita l'altro (proposta 66)");
