@@ -1607,12 +1607,12 @@ export default function MapView({
   // Proposta 68: il ricordo del salvato che riaffiora ("Salvato a marzo · la tua nota: «…»"). Nota e consiglio
   // sono già in memoria; il reel collegato si legge solo se servono (una lettura, solo i propri).
   const [ricordoVicino, setRicordoVicino] = useState<{ id: string; testo: string } | null>(null);
-  const leggiRicordo = (place: Place) => {
+  const leggiRicordo = (place: Place): Promise<void> => {
     const base = { savedAt: place.savedAt ?? null, note: place.note ?? null, consigliatoDa: place.consigliatoDa ?? null };
     const subito = ricordoSalvato(base);
-    if (subito || !userId) { setRicordoVicino(subito ? { id: place.id, testo: subito } : null); return; }
+    if (subito || !userId) { setRicordoVicino(subito ? { id: place.id, testo: subito } : null); return Promise.resolve(); }
     setRicordoVicino(null);
-    void browserClient()
+    return browserClient()
       .then((client) => client.from("contenuti_locali").select("fonte, url").eq("user_id", userId).eq("place_id", place.id).order("created_at", { ascending: true }).limit(1))
       .then(({ data, error }) => {
         const reel = !error && Array.isArray(data) && data[0] ? (data[0] as { fonte: string; url: string }) : null;
@@ -1629,8 +1629,9 @@ export default function MapView({
       const oggi = new Date().toDateString();
       try { if (localStorage.getItem(chiave) === oggi) return; localStorage.setItem(chiave, oggi); } catch { /* storage non disponibile */ }
     }
-    setNearbySaved(near);
-    leggiRicordo(near.place);
+    // Revisore 18/11: l'avviso aspetta il ricordo (al massimo 0,6 s), così non cresce dopo essere comparso.
+    const pronto = leggiRicordo(near.place);
+    void Promise.race([pronto, new Promise((ok) => setTimeout(ok, 600))]).then(() => setNearbySaved(near));
     if (nearbyTimer.current) clearTimeout(nearbyTimer.current);
     nearbyTimer.current = setTimeout(() => setNearbySaved(null), 9000);
   };
@@ -4448,7 +4449,7 @@ export default function MapView({
             <span className="min-w-0 flex-1 text-sm font-sans">
               <span className="font-semibold">📌 A {distanceLabel(userPos ?? nearbySaved.place, nearbySaved.place)}</span> c&apos;è {nearbySaved.place.name}, che volevi provare
               {ricordoVicino?.id === nearbySaved.place.id && (
-                <span data-testid="vicino-ricordo" className="mt-0.5 block truncate text-xs text-white/80">{ricordoVicino.testo}</span>
+                <span data-testid="vicino-ricordo" className="mt-0.5 line-clamp-2 block text-xs text-white/80">{ricordoVicino.testo}</span>
               )}
             </span>
             <button
