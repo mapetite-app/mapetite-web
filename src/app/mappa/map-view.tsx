@@ -1415,7 +1415,7 @@ export default function MapView({
   // Zero chiamate: solo i salvati già in memoria. L'id del salvato (UUID) serve a non citare il posto stesso.
   const percheSelezionato = useMemo(() => {
     if (!selected || savedPlaces.length === 0) return null;
-    return percheTiPiacera({ ...selected, id: placeUuids[selected.id] ?? selected.id }, savedPlaces, categoryLabel, nomeLeggibile);
+    return percheTiPiacera({ ...selected, id: placeUuids[selected.id] ?? selected.id }, savedPlaces, (c, n) => (tipoGoogleSconosciuto(c) ? null : categoryLabel(c, n)), nomeLeggibile);
   }, [selected, savedPlaces, placeUuids]);
   // Scheda aperta: la barra dell'app si nasconde (globals.css, html[data-scheda-aperta]).
   const schedaAperta = selected != null;

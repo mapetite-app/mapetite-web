@@ -11453,7 +11453,7 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
   const pp = await import(new URL("../../src/lib/perche-piacera.ts", import.meta.url).href);
   const cl = await import(new URL("../../src/lib/category-label.ts", import.meta.url).href);
   const nl = await import(new URL("../../src/lib/nome-leggibile.ts", import.meta.url).href);
-  const f = (t, s) => pp.percheTiPiacera(t, s, cl.categoryLabel, nl.nomeLeggibile);
+  const f = (t, s) => pp.percheTiPiacera(t, s, (c, n) => (cl.tipoGoogleSconosciuto(c) ? null : cl.categoryLabel(c, n)), nl.nomeLeggibile);
   const P = (id, name, category, tags, extra = {}) => ({ id, name, category, priceLevel: 2, lat: 41.889, lng: 12.469, tags, ...extra });
   const T = P("T", "Trattoria da Lucia", "seafood_restaurant", null);
   const S = [
@@ -11465,14 +11465,19 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
     P("f", "Bar Piaciuto", "bar", ["Mi è piaciuto"]),
     P("g", "Trattoria Chiusa", "Trattoria", ["Mi è piaciuto"], { businessStatus: "CLOSED_PERMANENTLY" }),
   ];
-  ok(f(T, S) === "Come Da Enzo al 29 e Trattoria Marco, che ti sono piaciuti: trattoria, prezzi simili, stessa zona", `perché ti piacerà: due 👍 dello stesso tipo, nome leggibile e corto, prezzo e zona veri (${f(T, S)})`);
-  ok(f(T, [S[2]]) === "Come Trattoria Lontana, che ti è piaciuto: trattoria", `perché ti piacerà: uno solo, a Milano e più caro → solo il tipo (${f(T, [S[2]])})`);
+  ok(f(T, S) === "Come Da Enzo al 29 e Trattoria Marco, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", `perché ti piacerà: due 👍 dello stesso tipo, nome leggibile e corto, prezzo e zona veri (${f(T, S)})`);
+  ok(f(T, [S[2]]) === "Come Trattoria Lontana, tra i posti che ti sono piaciuti: trattoria", `perché ti piacerà: uno solo, a Milano e più caro → solo il tipo (${f(T, [S[2]])})`);
   ok(f(T, [S[3], S[4], S[5], S[6]]) === null, "perché ti piacerà: niente riga con 👎, da provare, altro tipo o chiusi per sempre");
   ok(f(P("x", "Ristorante Qualsiasi", "italian_restaurant", null), [P("y", "Altro Ristorante", "italian_restaurant", ["Mi è piaciuto"])]) === null, "perché ti piacerà: 'Ristorante italiano' è generico, nessun legame");
   ok(f({ ...S[0] }, S) === null && f({ ...T, tags: ["Mi è piaciuto"] }, S) === null && f({ ...T, id: "a" }, [S[0]]) === null && f({ ...T, name: "Da Enzo al 29", id: "zz" }, [S[0]]) === null, "perché ti piacerà: mai sul posto che ti è già piaciuto, mai citando il posto stesso");
-  ok(f(P("s", "Sushi Ko", "sushi_restaurant", null), [P("k", "Zen", "sushi_restaurant", ["Mi è piaciuto"], { priceLevel: null })]) === "Come Zen, che ti è piaciuto: sushi, stessa zona"
-    && f(P("j", "Hasekura", "japanese_restaurant", null), [P("k", "Ginza", "japanese_restaurant", ["Mi è piaciuto"])]) === "Come Ginza, che ti è piaciuto: cucina giapponese, prezzi simili, stessa zona", `perché ti piacerà: cucine scritte per intero ('cucina giapponese') (${f(P("j", "Hasekura", "japanese_restaurant", null), [P("k", "Ginza", "japanese_restaurant", ["Mi è piaciuto"])])})`);
-  ok(pp.nomeCorto("Antica Trattoria della Pesa dal Mille e Cinquecento") === "Antica Trattoria della Pesa…", `perché ti piacerà: nomi lunghi tagliati a parola (${pp.nomeCorto("Antica Trattoria della Pesa dal Mille e Cinquecento")})`);
+  ok(f(P("s", "Sushi Ko", "sushi_restaurant", null), [P("k", "Zen", "sushi_restaurant", ["Mi è piaciuto"], { priceLevel: null })]) === "Come Zen, tra i posti che ti sono piaciuti: stessa zona"
+    && f(P("j", "Hasekura", "japanese_restaurant", null), [P("k", "Ginza", "japanese_restaurant", ["Mi è piaciuto"])]) === "Come Ginza, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", `perché ti piacerà: cucine scritte per intero ('cucina giapponese') (${f(P("j", "Hasekura", "japanese_restaurant", null), [P("k", "Ginza", "japanese_restaurant", ["Mi è piaciuto"])])})`);
+  // Revisore 18/11 (8,0): stessa insegna con nomi diversi, tagli su "e", tipi inglesi, bar generici.
+  ok(f(P("z", "Zen - Prati", "sushi_restaurant", null), [P("z2", "Zen - Centro Storico", "sushi_restaurant", ["Mi è piaciuto"], { lat: 45.46, lng: 9.19 })]) === null, "perché ti piacerà: mai la stessa insegna con un altro quartiere nel nome ('Zen - Prati' / 'Zen - Centro Storico')");
+  ok(pp.nomeCorto("Il Marchese Bar Amari e Liquori") === "Il Marchese Bar Amari…", `perché ti piacerà: il taglio non finisce su 'e' (${pp.nomeCorto("Il Marchese Bar Amari e Liquori")})`);
+  ok(f(P("k1", "Karaoke Uno", "karaoke", null), [P("k2", "Karaoke Due", "karaoke", ["Mi è piaciuto"])]) === null && f(P("b1", "Bar Uno", "bar", null), [P("b2", "Bar Sport", "bar", ["Mi è piaciuto"])]) === null, "perché ti piacerà: niente tipi Google in inglese né 'bar' come legame di gusto");
+  ok(f(P("t9", "Trattoria Monti", "Trattoria", null, { lat: 41.895, lng: 12.495 }), [P("t8", "Trattoria Trastevere", "Trattoria", ["Mi è piaciuto"], { lat: 41.889, lng: 12.47, priceLevel: 3 })]) === "Come Trattoria Trastevere, tra i posti che ti sono piaciuti: trattoria", "perché ti piacerà: Trastevere e Monti non sono 'stessa zona'");
+  ok(pp.nomeCorto("Antica Trattoria della Pesa dal Mille e Cinquecento") === "Antica Trattoria…", `perché ti piacerà: nomi lunghi tagliati a parola (${pp.nomeCorto("Antica Trattoria della Pesa dal Mille e Cinquecento")})`);
 
   if (!fakeUser) console.log("SKIP  perché ti piacerà nella scheda: dev server senza E2E_FAKE_USER");
   else {
@@ -11500,7 +11505,7 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
     const pt = p.getByTestId("per-te-scheda");
     await pt.waitFor({ timeout: 4000 }).catch(() => {});
     const testo = ((await pt.textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim();
-    ok(testo === "Per te · Come Da Enzo al 29, che ti è piaciuto: trattoria, prezzi simili, stessa zona" && (await pt.getAttribute("data-fonte")) === "salvati", `scheda: 'Per te' dai tuoi 👍 al posto della frase dell'AI, mai il 👎 (${testo})`);
+    ok(testo === "Per te · Come Da Enzo al 29, tra i posti che ti sono piaciuti: prezzi simili, stessa zona" && (await pt.getAttribute("data-fonte")) === "salvati", `scheda: 'Per te' dai tuoi 👍 al posto della frase dell'AI, mai il 👎 (${testo})`);
     const b = await pt.boundingBox();
     ok(b != null && b.y + b.height < 844 - 80, `scheda: la riga 'Per te' sta nella prima schermata a 390×844 (${Math.round((b?.y ?? 0) + (b?.height ?? 0))} px)`);
     if (process.env.PERCHE_SHOT) await p.screenshot({ path: process.env.PERCHE_SHOT });

@@ -1,5 +1,5 @@
 // Proposta 48 "Perché ti piacerà": il motivo personale scritto in parole, mai un punteggio.
-// "Come Roscioli e Armando, che ti sono piaciuti: trattoria, prezzi simili".
+// "Come Roscioli e Armando, tra i posti che ti sono piaciuti: prezzi simili, stessa zona".
 // Solo dati già salvati dall'utente (tipo, fascia di prezzo e posizione dei suoi 👍): zero chiamate.
 // Mai inventato: senza un legame vero (stesso tipo, non generico) la riga non c'è.
 // Non premia la popolarità: il legame è con i TUOI posti, non con quanti ne parlano.
@@ -30,9 +30,9 @@ export type PostoSimile = {
 };
 
 // Etichette che non dicono niente sul gusto ("Ristorante" come un altro "Ristorante"): nessun legame.
-const GENERICHE = new Set(["ristorante", "ristorante italiano", "ristorante mediterraneo", "da asporto", "alimentari", "area food", "negozio", "buffet", "fast food"]);
-// Oltre questa distanza "stessa zona" non vale (circa 15 minuti a piedi).
-const ZONA_M = 1500;
+const GENERICHE = new Set(["ristorante", "ristorante italiano", "ristorante mediterraneo", "da asporto", "alimentari", "area food", "negozio", "buffet", "fast food", "bar", "caffè", "caffetteria", "tavola calda", "discoteca", "bar e griglia"]);
+// Oltre questa distanza "stessa zona" non vale (circa 12 minuti a piedi; in centro a Roma 1,5 km univa Trastevere e Monti, revisore 18/11).
+const ZONA_M = 1000;
 // Un esempio a centinaia di km (un viaggio) resta valido per il tipo, ma non per la zona.
 
 function tipo(p: { category: string | null; name: string }, etichetta: Etichetta): string | null {
@@ -50,12 +50,16 @@ function inFrase(t: string): string {
   return t;
 }
 
-// Nome corto per la frase: "L'Elementare - Trastevere" → "L'Elementare"; mai più di 26 caratteri.
+// Nome corto per la frase: "L'Elementare - Trastevere" → "L'Elementare"; mai più di 24 caratteri, tagliato a parola
+// e mai su una parola vuota ("Bar Amari e…", revisore 18/11).
+const VUOTE_FINE = new Set(["e", "ed", "&", "di", "da", "del", "della", "dei", "al", "alla", "ai", "a", "in", "con", "per", "la", "il", "lo", "le", "i", "gli", "the", "of", "and"]);
 export function nomeCorto(name: string, leggibile: (n: string) => string = (n) => n): string {
   const base = leggibile(name).split(/\s+[-–—|·]\s+/)[0].trim();
-  if (base.length <= 26) return base;
-  const cut = base.slice(0, 26).replace(/\s+\S*$/, "");
-  return `${cut || base.slice(0, 25)}…`;
+  if (base.length <= 24) return base;
+  const parole = base.slice(0, 24).replace(/\s+\S*$/, "").split(/\s+/);
+  while (parole.length > 1 && VUOTE_FINE.has(parole[parole.length - 1].toLowerCase())) parole.pop();
+  const cut = parole.join(" ").replace(/[,;:]+$/, "");
+  return `${cut || base.slice(0, 23)}…`;
 }
 
 /**
@@ -69,11 +73,13 @@ export function percheTiPiacera(target: PostoSimile, salvati: PostoSimile[], eti
   if (target.tags?.includes(MI_E_PIACIUTO) || target.tags?.includes(NON_FA_PER_ME)) return null;
   const t = tipo(target, etichetta);
   if (!t) return null;
-  const nomeTarget = target.name.trim().toLowerCase();
+  // Confronto sul nome che si mostra: "Zen - Prati" e "Zen - Centro Storico" sono la stessa insegna (revisore 18/11).
+  const corto = (n: string) => nomeCorto(n, leggibile).replace(/…$/, "").trim().toLowerCase();
+  const nomeTarget = corto(target.name);
   const vicino = (p: PostoSimile) => distanceMeters(p, target);
   const candidati = salvati.filter((p) =>
     p.id !== target.id
-    && p.name.trim().toLowerCase() !== nomeTarget
+    && corto(p.name) !== nomeTarget
     && p.tags?.includes(MI_E_PIACIUTO) && !p.tags?.includes(NON_FA_PER_ME)
     && p.businessStatus !== "CLOSED_PERMANENTLY"
     && tipo(p, etichetta) === t);
@@ -84,9 +90,12 @@ export function percheTiPiacera(target: PostoSimile, salvati: PostoSimile[], eti
     .slice(0, 2);
   const nomi = scelti.map((p) => nomeCorto(p.name, leggibile));
   if (nomi.length === 2 && nomi[0].toLowerCase() === nomi[1].toLowerCase()) nomi.pop();
-  const chi = nomi.length === 2 ? `${nomi[0]} e ${nomi[1]}, che ti sono piaciuti` : `${nomi[0]}, che ti è piaciuto`;
-  const pezzi = [inFrase(t)];
+  // Forma neutra (revisore 18/11: "La Gatta Mangiona, che ti è piaciuto" era sgrammaticato).
+  const chi = nomi.length === 2 ? `${nomi[0]} e ${nomi[1]}` : nomi[0];
+  // Il tipo è già scritto sopra il nome: si ripete solo se è l'unico legame (revisore 18/11: "trattoria" tre volte).
+  const pezzi: string[] = [];
   if (scelti.slice(0, nomi.length).every(prezzoUguale)) pezzi.push("prezzi simili");
   if (scelti.slice(0, nomi.length).every((p) => vicino(p) <= ZONA_M)) pezzi.push("stessa zona");
-  return `Come ${chi}: ${pezzi.join(", ")}`;
+  if (pezzi.length === 0) pezzi.push(inFrase(t));
+  return `Come ${chi}, tra i posti che ti sono piaciuti: ${pezzi.join(", ")}`;
 }
