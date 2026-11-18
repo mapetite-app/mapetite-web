@@ -16,6 +16,32 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 18/11/2026 (mercoledì, CEO che chiude — tema "perché proprio a me" e salvati che tornano utili)
+
+### 66. "Non contarlo nei miei gusti" sul singolo salvato
+- **Problema:** `PROBLEMI.md` 28: i consigli imparano da tutto quello che salvi, anche dal posto salvato per i genitori, per una cena di lavoro o per un amico; la persona non può dire "questo non sono io".
+- **Cosa fa:** nel foglio "Altro" del posto salvato, un interruttore "Non contarlo nei miei gusti". Il posto resta salvato e visibile; esce solo dai segnali che alimentano "Per te", "Altri come questo" e "Perché ti piacerà". Nessuna nuova schermata.
+- **Da dove nasce:** Google Maps dal 22/10 usa salvati e ricerche per i consigli di Gemini e si può spegnere solo tutto insieme ("Consigli personalizzati", [Guida Google Maps](https://support.google.com/maps/answer/16833938)); Beli e Corner non lo prevedono. Noi lo diamo posto per posto.
+- **Valore per l'utente:** i consigli restano suoi anche se salva per altri; capisce che "Per te" nasce dai suoi gesti. **Per il ristoratore:** dati di gusto più puliti, quindi domanda più qualificata nel pannello.
+- **Sforzo:** S (una colonna sul salvato, un filtro nelle funzioni che leggono i gusti, una riga nel foglio). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
+### 67. "Da 5 recensioni, la più recente di 2 settimane fa": da quando parla il verdetto
+- **Problema:** `PROBLEMI.md` 28: solo il 4% sa riconoscere sempre una recensione falsa (Altroconsumo, 5/3/2026); un giudizio da recensioni di due anni fa vale meno, ma oggi non si vede.
+- **Cosa fa:** sotto il verdetto, una riga piccola: "Da 5 recensioni Google, la più recente di 2 settimane fa". Se la più recente ha più di un anno: "Recensioni di oltre un anno fa: potrebbe essere cambiato". Solo dati che Google ci dà già (`relativePublishTimeDescription`), mai stime.
+- **Da dove nasce:** Google, TripAdvisor e TheFork mostrano le date recensione per recensione, ma nessuno dice da quando parla il riassunto dell'AI. Collegata alla 18 ("Come lo sai?") ma diversa: là la frase dietro un ✓, qui la freschezza dell'intero verdetto.
+- **Valore per l'utente:** sa quanto fidarsi del verdetto in un colpo d'occhio; un posto cambiato di gestione non lo sorprende. **Per il ristoratore:** se ha cambiato cucina, le recensioni nuove contano subito di più di quelle vecchie, visibilmente.
+- **Sforzo:** S (il campo arriva già nella risposta Google; salvarlo accanto al verdetto e una riga nella scheda). **Costo Google/Haiku:** zero (nessuna chiamata in più, FIELD_MASK invariato).
+- **Stato proposto:** PRONTA. Attenzione per chi la costruisce: il testo è relativo al momento della ricerca ("2 settimane fa"), quindi va salvato con la data del controllo o convertito in mese, mai mostrato vecchio come se fosse di oggi.
+
+### 68. "L'avevi salvato perché…": il motivo originale torna con il posto
+- **Problema:** il cuore di `VISIONE.md` (il ricordo si disperde: bandierine su Maps senza contesto) e `PROBLEMI.md` 28 (non si sa perché un posto viene riproposto). Quando un salvato riaffiora ("Sei vicino", "Da provare da mesi", "Dai tuoi salvati"), oggi si vede il nome ma non il motivo per cui la persona l'aveva salvato.
+- **Cosa fa:** sulla card del salvato che riaffiora, una riga sola: "Salvato a marzo · dal reel di @nome: «la carbonara di Testaccio»" oppure "· la tua nota: «per il compleanno di Sara»". Solo cose già salvate (data, fonte, didascalia del reel o nota); se non c'è niente, la riga non compare.
+- **Da dove nasce:** Google Maps (lista "Tutti i salvati" in prova, [Android Authority](https://androidauthority.com/google-maps-list-hide-apk-teardown-3697285)), Mapstr e Corner mostrano il posto, non il perché te l'eri segnato. Noi abbiamo il reel e la nota fin dal salvataggio.
+- **Valore per l'utente:** il posto torna con il suo ricordo: "ah sì, quello della carbonara", e si decide subito. **Per il ristoratore:** il motivo per cui viene salvato (in forma aggregata, mai il singolo) è il dato che vorrebbe nel pannello: "ti salvano per la carbonara".
+- **Sforzo:** S (dati già nel database; una riga nella card, testo tagliato a una riga). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA. Il pezzo per il ristoratore (motivi aggregati nel pannello) è un secondo passo, da fare solo con almeno 3 salvataggi per non rivelare il singolo.
+
 ## 17/11/2026 (martedì, CEO che chiude — tema prezzo vero e app concorrenti)
 
 ### 64. "Quanto si spende davvero" (detto da chi c'è stato)
