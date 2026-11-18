@@ -30,6 +30,9 @@ export type PublicSynthesis = {
   synthesis: string | null;
   go_for: string[] | null;
   dont_expect: string[] | null;
+  // Proposta 67 (migrazione 20261118b): da quante recensioni Google parla il verdetto. Assenti prima.
+  recensioni_n?: number | null;
+  recensione_ultima?: string | null;
 };
 
 export type PublicPlaceData = { place: PublicPlace; synthesis: PublicSynthesis | null };
@@ -91,11 +94,16 @@ export const loadPublicPlace = cache(async (id: string): Promise<PublicPlaceData
 
   let synthesis: PublicSynthesis | null = null;
   if (place.google_place_id) {
-    const { data: s, error: sErr } = await supabase
+    const COLS = "verdict, synthesis, go_for, dont_expect";
+    const gid = place.google_place_id;
+    const leggi = (conFreschezza: boolean) => supabase
       .from("place_synthesis")
-      .select("verdict, synthesis, go_for, dont_expect")
-      .eq("place_id", place.google_place_id)
+      .select((conFreschezza ? `${COLS}, recensioni_n, recensione_ultima` : COLS) as typeof COLS)
+      .eq("place_id", gid)
       .maybeSingle();
+    let { data: s, error: sErr } = await leggi(true);
+    // 42703 = migrazione 20261118b non applicata: si rilegge senza le colonne della freschezza.
+    if (sErr?.code === "42703") ({ data: s, error: sErr } = await leggi(false));
     if (sErr) console.error("[locali] lettura place_synthesis fallita:", sErr.message);
     synthesis = (s as PublicSynthesis | null) ?? null;
   }

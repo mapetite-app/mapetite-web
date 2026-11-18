@@ -3218,6 +3218,22 @@ else {
     // 18/10: con il permesso già dato l'avviso compare da solo all'apertura, senza toccare niente.
     { const t0 = await p.getByTestId("vicino-salvato").waitFor({ timeout: 5000 }).then(() => p.getByTestId("vicino-salvato").textContent(), () => "");
       ok((t0 ?? "").includes("Osteria Due"), `vicino a un salvato: all'apertura della mappa l'avviso compare da solo (${(t0 ?? "").slice(0, 60)})`); }
+    // Proposta 68: il ricordo del salvato (qui il reel Instagram collegato a Osteria Due, senza nota né data).
+    { const r = await p.getByTestId("vicino-ricordo").waitFor({ timeout: 4000 }).then(() => p.getByTestId("vicino-ricordo").textContent(), () => "");
+      ok(r === "Da un reel Instagram", `vicino a un salvato: sotto, il perché l'avevi salvato (proposta 68) (${r})`);
+      await p.screenshot({ path: `${OUT}/11d2-vicino-ricordo.png`, caret: "initial" }); }
+    { const rs = await import(new URL("../../src/lib/ricordo-salvato.ts", import.meta.url).href);
+      const now = new Date("2026-11-18T22:00:00+01:00");
+      const casi = [
+        [{ savedAt: "2026-03-10T10:00:00Z", note: "per il compleanno di Sara, prenotare il tavolo in terrazza" }, "«per il compleanno di Sara, prenotare…» · marzo"],
+        [{ savedAt: "2025-07-10T10:00:00Z", reel: { fonte: "TikTok", url: "https://www.tiktok.com/@mangiaroma/video/123" } }, "Dal video di @mangiaroma su TikTok · luglio 2025"],
+        [{ savedAt: "2026-11-02T10:00:00Z", reel: { fonte: "Instagram", url: "https://www.instagram.com/reel/abc/" } }, "Da un reel Instagram · questo mese"],
+        [{ savedAt: "2026-09-02T10:00:00Z", consigliatoDa: "Giulia" }, "Te l'ha consigliato Giulia · settembre"],
+        [{ savedAt: "2025-12-31T23:30:00Z", note: "capodanno" }, "«capodanno» · gennaio"],
+        [{ savedAt: "2026-09-02T10:00:00Z" }, null],
+        [{ savedAt: "2026-09-02T10:00:00Z", note: "   " }, null],
+      ];
+      for (const [inp, want] of casi) { const got = rs.ricordoSalvato(inp, now); ok(got === want, `ricordo del salvato (proposta 68): ${JSON.stringify(inp).slice(0, 60)} → ${got}`); } }
     // Giro del 1/11: l'avviso si chiude con ✕ e, da solo, non torna alla riapertura dello stesso giorno.
     await p.getByTestId("vicino-salvato-chiudi").click().catch(() => {});
     ok(!(await p.getByTestId("vicino-salvato").isVisible().catch(() => false)), "vicino a un salvato: ✕ chiude l'avviso");
@@ -11545,7 +11561,7 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
     const mkT = (id, name, extra = {}) => mk(id, name, 41.893, 12.468, { category: "italian_restaurant", types: ["italian_restaurant"], rating: 4.7, userRatingCount: 259, ...extra });
     const RIS = [mkT("Q1", "Trattoria da Lucia", { category: "seafood_restaurant", rating: 4.6, userRatingCount: 300 }), mkT("Q3", "Osteria Piccola", { rating: 4.8, userRatingCount: 120 })];
     const SY = { dettagli: {
-      Q1: { synthesis: "Trattoria di quartiere.", tags: [], verdict: "I romani ci tornano per la gricia.", goFor: [], dontExpect: [], matchReason: "È in un vicolo.", perTe: "il tipo di trattoria che ami" },
+      Q1: { synthesis: "Trattoria di quartiere.", tags: [], verdict: "I romani ci tornano per la gricia.", goFor: [], dontExpect: [], matchReason: "È in un vicolo.", perTe: "il tipo di trattoria che ami", recensioniN: 3, recensioneUltima: new Date(Date.now() - 20 * 86400000).toISOString() },
       Q3: { synthesis: "x", tags: [], verdict: "Piccola e vera.", goFor: [], dontExpect: [], matchReason: "Pochi tavoli." },
     }, esclusi: [] };
     const riga = (id, name, category, tags) => ({ tags, note: null, created_at: "2026-10-01T10:00:00Z", consigliato_da: null, solo_per_me: false, places: { id: `00000000-0000-4000-8000-0000000048${id}`, name, category, address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.8935, lng: 12.4685, google_place_id: `GP48${id}`, rating: 4.6, price_level: 2, business_status: null } });
@@ -11569,12 +11585,45 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
     ok(testo === "Per te · Come Da Enzo al 29, tra i posti che ti sono piaciuti: prezzi simili, stessa zona" && (await pt.getAttribute("data-fonte")) === "salvati", `scheda: 'Per te' dai tuoi 👍 al posto della frase dell'AI, mai il 👎 (${testo})`);
     const b = await pt.boundingBox();
     ok(b != null && b.y + b.height < 844 - 80, `scheda: la riga 'Per te' sta nella prima schermata a 390×844 (${Math.round((b?.y ?? 0) + (b?.height ?? 0))} px)`);
+    // Proposta 67: sotto il verdetto "Da 3 recensioni Google, la più recente di <mese>" (dati della risposta, mai stimati).
+    { const fv = await import(new URL("../../src/lib/freschezza-verdetto.ts", import.meta.url).href);
+      const atteso = fv.fraseFreschezza({ n: 3, ultima: SY.dettagli.Q1.recensioneUltima });
+      const riga = p.getByTestId("verdetto-freschezza");
+      const t = ((await riga.first().textContent({ timeout: 3000 }).catch(() => "")) ?? "").trim();
+      ok(atteso != null && t === atteso && /^Da 3 recensioni Google, la più recente di [a-zà-ù]+( \d{4})?$/.test(t), `scheda: riga 'da quando parla il verdetto' sotto il verdetto (${t || "assente"})`);
+      ok(await p.locator("[data-testid=verdetto-box] [data-testid=verdetto-freschezza]").count() === 1, "scheda: la riga della freschezza sta dentro il riquadro del verdetto"); }
     if (process.env.PERCHE_SHOT) await p.screenshot({ path: process.env.PERCHE_SHOT });
     await p.screenshot({ path: `${OUT}/91-perche-ti-piacera.png` });
     await p.getByRole("button", { name: /chiudi/i }).first().click().catch(() => {});
     await p.keyboard.press("Escape").catch(() => {});
     await c.close();
   }
+}
+// Proposta 67 "Da quando parla il verdetto": funzione pura (mese e anno nel fuso di Roma, mai date relative).
+{
+  const fv = await import(new URL("../../src/lib/freschezza-verdetto.ts", import.meta.url).href);
+  const f = fv.fraseFreschezza;
+  const ora = new Date("2026-11-18T10:00:00Z");
+  const chk = (got, want, msg) => ok(got === want, `freschezza verdetto: ${msg} (${got})`);
+  chk(f({ n: 5, ultima: "2026-10-12T09:00:00Z" }, ora), "Da 5 recensioni Google, la più recente di ottobre", "plurale, stesso anno: solo il mese");
+  chk(f({ n: 1, ultima: "2026-10-12T09:00:00Z" }, ora), "Da 1 recensione Google, di ottobre", "singolare");
+  chk(f({ n: 3, ultima: "2025-12-02T09:00:00Z" }, ora), "Da 3 recensioni Google, la più recente di dicembre 2025", "anno diverso: mese e anno");
+  chk(f({ n: 3, ultima: "2025-12-31T23:30:00Z" }, new Date("2026-03-01T10:00:00Z")), "Da 3 recensioni Google, la più recente di gennaio", "fuso di Roma: 31/12 23:30 UTC è gennaio 2026");
+  chk(f({ n: 4, ultima: "2025-10-01T09:00:00Z" }, ora), "Recensioni di oltre un anno fa: potrebbe essere cambiato", "oltre un anno");
+  chk(f({ n: 1, ultima: "2024-05-01T09:00:00Z" }, ora), "Recensione di oltre un anno fa: potrebbe essere cambiato", "oltre un anno, una sola");
+  chk(f({ n: 3, ultima: "2026-12-01T09:00:00Z" }, ora), null, "data futura: nessuna riga");
+  chk(f({ n: 0, ultima: "2026-10-12T09:00:00Z" }, ora), null, "zero recensioni: nessuna riga");
+  chk(f({ n: null, ultima: "2026-10-12T09:00:00Z" }, ora), null, "numero mancante: nessuna riga");
+  chk(f({ n: 3, ultima: null }, ora), null, "data mancante: nessuna riga");
+  chk(f({ n: 3, ultima: "ieri" }, ora), null, "data non valida: nessuna riga");
+  // Revisore 18/11: si salva solo il mese (giorno 15): la riga del mese in corso c'è anche il giorno 10; "oltre un anno" solo da 13 mesi.
+  { const cor = fv.freschezzaDa(["x", "y", "z"], ["2026-11-03T08:00:00Z", "2026-10-01T00:00:00Z", "2026-09-01T00:00:00Z"]);
+    chk(f(cor, new Date("2026-11-10T10:00:00Z")), "Da 3 recensioni Google, la più recente di novembre", "recensione del mese in corso vista il giorno 10");
+    chk(f(fv.freschezzaDa(["x"], ["2025-11-28T08:00:00Z"]), new Date("2026-11-18T10:00:00Z")), "Da 1 recensione Google, di novembre 2025", "11 mesi e mezzo non sono 'oltre un anno'"); }
+  const fd = fv.freschezzaDa(["buono", "ottimo", "  "], ["2026-09-01T10:00:00Z", "2026-10-05T10:00:00Z", "2026-11-01T10:00:00Z"]);
+  ok(fd.n === 2 && fd.ultima === "2026-10-15T12:00:00.000Z", `freschezza verdetto: conta solo le recensioni con testo, prende la più recente tra quelle e salva solo il mese (termini Google) (${JSON.stringify(fd)})`);
+  const fd0 = fv.freschezzaDa(null, null);
+  ok(fd0.n === null && fd0.ultima === null, "freschezza verdetto: senza recensioni nessun dato");
 }
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);

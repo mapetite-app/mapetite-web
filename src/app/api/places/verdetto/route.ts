@@ -58,13 +58,19 @@ export async function POST(request: Request) {
   }
 
   // Verdetto già scritto (da un'altra ricerca o da un altro utente): nessuna chiamata.
-  const { data: cached } = await createAdminClient()
+  const leggi = (conFreschezza: boolean) => createAdminClient()
     .from("place_synthesis")
-    .select("synthesis, tags, verdict, go_for, dont_expect")
+    .select(`synthesis, tags, verdict, go_for, dont_expect${conFreschezza ? ", recensioni_n, recensione_ultima" : ""}`)
     .eq("place_id", placeId)
-    .maybeSingle();
+    .maybeSingle<{ synthesis: string | null; tags: string[] | null; verdict: string | null; go_for: string[] | null; dont_expect: string[] | null; recensioni_n?: number | null; recensione_ultima?: string | null }>();
+  let { data: cached, error: cacheErr } = await leggi(true);
+  // 42703 = migrazione 20261118b non applicata: si rilegge senza le colonne della freschezza.
+  if (cacheErr?.code === "42703") ({ data: cached, error: cacheErr } = await leggi(false));
   if (cached && typeof cached.verdict === "string" && cached.verdict.trim() !== "") {
-    return NextResponse.json({ verdict: cached.verdict, synthesis: cached.synthesis, tags: cached.tags, goFor: cached.go_for, dontExpect: cached.dont_expect });
+    return NextResponse.json({
+      verdict: cached.verdict, synthesis: cached.synthesis, tags: cached.tags, goFor: cached.go_for, dontExpect: cached.dont_expect,
+      recensioniN: cached.recensioni_n ?? null, recensioneUltima: cached.recensione_ultima ?? null,
+    });
   }
 
   if (!allowAi("verdetti", clientKey(request, userId))) {
@@ -80,7 +86,7 @@ export async function POST(request: Request) {
   after(() => ricordaStato([place]));
   void recordEvent({ type: "funzione", userId, googlePlaceId: placeId, props: { nome: "verdetto_salvato" } });
 
-  const s = (await getSynthesis([place], "", userId, { soloVerdetto: true }).catch(() => ({})) as Record<string, { verdict: string; synthesis: string; tags: string[]; goFor: string[]; dontExpect: string[] }>)[placeId];
+  const s = (await getSynthesis([place], "", userId, { soloVerdetto: true }).catch(() => ({})) as Record<string, { verdict: string; synthesis: string; tags: string[]; goFor: string[]; dontExpect: string[]; recensioniN?: number | null; recensioneUltima?: string | null }>)[placeId];
   console.log(`[verdetto] ${place.name}: ${s?.verdict ? "scritto" : "non riuscito"}`);
   // I dati Google si mostrano nella scheda e basta (mai salvati: termini Google, 3.2.3(b)).
   return NextResponse.json({
@@ -89,6 +95,8 @@ export async function POST(request: Request) {
     tags: s?.tags ?? null,
     goFor: s?.goFor ?? null,
     dontExpect: s?.dontExpect ?? null,
+    recensioniN: s?.verdict ? s.recensioniN ?? null : null,
+    recensioneUltima: s?.verdict ? s.recensioneUltima ?? null : null,
     userRatingCount: place.userRatingCount,
     openNow: place.openNow,
     websiteUri: place.websiteUri,

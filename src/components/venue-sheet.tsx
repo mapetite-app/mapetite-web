@@ -27,6 +27,7 @@ import { votoOf, votoTag } from "@/lib/diario";
 import ConfrontoFonti from "@/components/confronto-fonti";
 import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocaleStato } from "@/components/posto-locale";
 import { frasePrezzo } from "@/lib/prezzo-locale";
+import { fraseFreschezza } from "@/lib/freschezza-verdetto";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 import VisiteMapetite from "@/components/visite-mapetite";
@@ -89,6 +90,9 @@ export type Venue = {
   editorialSummary?: string | null;
   // Proposta 45: stato da Google ("CLOSED_PERMANENTLY", "CLOSED_TEMPORARILY"), solo se noto.
   businessStatus?: string | null;
+  // Proposta 67: da quante recensioni Google parla il verdetto e la data (ISO) della più recente.
+  recensioniN?: number | null;
+  recensioneUltima?: string | null;
 };
 
 type VenueSheetProps = {
@@ -373,6 +377,8 @@ export default function VenueSheet({
     matchReasonText != null ||
     goForChips.length > 0 ||
     dontExpectChips.length > 0;
+  // "Da 3 recensioni Google, la più recente di ottobre" (proposta 67): null se il verdetto non le ha salvate.
+  const freschezza = fraseFreschezza({ n: venue.recensioniN, ultima: venue.recensioneUltima });
   const hasTags = tags != null && tags.length > 0;
   const hasPersonalTags = personalTags != null && personalTags.length > 0;
   const showPersonalBlock =
@@ -456,6 +462,9 @@ export default function VenueSheet({
               <p className="mt-2 font-sans text-sm leading-relaxed text-white/80">
                 {synthesis}
               </p>
+            )}
+            {freschezza && (
+              <p data-testid="verdetto-freschezza" className="mt-2 font-sans text-xs text-white/60">{freschezza}</p>
             )}
           </>
         )}
@@ -999,6 +1008,10 @@ export default function VenueSheet({
                 Il verdetto Mapetite
               </p>
               <p className={`${SERIF} mt-2 text-[20px] italic leading-[1.24] tracking-[-0.005em] text-[#141414] min-[380px]:text-[22px]`}>{headline}</p>
+              {/* Da quando parla il verdetto (proposta 67): una riga piccola e grigia, solo con dati salvati. */}
+              {freschezza && (
+                <p data-testid="verdetto-freschezza" className="mt-2 font-sans text-[12px] leading-snug text-text-muted">{freschezza}</p>
+              )}
             </section>
           ) : verdettoInArrivo ? (
             <section data-testid="verdetto-in-arrivo" className="mt-4 border-y border-t-[#cfd6d6] border-b-[#e1e5e5] pb-4 pt-3.5">

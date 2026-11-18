@@ -34,6 +34,7 @@ import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, etichettaNota, tipoGoogleSconosciuto } from "@/lib/category-label";
 import { percheTiPiacera } from "@/lib/perche-piacera";
+import { ricordoSalvato } from "@/lib/ricordo-salvato";
 import { momentSuggestion, fetchWeather, type Weather } from "@/lib/moment";
 import { momentoDi, type Momento } from "@/lib/home-proposte";
 import { contestoIdee, IDEE_MAX, percheMomento, titoloMomento, titoloBreve } from "@/lib/idee";
@@ -854,6 +855,9 @@ type VenueDetails = {
   photoAuthor?: string | null;
   editorialSummary?: string | null;
   orari?: Orari | null;
+  // Proposta 67: da quante recensioni Google parla il verdetto e la data della più recente (ISO).
+  recensioniN?: number | null;
+  recensioneUltima?: string | null;
 };
 
 const REFINEMENTS = ["+ economico", "+ con tavoli all'aperto", "+ aperto adesso", "+ poco turistico", "+ per un gruppo"];
@@ -1603,6 +1607,22 @@ export default function MapView({
   // "La mia posizione" e un suo "Da provare" è a due passi. Ritrova il locale nel momento giusto.
   const [nearbySaved, setNearbySaved] = useState<{ place: Place; meters: number } | null>(null);
   const nearbyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Proposta 68: il ricordo del salvato che riaffiora ("«per il compleanno di Sara» · marzo"). Nota e consiglio
+  // sono già in memoria; il reel collegato si legge solo se servono (una lettura, solo i propri).
+  const [ricordoVicino, setRicordoVicino] = useState<{ id: string; testo: string } | null>(null);
+  const leggiRicordo = (place: Place): Promise<void> => {
+    const base = { savedAt: place.savedAt ?? null, note: place.note ?? null, consigliatoDa: place.consigliatoDa ?? null };
+    const subito = ricordoSalvato(base);
+    if (subito || !userId) { setRicordoVicino(subito ? { id: place.id, testo: subito } : null); return Promise.resolve(); }
+    setRicordoVicino(null);
+    return browserClient()
+      .then((client) => client.from("contenuti_locali").select("fonte, url").eq("user_id", userId).eq("place_id", place.id).order("created_at", { ascending: true }).limit(1))
+      .then(({ data, error }) => {
+        const reel = !error && Array.isArray(data) && data[0] ? (data[0] as { fonte: string; url: string }) : null;
+        const testo = reel ? ricordoSalvato({ ...base, reel }) : null;
+        if (testo) setRicordoVicino({ id: place.id, testo });
+      }, () => {});
+  };
   const showNearby = (near: { place: Place; meters: number } | null, daSolo = false) => {
     if (!near) return;
     // Giro del 1/11: l'avviso tornava a ogni apertura e copriva il fondo dello schermo. Da solo
@@ -1612,7 +1632,9 @@ export default function MapView({
       const oggi = new Date().toDateString();
       try { if (localStorage.getItem(chiave) === oggi) return; localStorage.setItem(chiave, oggi); } catch { /* storage non disponibile */ }
     }
-    setNearbySaved(near);
+    // Revisore 18/11: l'avviso aspetta il ricordo (al massimo 0,6 s), così non cresce dopo essere comparso.
+    const pronto = leggiRicordo(near.place);
+    void Promise.race([pronto, new Promise((ok) => setTimeout(ok, 600))]).then(() => setNearbySaved(near));
     if (nearbyTimer.current) clearTimeout(nearbyTimer.current);
     nearbyTimer.current = setTimeout(() => setNearbySaved(null), 9000);
   };
@@ -1793,10 +1815,14 @@ export default function MapView({
       const googleIds = Object.keys(uuidMap);
       if (googleIds.length === 0) { setSynthSalvatiLetti(true); return; }
 
-      const { data: synthRows, error: synthError } = await supabase
+      const SYNTH_COLS = "place_id, synthesis, tags, verdict, go_for, dont_expect";
+      const leggiSynth = (conFreschezza: boolean) => supabase
         .from("place_synthesis")
-        .select("place_id, synthesis, tags, verdict, go_for, dont_expect")
+        .select((conFreschezza ? `${SYNTH_COLS}, recensioni_n, recensione_ultima` : SYNTH_COLS) as typeof SYNTH_COLS)
         .in("place_id", googleIds);
+      // recensioni_n / recensione_ultima (proposta 67) con la migrazione 20261118b: senza (42703) si rilegge senza.
+      let { data: synthRows, error: synthError } = await leggiSynth(true);
+      if (synthError?.code === "42703") ({ data: synthRows, error: synthError } = await leggiSynth(false));
 
       if (synthError) {
         console.error("[map-view] lettura place_synthesis (salvati) fallita:", synthError);
@@ -1819,6 +1845,8 @@ export default function MapView({
           verdict: (row.verdict as string | null) ?? null,
           goFor: (row.go_for as string[] | null) ?? null,
           dontExpect: (row.dont_expect as string[] | null) ?? null,
+          recensioniN: typeof (row as Record<string, unknown>).recensioni_n === "number" ? (row as Record<string, unknown>).recensioni_n as number : null,
+          recensioneUltima: typeof (row as Record<string, unknown>).recensione_ultima === "string" ? (row as Record<string, unknown>).recensione_ultima as string : null,
           // matchReason è query-dependent: non esiste in place_synthesis, sempre null sui salvati.
           matchReason: null,
         };
@@ -1859,6 +1887,7 @@ export default function MapView({
           phone: d.phone ?? null, selectedReviews: d.selectedReviews ?? null, synthesis: d.synthesis ?? null,
           tags: d.tags ?? null, verdict: d.verdict, goFor: d.goFor ?? null, dontExpect: d.dontExpect ?? null,
           matchReason: null, photoRef: d.photoRef ?? null, photoAuthor: d.photoAuthor ?? null,
+          recensioniN: d.recensioniN ?? null, recensioneUltima: d.recensioneUltima ?? null,
         };
         savedSynthRef.current = { ...savedSynthRef.current, [selectedSavedId]: det };
         setVenueDetails((prev) => ({ ...prev, [selectedSavedId]: { ...det, ...Object.fromEntries(Object.entries(prev[selectedSavedId] ?? {}).filter(([, v]) => v != null)) } }));
@@ -2052,7 +2081,7 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null;
+        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null; recensioniN?: number | null; recensioneUltima?: string | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
       const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null, types: p.types ?? null }));
@@ -2076,6 +2105,8 @@ export default function MapView({
           photoRef: p.photoRef ?? null,
           photoAuthor: p.photoAuthor ?? null,
           editorialSummary: p.editorialSummary ?? null,
+          recensioniN: p.recensioniN ?? null,
+          recensioneUltima: p.recensioneUltima ?? null,
         };
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null, id: ticket });
@@ -2697,7 +2728,7 @@ export default function MapView({
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null; recensioniN?: number | null; recensioneUltima?: string | null;
         };
         // "Altri come questo": il posto di partenza non torna tra i risultati (stesso id o stesso nome).
         const fuori = new Set(opts.simile?.escludi ?? []);
@@ -2738,6 +2769,8 @@ export default function MapView({
             photoRef: p.photoRef ?? null,
             photoAuthor: p.photoAuthor ?? null,
             editorialSummary: p.editorialSummary ?? null,
+            recensioniN: p.recensioniN ?? null,
+            recensioneUltima: p.recensioneUltima ?? null,
           };
         }
         const id = ticket;
@@ -4429,6 +4462,9 @@ export default function MapView({
           <div role="status" data-testid="vicino-salvato" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 text-sm font-sans">
               <span className="font-semibold">📌 A {distanceLabel(userPos ?? nearbySaved.place, nearbySaved.place)}</span> c&apos;è {nearbySaved.place.name}, che volevi provare
+              {ricordoVicino?.id === nearbySaved.place.id && (
+                <span data-testid="vicino-ricordo" className="mt-0.5 line-clamp-2 text-xs text-white/80">{ricordoVicino.testo}</span>
+              )}
             </span>
             <button
               type="button"
