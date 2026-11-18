@@ -11616,7 +11616,7 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
   chk(f({ n: 3, ultima: null }, ora), null, "data mancante: nessuna riga");
   chk(f({ n: 3, ultima: "ieri" }, ora), null, "data non valida: nessuna riga");
   const fd = fv.freschezzaDa(["buono", "ottimo", "  "], ["2026-09-01T10:00:00Z", "2026-10-05T10:00:00Z", "2026-11-01T10:00:00Z"]);
-  ok(fd.n === 2 && fd.ultima === "2026-10-05T10:00:00.000Z", `freschezza verdetto: conta solo le recensioni con testo e prende la più recente tra quelle (${JSON.stringify(fd)})`);
+  ok(fd.n === 2 && fd.ultima === "2026-10-15T12:00:00.000Z", `freschezza verdetto: conta solo le recensioni con testo, prende la più recente tra quelle e salva solo il mese (termini Google) (${JSON.stringify(fd)})`);
   const fd0 = fv.freschezzaDa(null, null);
   ok(fd0.n === null && fd0.ultima === null, "freschezza verdetto: senza recensioni nessun dato");
 }

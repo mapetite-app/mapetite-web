@@ -54,5 +54,16 @@ export function freschezzaDa(
     const ms = Date.parse(d);
     if (Number.isFinite(ms) && ms > ultimaMs) { ultimaMs = ms; ultima = new Date(ms).toISOString(); }
   }
+  // Prudenza con i termini Google (3.2.3(b), "No Caching"): si salva solo mese e anno, non la data esatta.
+  // A metà mese e a mezzogiorno UTC, così il mese resta lo stesso in ogni fuso. La riga mostra solo il mese.
+  if (ultima) {
+    const m = meseNumeroRoma(new Date(ultima));
+    ultima = m ? `${m.anno}-${m.mese}-15T12:00:00.000Z` : null;
+  }
   return { n: conTesto.length, ultima };
+}
+function meseNumeroRoma(d: Date): { anno: string; mese: string } | null {
+  const parti = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit" }).formatToParts(d);
+  const anno = parti.find((p) => p.type === "year")?.value, mese = parti.find((p) => p.type === "month")?.value;
+  return anno && mese ? { anno, mese } : null;
 }
