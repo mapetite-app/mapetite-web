@@ -92,8 +92,11 @@ export function percheTiPiacera(target: PostoSimile, salvati: PostoSimile[], eti
   const t = tipo(target, etichetta);
   if (!t) return null;
   const vicino = (p: PostoSimile) => distanceMeters(p, target);
+  // Un salvato senza nome (dato incompleto) non si cita mai: niente errori, niente riga.
+  if (typeof target.name !== "string") return null;
   const candidati = salvati.filter((p) =>
-    p.id !== target.id
+    typeof p.name === "string" && p.name.trim() !== ""
+    && p.id !== target.id
     && !stessaInsegna(p.name, target.name)
     && p.tags?.includes(MI_E_PIACIUTO) && !p.tags?.includes(NON_FA_PER_ME)
     && p.businessStatus !== "CLOSED_PERMANENTLY"
