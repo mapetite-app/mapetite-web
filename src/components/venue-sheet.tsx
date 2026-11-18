@@ -544,7 +544,7 @@ export default function VenueSheet({
         {isSaved && venue.fuoriGusti && (
           <p data-testid="fuori-gusti-scheda" className="mt-1.5 flex items-center gap-1.5 text-sm font-sans text-text-muted">
             <Sparkles size={14} className="shrink-0 text-brand" aria-hidden />
-            <span>Non conta nei tuoi gusti</span>
+            <span>Fuori dai tuoi gusti</span>
           </p>
         )}
         {/* Proposta 58: chi te l'ha consigliato (dal link condiviso o scritto a mano in Modifica). */}

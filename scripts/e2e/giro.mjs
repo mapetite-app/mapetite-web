@@ -5135,7 +5135,7 @@ else {
     await sd.getByRole("button", { name: /^(Salva|Fatto)$/ }).last().click().catch(() => {});
     await sd.waitForTimeout(500);
     ok(patchD.length === 1 && patchD[0].fuori_gusti === true && !("solo_per_me" in patchD[0]), `fuori dai gusti: acceso e salvato, il lucchetto non si riscrive (${JSON.stringify(patchD)})`);
-    ok(((await sd.getByTestId("fuori-gusti-scheda").textContent().catch(() => "")) ?? "").includes("Non conta nei tuoi gusti"), "fuori dai gusti: nella scheda 'Non conta nei tuoi gusti'"); }
+    ok(((await sd.getByTestId("fuori-gusti-scheda").textContent().catch(() => "")) ?? "").includes("Fuori dai tuoi gusti"), "fuori dai gusti: nella scheda 'Fuori dai tuoi gusti'"); }
   // Profilo privato e nessun amico: il link esce senza nome e senza riga.
   mioProfilo2 = { display_name: "Luca Bianchi", is_public: false }; amici2 = [];
   rowsD = rowsD.map((x) => ({ ...x, consigliato_da: null }));
