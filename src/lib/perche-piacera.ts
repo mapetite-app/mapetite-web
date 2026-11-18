@@ -8,6 +8,8 @@
 export type Etichetta = (category: string | null, name: string) => string | null;
 
 function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  // Senza coordinate vere nessuna zona (revisore 3, 18/11: null diventava 0 m, cioè "stessa zona" inventata).
+  if (![a.lat, a.lng, b.lat, b.lng].every((x) => typeof x === "number" && Number.isFinite(x))) return Infinity;
   const R = 6371000;
   const rad = (x: number) => (x * Math.PI) / 180;
   const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2;
@@ -46,9 +48,13 @@ function tipo(p: { category: string | null; name: string }, etichetta: Etichetta
 // Nome corto per la frase: "L'Elementare - Trastevere" → "L'Elementare", "Bar del Fico, Piazza del Fico" → "Bar del Fico";
 // mai più di 24 caratteri, tagliato a parola e mai su una parola vuota ("Bar Amari e…", "Guerra dal…": revisori 18/11).
 const VUOTE_FINE = new Set(["e", "ed", "&", "di", "da", "dal", "dallo", "dalla", "dai", "dagli", "dalle", "del", "dello", "della", "dei", "degli", "delle", "al", "allo", "alla", "ai", "agli", "alle", "a", "in", "nel", "nello", "nella", "nei", "su", "sul", "sullo", "sulla", "con", "per", "la", "il", "lo", "le", "i", "gli", "the", "of", "and"]);
-export function nomeCorto(name: string, leggibile: (n: string) => string = (n) => n): string {
-  const base = leggibile(name).split(/\s+[-–—|·]\s+|,|\s+\(/)[0].trim();
-  if (base.length <= 24) return base;
+// Revisore 3 (18/11): con un nome solo niente taglio ("Come Antica Pizzeria…," non si capiva): `taglia` solo per due nomi.
+// Se il pezzo prima del separatore è vuoto o è solo il tipo ("Pizzeria (Da Remo)", "Pane · Vino") si tiene il nome intero.
+export function nomeCorto(name: string, leggibile: (n: string) => string = (n) => n, taglia = true): string {
+  const intero = leggibile(name).trim();
+  const primo = intero.split(/\s+[-–—|]\s+|,|\s+\(/)[0].trim();
+  const base = primo.length >= 3 && !SOLO_TIPO.test(primo) ? primo : intero;
+  if (!taglia || base.length <= 24) return base;
   const parole = base.slice(0, 24).replace(/\s+\S*$/, "").split(/\s+/);
   while (parole.length > 1 && VUOTE_FINE.has(parole[parole.length - 1].toLowerCase())) parole.pop();
   const cut = parole.join(" ").replace(/[,;:]+$/, "");
@@ -58,9 +64,10 @@ export function nomeCorto(name: string, leggibile: (n: string) => string = (n) =
 // L'insegna, per riconoscere lo stesso posto scritto in modi diversi (revisore 18/11): senza parentesi, senza il pezzo
 // dopo la virgola o il trattino, senza "Roma"/"Milano" in fondo, senza la parola del tipo in testa
 // ("Trattoria Da Enzo" = "Da Enzo", "Zen-Prati" = "Zen", "Panificio Bonci Roma" = "Panificio Bonci").
+const SOLO_TIPO = /^(?:trattoria|osteria|hostaria|pizzeria|ristorante|bar|caff[eè]|enoteca|forno|panificio|pasticceria|gelateria|braceria|taverna|bistrot|sushi)$/i;
 const TIPO_IN_TESTA = /^(?:trattoria|osteria|hostaria|pizzeria|ristorante|bar|caff[eè]|enoteca|forno|panificio|pasticceria|gelateria|braceria|taverna|bistrot|sushi)\s+/;
 function insegna(n: string): string {
-  let k = n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+  let k = n.replace(/[’‘`´]/g, "'").replace(/&/g, " e ").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
     .replace(/\([^)]*\)/g, " ").split(/,|\s[-–—|·]\s|(?<=\S)-(?=\S)/)[0]
     .replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim()
     .replace(/\s+(?:roma|milano)$/, "");
@@ -68,12 +75,26 @@ function insegna(n: string): string {
   if (senzaTipo.length >= 3) k = senzaTipo;
   return k;
 }
+// Parole che non bastano a dire "stessa insegna" (articoli, tipi, aggettivi e cibi comuni).
+const COMUNI = new Set(["da", "dal", "dai", "del", "della", "dei", "di", "la", "il", "lo", "le", "gli", "i", "l", "al", "alla", "e", "the", "antica", "antico", "vecchia", "vecchio", "nuova", "nuovo", "piccola", "piccolo", "grande", "buona", "bella", "casa", "mamma", "nonna", "sora", "sor", "zia", "zio", "trattoria", "osteria", "hostaria", "pizzeria", "ristorante", "bar", "caffe", "enoteca", "forno", "panificio", "pasticceria", "gelateria", "braceria", "taverna", "bistrot", "sushi", "locanda", "vineria", "cucina", "pane", "vino", "pizza", "pasta", "birra", "gelato", "roma", "romana", "romano", "milano", "milanese", "italia", "italiano", "italiana"]);
+function primaParola(k: string): string | null {
+  for (const w of k.split(" ")) {
+    const p = w.replace(/^(?:l|d|un|dell|all|sull|nell)'/, "").replace(/'/g, "");
+    if (p.length >= 3 && !COMUNI.has(p)) return p;
+  }
+  return null;
+}
+// Revisore 3 (18/11): "Trapizzino Ponte Milvio" e "Trapizzino Testaccio", "Sushiko Prati" e "Sushiko Monti", "L'Elementare"
+// e "L’Elementare": stessa insegna anche senza separatore e con l'apostrofo tipografico. Basta la prima parola distintiva
+// uguale: nel dubbio il posto non si cita (meglio nessuna riga che un'altra sede dello stesso posto).
 function stessaInsegna(a: string, b: string): boolean {
   const x = insegna(a), y = insegna(b);
   if (!x || !y) return false;
   if (x === y) return true;
   const [corto, lungo] = x.length <= y.length ? [x, y] : [y, x];
-  return corto.length >= 3 && lungo.startsWith(`${corto} `);
+  if (corto.length >= 3 && lungo.startsWith(`${corto} `)) return true;
+  const px = primaParola(x), py = primaParola(y);
+  return px != null && px === py;
 }
 
 // Oltre questa distanza un esempio dello stesso tipo e basta non dice niente (altra città, un viaggio).
@@ -112,7 +133,8 @@ export function percheTiPiacera(target: PostoSimile, salvati: PostoSimile[], eti
   const secondo = ordinati[1];
   if (secondo && prezzoUguale(secondo) === prezzoUguale(primo) && inZona(secondo) === inZona(primo) && !stessaInsegna(secondo.name, primo.name)) scelti.push(secondo);
   let nomi = scelti.map((p) => nomeCorto(p.name, leggibile));
-  if (nomi.length === 2 && (nomi.some((n) => n.endsWith("…")) || `${nomi[0]} e ${nomi[1]}`.length > 34)) nomi = nomi.slice(0, 1);
+  if (nomi.length === 2 && (nomi.some((n) => n.endsWith("…")) || `${nomi[0]} e ${nomi[1]}`.length > 34)) nomi = [nomeCorto(primo.name, leggibile, false)];
+  else if (nomi.length === 1) nomi = [nomeCorto(primo.name, leggibile, false)];
   // Forma neutra (revisore 18/11: "La Gatta Mangiona, che ti è piaciuto" era sgrammaticato).
   const chi = nomi.length === 2 ? `${nomi[0]} e ${nomi[1]}` : nomi[0];
   const pezzi: string[] = [];
