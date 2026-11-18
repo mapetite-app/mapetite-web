@@ -11530,6 +11530,7 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
   chk(pp.nomeCorto("Pane, Vino e San Daniele"), "Pane, Vino e San Daniele", "nome corto: una parola sola prima della virgola resta col resto");
   chk(f(T, [P("u", "Da Remo", "Trattoria", L), P("v", "Emma", "Trattoria", L)]), "Come Da Remo ed Emma, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", "'ed' davanti a vocale");
   chk(f(T, [P("u", "Da Remo", "Trattoria", L, { lat: 45.46, lng: 9.19 })]), null, "mai un esempio di un'altra città, nemmeno col prezzo uguale");
+  chk(f(T, [P("u", "Da Michele", "Trattoria", L, { lat: 45.46, lng: 9.19 }), P("v", "Da Remo", "Trattoria", L, { lat: 41.895, lng: 12.495, priceLevel: 3 })]), "Come Da Remo, tra i posti che ti sono piaciuti", "un posto di un'altra città non toglie la riga del posto in città");
   // Proposta 66: un 👍 "Non contarlo nei miei gusti" non si cita mai.
   chk(f(P("t", "Trattoria da Lucia", "Trattoria", null), [P("u", "Da Enzo al 29", "Trattoria", L, { fuoriGusti: true })]), null, "un 👍 fuori dai gusti non si cita (proposta 66)");
   chk(f(P("t", "Trattoria da Lucia", "Trattoria", null), [P("u", "Da Enzo al 29", "Trattoria", L, { fuoriGusti: true }), P("v", "Da Cesare", "Trattoria", L)]), "Come Da Cesare, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", "con un 👍 fuori dai gusti si cita l'altro (proposta 66)");

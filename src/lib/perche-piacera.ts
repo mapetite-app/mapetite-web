@@ -127,6 +127,8 @@ export function percheTiPiacera(target: PostoSimile, salvati: PostoSimile[], eti
     && p.tags?.includes(MI_E_PIACIUTO) && !p.tags?.includes(NON_FA_PER_ME)
     && p.businessStatus !== "CLOSED_PERMANENTLY"
     && p.fuoriGusti !== true
+    // Mai un esempio di un'altra città, né primo né secondo (revisore 4: escluso prima dell'ordinamento).
+    && distanceMeters(p, target) <= CITTA_M
     && tipo(p, etichetta) === t);
   if (candidati.length === 0) return null;
   const prezzoUguale = (p: PostoSimile) => target.priceLevel != null && target.priceLevel > 0 && p.priceLevel === target.priceLevel;
@@ -143,7 +145,7 @@ export function percheTiPiacera(target: PostoSimile, salvati: PostoSimile[], eti
   if (nomi.length === 2 && (nomi.some((n) => n.endsWith("…")) || `${nomi[0]} e ${nomi[1]}`.length > 34)) nomi = [nomeCorto(primo.name, leggibile, false)];
   else if (nomi.length === 1) nomi = [nomeCorto(primo.name, leggibile, false)];
   // Forma neutra (revisore 18/11: "La Gatta Mangiona, che ti è piaciuto" era sgrammaticato).
-  const chi = nomi.length === 2 ? `${nomi[0]} ${/^[eE]/.test(nomi[1]) ? "ed" : "e"} ${nomi[1]}` : nomi[0];
+  const chi = nomi.length === 2 ? `${nomi[0]} ${/^[eEèÈéÉ]/.test(nomi[1]) ? "ed" : "e"} ${nomi[1]}` : nomi[0];
   const pezzi: string[] = [];
   if (prezzoUguale(primo)) pezzi.push("prezzi simili");
   if (inZona(primo)) pezzi.push("stessa zona");
