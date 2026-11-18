@@ -63,6 +63,47 @@ async function loadRows(): Promise<{ rows: EventRow[]; troncato: boolean; errore
   return { rows, troncato: true, errore: null };
 }
 
+// Segnalazioni dei tester (proposta 54): le ultime 30, lette solo qui con la chiave di servizio.
+// Senza la tabella (migrazione 20261119 non applicata) la sezione resta vuota, senza errori.
+type Segnalazione = { id: string; user_id: string; testo: string; pagina: string | null; larghezza: number | null; created_at: string };
+async function loadSegnalazioni(): Promise<Segnalazione[]> {
+  try {
+    const { data, error } = await createAdminClient()
+      .from("segnalazioni")
+      .select("id,user_id,testo,pagina,larghezza,created_at")
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (error) {
+      if (error.code !== "42P01" && error.code !== "PGRST205") console.warn(`[numeri] segnalazioni non lette ${error.code ?? ""}`);
+      return [];
+    }
+    return (data ?? []) as Segnalazione[];
+  } catch {
+    return [];
+  }
+}
+
+function Segnalazioni({ items }: { items: Segnalazione[] }) {
+  return (
+    <Section title="Segnalazioni dei tester" note="Le ultime 30 da “Qualcosa non va?” nel Profilo.">
+      {items.length === 0 ? (
+        <p data-testid="numeri-segnalazioni" className="text-sm font-sans text-text-muted">Ancora nessuna segnalazione</p>
+      ) : (
+        <ul data-testid="numeri-segnalazioni" className="space-y-2">
+          {items.map((s) => (
+            <li key={s.id} className="rounded-card border border-border bg-white p-3 text-sm font-sans">
+              <p className="whitespace-pre-wrap break-words text-text">{s.testo}</p>
+              <p className="mt-1 text-xs text-text-muted">
+                {quando(s.created_at)} · {s.pagina ?? "pagina ?"}{s.larghezza ? ` · ${s.larghezza}px` : ""} · tester {s.user_id.slice(0, 4)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
+  );
+}
+
 // Email dei registrati, per riconoscere i tester nella tabella.
 async function loadEmails(): Promise<Map<string, string>> {
   const m = new Map<string, string>();
@@ -381,9 +422,9 @@ export default async function NumeriPage({ searchParams }: { searchParams: Promi
 
   const sp = await searchParams;
   const giorni = PERIODI.find((p) => String(p) === sp.giorni) ?? 7;
-  const [{ rows, troncato, errore }, emails, ultimoVerdetto] = fake
-    ? [{ rows: fake, troncato: false, errore: null }, new Map<string, string>(), null]
-    : await Promise.all([loadRows(), loadEmails(), loadUltimoVerdetto()]);
+  const [{ rows, troncato, errore }, emails, ultimoVerdetto, segnalazioni] = fake
+    ? [{ rows: fake, troncato: false, errore: null }, new Map<string, string>(), null, [] as Segnalazione[]]
+    : await Promise.all([loadRows(), loadEmails(), loadUltimoVerdetto(), loadSegnalazioni()]);
   const n = computeNumeri(rows, giorni, undefined, emails);
   const google = googleOggi(rows);
   const ai = statoAi(ultimoVerdetto, rows);
@@ -432,6 +473,7 @@ export default async function NumeriPage({ searchParams }: { searchParams: Promi
       ) : (
         <Pannello n={n} troncato={troncato} />
       )}
+      <Segnalazioni items={segnalazioni} />
     </main>
   );
 }

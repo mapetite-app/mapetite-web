@@ -99,7 +99,16 @@ function stessaInsegna(a: string, b: string): boolean {
   // Revisore 4 (18/11): "Pizzarium" in "Bonci Pizzarium", "50 Kalò" in "Ciro Salvo 50 Kalò": contenuto come parole intere.
   if (corto.length >= 4 && ` ${lungo} `.includes(` ${corto} `)) return true;
   const px = primaParola(x), py = primaParola(y);
-  return px != null && px === py;
+  if (px != null && px === py) return true;
+  // Minore del revisore 4 (18/11): stessa catena con le parole in altro ordine ("Bonci Pizzarium" / "Pizzarium Bonci",
+  // "Gino Sorbillo Lievito Madre" / "Sorbillo Pizzeria Milano"): se tutte le parole distintive del nome più corto
+  // stanno nell'altro, ed almeno una è lunga (5+ lettere), è la stessa insegna. Nel dubbio la riga non c'è.
+  const px2 = distintive(x), py2 = distintive(y);
+  const [poche, tante] = px2.size <= py2.size ? [px2, py2] : [py2, px2];
+  return poche.size > 0 && [...poche].some((w) => w.length >= 5) && [...poche].every((w) => tante.has(w));
+}
+function distintive(k: string): Set<string> {
+  return new Set(k.split(" ").map((w) => w.replace(/^(?:l|d|un|dell|all|sull|nell)'/, "").replace(/'/g, "")).filter((w) => w.length >= 3 && !COMUNI.has(w)));
 }
 
 // Oltre questa distanza un esempio dello stesso tipo e basta non dice niente (altra città, un viaggio).

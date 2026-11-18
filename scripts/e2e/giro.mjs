@@ -8489,7 +8489,7 @@ else {
       // Profilo da collegato: in fondo feedback ed Esci (prima erano nella barra).
       await bp.goto(`${BASE}/profilo#altro`, { waitUntil: "networkidle" });
       const acc = bp.getByTestId("profilo-account");
-      ok(await acc.getByRole("link", { name: /Dai un feedback/ }).isVisible() && await acc.getByRole("button", { name: "Esci" }).isVisible(), "profilo da collegato: in Impostazioni 'Dai un feedback' ed 'Esci'");
+      ok(await acc.getByRole("button", { name: /Dai un feedback/ }).isVisible() && await acc.getByRole("link", { name: /Dai un feedback/ }).count() === 0 && await acc.getByRole("button", { name: "Esci" }).isVisible(), "profilo da collegato: in Impostazioni 'Dai un feedback' (apre il foglio, proposta 54) ed 'Esci'");
       // Pagine che nascono dai salvati, profili delle persone e home: accese le voci giuste.
       for (const [path, voce] of [["/raccolte/Prova", "Salvati"], ["/u/nessuno", "Amici"], ["/", null]]) {
         await bp.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
@@ -11534,7 +11534,7 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
   const insFalliti = ins.filter(([x, y]) => f(P("t", x, "Trattoria", null), [P("u", y, "Trattoria", L)]) !== null).map((c) => c.join(" / "));
   ok(insFalliti.length === 0, `perché ti piacerà: mai un'altra sede della stessa insegna (${insFalliti.join("; ") || "tutte riconosciute"})`);
   // Revisore 3 (18/11): sedi senza separatore, apostrofo tipografico, "&".
-  const ins3 = [["Trapizzino Ponte Milvio", "Trapizzino Testaccio"], ["Sushiko Prati", "Sushiko Monti"], ["Berberè Isola", "Berberè Navigli"], ["L'Elementare", "L’Elementare"], ["L'Elementare Trastevere", "L’Elementare - Monti"], ["180g Pizzeria Romana Centocelle", "180g Pizzeria Romana Ostiense"], ["Fatamorgana Trastevere", "Gelateria Fatamorgana Monti"], ["Romeo Chef & Baker Prati", "Romeo Chef e Baker Testaccio"], ["Pizzarium", "Bonci Pizzarium"], ["Pizza Illuminati", "Seu Pizza Illuminati"], ["Ciro Salvo 50 Kalò", "50 Kalò"]];
+  const ins3 = [["Trapizzino Ponte Milvio", "Trapizzino Testaccio"], ["Sushiko Prati", "Sushiko Monti"], ["Berberè Isola", "Berberè Navigli"], ["L'Elementare", "L’Elementare"], ["L'Elementare Trastevere", "L’Elementare - Monti"], ["180g Pizzeria Romana Centocelle", "180g Pizzeria Romana Ostiense"], ["Fatamorgana Trastevere", "Gelateria Fatamorgana Monti"], ["Romeo Chef & Baker Prati", "Romeo Chef e Baker Testaccio"], ["Pizzarium", "Bonci Pizzarium"], ["Pizza Illuminati", "Seu Pizza Illuminati"], ["Ciro Salvo 50 Kalò", "50 Kalò"], ["Bonci Pizzarium", "Pizzarium Bonci"], ["Gino Sorbillo Lievito Madre al Duomo", "Sorbillo Pizzeria Milano"]];
   const ins3Falliti = ins3.filter(([x, y]) => f(P("t", x, "Trattoria", null), [P("u", y, "Trattoria", L)]) !== null).map((c) => c.join(" / "));
   ok(ins3Falliti.length === 0, `perché ti piacerà: stessa insegna anche senza separatore e con l'apostrofo tipografico (${ins3Falliti.join("; ") || "tutte riconosciute"})`);
   chk(f(P("t", "Trattoria da Lucia", "Trattoria", null), [P("u", "Da Enzo al 29", "Trattoria", L)]), "Come Da Enzo al 29, tra i posti che ti sono piaciuti: prezzi simili, stessa zona", "insegne diverse restano diverse");
@@ -11624,6 +11624,61 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
   ok(fd.n === 2 && fd.ultima === "2026-10-15T12:00:00.000Z", `freschezza verdetto: conta solo le recensioni con testo, prende la più recente tra quelle e salva solo il mese (termini Google) (${JSON.stringify(fd)})`);
   const fd0 = fv.freschezzaDa(null, null);
   ok(fd0.n === null && fd0.ultima === null, "freschezza verdetto: senza recensioni nessun dato");
+}
+// Proposta 54 "Qualcosa non va?": riga nelle Impostazioni del Profilo, foglio con testo e "Invia",
+// POST /api/segnalazioni con la pagina (solo percorso). Errore: il testo resta.
+if (!process.env.E2E_FAKE_USER) console.log("SKIP  qualcosa non va: serve E2E_FAKE_USER");
+else {
+  const qc = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await qc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await qc.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await qc.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  await qc.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify({ email: "tester@example.com", saved: [], reviews: [] })), url: BASE }]);
+  const inviate = [];
+  let risposta = 200;
+  await qc.route("**/api/segnalazioni", (r) => { inviate.push(r.request().postDataJSON()); return risposta === 200 ? r.fulfill({ json: { ok: true } }) : r.fulfill({ status: risposta, json: { error: "Non sono riuscito a inviarla. Riprova tra poco." } }); });
+  const q = await qc.newPage();
+  q.on("pageerror", (e) => errors.push(e.message));
+  await q.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch { /* ignorato */ } });
+  await q.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  await q.locator("#altro > summary").click().catch(() => {});
+  const riga = q.getByTestId("profilo-qualcosa-non-va");
+  await riga.waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await riga.isVisible() && ((await riga.textContent()) ?? "").includes("Dai un feedback") && await q.getByTestId("profilo-qualcosa-non-va").count() === 1 && await q.getByRole("link", { name: /Dai un feedback/ }).count() === 0, "qualcosa non va: una sola riga 'Dai un feedback' in Impostazioni, che apre il foglio (niente doppione col mailto)");
+  { const h = (await riga.boundingBox())?.height ?? 0; ok(h >= 44, `qualcosa non va: riga alta almeno 44px (${Math.round(h)})`); }
+  await riga.click().catch(() => {});
+  const foglio = q.getByTestId("segnalazione-foglio");
+  await foglio.waitFor({ timeout: 4000 }).catch(() => {});
+  ok(((await q.getByTestId("segnalazione-email").getAttribute("href").catch(() => "")) ?? "").startsWith("mailto:") || await q.getByTestId("segnalazione-email").isVisible().catch(() => false), "qualcosa non va: nel foglio resta l'email, discreta ('Preferisci l'email?')");
+  await foglio.waitFor({ timeout: 3000 }).catch(() => {});
+  ok(await foglio.isVisible(), "qualcosa non va: il foglio si apre");
+  const campo = q.getByTestId("segnalazione-testo");
+  const invia = q.getByTestId("segnalazione-invia");
+  ok((await campo.getAttribute("maxlength")) === "1000", "qualcosa non va: testo al massimo 1000 caratteri");
+  { const h = (await invia.boundingBox())?.height ?? 0; ok(h >= 44, `qualcosa non va: tasto Invia alto almeno 44px (${Math.round(h)})`); }
+  await campo.fill("ok");
+  await invia.click({ force: true, timeout: 1000 }).catch(() => {});
+  await q.waitForTimeout(300);
+  ok(await invia.isDisabled() && inviate.length === 0, `qualcosa non va: testo troppo corto non parte (${inviate.length} invii)`);
+  const scritto = "La mappa non si apre dopo il salvataggio";
+  await campo.fill(scritto);
+  await q.screenshot({ path: `${OUT}/92-qualcosa-non-va.png` });
+  risposta = 500;
+  await invia.click();
+  await q.getByTestId("segnalazione-errore").waitFor({ timeout: 3000 }).catch(() => {});
+  ok(await q.getByTestId("segnalazione-errore").isVisible() && (await campo.inputValue()) === scritto && await foglio.isVisible(), "qualcosa non va: su errore 500 messaggio chiaro e il testo resta");
+  risposta = 200;
+  await invia.click();
+  await q.getByTestId("segnalazione-grazie").waitFor({ timeout: 3000 }).catch(() => {});
+  const ultimo = inviate[inviate.length - 1] ?? {};
+  ok(inviate.length === 2 && ultimo.testo === scritto && ultimo.pagina === "/profilo" && typeof ultimo.larghezza === "number", `qualcosa non va: POST /api/segnalazioni con testo e pagina '/profilo' (${JSON.stringify(ultimo)})`);
+  ok(((await q.getByTestId("segnalazione-grazie").textContent().catch(() => "")) ?? "").includes("Grazie") && (await foglio.count()) === 0, "qualcosa non va: dopo l'invio 'Grazie' e il foglio si chiude");
+  await qc.close();
+  // Route vera con utente finto: 200 a un testo valido (senza scrivere), 400 a uno vuoto.
+  const post = (testo) => fetch(`${BASE}/api/segnalazioni`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ testo, pagina: "/profilo?q=segreto", larghezza: 390 }) });
+  const r1 = await post("Il tasto salva non risponde");
+  const r2 = await post("");
+  ok(r1.status === 200 && r2.status === 400, `qualcosa non va: route 200 a testo valido, 400 a testo vuoto (${r1.status}, ${r2.status})`);
 }
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
