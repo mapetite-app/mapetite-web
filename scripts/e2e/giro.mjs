@@ -3218,6 +3218,21 @@ else {
     // 18/10: con il permesso già dato l'avviso compare da solo all'apertura, senza toccare niente.
     { const t0 = await p.getByTestId("vicino-salvato").waitFor({ timeout: 5000 }).then(() => p.getByTestId("vicino-salvato").textContent(), () => "");
       ok((t0 ?? "").includes("Osteria Due"), `vicino a un salvato: all'apertura della mappa l'avviso compare da solo (${(t0 ?? "").slice(0, 60)})`); }
+    // Proposta 68: il ricordo del salvato (qui il reel Instagram collegato a Osteria Due, senza nota né data).
+    { const r = await p.getByTestId("vicino-ricordo").waitFor({ timeout: 4000 }).then(() => p.getByTestId("vicino-ricordo").textContent(), () => "");
+      ok(r === "Da un reel Instagram", `vicino a un salvato: sotto, il perché l'avevi salvato (proposta 68) (${r})`);
+      await p.screenshot({ path: `${OUT}/11d2-vicino-ricordo.png`, caret: "initial" }); }
+    { const rs = await import(new URL("../../src/lib/ricordo-salvato.ts", import.meta.url).href);
+      const now = new Date("2026-11-18T22:00:00+01:00");
+      const casi = [
+        [{ savedAt: "2026-03-10T10:00:00Z", note: "per il compleanno di Sara, prenotare il tavolo in terrazza" }, "Salvato a marzo · la tua nota: «per il compleanno di Sara, prenotare…»"],
+        [{ savedAt: "2025-07-10T10:00:00Z", reel: { fonte: "TikTok", url: "https://www.tiktok.com/@mangiaroma/video/123" } }, "Salvato a luglio 2025 · dal video di @mangiaroma su TikTok"],
+        [{ savedAt: "2026-11-02T10:00:00Z", reel: { fonte: "Instagram", url: "https://www.instagram.com/reel/abc/" } }, "Salvato questo mese · da un reel Instagram"],
+        [{ savedAt: "2026-09-02T10:00:00Z", consigliatoDa: "Giulia" }, "Salvato a settembre · te l'ha consigliato Giulia"],
+        [{ savedAt: "2026-09-02T10:00:00Z" }, null],
+        [{ savedAt: "2026-09-02T10:00:00Z", note: "   " }, null],
+      ];
+      for (const [inp, want] of casi) { const got = rs.ricordoSalvato(inp, now); ok(got === want, `ricordo del salvato (proposta 68): ${JSON.stringify(inp).slice(0, 60)} → ${got}`); } }
     // Giro del 1/11: l'avviso si chiude con ✕ e, da solo, non torna alla riapertura dello stesso giorno.
     await p.getByTestId("vicino-salvato-chiudi").click().catch(() => {});
     ok(!(await p.getByTestId("vicino-salvato").isVisible().catch(() => false)), "vicino a un salvato: ✕ chiude l'avviso");

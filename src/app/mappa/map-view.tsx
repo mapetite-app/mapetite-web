@@ -34,6 +34,7 @@ import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, etichettaNota, tipoGoogleSconosciuto } from "@/lib/category-label";
 import { percheTiPiacera } from "@/lib/perche-piacera";
+import { ricordoSalvato } from "@/lib/ricordo-salvato";
 import { momentSuggestion, fetchWeather, type Weather } from "@/lib/moment";
 import { momentoDi, type Momento } from "@/lib/home-proposte";
 import { contestoIdee, IDEE_MAX, percheMomento, titoloMomento, titoloBreve } from "@/lib/idee";
@@ -1603,6 +1604,22 @@ export default function MapView({
   // "La mia posizione" e un suo "Da provare" è a due passi. Ritrova il locale nel momento giusto.
   const [nearbySaved, setNearbySaved] = useState<{ place: Place; meters: number } | null>(null);
   const nearbyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Proposta 68: il ricordo del salvato che riaffiora ("Salvato a marzo · la tua nota: «…»"). Nota e consiglio
+  // sono già in memoria; il reel collegato si legge solo se servono (una lettura, solo i propri).
+  const [ricordoVicino, setRicordoVicino] = useState<{ id: string; testo: string } | null>(null);
+  const leggiRicordo = (place: Place) => {
+    const base = { savedAt: place.savedAt ?? null, note: place.note ?? null, consigliatoDa: place.consigliatoDa ?? null };
+    const subito = ricordoSalvato(base);
+    if (subito || !userId) { setRicordoVicino(subito ? { id: place.id, testo: subito } : null); return; }
+    setRicordoVicino(null);
+    void browserClient()
+      .then((client) => client.from("contenuti_locali").select("fonte, url").eq("user_id", userId).eq("place_id", place.id).order("created_at", { ascending: true }).limit(1))
+      .then(({ data, error }) => {
+        const reel = !error && Array.isArray(data) && data[0] ? (data[0] as { fonte: string; url: string }) : null;
+        const testo = reel ? ricordoSalvato({ ...base, reel }) : null;
+        if (testo) setRicordoVicino({ id: place.id, testo });
+      }, () => {});
+  };
   const showNearby = (near: { place: Place; meters: number } | null, daSolo = false) => {
     if (!near) return;
     // Giro del 1/11: l'avviso tornava a ogni apertura e copriva il fondo dello schermo. Da solo
@@ -1613,6 +1630,7 @@ export default function MapView({
       try { if (localStorage.getItem(chiave) === oggi) return; localStorage.setItem(chiave, oggi); } catch { /* storage non disponibile */ }
     }
     setNearbySaved(near);
+    leggiRicordo(near.place);
     if (nearbyTimer.current) clearTimeout(nearbyTimer.current);
     nearbyTimer.current = setTimeout(() => setNearbySaved(null), 9000);
   };
@@ -4429,6 +4447,9 @@ export default function MapView({
           <div role="status" data-testid="vicino-salvato" className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-float">
             <span className="min-w-0 flex-1 text-sm font-sans">
               <span className="font-semibold">📌 A {distanceLabel(userPos ?? nearbySaved.place, nearbySaved.place)}</span> c&apos;è {nearbySaved.place.name}, che volevi provare
+              {ricordoVicino?.id === nearbySaved.place.id && (
+                <span data-testid="vicino-ricordo" className="mt-0.5 block truncate text-xs text-white/80">{ricordoVicino.testo}</span>
+              )}
             </span>
             <button
               type="button"
