@@ -1,7 +1,7 @@
 "use client";
 
 import { tagLabel, isStateTag } from "@/lib/tags";
-import { Lock, UserRoundX, X, Quote, Navigation, Globe, Phone, Check, Share, Share2, Footprints, CalendarCheck, Ellipsis, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck, ChevronRight, Sparkles } from "lucide-react";
+import { Lock, X, Quote, Navigation, Globe, Phone, Check, Share, Share2, Footprints, CalendarCheck, Ellipsis, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck, ChevronRight, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { SchedaVisitaContext, type SchedaVisita } from "@/components/scheda-visita";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
@@ -543,7 +543,7 @@ export default function VenueSheet({
         {/* Proposta 66: fuori dai gusti (si cambia in Modifica). */}
         {isSaved && venue.fuoriGusti && (
           <p data-testid="fuori-gusti-scheda" className="mt-1.5 flex items-center gap-1.5 text-sm font-sans text-text-muted">
-            <UserRoundX size={14} className="shrink-0 text-brand" aria-hidden />
+            <Sparkles size={14} className="shrink-0 text-brand" aria-hidden />
             <span>Non conta nei tuoi gusti</span>
           </p>
         )}

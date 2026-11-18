@@ -24,7 +24,7 @@ import InstallHint from "@/components/install-hint";
 import { PrenotazioneMappa } from "@/components/prenotazione-avvisi";
 import VoiceButton from "@/components/voice-button";
 import DragToClose from "@/components/drag-to-close";
-import { Bookmark, ArrowUp, Lock, ThumbsDown, UserRoundX, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { Bookmark, ArrowUp, Lock, ThumbsDown, ChevronRight, Lightbulb, List as ListIcon, LocateFixed, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { clearRecentSearches, loadRecentSearches, saveRecentSearch, subscribeRecent, useBeta, useOptIn, useVariant } from "@/lib/beta";
 import { cityFromAddress } from "@/lib/city";
 import { hasStateOrTag, isStateTag, sortTags, tagLabel, OPINION_LIKE, OPINION_DISLIKE } from "@/lib/tags";
@@ -270,9 +270,9 @@ function SaveModal({
       onClick={() => setFuoriGusti((v) => !v)}
       className="mt-2 flex min-h-11 w-full items-center gap-3 rounded-btn border border-border bg-white px-3 py-2 text-left"
     >
-      <UserRoundX size={16} aria-hidden className={`shrink-0 ${fuoriGusti ? "text-brand" : "text-text-muted"}`} />
+      <Sparkles size={16} aria-hidden className={`shrink-0 ${fuoriGusti ? "text-brand" : "text-text-muted"}`} />
       <span className="min-w-0 flex-1">
-        <span className="block font-display text-sm font-semibold text-brand">Non contarlo nei miei gusti</span>
+        <span className="block font-display text-sm font-semibold text-brand">Fuori dai miei gusti</span>
         <span className="block text-xs font-sans text-text-muted">Resta salvato, ma non guida i consigli</span>
       </span>
       <span aria-hidden className={`relative h-6 w-10 shrink-0 rounded-pill transition-colors ${fuoriGusti ? "bg-brand" : "bg-border"}`}>
@@ -592,7 +592,7 @@ function similarSavedMatch(place: Place, saved: Place[]): { name: string; d: num
   if (!kind) return null;
   let best: { name: string; d: number } | null = null;
   for (const s of saved) {
-    if (s.name === place.name || categoryLabel(s.category) !== kind || s.tags?.includes(OPINION_DISLIKE)) continue;
+    if (s.name === place.name || categoryLabel(s.category) !== kind || s.tags?.includes(OPINION_DISLIKE) || s.fuoriGusti === true) continue;
     if (place.priceLevel != null && s.priceLevel != null && Math.abs(place.priceLevel - s.priceLevel) > 1) continue;
     const d = distanceMeters(s, place);
     if (d > SIMILAR_MAX_METERS) continue;
@@ -1288,7 +1288,8 @@ export default function MapView({
   // ne hai di più, cercato "poco conosciuto" (così i locali di massa vanno in fondo). Una ricerca
   // parte solo se la tocchi.
   const savedSuggestion = useMemo(() => {
-    const liked = savedPlaces.filter((p) => !p.tags?.includes(OPINION_DISLIKE));
+    // Proposta 66: i posti "Non contarlo nei miei gusti" non suggeriscono niente (revisore 18/11).
+    const liked = savedPlaces.filter((p) => !p.tags?.includes(OPINION_DISLIKE) && p.fuoriGusti !== true);
     if (liked.length < 3) return null;
     const top = (values: (string | null)[]) => {
       const counts = new globalThis.Map<string, number>();
