@@ -3736,6 +3736,12 @@ else {
       const card = pq.getByTestId("stasera-proposta");
       ok((await card.count()) === 1 && /Stasera c'è posto\s*· dice il locale/.test((await card.getByTestId("stasera-posto").textContent().catch(() => "")) ?? ""), `c'è posto stasera: la proposta dice 'Stasera c'è posto · dice il locale' (${await card.getByTestId("stasera-posto").textContent().catch(() => "assente")})`);
       ok(((await pq.getByTestId("stasera-riepilogo").textContent().catch(() => "")) ?? "").endsWith("dove c'è posto"), "c'è posto stasera: il riepilogo lo dice");
+      {
+        // Minore del revisore (19/11): una sola pillola corallo per card. Con "c'è posto" lo stato è tenue.
+        const stato = card.getByTestId("stasera-stato");
+        const cls = (await stato.count()) ? ((await stato.getAttribute("class")) ?? "") : "";
+        ok((await stato.count()) === 0 || (!/\bbg-accent\b/.test(cls) && /bg-surface/.test(cls)), `c'è posto stasera: lo stato della card è tenue accanto a 'c'è posto' (${cls.slice(0, 80) || "nessuno stato"})`);
+      }
       await pq.screenshot({ path: `${OUT}/69-stasera-posto.png`, caret: "initial" });
       await pc.close();
     }
@@ -5112,11 +5118,15 @@ else {
   const nomiD = await Ld.getByTestId("salvato-riga").locator("span.block.truncate").allTextContents();
   ok(nomiD.length === 1 && nomiD[0] === "Da Enzo al 29" && (await amiciBtn.getAttribute("aria-pressed").catch(() => null)) === "true", `dagli amici: acceso, solo i posti consigliati (${nomiD.join(", ")})`);
   await sd.screenshot({ path: `${OUT}/54-salvati-dagli-amici.png`, caret: "initial" });
+  // Minore del revisore (19/11): la riga "Salvato a … · dal video" compare già intera (niente lampo della fonte).
+  await sd.evaluate(() => { window.__primaRiga = null; const mo = new MutationObserver(() => { const el = document.querySelector("[data-testid=salvato-quando-scheda]"); if (el && window.__primaRiga == null) { window.__primaRiga = el.textContent; mo.disconnect(); } }); mo.observe(document.body, { childList: true, subtree: true, characterData: true }); });
   await Ld.getByTestId("salvato-riga").filter({ hasText: "Da Enzo al 29" }).click().catch(() => {});
   await sd.getByTestId("tue-note").waitFor({ timeout: 5000 }).catch(() => {});
   ok(((await sd.getByTestId("consigliato-scheda").textContent().catch(() => "")) ?? "").includes("Te l'ha consigliato Giulia") && (await sd.getByTestId("dillo-amico").count()) === 0, "consigliato da: nella scheda del salvato 'Te l'ha consigliato Giulia', 'Dillo a' solo dopo la visita");
   { const q = await sd.getByTestId("salvato-quando-scheda").waitFor({ timeout: 4000 }).then(() => sd.getByTestId("salvato-quando-scheda").textContent(), () => "");
-    ok(/^Salvato (questo mese|a novembre( 2026)?) · dal video di @mangiaroma su TikTok$/.test(q ?? ""), `scheda del salvato: quando e da quale reel l'avevi salvato (proposta 68) (${q})`); }
+    ok(/^Salvato (questo mese|a novembre( 2026)?) · dal video di @mangiaroma su TikTok$/.test(q ?? ""), `scheda del salvato: quando e da quale reel l'avevi salvato (proposta 68) (${q})`);
+    const prima = await sd.evaluate(() => window.__primaRiga);
+    ok(prima === q, `scheda del salvato: la riga compare già con la fonte del reel, senza lampo (prima: ${prima})`); }
   await sd.getByTestId("consigliato-scheda").scrollIntoViewIfNeeded().catch(() => {});
   await sd.screenshot({ path: `${OUT}/55-scheda-consigliato.png`, caret: "initial" });
   // Condividi con il nome (profilo pubblico): link con da=Luca, riga "Il link porta il tuo nome · Togli".

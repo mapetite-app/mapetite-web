@@ -214,18 +214,26 @@ export default function VenueSheet({
   // Proposta 68 nella scheda: "Salvato a marzo · da un reel Instagram" in "Le tue note". Il reel collegato si legge
   // solo per i propri salvati (una lettura, solo le proprie righe); nota e consiglio hanno già la loro riga.
   const [reelMio, setReelMio] = useState<{ id: string; fonte: string; url: string } | null>(null);
+  // Minore del revisore (19/11): la riga aspetta la lettura del reel (al massimo 1,5 s), con lo spazio già
+  // riservato, così "· dal reel" non compare dopo la data con un lampo.
+  const [reelLetto, setReelLetto] = useState<string | null>(null);
+  const leggeReel = isSaved && !!userId && isUuid(venue.id);
   useEffect(() => {
-    if (!isSaved || !userId || !isUuid(venue.id)) return;
+    if (!leggeReel) return;
     let vivo = true;
+    // Il tetto conta dalla domanda al database, non dal caricamento del client (lento solo in sviluppo).
+    let basta: ReturnType<typeof setTimeout> | undefined;
     void browserClient()
-      .then((client) => client.from("contenuti_locali").select("fonte, url").eq("user_id", userId).eq("place_id", venue.id).order("created_at", { ascending: true }).limit(1))
+      .then((client) => { basta = setTimeout(() => { if (vivo) setReelLetto(venue.id); }, 1500); return client.from("contenuti_locali").select("fonte, url").eq("user_id", userId).eq("place_id", venue.id).order("created_at", { ascending: true }).limit(1); })
       .then(({ data, error }) => {
         const r = !error && Array.isArray(data) && data[0] ? (data[0] as { fonte: string; url: string }) : null;
         if (vivo && r) setReelMio({ id: venue.id, ...r });
-      }, () => {});
-    return () => { vivo = false; };
-  }, [isSaved, userId, venue.id]);
+      }, () => {})
+      .finally(() => { if (vivo) setReelLetto(venue.id); });
+    return () => { vivo = false; if (basta) clearTimeout(basta); };
+  }, [leggeReel, userId, venue.id]);
   const salvato = isSaved ? salvatoDa(venue.savedAt, reelMio?.id === venue.id ? reelMio : null) : null;
+  const salvatoPronto = !leggeReel || reelLetto === venue.id;
   // Segnali di comportamento (percorso, chiama, sito, condividi): vedi src/lib/track.ts.
   // `da` distingue i tocchi della barra azioni in basso da quelli nel resto della scheda.
   const signal = (type: "percorso" | "chiama" | "sito" | "condividi", da?: string) =>
@@ -561,11 +569,13 @@ export default function VenueSheet({
         <p className={`font-display font-semibold uppercase text-accent ${editorial ? "text-[10.5px] tracking-[0.14em]" : "text-xs tracking-wide"}`}>
           Le tue note
         </p>
-        {salvato && (
-          <p data-testid="salvato-quando-scheda" className="mt-1 text-xs font-sans text-text-muted">
+        {salvato && salvatoPronto && (
+          <p data-testid="salvato-quando-scheda" className="mt-1 min-h-4 text-xs font-sans text-text-muted">
             {[salvato.data, salvato.fonte && (salvato.data ? salvato.fonte : `${salvato.fonte.charAt(0).toUpperCase()}${salvato.fonte.slice(1)}`)].filter(Boolean).join(" · ")}
           </p>
         )}
+        {/* Mentre si legge il reel: la riga vuota tiene il posto (niente salto quando arriva). */}
+        {!salvatoPronto && salvato && <p aria-hidden data-testid="salvato-quando-attesa" className="mt-1 min-h-4 text-xs" />}
         {/* Proposta 59: il lucchetto "Solo per me" (si cambia in Modifica). */}
         {isSaved && venue.soloPerMe && (
           <p data-testid="solo-per-me-scheda" className="mt-1.5 flex items-center gap-1.5 text-sm font-sans text-text-muted">

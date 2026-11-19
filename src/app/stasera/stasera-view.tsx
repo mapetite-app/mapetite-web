@@ -62,20 +62,24 @@ async function loadSaved(userId: string): Promise<{ spots: SavedSpot[]; verdicts
   }
   // Proposta 69: quali salvati hanno detto "stasera c'è posto" (solo locali verificati, parola del titolare).
   // Un di più: se la lettura fallisce (o mancano le colonne) nessuna pillola, il resto non cambia.
-  const ids = spots.map((s) => s.id);
-  for (let i = 0; i < ids.length; i += 150) {
-    const { data: ver, error: verErr } = await supabase
-      .from("places")
-      .select("id, verified_at, giorni_tranquilli, giorni_tranquilli_at")
-      .in("id", ids.slice(i, i + 150))
-      .not("verified_at", "is", null);
-    if (verErr) { if (verErr.code !== "42703") console.error("[stasera] lettura locali verificati fallita:", verErr); break; }
-    const conPosto = new Set((ver ?? []).filter((r) => postoStasera({ verificato: true, giorni: r.giorni_tranquilli, at: (r.giorni_tranquilli_at as string | null) ?? null })).map((r) => r.id as string));
-    for (const s of spots) if (conPosto.has(s.id)) s.postoStasera = true;
-  }
+  // Letta in parallelo con i verdetti (minore del revisore, 19/11): una sola attesa invece di due.
+  const leggiPosto = async () => {
+    const ids = spots.map((s) => s.id);
+    for (let i = 0; i < ids.length; i += 150) {
+      const { data: ver, error: verErr } = await supabase
+        .from("places")
+        .select("id, verified_at, giorni_tranquilli, giorni_tranquilli_at")
+        .in("id", ids.slice(i, i + 150))
+        .not("verified_at", "is", null);
+      if (verErr) { if (verErr.code !== "42703") console.error("[stasera] lettura locali verificati fallita:", verErr); return; }
+      const conPosto = new Set((ver ?? []).filter((r) => postoStasera({ verificato: true, giorni: r.giorni_tranquilli, at: (r.giorni_tranquilli_at as string | null) ?? null })).map((r) => r.id as string));
+      for (const s of spots) if (conPosto.has(s.id)) s.postoStasera = true;
+    }
+  };
   const verdicts: Record<string, string> = {};
-  const googleIds = spots.map((s) => s.googlePlaceId).filter((g): g is string => !!g);
-  if (googleIds.length > 0) {
+  const leggiVerdetti = async () => {
+    const googleIds = spots.map((s) => s.googlePlaceId).filter((g): g is string => !!g);
+    if (googleIds.length === 0) return;
     // Il verdetto è un di più: se la lettura fallisce, le proposte restano senza.
     const { data: rows, error: synthError } = await supabase
       .from("place_synthesis")
@@ -86,7 +90,8 @@ async function loadSaved(userId: string): Promise<{ spots: SavedSpot[]; verdicts
       const v = (r.verdict as string | null)?.trim();
       if (v) verdicts[r.place_id as string] = v;
     }
-  }
+  };
+  await Promise.all([leggiPosto().catch((e) => console.error("[stasera] posto:", e)), leggiVerdetti().catch((e) => console.error("[stasera] verdetti:", e))]);
   return { spots, verdicts };
 }
 
@@ -131,8 +136,9 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
           {(planned || want || done) && (
             <span
               data-testid="stasera-stato"
-              className={`mt-1.5 inline-block rounded-pill px-2.5 py-0.5 font-display text-xs font-semibold ${planned || want ? "bg-accent text-white" : "bg-surface text-text-muted"}`}
+              className={`mt-1.5 inline-block rounded-pill px-2.5 py-0.5 font-display text-xs font-semibold ${(planned || want) && !spot.postoStasera ? "bg-accent text-white" : "bg-surface text-text-muted"}`}
             >
+              {/* Una sola pillola corallo per card (minore del revisore, 19/11): con "c'è posto" lo stato diventa tenue. */}
               {planned ? "📅 Avevi detto: ci vado" : want ? "📌 Da provare" : "✓ Ci sono stato"}
             </span>
           )}
