@@ -69,6 +69,7 @@ const SEZIONI: { titolo: string; righe: string[]; id?: string }[] = [
     righe: [
       `Puoi chiedere in qualsiasi momento di vedere, correggere o cancellare i tuoi dati, compreso l'account: scrivi a ${CONTACT} dall'email con cui sei registrato. Rispondiamo entro 30 giorni.`,
       "Gusti, salvati e profilo si possono cambiare anche dall'app, in Profilo.",
+      "Una copia dei tuoi salvati (nome, indirizzo, stato, raccolte, note) si scarica in un file da Profilo › Impostazioni › \u201cScarica i tuoi salvati\u201d.",
     ],
   },
 ];

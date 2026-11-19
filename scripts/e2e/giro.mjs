@@ -11669,6 +11669,12 @@ else {
   await riga.waitFor({ timeout: 4000 }).catch(() => {});
   ok(await riga.isVisible() && ((await riga.textContent()) ?? "").includes("Dai un feedback") && await q.getByTestId("profilo-qualcosa-non-va").count() === 1 && await q.getByRole("link", { name: /Dai un feedback/ }).count() === 0, "qualcosa non va: una sola riga 'Dai un feedback' in Impostazioni, che apre il foglio (niente doppione col mailto)");
   { const h = (await riga.boundingBox())?.height ?? 0; ok(h >= 44, `qualcosa non va: riga alta almeno 44px (${Math.round(h)})`); }
+  // Proposta 70: "Scarica i tuoi salvati" nelle Impostazioni, un link al file (attributo download).
+  { const es = q.getByTestId("esporta-salvati");
+    const h = (await es.boundingBox().catch(() => null))?.height ?? 0;
+    ok(await es.isVisible().catch(() => false) && ((await es.textContent()) ?? "").includes("Scarica i tuoi salvati") && (await es.getAttribute("href")) === "/api/salvati/esporta" && (await es.getAttribute("download")) !== null && h >= 44, `esporta salvati: riga 'Scarica i tuoi salvati' nelle Impostazioni, alta ${Math.round(h)}px`);
+    await es.scrollIntoViewIfNeeded().catch(() => {});
+    await q.screenshot({ path: `${OUT}/70-esporta-salvati.png`, caret: "initial" }); }
   await riga.click().catch(() => {});
   const foglio = q.getByTestId("segnalazione-foglio");
   await foglio.waitFor({ timeout: 4000 }).catch(() => {});
@@ -11702,6 +11708,16 @@ else {
   const r1 = await post("Il tasto salva non risponde");
   const r2 = await post("");
   ok(r1.status === 200 && r2.status === 400, `qualcosa non va: route 200 a testo valido, 400 a testo vuoto (${r1.status}, ${r2.status})`);
+  // Proposta 70: route del file e contenuto del CSV.
+  { const r = await fetch(`${BASE}/api/salvati/esporta`);
+    const t = await r.text();
+    ok(r.status === 200 && /text\/csv/.test(r.headers.get("content-type") ?? "") && /attachment; filename="mapetite-salvati-\d{4}-\d{2}-\d{2}\.csv"/.test(r.headers.get("content-disposition") ?? "") && t.startsWith("\uFEFFNome;Indirizzo;Google Maps;Stato;Com'era;Raccolte;Nota;Consigliato da;Salvato il"), `esporta salvati: route con file CSV e intestazione (${r.status}, ${r.headers.get("content-disposition")})`);
+    const es = await import(new URL("../../src/lib/esporta-salvati.ts", import.meta.url).href);
+    const riga = es.rigaCsv({ created_at: "2026-03-10T23:30:00Z", tags: ["Già visitato", "Mi è piaciuto", "romantico", "Roma"], note: 'Chiedere del "tavolo 4"; terrazza', consigliato_da: "Giulia", places: { name: "Da Enzo al 29", address: "Via dei Vascellari 29, Roma", google_place_id: "ChIJabc123defGHI" } });
+    ok(riga === 'Da Enzo al 29;Via dei Vascellari 29, Roma;https://www.google.com/maps/search/?api=1&query=Da%20Enzo%20al%2029&query_place_id=ChIJabc123defGHI;Ci sono stato;Mi è piaciuto;romantico, Roma;"Chiedere del ""tavolo 4""; terrazza";Giulia;11/03/2026', `esporta salvati: una riga completa, data nel fuso di Roma (${riga})`);
+    const formula = es.rigaCsv({ tags: ["Da provare"], note: "=HYPERLINK(\"x\")", places: { name: "@posto", address: null, google_place_id: "00000000-0000-4000-8000-000000000001" } });
+    ok(formula === `'@posto;;;Da provare;;;"'=HYPERLINK(""x"")";;`, `esporta salvati: niente formule di Excel, niente link senza Place ID Google (${formula})`);
+    ok(es.salvatiCsv([{ places: null }, { places: { name: "A" } }]).split("\r\n").length === 3, "esporta salvati: righe senza locale saltate"); }
 }
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
