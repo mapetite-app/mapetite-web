@@ -58,6 +58,8 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
 
 11. **Privacy: avvocato ed età minima — APERTA dall'8/11, una decisione.** Prima di aprire l'app al pubblico: far rivedere `/privacy` (sezione "Profilo pubblico e amici", con le righe nuove del 14/11 su link d'invito che rende amici e "Trova amici dalla rubrica") e scegliere l'età minima alla registrazione (14 anni è il minimo in Italia per il consenso; oppure 16 o 18).
 
+12. **"Scarica i tuoi salvati" (proposta 70) — APERTA dal 19/11, una decisione.** Pronta e approvata, ma non in produzione: nome e indirizzo dei locali vengono da Google e i termini Google vietano di esportarli fuori dal servizio. Scegli: (a) file solo con i tuoi dati (nota, raccolte, stato, data) più il link Google Maps del posto, senza nome e indirizzo; (b) aspettare il parere dell'avvocato (voce 11); (c) lasciar perdere.
+
 ## Fatte
 
 - **Scelta del design (PR #87) — FATTA il 21/10:** "tutto come consigliato", deciso da Claude su autorizzazione di Lorenzo.

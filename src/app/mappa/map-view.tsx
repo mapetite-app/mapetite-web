@@ -4329,6 +4329,7 @@ export default function MapView({
                 personalNote: selected.note,
                 consigliatoDa: selected.consigliatoDa ?? null,
                 soloPerMe: selected.soloPerMe === true,
+                savedAt: selected.savedAt ?? savedPlaces.find((p) => p.id === selected.id)?.savedAt ?? null,
                 fuoriGusti: selected.fuoriGusti === true,
                 businessStatus: selected.businessStatus ?? null,
                 percheTiPiacera: percheSelezionato,
