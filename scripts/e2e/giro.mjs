@@ -11739,7 +11739,8 @@ else {
   ok(r1.status === 200 && r2.status === 400, `qualcosa non va: route 200 a testo valido, 400 a testo vuoto (${r1.status}, ${r2.status})`);
   // Proposta 70: route del file e contenuto del CSV.
   { const r = await fetch(`${BASE}/api/salvati/esporta`);
-    const t = await r.text();
+    const b = new Uint8Array(await r.arrayBuffer());
+    const t = new TextDecoder("utf-8", { ignoreBOM: true }).decode(b);
     ok(r.status === 200 && /text\/csv/.test(r.headers.get("content-type") ?? "") && /attachment; filename="mapetite-salvati-\d{4}-\d{2}-\d{2}\.csv"/.test(r.headers.get("content-disposition") ?? "") && t.startsWith("\uFEFFNome;Indirizzo;Google Maps;Stato;Com'era;Raccolte;Nota;Consigliato da;Salvato il"), `esporta salvati: route con file CSV e intestazione (${r.status}, ${r.headers.get("content-disposition")})`);
     const es = await import(new URL("../../src/lib/esporta-salvati.ts", import.meta.url).href);
     const riga = es.rigaCsv({ created_at: "2026-03-10T23:30:00Z", tags: ["Già visitato", "Mi è piaciuto", "romantico", "Roma"], note: 'Chiedere del "tavolo 4"; terrazza', consigliato_da: "Giulia", places: { name: "Da Enzo al 29", address: "Via dei Vascellari 29, Roma", google_place_id: "ChIJabc123defGHI" } });
