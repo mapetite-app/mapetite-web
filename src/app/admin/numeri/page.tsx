@@ -32,6 +32,7 @@ async function e2eRows(): Promise<EventRow[] | null> {
 
 // Segnalazioni finte per il giro automatico (solo in sviluppo con E2E_FAKE_USER, cookie e2e_segnalazioni).
 async function e2eSegnalazioni(): Promise<Segnalazione[]> {
+  if (process.env.NODE_ENV !== "development" || !process.env.E2E_FAKE_USER) return [];
   const raw = (await cookies()).get("e2e_segnalazioni")?.value;
   if (!raw) return [];
   try {

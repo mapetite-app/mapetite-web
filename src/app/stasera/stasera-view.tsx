@@ -402,7 +402,7 @@ export default function StaseraView({ userId }: { userId: string }) {
                   )}
                   {soloPosto && (
                     <button type="button" data-testid="stasera-allarga" onClick={() => setSoloPosto(false)} className="min-h-11 rounded-pill border border-brand/30 bg-white px-4 font-display text-sm font-semibold text-brand">
-                      Anche senza posto detto
+                      Anche gli altri posti
                     </button>
                   )}
                   {onlyNew && (
