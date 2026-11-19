@@ -180,7 +180,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Gambero Rosso fa una guida a mano per evitare le trappole del Tridente ([Gambero Rosso](https://www.gamberorosso.it/notizie/rubriche/miniguide/dove-mangiare-centro-roma/)); nelle app viste nessuno lo dice. È il caso della VISIONE (4.396 recensioni in inglese messo primo).
 - **Valore per l'utente:** capisce in un secondo se è un posto di quartiere. **Per il ristoratore:** il locale onesto in zona turistica smette di confondersi con gli altri.
 - **Sforzo:** S (prima verificare che `originalText.languageCode` arrivi già con il FIELD_MASK attuale). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA dal 9/11.
+- **Stato proposto:** PRONTA dal 9/11. **19/11 sera: costruita, approvata dal revisore e poi tolta prima del merge.** Prova con 2 ricerche Google vere: con `languageCode=it` (come chiede l'app) Google sceglie recensioni nella lingua della richiesta. Trattoria Da Enzo al 29, il posto più turistico di Trastevere, esce con 5 recensioni su 5 in italiano, e Da Teo lo stesso. La riga "tutte in italiano" sarebbe falsa proprio dove serve. Codice nel commit `9a709452`, annullato. Si riprende solo con una Text Search senza `languageCode` (cambia la lingua dei testi passati all'AI: da provare a parte, con un costo da stimare) oppure non si fa.
 
 ### 51. "Da ordinare": il piatto che le recensioni nominano di più, con la prova
 - **Problema:** `PROBLEMI.md` 22 e 10: la scheda dice com'è il posto, non cosa prendere; chi arriva da un reel spesso ricorda solo il piatto.
