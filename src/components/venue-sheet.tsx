@@ -217,14 +217,14 @@ export default function VenueSheet({
   // Proposta 68 nella scheda: "Salvato a marzo · da un reel Instagram" in "Le tue note". Il reel collegato si legge
   // solo per i propri salvati (una lettura, solo le proprie righe); nota e consiglio hanno già la loro riga.
   const [reelMio, setReelMio] = useState<{ id: string; fonte: string; url: string } | null>(null);
-  // Minore del revisore (19/11): la riga aspetta la lettura del reel (al massimo 0,6 s), con lo spazio già
+  // Minore del revisore (19/11): la riga aspetta la lettura del reel (al massimo 1,5 s), con lo spazio già
   // riservato, così "· dal reel" non compare dopo la data con un lampo.
   const [reelLetto, setReelLetto] = useState<string | null>(null);
   const leggeReel = isSaved && !!userId && isUuid(venue.id);
   useEffect(() => {
     if (!leggeReel) return;
     let vivo = true;
-    const basta = setTimeout(() => { if (vivo) setReelLetto(venue.id); }, 600);
+    const basta = setTimeout(() => { if (vivo) setReelLetto(venue.id); }, 1500);
     void browserClient()
       .then((client) => client.from("contenuti_locali").select("fonte, url").eq("user_id", userId).eq("place_id", venue.id).order("created_at", { ascending: true }).limit(1))
       .then(({ data, error }) => {
