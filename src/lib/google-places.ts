@@ -35,7 +35,7 @@ type GooglePlace = {
   types?: string[];
   websiteUri?: string;
   editorialSummary?: { text?: string };
-  reviews?: { text?: { text?: string }; originalText?: { text?: string; languageCode?: string }; rating?: number; relativePublishTimeDescription?: string; publishTime?: string }[];
+  reviews?: { text?: { text?: string }; rating?: number; relativePublishTimeDescription?: string; publishTime?: string }[];
   nationalPhoneNumber?: string;
   photos?: { name: string; authorAttributions?: { displayName?: string }[] }[];
 } & Partial<Record<GoogleAttribute, boolean>>;
@@ -64,9 +64,6 @@ export type PlaceResult = {
   // Data di ciascuna di quelle recensioni (publishTime ISO di Google, stesso ordine di reviewTexts; null se
   // Google non la dà). Serve alla riga "Da 3 recensioni Google, la più recente di ottobre" (proposta 67).
   reviewTimes?: (string | null)[] | null;
-  // Lingua ORIGINALE di ciascuna di quelle recensioni (originalText.languageCode, "it", "en"…; null se Google
-  // non la dà). Con languageCode=it il testo arriva tradotto: solo da qui si sa chi l'ha scritta (proposta 50).
-  reviewLangs?: (string | null)[] | null;
   // Le stesse recensioni con il voto (per la riga di ripiego della card: mai una stroncatura). Solo server.
   reviewItems?: { text: string; rating: number | null }[] | null;
   phone: string | null;
@@ -324,13 +321,6 @@ function mapGooglePlace(place: GooglePlace): PlaceResult {
         .slice(0, 5)
         .map((r) => (typeof r.publishTime === "string" ? r.publishTime : null));
       return times.length > 0 ? times : null;
-    })(),
-    reviewLangs: (() => {
-      const langs = (place.reviews ?? [])
-        .filter((r) => typeof r.text?.text === "string" && r.text.text.trim().length > 0)
-        .slice(0, 5)
-        .map((r) => (typeof r.originalText?.languageCode === "string" && r.originalText.languageCode.trim() ? r.originalText.languageCode.trim().toLowerCase() : null));
-      return langs.length > 0 ? langs : null;
     })(),
     reviewItems: (() => {
       const items = (place.reviews ?? [])

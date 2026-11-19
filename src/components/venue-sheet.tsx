@@ -97,9 +97,6 @@ export type Venue = {
   // Proposta 67: da quante recensioni Google parla il verdetto e la data (ISO) della più recente.
   recensioniN?: number | null;
   recensioneUltima?: string | null;
-  // Proposta 50: quante di quelle recensioni sono scritte in italiano / in inglese (lingua originale).
-  recensioniIt?: number | null;
-  recensioniEn?: number | null;
 };
 
 type VenueSheetProps = {
@@ -224,15 +221,16 @@ export default function VenueSheet({
   useEffect(() => {
     if (!leggeReel) return;
     let vivo = true;
-    const basta = setTimeout(() => { if (vivo) setReelLetto(venue.id); }, 1500);
+    // Il tetto conta dalla domanda al database, non dal caricamento del client (lento solo in sviluppo).
+    let basta: ReturnType<typeof setTimeout> | undefined;
     void browserClient()
-      .then((client) => client.from("contenuti_locali").select("fonte, url").eq("user_id", userId).eq("place_id", venue.id).order("created_at", { ascending: true }).limit(1))
+      .then((client) => { basta = setTimeout(() => { if (vivo) setReelLetto(venue.id); }, 1500); return client.from("contenuti_locali").select("fonte, url").eq("user_id", userId).eq("place_id", venue.id).order("created_at", { ascending: true }).limit(1); })
       .then(({ data, error }) => {
         const r = !error && Array.isArray(data) && data[0] ? (data[0] as { fonte: string; url: string }) : null;
         if (vivo && r) setReelMio({ id: venue.id, ...r });
       }, () => {})
       .finally(() => { if (vivo) setReelLetto(venue.id); });
-    return () => { vivo = false; clearTimeout(basta); };
+    return () => { vivo = false; if (basta) clearTimeout(basta); };
   }, [leggeReel, userId, venue.id]);
   const salvato = isSaved ? salvatoDa(venue.savedAt, reelMio?.id === venue.id ? reelMio : null) : null;
   const salvatoPronto = !leggeReel || reelLetto === venue.id;
@@ -407,7 +405,7 @@ export default function VenueSheet({
     goForChips.length > 0 ||
     dontExpectChips.length > 0;
   // "Da 3 recensioni Google, la più recente di ottobre" (proposta 67): null se il verdetto non le ha salvate.
-  const freschezza = fraseFreschezza({ n: venue.recensioniN, ultima: venue.recensioneUltima, it: venue.recensioniIt, en: venue.recensioniEn });
+  const freschezza = fraseFreschezza({ n: venue.recensioniN, ultima: venue.recensioneUltima });
   const hasTags = tags != null && tags.length > 0;
   const hasPersonalTags = personalTags != null && personalTags.length > 0;
   const showPersonalBlock =

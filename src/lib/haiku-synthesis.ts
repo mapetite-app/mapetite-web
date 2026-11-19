@@ -74,9 +74,6 @@ export type PlaceSynthesis = {
   // recente. Null per i verdetti in cache scritti prima (nessuna riga: non si inventa).
   recensioniN?: number | null;
   recensioneUltima?: string | null;
-  // Proposta 50: quante di quelle recensioni sono scritte (in originale) in italiano e in inglese.
-  recensioniIt?: number | null;
-  recensioniEn?: number | null;
 };
 export type MatchLevel = "alto" | "medio" | "basso";
 
@@ -89,9 +86,6 @@ type CachedSynthesis = {
   dontExpect: string[];
   recensioniN?: number | null;
   recensioneUltima?: string | null;
-  // Proposta 50: quante di quelle recensioni sono scritte (in originale) in italiano e in inglese.
-  recensioniIt?: number | null;
-  recensioniEn?: number | null;
 };
 
 const SYNTHESIS_SYSTEM = `REGOLA ASSOLUTA: scrivi ESCLUSIVAMENTE in italiano corretto. Le recensioni in input sono in inglese: NON copiare parole inglesi, NON usare calchi, NON inventare parole. Ogni singola parola di synthesis, tags, verdict, go_for e dont_expect deve essere una parola italiana esistente. Se un concetto è espresso in inglese nelle recensioni, traducilo. Esempi di errori da non fare: "vibe" → atmosfera, "food" → cibo, "view" o "breathtaking" → vista mozzafiato, "handmade" → fatto a mano, "chill" → rilassato, "food pairing" → abbinamenti. Ammessi solo i prestiti entrati nell'italiano: cocktail, drink, staff, brunch, rooftop, lounge, location.
@@ -480,7 +474,7 @@ export async function getSynthesis(
     const supabase = createAdminClient();
     const leggi = (conFreschezza: boolean) => supabase
       .from("place_synthesis")
-      .select(`place_id, synthesis, tags, verdict, go_for, dont_expect, generated_at${conFreschezza ? ", recensioni_n, recensione_ultima, recensioni_it, recensioni_en" : ""}`)
+      .select(`place_id, synthesis, tags, verdict, go_for, dont_expect, generated_at${conFreschezza ? ", recensioni_n, recensione_ultima" : ""}`)
       .in("place_id", ids);
     let { data, error } = await leggi(true);
     // 42703 = migrazione 20261118b non applicata: si rilegge senza le colonne della freschezza.
@@ -505,8 +499,6 @@ export async function getSynthesis(
           dontExpect: (row.dont_expect as string[] | null) ?? [],
           recensioniN: typeof row.recensioni_n === "number" ? row.recensioni_n : null,
           recensioneUltima: typeof row.recensione_ultima === "string" ? row.recensione_ultima : null,
-          recensioniIt: typeof row.recensioni_it === "number" ? row.recensioni_it : null,
-          recensioniEn: typeof row.recensioni_en === "number" ? row.recensioni_en : null,
         });
       }
     }
@@ -600,8 +592,8 @@ export async function getSynthesis(
               // Le stesse recensioni passate all'AI qui sopra (stesso taglio): numero e data della più recente.
               ...(() => {
                 const p = batch.find((x) => x.id === o.id);
-                const f = freschezzaDa((p?.reviewTexts ?? []).slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS), (p?.reviewTimes ?? []).slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS), (p?.reviewLangs ?? []).slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS));
-                return { recensioniN: f.n, recensioneUltima: f.ultima, recensioniIt: f.it, recensioniEn: f.en };
+                const f = freschezzaDa((p?.reviewTexts ?? []).slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS), (p?.reviewTimes ?? []).slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS));
+                return { recensioniN: f.n, recensioneUltima: f.ultima };
               })(),
             });
           }
@@ -637,9 +629,6 @@ export async function getSynthesis(
           // Proposta 67 (migrazione 20261118b): da quante recensioni parla il verdetto.
           recensioni_n: s.recensioniN ?? null,
           recensione_ultima: s.recensioneUltima ?? null,
-          // Proposta 50 (migrazione 20261120): solo i due conteggi, nessun testo Google.
-          recensioni_it: s.recensioniIt ?? null,
-          recensioni_en: s.recensioniEn ?? null,
         }));
         let { error } = rows.length === 0 ? { error: null } : await supabase
           .from("place_synthesis")
@@ -689,8 +678,6 @@ export async function getSynthesis(
       dontExpect: s.dontExpect,
       recensioniN: s.recensioniN ?? null,
       recensioneUltima: s.recensioneUltima ?? null,
-      recensioniIt: s.recensioniIt ?? null,
-      recensioniEn: s.recensioniEn ?? null,
       matchReason: matchReasons.get(id) ?? "",
       perTe: perTes.get(id) ?? "",
       // Nel dubbio il locale resta: fit mancante = true.

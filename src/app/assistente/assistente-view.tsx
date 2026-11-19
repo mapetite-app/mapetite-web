@@ -140,7 +140,7 @@ type RawPlace = {
   selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
   goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null;
   // Proposta 67: da quante recensioni e di quando parla il verdetto (revisore 18/11: anche dalla prima risposta).
-  recensioniN?: number | null; recensioneUltima?: string | null; recensioniIt?: number | null; recensioniEn?: number | null;
+  recensioniN?: number | null; recensioneUltima?: string | null;
 };
 type Pending = { places: unknown[]; token: string; gruppi?: { places: unknown[]; token: string }[] } | null;
 type VerdictReply = { dettagli?: Record<string, Partial<Card>>; esclusi?: string[]; livelli?: Record<string, string> };
@@ -155,7 +155,6 @@ function toCard(p: RawPlace): Card {
     personalTags: null, personalNote: null, photoRef: p.photoRef ?? null, photoAuthor: p.photoAuthor ?? null,
     editorialSummary: p.editorialSummary ?? null,
     recensioniN: p.recensioniN ?? null, recensioneUltima: p.recensioneUltima ?? null,
-    recensioniIt: p.recensioniIt ?? null, recensioniEn: p.recensioniEn ?? null,
   };
 }
 
