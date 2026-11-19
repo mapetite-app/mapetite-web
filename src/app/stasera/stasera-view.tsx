@@ -10,6 +10,7 @@ import { cityFromAddress } from "@/lib/city";
 import { distanceLabel } from "@/lib/distance";
 import { track } from "@/lib/track";
 import { isStateTag, tagDisplay } from "@/lib/tags";
+import { postoStasera } from "@/lib/serate";
 import {
   STATE_DONE,
   STATE_WANT,
@@ -58,6 +59,19 @@ async function loadSaved(userId: string): Promise<{ spots: SavedSpot[]; verdicts
       note: (row.note as string | null)?.trim() || null,
       pianoAl: typeof row.piano_al === "string" ? row.piano_al : null,
     });
+  }
+  // Proposta 69: quali salvati hanno detto "stasera c'è posto" (solo locali verificati, parola del titolare).
+  // Un di più: se la lettura fallisce (o mancano le colonne) nessuna pillola, il resto non cambia.
+  const ids = spots.map((s) => s.id);
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data: ver, error: verErr } = await supabase
+      .from("places")
+      .select("id, verified_at, giorni_tranquilli, giorni_tranquilli_at")
+      .in("id", ids.slice(i, i + 150))
+      .not("verified_at", "is", null);
+    if (verErr) { if (verErr.code !== "42703") console.error("[stasera] lettura locali verificati fallita:", verErr); break; }
+    const conPosto = new Set((ver ?? []).filter((r) => postoStasera({ verificato: true, giorni: r.giorni_tranquilli, at: (r.giorni_tranquilli_at as string | null) ?? null })).map((r) => r.id as string));
+    for (const s of spots) if (conPosto.has(s.id)) s.postoStasera = true;
   }
   const verdicts: Record<string, string> = {};
   const googleIds = spots.map((s) => s.googlePlaceId).filter((g): g is string => !!g);
@@ -122,6 +136,12 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
               {planned ? "📅 Avevi detto: ci vado" : want ? "📌 Da provare" : "✓ Ci sono stato"}
             </span>
           )}
+          {spot.postoStasera && (
+            <span data-testid="stasera-posto" className="mt-1.5 flex w-fit items-center gap-1 rounded-pill bg-accent-light px-2.5 py-0.5 font-display text-xs font-semibold text-accent">
+              🌙 Stasera c&apos;è posto
+              <span className="font-sans font-normal text-text-muted">· dice il locale</span>
+            </span>
+          )}
         </div>
         <ChevronRight aria-hidden size={20} className="mt-1 shrink-0 text-text-muted" />
       </Link>
@@ -175,6 +195,8 @@ export default function StaseraView({ userId }: { userId: string }) {
   const [proposals, setProposals] = useState<SavedSpot[] | null>(null);
   const [shown, setShown] = useState<Set<string>>(new Set());
   const [restarted, setRestarted] = useState(false);
+  // Proposta 69: "🌙 Dove c'è posto" (solo se almeno un salvato lo ha detto oggi).
+  const [soloPosto, setSoloPosto] = useState(false);
 
   const load = useCallback(() => {
     let alive = true;
@@ -208,9 +230,11 @@ export default function StaseraView({ userId }: { userId: string }) {
   }, [askPosition]);
 
   const choices: Choices = useMemo(
-    () => ({ occasion, onlyNew, near: wantNear && pos ? pos : null, city }),
-    [occasion, onlyNew, wantNear, pos, city],
+    () => ({ occasion, onlyNew, near: wantNear && pos ? pos : null, city, soloPosto }),
+    [occasion, onlyNew, wantNear, pos, city, soloPosto],
   );
+  // Quanti salvati con posto stasera rispettano le altre scelte (la pillola c'è solo se almeno uno, o se è accesa).
+  const nPosto = useMemo(() => (spots ?? []).filter((s) => s.postoStasera && matches(s, { ...choices, soloPosto: false })).length, [spots, choices]);
   const collections = useMemo(() => collectionsOf(spots ?? []), [spots]);
   const cities = useMemo(() => citiesOf(spots ?? []), [spots]);
   const matching = useMemo(() => (spots ?? []).filter((s) => matches(s, choices)), [spots, choices]);
@@ -243,7 +267,7 @@ export default function StaseraView({ userId }: { userId: string }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const summary = [occasion ? tagDisplay(occasion) : "Qualsiasi occasione", city ? `a ${city}` : choices.near ? "vicino a te" : "ovunque", onlyNew ? "da provare" : "anche dove sono stato"].join(" · ");
+  const summary = [occasion ? tagDisplay(occasion) : "Qualsiasi occasione", city ? `a ${city}` : choices.near ? "vicino a te" : "ovunque", onlyNew ? "da provare" : "anche dove sono stato", soloPosto ? "dove c'è posto" : null].filter(Boolean).join(" · ");
 
   return (
     <main data-testid="stasera" className="-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] min-h-dvh bg-[#f6f7f7] pb-[var(--nav-height-mobile)] text-text md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
@@ -353,6 +377,13 @@ export default function StaseraView({ userId }: { userId: string }) {
               <Pill active={onlyNew} onClick={() => setOnlyNew(true)}>📌 Da provare</Pill>
               <Pill active={!onlyNew} onClick={() => setOnlyNew(false)}>Anche dove sono stato</Pill>
             </div>
+            {(nPosto > 0 || soloPosto) && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Pill testId="stasera-solo-posto" active={soloPosto} onClick={() => { setSoloPosto(!soloPosto); if (!soloPosto) track("funzione", null, { nome: "stasera_posto", risultati: nPosto }); }}>
+                  🌙 Dove c&apos;è posto · {nPosto}
+                </Pill>
+              </div>
+            )}
 
             {matchCount === 0 ? (
               <div data-testid="stasera-nessuno" className="mt-8 rounded-card border border-[#e3e7e7] bg-white p-4">
@@ -367,6 +398,11 @@ export default function StaseraView({ userId }: { userId: string }) {
                   {(choices.near || city) && (
                     <button type="button" data-testid="stasera-allarga" onClick={() => { setWantNear(false); setCity(null); }} className="min-h-11 rounded-pill border border-brand/30 bg-white px-4 font-display text-sm font-semibold text-brand">
                       Cerca ovunque
+                    </button>
+                  )}
+                  {soloPosto && (
+                    <button type="button" data-testid="stasera-allarga" onClick={() => setSoloPosto(false)} className="min-h-11 rounded-pill border border-brand/30 bg-white px-4 font-display text-sm font-semibold text-brand">
+                      Anche senza posto detto
                     </button>
                   )}
                   {onlyNew && (

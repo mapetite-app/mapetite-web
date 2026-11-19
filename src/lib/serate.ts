@@ -58,3 +58,15 @@ export function frasePosto(
   const ordinati = [...giorni].sort((a, b) => ((a - oggi + 7) % 7) - ((b - oggi + 7) % 7));
   return `${maiuscola(elenco(ordinati.map((g) => GIORNI[g])))} c'è posto`;
 }
+
+/**
+ * Proposta 69 "C'è posto stasera, tra i tuoi salvati": il locale verificato ha detto che oggi (a Roma) ha posto,
+ * con un'informazione ancora valida. Mai stimato: senza la parola del locale è false.
+ */
+export function postoStasera(
+  info: { verificato: boolean; giorni: unknown; at: string | null } | null | undefined,
+  now: number = Date.now(),
+): boolean {
+  if (!info?.verificato || !seraValida(info.at, now)) return false;
+  return pulisciGiorni(info.giorni).includes(oggiARoma(now));
+}

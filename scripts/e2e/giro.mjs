@@ -3706,10 +3706,39 @@ else {
       await c.route("**/rest/v1/saved_places**", (r) => r.request().url().includes("select=place_id") ? r.fulfill({ json: stData.map((x) => ({ place_id: x.places.id })) }) : r.fulfill({ json: stData }));
       await c.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [{ place_id: "G1", verdict: "Vista vera sui tetti, cocktail fatti con cura." }] }));
       await c.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [] }));
+      await c.route("**/rest/v1/places?**", (r) => r.fulfill({ json: [] }));
       await c.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
       await c.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
       return c;
     });
+    // Proposta 69: "🌙 Dove c'è posto" solo se un salvato verificato ha detto che stasera c'è posto (oggi a Roma).
+    {
+      const oggi = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Rome", weekday: "short" }).format(new Date())];
+      const sm = await import(new URL("../../src/lib/serate.ts", import.meta.url).href);
+      const fresco = new Date(Date.now() - 86_400_000).toISOString();
+      ok(sm.postoStasera({ verificato: true, giorni: [oggi], at: fresco }) && !sm.postoStasera({ verificato: false, giorni: [oggi], at: fresco }) && !sm.postoStasera({ verificato: true, giorni: [(oggi + 1) % 7], at: fresco }) && !sm.postoStasera({ verificato: true, giorni: [oggi], at: new Date(Date.now() - 61 * 86_400_000).toISOString() }), "c'è posto stasera (proposta 69): solo verificato, oggi tra i giorni, informazione di meno di 60 giorni");
+      const pc = await stCtx();
+      const letture = [];
+      await pc.route("**/rest/v1/places?**", (r) => { letture.push(decodeURIComponent(r.request().url())); return r.fulfill({ json: [
+        { id: "00000000-0000-4000-8000-000000000203", verified_at: fresco, giorni_tranquilli: [oggi], giorni_tranquilli_at: fresco },
+        { id: "00000000-0000-4000-8000-000000000207", verified_at: fresco, giorni_tranquilli: [(oggi + 1) % 7], giorni_tranquilli_at: fresco },
+      ] }); });
+      const pq = await pc.newPage();
+      pq.on("pageerror", (e) => errors.push(e.message));
+      await pq.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+      const pill = pq.getByTestId("stasera-solo-posto");
+      await pill.waitFor({ timeout: 6000 }).catch(() => {});
+      ok(((await pill.textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim() === "🌙 Dove c'è posto · 1" && letture.some((u) => u.includes("verified_at=not.is.null")), `c'è posto stasera: pillola con 1 salvato (Enoteca Tre), lettura solo dei locali verificati (${await pill.textContent().catch(() => "assente")})`);
+      await pill.click().catch(() => {});
+      ok((await pq.getByTestId("stasera-conteggio").textContent().catch(() => ""))?.startsWith("1 salvato") && (await pill.getAttribute("aria-pressed")) === "true", "c'è posto stasera: accesa, resta 1 salvato");
+      await pq.getByTestId("stasera-proponi").click().catch(() => {});
+      await pq.getByTestId("stasera-proposta").first().waitFor({ timeout: 3000 }).catch(() => {});
+      const card = pq.getByTestId("stasera-proposta");
+      ok((await card.count()) === 1 && /Stasera c'è posto\s*· dice il locale/.test((await card.getByTestId("stasera-posto").textContent().catch(() => "")) ?? ""), `c'è posto stasera: la proposta dice 'Stasera c'è posto · dice il locale' (${await card.getByTestId("stasera-posto").textContent().catch(() => "assente")})`);
+      ok(((await pq.getByTestId("stasera-riepilogo").textContent().catch(() => "")) ?? "").endsWith("dove c'è posto"), "c'è posto stasera: il riepilogo lo dice");
+      await pq.screenshot({ path: `${OUT}/69-stasera-posto.png`, caret: "initial" });
+      await pc.close();
+    }
     const stc = await stCtx();
     const sq = await stc.newPage();
     sq.on("pageerror", (e) => errors.push(e.message));

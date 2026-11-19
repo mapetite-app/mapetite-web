@@ -24,6 +24,8 @@ export type SavedSpot = {
   note: string | null;
   // "Quando ci vai?" (proposta 17): giorno scelto dall'utente, AAAA-MM-GG, o null.
   pianoAl?: string | null;
+  // Proposta 69: il locale (verificato) ha detto che stasera c'è posto. Mai stimato.
+  postoStasera?: boolean;
 };
 
 // Giorno di Roma come AAAA-MM-GG.
@@ -51,6 +53,8 @@ export type Choices = {
   near: { lat: number; lng: number } | null; // null = Ovunque
   city: string | null; // città ricavata dall'indirizzo (es. "Roma"), null = tutte
   onlyNew: boolean; // true = Da provare (esclusi i "Ci sono stato")
+  // Proposta 69: solo dove il locale ha detto che stasera c'è posto (facoltativa).
+  soloPosto?: boolean;
 };
 
 // Raccolte = tag dell'utente esclusi i due di stato, dalla più ricca.
@@ -81,6 +85,7 @@ export function matches(s: SavedSpot, c: Choices): boolean {
   if (s.tags.includes(OPINION_DISLIKE)) return false;
   if (c.occasion && !s.tags.includes(c.occasion)) return false;
   if (c.onlyNew && s.tags.includes(STATE_DONE)) return false;
+  if (c.soloPosto && !s.postoStasera) return false;
   if (c.near) {
     if (s.lat == null || s.lng == null) return false;
     if (distanceMeters(c.near, { lat: s.lat, lng: s.lng }) > NEAR_RADIUS_M) return false;
