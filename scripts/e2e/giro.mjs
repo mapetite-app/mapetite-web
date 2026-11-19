@@ -3233,6 +3233,12 @@ else {
         [{ savedAt: "2026-09-02T10:00:00Z" }, null],
         [{ savedAt: "2026-09-02T10:00:00Z", note: "   " }, null],
       ];
+      for (const [inp, reel, want] of [
+        ["2026-03-10T10:00:00Z", null, '{"data":"Salvato a marzo","fonte":null}'],
+        ["2025-07-10T10:00:00Z", { fonte: "Instagram", url: "https://www.instagram.com/reel/abc/" }, '{"data":"Salvato a luglio 2025","fonte":"da un reel Instagram"}'],
+        [null, { fonte: "YouTube", url: "https://youtu.be/x" }, '{"data":null,"fonte":"da un video YouTube"}'],
+        [null, null, "null"],
+      ]) { const got = JSON.stringify(rs.salvatoDa(inp, reel, now)); ok(got === want, `scheda del salvato (proposta 68): ${inp} → ${got}`); }
       for (const [inp, want] of casi) { const got = rs.ricordoSalvato(inp, now); ok(got === want, `ricordo del salvato (proposta 68): ${JSON.stringify(inp).slice(0, 60)} → ${got}`); } }
     // Giro del 1/11: l'avviso si chiude con ✕ e, da solo, non torna alla riapertura dello stesso giorno.
     await p.getByTestId("vicino-salvato-chiudi").click().catch(() => {});
@@ -5042,7 +5048,12 @@ else {
   const evD = [];
   await sctx2.route("**/api/events", (r) => { evD.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
   await sctx2.route("**/api/places/add", (r) => r.fulfill({ json: { place: { id: "00000000-0000-4000-8000-000000005801" } } }));
-  for (const t of ["place_synthesis", "contenuti_locali", "foto_locali"]) await sctx2.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+  for (const t of ["place_synthesis", "foto_locali"]) await sctx2.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+  // Proposta 68 nella scheda: il reel collegato a Da Enzo (solo la lettura della scheda, select=fonte,url).
+  await sctx2.route("**/rest/v1/contenuti_locali**", (r) => {
+    const u = decodeURIComponent(r.request().url());
+    return r.fulfill({ json: u.includes("select=fonte,url") && u.includes("place_id=eq.00000000-0000-4000-8000-000000005801") ? [{ fonte: "TikTok", url: "https://www.tiktok.com/@mangiaroma/video/1" }] : [] });
+  });
   let mioProfilo2 = { display_name: "Luca Bianchi", is_public: true };
   let amici2 = [];
   await sctx2.route("**/rest/v1/profiles**", profiloFinto(() => mioProfilo2));
@@ -5075,6 +5086,8 @@ else {
   await Ld.getByTestId("salvato-riga").filter({ hasText: "Da Enzo al 29" }).click().catch(() => {});
   await sd.getByTestId("tue-note").waitFor({ timeout: 5000 }).catch(() => {});
   ok(((await sd.getByTestId("consigliato-scheda").textContent().catch(() => "")) ?? "").includes("Te l'ha consigliato Giulia") && (await sd.getByTestId("dillo-amico").count()) === 0, "consigliato da: nella scheda del salvato 'Te l'ha consigliato Giulia', 'Dillo a' solo dopo la visita");
+  { const q = await sd.getByTestId("salvato-quando-scheda").waitFor({ timeout: 4000 }).then(() => sd.getByTestId("salvato-quando-scheda").textContent(), () => "");
+    ok(/^Salvato (questo mese|a novembre( 2026)?) · dal video di @mangiaroma su TikTok$/.test(q ?? ""), `scheda del salvato: quando e da quale reel l'avevi salvato (proposta 68) (${q})`); }
   await sd.getByTestId("consigliato-scheda").scrollIntoViewIfNeeded().catch(() => {});
   await sd.screenshot({ path: `${OUT}/55-scheda-consigliato.png`, caret: "initial" });
   // Condividi con il nome (profilo pubblico): link con da=Luca, riga "Il link porta il tuo nome · Togli".

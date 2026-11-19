@@ -22,7 +22,7 @@ function annoMese(d: Date): { anno: string; mese: string } {
   const parti = ROMA.formatToParts(d);
   return { anno: parti.find((p) => p.type === "year")?.value ?? "", mese: parti.find((p) => p.type === "month")?.value ?? "" };
 }
-function quando(savedAt: string | null | undefined, now: Date): string | null {
+export function quando(savedAt: string | null | undefined, now: Date): string | null {
   if (!savedAt) return null;
   const d = new Date(savedAt);
   if (Number.isNaN(d.getTime()) || d.getTime() > now.getTime() + 60_000) return null;
@@ -69,4 +69,15 @@ export function ricordoSalvato(r: RicordoInput, now: Date = new Date()): string 
   const q = quando(r.savedAt, now);
   const testo = `${motivo.charAt(0).toUpperCase()}${motivo.slice(1)}`;
   return q ? `${testo} · ${q}` : testo;
+}
+
+// Proposta 68 nella scheda del salvato ("Le tue note"): "Salvato a marzo · dal video di @nome su TikTok".
+// Nota e consiglio hanno già la loro riga nella scheda: qui solo la data e la fonte (reel), che altrove non si vedono.
+// Senza data né reel nessuna riga.
+export function salvatoDa(savedAt: string | null | undefined, reel: { fonte: string; url: string } | null | undefined, now: Date = new Date()): { data: string | null; fonte: string | null } | null {
+  const q = quando(savedAt, now);
+  const data = q ? (q === "questo mese" ? "Salvato questo mese" : `Salvato a ${q}`) : null;
+  const fonte = reel ? motivoSalvato({ reel }) : null;
+  if (!data && !fonte) return null;
+  return { data, fonte };
 }

@@ -30,6 +30,8 @@ import { frasePrezzo } from "@/lib/prezzo-locale";
 import { fraseFreschezza } from "@/lib/freschezza-verdetto";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
+import { salvatoDa } from "@/lib/ricordo-salvato";
+import { browserClient } from "@/lib/supabase/client-lazy";
 import VisiteMapetite from "@/components/visite-mapetite";
 
 // Riquadri della barra azioni teal (mockup A "Editoriale", 21/10): icona e parola su una riga, 50px.
@@ -74,6 +76,8 @@ export type Venue = {
   consigliatoDa?: string | null;
   // Proposta 59: lucchetto "Solo per me" (si cambia in Modifica).
   soloPerMe?: boolean;
+  // Proposta 68: quando l'hai salvato (saved_places.created_at), per "Salvato a marzo · da un reel Instagram".
+  savedAt?: string | null;
   // Proposta 66: "Non contarlo nei miei gusti" (si cambia in Modifica).
   fuoriGusti?: boolean;
   photoRef?: string | null;
@@ -207,6 +211,21 @@ export default function VenueSheet({
     personalNote,
   } = venue;
   const consigliatoDa = isSaved ? venue.consigliatoDa?.trim() || null : null;
+  // Proposta 68 nella scheda: "Salvato a marzo · da un reel Instagram" in "Le tue note". Il reel collegato si legge
+  // solo per i propri salvati (una lettura, solo le proprie righe); nota e consiglio hanno già la loro riga.
+  const [reelMio, setReelMio] = useState<{ id: string; fonte: string; url: string } | null>(null);
+  useEffect(() => {
+    if (!isSaved || !userId || !isUuid(venue.id)) return;
+    let vivo = true;
+    void browserClient()
+      .then((client) => client.from("contenuti_locali").select("fonte, url").eq("user_id", userId).eq("place_id", venue.id).order("created_at", { ascending: true }).limit(1))
+      .then(({ data, error }) => {
+        const r = !error && Array.isArray(data) && data[0] ? (data[0] as { fonte: string; url: string }) : null;
+        if (vivo && r) setReelMio({ id: venue.id, ...r });
+      }, () => {});
+    return () => { vivo = false; };
+  }, [isSaved, userId, venue.id]);
+  const salvato = isSaved ? salvatoDa(venue.savedAt, reelMio?.id === venue.id ? reelMio : null) : null;
   // Segnali di comportamento (percorso, chiama, sito, condividi): vedi src/lib/track.ts.
   // `da` distingue i tocchi della barra azioni in basso da quelli nel resto della scheda.
   const signal = (type: "percorso" | "chiama" | "sito" | "condividi", da?: string) =>
@@ -542,6 +561,11 @@ export default function VenueSheet({
         <p className={`font-display font-semibold uppercase text-accent ${editorial ? "text-[10.5px] tracking-[0.14em]" : "text-xs tracking-wide"}`}>
           Le tue note
         </p>
+        {salvato && (
+          <p data-testid="salvato-quando-scheda" className="mt-1 text-xs font-sans text-text-muted">
+            {[salvato.data, salvato.fonte && (salvato.data ? salvato.fonte : `${salvato.fonte.charAt(0).toUpperCase()}${salvato.fonte.slice(1)}`)].filter(Boolean).join(" · ")}
+          </p>
+        )}
         {/* Proposta 59: il lucchetto "Solo per me" (si cambia in Modifica). */}
         {isSaved && venue.soloPerMe && (
           <p data-testid="solo-per-me-scheda" className="mt-1.5 flex items-center gap-1.5 text-sm font-sans text-text-muted">
