@@ -32,7 +32,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** nessuno dei concorrenti consumer lo mette in vista; è anche il diritto alla portabilità (art. 20 GDPR). Insieme a "Nessun tetto" (proposta 62): porti tutto dentro, porti tutto fuori.
 - **Valore per l'utente:** fiducia per importare tutto da Google senza paura. **Per il ristoratore:** nessuno diretto; indiretto, più posti importati = più domanda misurata.
 - **Sforzo:** S (una route che legge `saved_places` dell'utente e risponde con un CSV, un link nel Profilo). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA → **DA DECIDERE LORENZO (19/11).** Costruita e approvata dal revisore (8,5), ma tenuta fuori dalla produzione: nome e indirizzo dei locali trovati con Google sono contenuti Google, e metterli in un file esterno può urtare i termini Google (3.2.3, niente esportazione). Codice pronto nei commit `3e9a46f6` e `c7aff973`. **Domanda:** esportiamo il file solo con i dati della persona (nota, raccolte, stato, data) più il link Google Maps del posto, senza nome e indirizzo, o aspettiamo un parere?
 
 ## 18/11/2026 (mercoledì, CEO che chiude — tema "perché proprio a me" e salvati che tornano utili)
 
