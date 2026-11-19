@@ -94,7 +94,7 @@ export default async function LocalePubblicoPage({ params, searchParams }: Props
   const goFor = cleanList(synthesis?.go_for);
   const dontExpect = cleanList(synthesis?.dont_expect);
   // "Da 3 recensioni Google, la più recente di ottobre" (proposta 67): solo se il verdetto le ha salvate.
-  const freschezza = verdict ? fraseFreschezza({ n: synthesis?.recensioni_n, ultima: synthesis?.recensione_ultima }) : null;
+  const freschezza = verdict ? fraseFreschezza({ n: synthesis?.recensioni_n, ultima: synthesis?.recensione_ultima, it: synthesis?.recensioni_it, en: synthesis?.recensioni_en }) : null;
   const hasVerdict = verdict != null || synthText != null || goFor.length > 0 || dontExpect.length > 0;
 
   const directions = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;

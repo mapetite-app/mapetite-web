@@ -3736,6 +3736,12 @@ else {
       const card = pq.getByTestId("stasera-proposta");
       ok((await card.count()) === 1 && /Stasera c'è posto\s*· dice il locale/.test((await card.getByTestId("stasera-posto").textContent().catch(() => "")) ?? ""), `c'è posto stasera: la proposta dice 'Stasera c'è posto · dice il locale' (${await card.getByTestId("stasera-posto").textContent().catch(() => "assente")})`);
       ok(((await pq.getByTestId("stasera-riepilogo").textContent().catch(() => "")) ?? "").endsWith("dove c'è posto"), "c'è posto stasera: il riepilogo lo dice");
+      {
+        // Minore del revisore (19/11): una sola pillola corallo per card. Con "c'è posto" lo stato è tenue.
+        const stato = card.getByTestId("stasera-stato");
+        const cls = (await stato.count()) ? ((await stato.getAttribute("class")) ?? "") : "";
+        ok((await stato.count()) === 0 || (!/\bbg-accent\b/.test(cls) && /bg-surface/.test(cls)), `c'è posto stasera: lo stato della card è tenue accanto a 'c'è posto' (${cls.slice(0, 80) || "nessuno stato"})`);
+      }
       await pq.screenshot({ path: `${OUT}/69-stasera-posto.png`, caret: "initial" });
       await pc.close();
     }
@@ -5112,11 +5118,15 @@ else {
   const nomiD = await Ld.getByTestId("salvato-riga").locator("span.block.truncate").allTextContents();
   ok(nomiD.length === 1 && nomiD[0] === "Da Enzo al 29" && (await amiciBtn.getAttribute("aria-pressed").catch(() => null)) === "true", `dagli amici: acceso, solo i posti consigliati (${nomiD.join(", ")})`);
   await sd.screenshot({ path: `${OUT}/54-salvati-dagli-amici.png`, caret: "initial" });
+  // Minore del revisore (19/11): la riga "Salvato a … · dal video" compare già intera (niente lampo della fonte).
+  await sd.evaluate(() => { window.__primaRiga = null; const mo = new MutationObserver(() => { const el = document.querySelector("[data-testid=salvato-quando-scheda]"); if (el && window.__primaRiga == null) { window.__primaRiga = el.textContent; mo.disconnect(); } }); mo.observe(document.body, { childList: true, subtree: true, characterData: true }); });
   await Ld.getByTestId("salvato-riga").filter({ hasText: "Da Enzo al 29" }).click().catch(() => {});
   await sd.getByTestId("tue-note").waitFor({ timeout: 5000 }).catch(() => {});
   ok(((await sd.getByTestId("consigliato-scheda").textContent().catch(() => "")) ?? "").includes("Te l'ha consigliato Giulia") && (await sd.getByTestId("dillo-amico").count()) === 0, "consigliato da: nella scheda del salvato 'Te l'ha consigliato Giulia', 'Dillo a' solo dopo la visita");
   { const q = await sd.getByTestId("salvato-quando-scheda").waitFor({ timeout: 4000 }).then(() => sd.getByTestId("salvato-quando-scheda").textContent(), () => "");
-    ok(/^Salvato (questo mese|a novembre( 2026)?) · dal video di @mangiaroma su TikTok$/.test(q ?? ""), `scheda del salvato: quando e da quale reel l'avevi salvato (proposta 68) (${q})`); }
+    ok(/^Salvato (questo mese|a novembre( 2026)?) · dal video di @mangiaroma su TikTok$/.test(q ?? ""), `scheda del salvato: quando e da quale reel l'avevi salvato (proposta 68) (${q})`);
+    const prima = await sd.evaluate(() => window.__primaRiga);
+    ok(prima === q, `scheda del salvato: la riga compare già con la fonte del reel, senza lampo (prima: ${prima})`); }
   await sd.getByTestId("consigliato-scheda").scrollIntoViewIfNeeded().catch(() => {});
   await sd.screenshot({ path: `${OUT}/55-scheda-consigliato.png`, caret: "initial" });
   // Condividi con il nome (profilo pubblico): link con da=Luca, riga "Il link porta il tuo nome · Togli".
@@ -11613,7 +11623,7 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
     const mkT = (id, name, extra = {}) => mk(id, name, 41.893, 12.468, { category: "italian_restaurant", types: ["italian_restaurant"], rating: 4.7, userRatingCount: 259, ...extra });
     const RIS = [mkT("Q1", "Trattoria da Lucia", { category: "seafood_restaurant", rating: 4.6, userRatingCount: 300 }), mkT("Q3", "Osteria Piccola", { rating: 4.8, userRatingCount: 120 })];
     const SY = { dettagli: {
-      Q1: { synthesis: "Trattoria di quartiere.", tags: [], verdict: "I romani ci tornano per la gricia.", goFor: [], dontExpect: [], matchReason: "È in un vicolo.", perTe: "il tipo di trattoria che ami", recensioniN: 3, recensioneUltima: new Date(Date.now() - 20 * 86400000).toISOString() },
+      Q1: { synthesis: "Trattoria di quartiere.", tags: [], verdict: "I romani ci tornano per la gricia.", goFor: [], dontExpect: [], matchReason: "È in un vicolo.", perTe: "il tipo di trattoria che ami", recensioniN: 3, recensioneUltima: new Date(Date.now() - 20 * 86400000).toISOString(), recensioniIt: 3, recensioniEn: 0 },
       Q3: { synthesis: "x", tags: [], verdict: "Piccola e vera.", goFor: [], dontExpect: [], matchReason: "Pochi tavoli." },
     }, esclusi: [] };
     const riga = (id, name, category, tags) => ({ tags, note: null, created_at: "2026-10-01T10:00:00Z", consigliato_da: null, solo_per_me: false, places: { id: `00000000-0000-4000-8000-0000000048${id}`, name, category, address: "Via del Moro 12, 00153 Roma RM, Italy", lat: 41.8935, lng: 12.4685, google_place_id: `GP48${id}`, rating: 4.6, price_level: 2, business_status: null } });
@@ -11639,10 +11649,10 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
     ok(b != null && b.y + b.height < 844 - 80, `scheda: la riga 'Per te' sta nella prima schermata a 390×844 (${Math.round((b?.y ?? 0) + (b?.height ?? 0))} px)`);
     // Proposta 67: sotto il verdetto "Da 3 recensioni Google, la più recente di <mese>" (dati della risposta, mai stimati).
     { const fv = await import(new URL("../../src/lib/freschezza-verdetto.ts", import.meta.url).href);
-      const atteso = fv.fraseFreschezza({ n: 3, ultima: SY.dettagli.Q1.recensioneUltima });
+      const atteso = fv.fraseFreschezza({ n: 3, ultima: SY.dettagli.Q1.recensioneUltima, it: 3, en: 0 });
       const riga = p.getByTestId("verdetto-freschezza");
       const t = ((await riga.first().textContent({ timeout: 3000 }).catch(() => "")) ?? "").trim();
-      ok(atteso != null && t === atteso && /^Da 3 recensioni Google, la più recente di [a-zà-ù]+( \d{4})?$/.test(t), `scheda: riga 'da quando parla il verdetto' sotto il verdetto (${t || "assente"})`);
+      ok(atteso != null && t === atteso && /^Da 3 recensioni Google, la più recente di [a-zà-ù]+( \d{4})? · tutte in italiano$/.test(t), `scheda: riga 'da quando parla il verdetto' sotto il verdetto, con chi le ha scritte (proposta 50) (${t || "assente"})`);
       ok(await p.locator("[data-testid=verdetto-box] [data-testid=verdetto-freschezza]").count() === 1, "scheda: la riga della freschezza sta dentro il riquadro del verdetto"); }
     if (process.env.PERCHE_SHOT) await p.screenshot({ path: process.env.PERCHE_SHOT });
     await p.screenshot({ path: `${OUT}/91-perche-ti-piacera.png` });
@@ -11676,6 +11686,18 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
   ok(fd.n === 2 && fd.ultima === "2026-10-15T12:00:00.000Z", `freschezza verdetto: conta solo le recensioni con testo, prende la più recente tra quelle e salva solo il mese (termini Google) (${JSON.stringify(fd)})`);
   const fd0 = fv.freschezzaDa(null, null);
   ok(fd0.n === null && fd0.ultima === null, "freschezza verdetto: senza recensioni nessun dato");
+  // Proposta 50 "Chi ha scritto le recensioni": coda " · 4 in italiano" solo con segnale netto, lingua originale di Google.
+  chk(f({ n: 5, ultima: "2026-10-12T09:00:00Z", it: 4, en: 1 }, ora), "Da 5 recensioni Google, la più recente di ottobre · 4 in italiano", "lingue: 4 su 5 in italiano");
+  chk(f({ n: 5, ultima: "2026-10-12T09:00:00Z", it: 0, en: 5 }, ora), "Da 5 recensioni Google, la più recente di ottobre · tutte in inglese", "lingue: tutte in inglese");
+  chk(f({ n: 5, ultima: "2026-10-12T09:00:00Z", it: 3, en: 2 }, ora), "Da 5 recensioni Google, la più recente di ottobre", "lingue: 3 e 2 non è un segnale netto");
+  chk(f({ n: 2, ultima: "2026-10-12T09:00:00Z", it: 2, en: 0 }, ora), "Da 2 recensioni Google, la più recente di ottobre", "lingue: con 2 recensioni niente coda");
+  chk(f({ n: 5, ultima: "2026-10-12T09:00:00Z", it: null, en: null }, ora), "Da 5 recensioni Google, la più recente di ottobre", "lingue: verdetto vecchio senza conteggi, niente coda");
+  chk(f({ n: 4, ultima: "2026-10-12T09:00:00Z", it: 7, en: 0 }, ora), "Da 4 recensioni Google, la più recente di ottobre", "lingue: conteggio incoerente (più del totale), niente coda");
+  chk(f({ n: 4, ultima: "2025-01-12T09:00:00Z", it: 4, en: 0 }, ora), "Recensioni di oltre un anno fa: potrebbe essere cambiato", "lingue: con recensioni vecchie resta solo l'avviso");
+  { const fl = fv.freschezzaDa(["a", "b", "c", "d", "  "], [null, null, null, null, null], ["it", "it-IT", "en", null, "it"]);
+    ok(fl.n === 4 && fl.it === 2 && fl.en === 1, `freschezza verdetto: lingue contate solo sulle recensioni con testo, 'it-IT' vale italiano (${JSON.stringify(fl)})`);
+    const fz = fv.freschezzaDa(["a", "b"], [null, null]);
+    ok(fz.it === null && fz.en === null, `freschezza verdetto: senza lingue note i conteggi restano vuoti, mai zero inventati (${JSON.stringify(fz)})`); }
 }
 // Proposta 54 "Qualcosa non va?": riga nelle Impostazioni del Profilo, foglio con testo e "Invia",
 // POST /api/segnalazioni con la pagina (solo percorso). Errore: il testo resta.

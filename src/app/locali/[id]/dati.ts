@@ -33,6 +33,8 @@ export type PublicSynthesis = {
   // Proposta 67 (migrazione 20261118b): da quante recensioni Google parla il verdetto. Assenti prima.
   recensioni_n?: number | null;
   recensione_ultima?: string | null;
+  recensioni_it?: number | null;
+  recensioni_en?: number | null;
 };
 
 export type PublicPlaceData = { place: PublicPlace; synthesis: PublicSynthesis | null };
@@ -98,7 +100,7 @@ export const loadPublicPlace = cache(async (id: string): Promise<PublicPlaceData
     const gid = place.google_place_id;
     const leggi = (conFreschezza: boolean) => supabase
       .from("place_synthesis")
-      .select((conFreschezza ? `${COLS}, recensioni_n, recensione_ultima` : COLS) as typeof COLS)
+      .select((conFreschezza ? `${COLS}, recensioni_n, recensione_ultima, recensioni_it, recensioni_en` : COLS) as typeof COLS)
       .eq("place_id", gid)
       .maybeSingle();
     let { data: s, error: sErr } = await leggi(true);

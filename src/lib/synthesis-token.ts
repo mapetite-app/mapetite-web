@@ -10,7 +10,7 @@ import type { Candidato } from "@/lib/prova-requisito";
 
 export type SynthesisInput = Pick<
   PlaceResult,
-  "id" | "name" | "category" | "rating" | "userRatingCount" | "priceLevel" | "editorialSummary" | "types" | "reviewTexts" | "reviewTimes"
+  "id" | "name" | "category" | "rating" | "userRatingCount" | "priceLevel" | "editorialSummary" | "types" | "reviewTexts" | "reviewTimes" | "reviewLangs"
 > & {
   // "✓ terrazza" candidati (frase copiata da una recensione da 4-5 stelle): l'AI del secondo tempo
   // dice quali affermano davvero il requisito. Firmati con il resto: il client non può aggiungerne.
@@ -32,6 +32,8 @@ export function buildSynthesisInput(places: PlaceResult[], prove: Record<string,
       : null,
     // Date delle stesse recensioni (proposta 67): firmate con il resto, il client non può cambiarle.
     ...(p.reviewTexts && p.reviewTimes?.length ? { reviewTimes: p.reviewTimes.slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS) } : {}),
+    // Lingua originale delle stesse recensioni (proposta 50), firmata come le date.
+    ...(p.reviewTexts && p.reviewLangs?.length ? { reviewLangs: p.reviewLangs.slice(0, REVIEWS_PER_PLACE_FOR_SYNTHESIS) } : {}),
     ...(prove[p.id]?.length ? { prove: prove[p.id] } : {}),
   }));
 }
