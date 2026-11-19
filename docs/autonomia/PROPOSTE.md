@@ -16,6 +16,24 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 19/11/2026 (giovedì, CEO che chiude — tema: Google Maps ora risponde dai tuoi salvati)
+
+### 69. "C'è posto stasera", tra i tuoi salvati
+- **Problema:** `PROBLEMI.md` 29: al momento della scelta i salvati sono una lista muta; Google Ask Maps dal 16/11 risponde "quali dei miei salvati hanno posto".
+- **Cosa fa:** nei Salvati (e nel "📌 Nei tuoi salvati" della barra quando la richiesta dice "stasera", "adesso", "c'è posto"), una pillola "🌙 C'è posto" che tiene solo i salvati il cui locale ha detto oggi "c'è posto" (pannello del ristoratore, proposta 25). Se nessuno lo ha detto, la pillola non compare: mai un "c'è posto" stimato.
+- **Da dove nasce:** Google Ask Maps (disponibilità da sistemi di prenotazione, fonti non chiare), Places "Table Tonight" (solo tavoli, nessun legame col gusto). Noi: dai *tuoi* posti, con la fonte detta ("dice il locale").
+- **Valore per l'utente:** dalla lista al tavolo in un tocco, senza telefonare a tre posti pieni. **Per il ristoratore:** il motivo concreto per verificarsi e aggiornare "c'è posto": arriva a chi l'ha già salvato, cioè domanda qualificata (VISIONE).
+- **Sforzo:** S/M (lettura di `info_locale` per gli id dei salvati, una pillola, una regola nella barra). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
+### 70. "Porta via i tuoi salvati": esporta in un file
+- **Problema:** `PROBLEMI.md` 29 e VISIONE ("zero luoghi persi"): chi mette anni di posti in un'app teme di restarci chiuso; Google lega i salvati a Gemini e Calendar, Mapstr mette il muro dei 300 posti.
+- **Cosa fa:** in Profilo › I tuoi dati, "Scarica i tuoi salvati": un file CSV (si apre con Excel e Google Fogli) con nome, indirizzo, link Google Maps, stato, tag, nota, chi te l'ha consigliato, data. Solo i dati della persona, nessun contenuto Google (niente recensioni né foto).
+- **Da dove nasce:** nessuno dei concorrenti consumer lo mette in vista; è anche il diritto alla portabilità (art. 20 GDPR). Insieme a "Nessun tetto" (proposta 62): porti tutto dentro, porti tutto fuori.
+- **Valore per l'utente:** fiducia per importare tutto da Google senza paura. **Per il ristoratore:** nessuno diretto; indiretto, più posti importati = più domanda misurata.
+- **Sforzo:** S (una route che legge `saved_places` dell'utente e risponde con un CSV, un link nel Profilo). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
 ## 18/11/2026 (mercoledì, CEO che chiude — tema "perché proprio a me" e salvati che tornano utili)
 
 ### 66. "Non contarlo nei miei gusti" sul singolo salvato
