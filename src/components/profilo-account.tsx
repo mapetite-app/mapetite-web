@@ -1,7 +1,6 @@
 "use client";
 
-import { ChevronRight, Download, LogOut, MessageCircle } from "lucide-react";
-import { trackFeature } from "@/lib/track";
+import { ChevronRight, LogOut, MessageCircle } from "lucide-react";
 import { logout } from "@/lib/supabase/actions";
 import { FEEDBACK_EMAIL, feedbackMailto } from "@/lib/feedback";
 import EliminaAccount from "@/components/elimina-account";
@@ -34,23 +33,6 @@ export default function ProfiloAccount({ loggedIn, compatto = false }: { loggedI
         </a>
         )}
         {loggedIn && <AvvisiPush forma="riga" contesto="profilo" />}
-        {/* Proposta 70: i salvati restano tuoi. Un file CSV (Excel, Google Fogli) con nome, indirizzo, link e note. */}
-        {loggedIn && (
-          <a
-            href="/api/salvati/esporta"
-            download
-            data-testid="esporta-salvati"
-            onClick={() => trackFeature("esporta_salvati")}
-            className={`${row} border-t border-border text-text`}
-          >
-            <Download aria-hidden className="h-5 w-5 text-brand" strokeWidth={1.75} />
-            <span className="flex-1">
-              Scarica i tuoi salvati
-              <span className="block text-xs font-sans font-normal text-text-muted">Un file per Excel o Google Fogli</span>
-            </span>
-            <ChevronRight aria-hidden className="h-4 w-4 text-text-muted" />
-          </a>
-        )}
         {loggedIn && (
           <form action={async () => { await spegniPerUscita(); await logout(); }} className="border-t border-border">
             <button type="submit" className={`${row} text-error`}>
