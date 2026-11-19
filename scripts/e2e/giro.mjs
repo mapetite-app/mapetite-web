@@ -6253,6 +6253,16 @@ else {
     { created_at: iso(15), type: "chiama", user_id: U, anon_id: null, session_id: "s1", props: { fonte: "prenota", contesto: "whatsapp" } },
     { created_at: iso(14), type: "condividi", user_id: U, anon_id: null, session_id: "s1", props: { contesto: "raccolta" } },
   ]);
+  // Proposta 54: segnalazioni dei tester nel pannello (finte, cookie e2e_segnalazioni). Prima: nessuna.
+  ok(((await tp.getByTestId("numeri-segnalazioni").textContent().catch(() => "")) ?? "").includes("Ancora nessuna segnalazione"), "pannello: senza segnalazioni 'Ancora nessuna segnalazione'");
+  await tctx.addCookies([{ name: "e2e_segnalazioni", value: encodeURIComponent(JSON.stringify([
+    { id: "s-2", user_id: "abcd0000-0000-0000-0000-000000000002", testo: "La mappa non si apre\nsu iPhone", pagina: "/mappa", larghezza: 390, created_at: iso(5) },
+    { id: "s-1", user_id: "ef010000-0000-0000-0000-000000000001", testo: "Il tasto Salva è lento", pagina: null, larghezza: null, created_at: iso(60) },
+  ])), url: BASE }]);
+  await tp.goto(`${BASE}/admin/numeri?giorni=7`, { waitUntil: "networkidle" });
+  { const righe = await tp.getByTestId("numeri-segnalazioni").locator("li").allTextContents();
+    ok(righe.length === 2 && righe[0].includes("La mappa non si apre") && righe[0].includes("/mappa · 390px · tester abcd") && righe[1].includes("pagina ?") && righe[1].includes("tester ef01") && !righe[1].includes("px"), `pannello: segnalazioni dei tester, la più recente prima, pagina e id abbreviato (${JSON.stringify(righe)})`); }
+  await tctx.clearCookies({ name: "e2e_segnalazioni" }).catch(() => {});
   await tp.goto(`${BASE}/admin/numeri?giorni=7`, { waitUntil: "networkidle" });
   ok((await tp.getByTestId("numeri-riepilogo").textContent())?.includes("Persone attive"), "pannello: riepilogo con le persone attive");
   ok(/Google oggi: 1 su 50/.test((await tp.getByTestId("numeri-google").textContent()) ?? ""), `pannello: quota Google di oggi (${await tp.getByTestId("numeri-google").textContent()})`);

@@ -30,6 +30,18 @@ async function e2eRows(): Promise<EventRow[] | null> {
   }
 }
 
+// Segnalazioni finte per il giro automatico (solo in sviluppo con E2E_FAKE_USER, cookie e2e_segnalazioni).
+async function e2eSegnalazioni(): Promise<Segnalazione[]> {
+  const raw = (await cookies()).get("e2e_segnalazioni")?.value;
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(decodeURIComponent(raw));
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
 // Ultimo verdetto scritto dall'AI (proposta 24): per sapere se l'AI si è fermata.
 async function loadUltimoVerdetto(): Promise<string | null> {
   try {
@@ -423,7 +435,7 @@ export default async function NumeriPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const giorni = PERIODI.find((p) => String(p) === sp.giorni) ?? 7;
   const [{ rows, troncato, errore }, emails, ultimoVerdetto, segnalazioni] = fake
-    ? [{ rows: fake, troncato: false, errore: null }, new Map<string, string>(), null, [] as Segnalazione[]]
+    ? [{ rows: fake, troncato: false, errore: null }, new Map<string, string>(), null, await e2eSegnalazioni()]
     : await Promise.all([loadRows(), loadEmails(), loadUltimoVerdetto(), loadSegnalazioni()]);
   const n = computeNumeri(rows, giorni, undefined, emails);
   const google = googleOggi(rows);
