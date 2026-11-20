@@ -143,7 +143,8 @@ function lode(frase: string, piatto: string, re: RegExp): boolean {
   });
 }
 
-const MAX_PROVA = 150;
+// Circa due righe e mezza a 390 px (revisore 3: a 150 caratteri la citazione andava su 4 righe).
+const MAX_PROVA = 110;
 
 /** La prova: la frase intera se corta; altrimenti un pezzo intorno al piatto, tagliato a fine parola. */
 function prova(frase: string, re: RegExp): string {
@@ -151,7 +152,7 @@ function prova(frase: string, re: RegExp): string {
   if (f.length <= MAX_PROVA) return f;
   const m = piano(f).match(re);
   const at = m?.index ?? 0;
-  let start = Math.max(0, at - 60);
+  let start = Math.max(0, at - 40);
   if (start > 0) start = f.indexOf(" ", start) + 1;
   let fine = Math.min(f.length, start + MAX_PROVA);
   if (fine < f.length) fine = f.lastIndexOf(" ", fine);
