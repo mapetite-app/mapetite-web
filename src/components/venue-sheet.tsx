@@ -44,6 +44,8 @@ export const ACTION_TILE =
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 // Chiave di "Da ordinare" nello stesso stato dei ✓ (una sola frase aperta per volta): non può essere un requisito.
 const PIATTO = "\u0000piatto";
+// "in 2 delle 5 recensioni lette", "in tutte e 2 le recensioni lette".
+const contoPiatto = (n: number, di: number) => (n >= di ? `in tutte e ${n} le recensioni lette` : `in ${n} delle ${di} recensioni lette`);
 const PAPER = "bg-white"; // Lorenzo 5/11: niente più carta crema, bianco pieno come Places
 const TILE = `${ACTION_TILE} bg-white/10`;
 
@@ -1082,30 +1084,6 @@ export default function VenueSheet({
             </p>
           )}
 
-          {/* "Da ordinare" (proposta 51): il piatto che almeno 2 recensioni Google lette nominano bene, con il conto
-              dichiarato; un tocco mostra la frase (copiata, mai riscritta). Senza prova la riga non c'è. */}
-          {venue.daOrdinare && (
-            <div data-testid="da-ordinare" className="mt-2">
-              <button
-                type="button"
-                aria-expanded={provaAperta === PIATTO}
-                onClick={() => setProvaAperta((x) => (x === PIATTO ? null : PIATTO))}
-                className="-mx-1 flex min-h-11 w-[calc(100%+0.5rem)] items-center gap-1.5 rounded-lg px-1 text-left text-[13.5px] font-sans leading-snug text-[#3d4248] active:bg-bg"
-              >
-                <span className="min-w-0">
-                  <b className="font-display font-semibold text-brand">Da ordinare</b> · <span className="font-semibold text-[#141414] underline decoration-[#cfd6d6] underline-offset-[3px]">{venue.daOrdinare.piatto}</span>
-                  <span className="text-text-muted"> · in {venue.daOrdinare.n} recensioni su {venue.daOrdinare.di}</span>
-                </span>
-              </button>
-              {provaAperta === PIATTO && (
-                <p data-testid="prova-piatto" className="mt-0.5 scroll-mb-28 text-[13.5px] font-sans leading-snug text-[#3d4248]">
-                  <span className={`${SERIF} italic text-[#141414]`}>«{venue.daOrdinare.prova}»</span>
-                  <span className="text-text-muted"> · da una recensione su Google</span>
-                </p>
-              )}
-            </div>
-          )}
-
           {/* Requisiti della ricerca confermati: un tocco mostra la frase della recensione (copiata, mai riscritta). */}
           {(venue.requisiti?.length ?? 0) > 0 && (
             <div data-testid="requisiti-scheda" className="mt-3.5">
@@ -1126,6 +1104,30 @@ export default function VenueSheet({
               {provaAperta && venue.requisiti!.find((x) => x.r === provaAperta) && (
                 <p data-testid="prova-recensione" className="mt-2 scroll-mb-28 text-[13.5px] font-sans leading-snug text-[#3d4248]">
                   <span className={`${SERIF} italic text-[#141414]`}>«{venue.requisiti!.find((x) => x.r === provaAperta)!.prova}»</span>
+                  <span className="text-text-muted"> · da una recensione su Google</span>
+                </p>
+              )}
+            </div>
+          )}
+          {/* "Da ordinare" (proposta 51): il piatto che almeno 2 recensioni Google lette nominano bene, con il conto
+              dichiarato. Sotto i ✓ della ricerca, che restano la conferma di quello che hai chiesto (revisore 20/11); un tocco mostra la frase (copiata, mai riscritta). Senza prova la riga non c'è. */}
+          {venue.daOrdinare && (
+            <div data-testid="da-ordinare" className={(venue.requisiti?.length ?? 0) > 0 ? "mt-2" : "mt-2.5"}>
+              <button
+                type="button"
+                aria-expanded={provaAperta === PIATTO}
+                onClick={() => setProvaAperta((x) => (x === PIATTO ? null : PIATTO))}
+                className="-mx-1 flex min-h-11 w-[calc(100%+0.5rem)] items-center gap-1.5 rounded-lg px-1 text-left text-[13.5px] font-sans leading-snug text-[#3d4248] active:bg-bg"
+              >
+                <span className="min-w-0">
+                  <b className="font-display font-semibold text-brand">Da ordinare</b> · <span className="font-semibold text-[#141414] underline decoration-[#cfd6d6] underline-offset-[3px]">{venue.daOrdinare.piatto}</span>
+                  {/* "su 5" da solo sembrava il totale del locale (revisore 20/11): si dice che sono quelle lette. */}
+                  <span className="text-text-muted"> · <span className="whitespace-nowrap">{contoPiatto(venue.daOrdinare.n, venue.daOrdinare.di)}</span></span>
+                </span>
+              </button>
+              {provaAperta === PIATTO && (
+                <p data-testid="prova-piatto" className="mt-0.5 scroll-mb-28 text-[13.5px] font-sans leading-snug text-[#3d4248]">
+                  <span className={`${SERIF} italic text-[#141414]`}>«{venue.daOrdinare.prova}»</span>
                   <span className="text-text-muted"> · da una recensione su Google</span>
                 </p>
               )}

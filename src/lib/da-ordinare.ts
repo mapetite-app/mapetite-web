@@ -18,7 +18,7 @@ const PIATTI: [string, RegExp][] = [
   ["carciofo alla giudia", /\bcarciof[oi]\s+alla\s+giudia\b/],
   ["carciofo alla romana", /\bcarciof[oi]\s+alla\s+romana\b/],
   ["supplì", /\bsuppl[iì]\b/],
-  ["coda alla vaccinara", /\b(?:coda\s+alla\s+)?vaccinara\b/],
+  ["coda alla vaccinara", /\bcoda\s+(?:alla\s+)?vaccinara\b/],
   ["saltimbocca", /\bsaltimbocca\b/],
   ["trippa", /\btrippa\b/],
   ["abbacchio", /\babbacchio\b/],
@@ -46,7 +46,7 @@ const PIATTI: [string, RegExp][] = [
   ["panzerotti", /\bpanzerott[oi]\b/],
   ["focaccia", /\bfocacci[ae]\b/],
   ["lampredotto", /\blampredotto\b/],
-  ["bistecca alla fiorentina", /\bbistecca\s+alla\s+fiorentina\b|\bla\s+fiorentina\b/],
+  ["bistecca alla fiorentina", /\bbistecca\s+(?:alla\s+)?fiorentina\b/],
   ["arrosticini", /\barrosticin[io]\b/],
   // Sud e mare
   ["parmigiana", /\bparmigiana\b/],
@@ -64,7 +64,7 @@ const PIATTI: [string, RegExp][] = [
   ["bombolone", /\bbombolon[ei]\b/],
   ["sfogliatella", /\bsfogliatell[ae]\b/],
   ["panna cotta", /\bpanna\s*cotta\b/],
-  ["babà", /\bbaba\b/],
+  ["babà", /\bbaba\b(?!\s+(?:g|gh)an)/],
   ["crostata", /\bcrostat[ae]\b/],
   // Altre cucine
   ["ramen", /\bramen\b/],
@@ -80,8 +80,13 @@ const PIATTI: [string, RegExp][] = [
   ["negroni", /\bnegroni\b/],
 ];
 
-// Frase che critica o nega: "la carbonara non era un granché", "supplì freddi", "peccato per il tiramisù".
-const CRITICA = /\b(?:purtroppo|peccato|pero|unic[ao]\s+pecca|delud|delusion|scott[aoie]\b|insipid|sciap|gommos|bruciat|cott[aoie]\s+troppo|crud[ao]\s+dentro|salat[aoie]|unt[aoie]\b|fredd[aoie]|pessim|scars[aoie]|mediocr|banal|niente\s+di\s+(?:che|speciale)|non\b|nemmeno|neanche|senza\s+infamia|evitate|evitare|sconsigli|mai\s+piu|cosi\s+cosi|nella\s+media|un\s+po'?\s+(?:troppo|poco)|troppo|caro|car[ie]\b|esagerat|mi\s+aspettavo|pensavo)/;
+// Frase che critica, nega o confronta: "la carbonara non era un granché", "supplì freddi", "carbonara ok ma
+// nulla di speciale", "la migliore resta quella di Roscioli" (revisore 20/11). Meglio perdere un piatto buono
+// che mostrarne uno con una frase contro.
+const CRITICA = /\b(?:purtroppo|peccato|pero|ma|unic[ao]\s+pecca|delud|delusion|scott[aoie]\b|insipid|sciap|gommos|bruciat|cott[aoie]\s+troppo|crud[ao]\s+dentro|salat[aoie]|unt[aoie]\b|fredd[aoie]|pessim|scars[aoie]|mediocr|banal|normal[ei]|nulla|niente|non\b|nemmeno|neanche|neppure|senza\s+infamia|evitate|evitare|sconsigli|mai\s+piu|cosi\s+cosi|nella\s+media|sotto\s+le\s+aspettative|aspettativ|un\s+po'?\s+(?:troppo|poco)|troppo|poco|meno|migliore|migliori|meglio|peggio|peggiore|altrove|rispetto|invece|resta\s+quell|caro|car[ie]\b|esagerat|mi\s+aspettavo|pensavo|vegan[aoie]|vegetarian[aoie]|anche|but|not|bland|overcooked|salty|cold|disappoint|average|mediocre)\b/;
+// E deve dire che è buono: un piatto solo nominato ("In menù c'è anche la carbonara", "abbiamo preso
+// amatriciana e cacio e pepe") non è un consiglio (revisore 20/11).
+const POSITIVA = /\b(?:ottim|buon|squisit|delizios|eccezional|perfett|top\b|super\b|memorabil|da\s+provare|consigl|imperdibil|spettacol|fantastic|strepitos|favolos|divin|incredibil|cremos|sublim|da\s+applausi|da\s+manuale|da\s+urlo|eccellent|sontuos|meraviglios|stupend|fenomenal|squisitezza|great|amazing|delicious|excellent|perfect|must)/;
 
 /** Minuscolo e senza accenti: "Supplì" e "suppli", "Tiramisù" e "tiramisu" contano uguale. */
 function piano(t: string): string {
@@ -127,7 +132,7 @@ export function daOrdinare(
     let primo = Infinity;
     lette.forEach((r, i) => {
       if (r.rating != null && r.rating < 4) return;
-      const buona = frasi(r.text!).find((f) => { const x = piano(f); return re.test(x) && !CRITICA.test(x); });
+      const buona = frasi(r.text!).find((f) => { const x = piano(f); return re.test(x) && POSITIVA.test(x) && !CRITICA.test(x); });
       if (!buona) return;
       n++;
       if (p == null) { p = prova(buona, re); primo = i; }

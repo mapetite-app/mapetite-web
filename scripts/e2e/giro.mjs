@@ -11760,6 +11760,15 @@ else {
   const d3 = dz.daOrdinare(R(lunga, "Cacio e pepe buonissima."), "X");
   ok(d3 != null && d3.prova.length <= 152 && d3.prova.includes("cacio e pepe") && lunga.replace(/…/g, "").includes(d3.prova.replace(/^…|…$/g, "")), `da ordinare: prova lunga tagliata intorno al piatto, testo vero (${d3?.prova})`);
 
+  // Revisore 20/11: piatto sbagliato da una parola sola, critiche e confronti, piatto solo nominato.
+  ok(dz.daOrdinare(R("Ottima la trippa alla vaccinara!", "Trippa alla vaccinara buonissima."), "X")?.piatto === "trippa", "da ordinare: 'trippa alla vaccinara' non diventa 'coda alla vaccinara'");
+  ok(dz.daOrdinare(R("Ottima cena, la Fiorentina ha vinto!", "Super serata, la fiorentina è top."), "X") === null, "da ordinare: 'la fiorentina' da sola non è la bistecca");
+  ok(dz.daOrdinare(R("Baba ghanoush buonissimo.", "Ottimo il baba ghanoush."), "X") === null, "da ordinare: 'baba ghanoush' non è il babà");
+  for (const [a, b, msg] of [["Carbonara ok ma nulla di speciale.", "Carbonara buona ma normale."], ["Mi è piaciuta meno la carbonara, buona però.", "Carbonara buona, meno il resto."], ["Buona, ma la migliore carbonara resta quella di Roscioli.", "Carbonara buona, migliori altrove."]]) ok(dz.daOrdinare(R(a, b), "X") === null, `da ordinare: mai da frasi con 'ma', 'meno' o confronti (${a})`);
+  ok(dz.daOrdinare(R("In menù c'è anche la carbonara.", "Abbiamo preso amatriciana e carbonara."), "X") === null, "da ordinare: un piatto solo nominato, senza lode, non conta");
+  ok(dz.daOrdinare(R("La carbonara vegana è buonissima.", "Ottima la carbonara vegetariana."), "X") === null, "da ordinare: una variante (vegana, vegetariana) non è il piatto");
+  { const t2 = dz.daOrdinare(R("Gricia ottima.", "Gricia buonissima."), "X"); ok(t2?.n === 2 && t2.di === 2, "da ordinare: 2 su 2 (la scheda dice 'in tutte e 2 le recensioni lette')"); }
+
   if (!fakeUser) console.log("SKIP  da ordinare nella scheda: dev server senza E2E_FAKE_USER");
   else {
     const mkT = (id, name, extra = {}) => mk(id, name, 41.877, 12.476, { category: "italian_restaurant", types: ["italian_restaurant"], rating: 4.6, userRatingCount: 900, ...extra });
@@ -11781,7 +11790,7 @@ else {
     const riga = p.getByTestId("da-ordinare");
     await riga.waitFor({ timeout: 4000 }).catch(() => {});
     const t = ((await riga.textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim();
-    ok(t === "Da ordinare · cacio e pepe · in 3 recensioni su 5", `scheda: riga 'Da ordinare' con il conto dichiarato (${t || "assente"})`);
+    ok(t === "Da ordinare · cacio e pepe · in 3 delle 5 recensioni lette", `scheda: riga 'Da ordinare' con il conto dichiarato (${t || "assente"})`);
     const b = await riga.boundingBox();
     ok(b != null && b.y + b.height < 844 - 80 && b.height >= 44, `scheda: 'Da ordinare' nella prima schermata a 390×844, tocco alto almeno 44 (${Math.round((b?.y ?? 0) + (b?.height ?? 0))} px, h ${Math.round(b?.height ?? 0)})`);
     ok(await p.getByTestId("prova-piatto").count() === 0, "scheda: la frase della recensione si vede solo dopo il tocco");
