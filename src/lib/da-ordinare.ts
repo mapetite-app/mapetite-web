@@ -6,7 +6,8 @@
 // che dà il nome al locale ("Trapizzino" → niente "trapizzino"). Senza prova la riga non c'è.
 // Funzione pura: la usano la ricerca, il verdetto dei salvati e il giro automatico.
 
-export type DaOrdinare = { piatto: string; n: number; di: number; prova: string };
+// `chiesto` (proposta 73): è il piatto nominato nella ricerca ("dove mangio la cacio e pepe").
+export type DaOrdinare = { piatto: string; n: number; di: number; prova: string; chiesto?: true };
 
 // [nome mostrato, espressione]. Espressioni su testo minuscolo senza accenti (vedi `piano`).
 const PIATTI: [string, RegExp][] = [
@@ -159,9 +160,33 @@ function prova(frase: string, re: RegExp): string {
   return `${start > 0 ? "…" : ""}${f.slice(start, fine).replace(/[\s,;:–-]+$/, "")}${fine < f.length ? "…" : ""}`;
 }
 
+/**
+ * Proposta 73: il piatto dell'elenco nominato nella frase della ricerca ("dove mangio la cacio e pepe a Testaccio"
+ * → "cacio e pepe"), o null. Solo un piatto: con due o più ("carbonara o amatriciana") non si sceglie per la persona.
+ * Una variante ("pizza cacio e pepe", "gelato al tiramisù") non è il piatto.
+ */
+export function piattoNellaRichiesta(richiesta: string | null | undefined): string | null {
+  const q = piano(richiesta ?? "");
+  if (!q.trim()) return null;
+  const trovati = PIATTI.filter(([, re]) => re.test(q));
+  if (trovati.length !== 1) return null;
+  const [piatto, re] = trovati[0];
+  const m = q.match(re)!;
+  // La variante si guarda solo accanto al piatto (due parole prima, tre dopo): "pizzeria con supplì" chiede i supplì,
+  // "pizza cacio e pepe" no. "Pizzeria" non è una variante; "pizza bianca" e "pizza fritta" contengono "pizza" da sé.
+  const prima = q.slice(0, m.index).trim().split(/\s+/).slice(-2).join(" ");
+  const dopo = q.slice((m.index ?? 0) + m[0].length).trim().split(/\s+/).slice(0, 3).join(" ");
+  const accanto = `${prima} ${dopo}`.replace(/\bpizzeri\w*/g, " ");
+  if (VARIANTE.test(accanto) && !/^pizz/.test(piatto)) return null;
+  return piatto;
+}
+
 export function daOrdinare(
   reviews: { text?: string | null; rating?: number | null }[] | null | undefined,
   nomeLocale?: string | null,
+  // Proposta 73: il piatto chiesto nella ricerca. Se almeno 2 recensioni lette lo lodano, vince lui
+  // (anche se un altro piatto ne ha di più): è la conferma di quello che la persona ha chiesto.
+  piattoChiesto?: string | null,
 ): DaOrdinare | null {
   const lette = (reviews ?? []).filter((r) => typeof r.text === "string" && r.text.trim().length > 0);
   if (lette.length < 2) return null;
@@ -181,6 +206,7 @@ export function daOrdinare(
       if (p == null) { p = prova(buona, re); primo = i; }
     });
     // A pari numero vince il piatto della recensione che viene prima (Google le ordina per pertinenza).
+    if (n >= 2 && p != null && piatto === piattoChiesto) return { piatto, n, di: lette.length, prova: p, chiesto: true };
     if (n >= 2 && p != null && (!best || n > best.n || (n === best.n && primo < best.primo))) best = { piatto, n, prova: p, primo };
   }
   return best ? { piatto: best.piatto, n: best.n, di: lette.length, prova: best.prova } : null;

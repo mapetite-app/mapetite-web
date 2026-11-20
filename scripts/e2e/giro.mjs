@@ -11819,6 +11819,39 @@ else {
     await c.close();
   }
 }
+// Proposta 73 "Dove mangio la cacio e pepe?": il piatto nominato nella ricerca, confermato da almeno 2 recensioni lette.
+{
+  const dz = await import(new URL("../../src/lib/da-ordinare.ts", import.meta.url).href);
+  const R = (...t) => t.map((text) => ({ text, rating: 5 }));
+  for (const [q, atteso] of [["dove mangio la cacio e pepe a Testaccio", "cacio e pepe"], ["pizzeria con supplì buoni", "supplì"], ["miglior tiramisù di Milano", "tiramisù"], ["pizza fritta a Napoli", "pizza fritta"], ["pizza cacio e pepe", null], ["gelato al tiramisù", null], ["carbonara o amatriciana", null], ["trattoria romantica a Trastevere", null], ["", null]])
+    ok(dz.piattoNellaRichiesta(q) === atteso, `piatto chiesto: "${q}" → ${atteso ?? "nessuno"} (${dz.piattoNellaRichiesta(q)})`);
+  const rv = R("Carbonara buonissima.", "Ottima la carbonara.", "Carbonara top.", "Cacio e pepe cremosa, buonissima.", "La cacio e pepe era perfetta.");
+  ok(dz.daOrdinare(rv, "X")?.piatto === "carbonara" && !dz.daOrdinare(rv, "X")?.chiesto, "piatto chiesto: senza richiesta vince il piatto più lodato");
+  { const c = dz.daOrdinare(rv, "X", "cacio e pepe"); ok(c?.piatto === "cacio e pepe" && c.chiesto === true && c.n === 2 && c.di === 5, `piatto chiesto: con 2 lodi vince il piatto della ricerca (${JSON.stringify(c)})`); }
+  { const c = dz.daOrdinare(R("Carbonara buonissima.", "Ottima la carbonara.", "Cacio e pepe buonissima."), "X", "cacio e pepe"); ok(c?.piatto === "carbonara" && !c.chiesto, "piatto chiesto: con una lode sola niente ✓ (resta il piatto più lodato)"); }
+  ok(dz.daOrdinare(R("La cacio e pepe non era un granché.", "Cacio e pepe salata."), "X", "cacio e pepe") === null, "piatto chiesto: mai da critiche");
+  if (fakeUser) {
+    const mkT = (id, name, extra = {}) => mk(id, name, 41.877, 12.476 + Number(id.slice(1)) * 0.001, { category: "italian_restaurant", types: ["italian_restaurant"], rating: 4.6, userRatingCount: 300, ...extra });
+    const RIS = [mkT("C1", "Trattoria Uno", { daOrdinare: { piatto: "cacio e pepe", n: 3, di: 5, prova: "Cacio e pepe cremosa, buonissima.", chiesto: true } }), mkT("C2", "Trattoria Due", { daOrdinare: { piatto: "carbonara", n: 2, di: 5, prova: "Carbonara top." } })];
+    const SY = { dettagli: { C1: { synthesis: "x", tags: [], verdict: "Cucina romana vera, senza fretta.", goFor: [], dontExpect: [], matchReason: null }, C2: { synthesis: "x", tags: [], verdict: "Piccola e di quartiere.", goFor: [], dontExpect: [], matchReason: null } } };
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await c.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    await c.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"/>' }));
+    for (const t of ["saved_places", "place_synthesis", "profiles"]) await c.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+    await c.route("**/api/search", (r) => r.fulfill({ json: { risultati: RIS, filtri_usati: { categoria: "restaurant", parole_chiave: ["cacio e pepe"], vicino_a_me: false, zona: "Testaccio" }, sintesi_pendente: { places: RIS.map((x) => ({ id: x.id })), token: "x" } } }));
+    await c.route("**/api/search/synthesis", (r) => r.fulfill({ json: SY }));
+    const p = await c.newPage();
+    p.on("pageerror", (e) => errors.push(e.message));
+    await p.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
+    await p.goto(`${BASE}/mappa?q=${encodeURIComponent("dove mangio la cacio e pepe a Testaccio")}`, { waitUntil: "networkidle" });
+    await p.getByText("Cucina romana vera, senza fretta.").first().waitFor({ timeout: 8000 }).catch(() => {});
+    const r1 = ((await p.locator("ul.snap-x li[data-id=C1]").getByTestId("requisiti-card").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ").trim();
+    ok(r1 === "✓ cacio e pepe", `card: il piatto chiesto e lodato ha il ✓ (${r1 || "assente"})`);
+    ok(await p.locator("ul.snap-x li[data-id=C2]").getByTestId("requisiti-card").count() === 0, "card: un altro piatto lodato non dà il ✓ del piatto chiesto");
+    await p.screenshot({ path: `${OUT}/94-piatto-chiesto.png` });
+    await c.close();
+  }
+}
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);

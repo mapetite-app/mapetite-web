@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, SYNTHESIS_LIMIT, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
-import { daOrdinare } from "@/lib/da-ordinare";
+import { daOrdinare, piattoNellaRichiesta } from "@/lib/da-ordinare";
 import { extractSearchIntent, sanitizeIntent } from "@/lib/search-intent";
 import { inFondoPerPrezzo, prezzoMax } from "@/lib/budget";
 import { distanceMeters } from "@/lib/distance";
@@ -147,6 +147,8 @@ export async function POST(request: Request) {
   // gusti: in fondo per le diete del profilo (niente pesce, niente carne): il telefono li tiene in fondo
   // anche quando arriva l'ordine dell'AI (prima una pescheria "alto" tornava in cima).
   const daParte: { turistici: string[]; fuori_tema: string[]; fuori_zona: string[]; gusti?: string[]; budget?: string[] } = { turistici: [], fuori_tema: [], fuori_zona: [] };
+  // Proposta 73: il piatto nominato nella frase ("dove mangio la cacio e pepe"). Solo ricerche libere nel mondo.
+  const piattoChiesto = source === "world" && searchIntent === "natural" ? piattoNellaRichiesta(query) : null;
 
   if (source === "world") {
     // Capire la richiesta prima di Google (solo ricerche in linguaggio naturale).
@@ -411,6 +413,21 @@ export async function POST(request: Request) {
       if (lowered.length > 0) {
         risultati = places;
         console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} dopo i primi 3 (molte più recensioni degli altri): ${JSON.stringify(lowered)}`);
+      }
+    }
+    // "Dove mangio la cacio e pepe?" (proposta 73): tra i locali già trovati da Google salgono quelli in cui almeno
+    // 2 recensioni lette lodano proprio quel piatto (la prova, non il numero di recensioni). Mai un posto nuovo,
+    // mai sopra chi non è stato messo da parte; i locali di massa non salgono per questo (VISIONE).
+    if (piattoChiesto) {
+      const daParteNomi = new Set([...daParte.turistici, ...daParte.fuori_tema, ...daParte.fuori_zona, ...(daParte.gusti ?? []), ...(daParte.budget ?? [])]);
+      const isMass = massPredicate(risultati);
+      const conProva = (p: PlaceResult) => !daParteNomi.has(p.name) && !isMass(p) && daOrdinare(p.reviewItems ?? p.reviewTexts?.map((text) => ({ text })), p.name, piattoChiesto)?.chiesto === true;
+      const su = risultati.filter(conProva);
+      if (su.length > 0) {
+        const davanti = risultati.filter((p) => !daParteNomi.has(p.name));
+        const dietro = risultati.filter((p) => daParteNomi.has(p.name));
+        risultati = [...su, ...davanti.filter((p) => !su.includes(p)), ...dietro];
+        console.log(`[search-piatto] q=${JSON.stringify(query.trim().slice(0, 80))} piatto=${piattoChiesto} su (lodato in almeno 2 recensioni): ${JSON.stringify(su.map((p) => p.name))}`);
       }
     }
     // Città nominata ("a Milano"): i locali di un'altra città vanno in fondo (mai esclusi), per ultimi.
@@ -681,7 +698,7 @@ ESEMPI (input → output atteso):
       orari: compattaOrari(regularPeriods),
       selectedReviews: selectQualityReviews(reviewItems ?? reviewTexts),
       // "Da ordinare" (proposta 51): dalle recensioni Google lette, intere; calcolato ora e mai salvato.
-      daOrdinare: daOrdinare(reviewItems ?? reviewTexts?.map((text) => ({ text })), p.name),
+      daOrdinare: daOrdinare(reviewItems ?? reviewTexts?.map((text) => ({ text })), p.name, piattoChiesto),
       synthesis: s?.synthesis || null,
       tags: s?.tags?.length ? s.tags : rest.tags ?? null,
       verdict: s?.verdict || null,
