@@ -778,7 +778,8 @@ export default function VenueSheet({
         .map((r) => r.text?.trim() ?? "")
         .filter((t) => t.length >= 20 && t !== recensioneInVista)
         .map(a140),
-    )].slice(0, 2);
+    // Con "Da ordinare" niente altre citazioni sotto: due frasi di recensione impilate si confondevano (revisore 2, 20/11).
+    )].slice(0, venue.daOrdinare ? 0 : 2);
     // Nulla tra il verdetto e "Orari, contatti, recensioni": basta il filetto sotto il verdetto.
     const subitoDopoVerdetto = (headline != null || verdettoInArrivo || googleLine != null)
       && (venue.requisiti?.length ?? 0) === 0 && !venue.daOrdinare && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
@@ -1122,7 +1123,7 @@ export default function VenueSheet({
                 <span className="min-w-0">
                   <b className="font-display font-semibold text-brand">Da ordinare</b> · <span className="font-semibold text-[#141414] underline decoration-[#cfd6d6] underline-offset-[3px]">{venue.daOrdinare.piatto}</span>
                   {/* "su 5" da solo sembrava il totale del locale (revisore 20/11): si dice che sono quelle lette. */}
-                  <span className="text-text-muted"> · <span className="whitespace-nowrap">{contoPiatto(venue.daOrdinare.n, venue.daOrdinare.di)}</span></span>
+                  <span className="text-text-muted"> <span className="whitespace-nowrap">· {contoPiatto(venue.daOrdinare.n, venue.daOrdinare.di)}</span></span>
                 </span>
               </button>
               {provaAperta === PIATTO && (

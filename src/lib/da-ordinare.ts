@@ -15,7 +15,7 @@ const PIATTI: [string, RegExp][] = [
   ["carbonara", /\bcarbonar[ae]\b/],
   ["amatriciana", /\ba?matriciana\b/],
   ["gricia", /\bgricia\b/],
-  ["carciofo alla giudia", /\bcarciof[oi]\s+alla\s+giudia\b/],
+  ["carciofo alla giudia", /\bcarciof[oi]\s+alla\s+giud[ie]a\b/],
   ["carciofo alla romana", /\bcarciof[oi]\s+alla\s+romana\b/],
   ["supplì", /\bsuppl[iì]\b/],
   ["coda alla vaccinara", /\bcoda\s+(?:alla\s+)?vaccinara\b/],
@@ -69,7 +69,6 @@ const PIATTI: [string, RegExp][] = [
   // Altre cucine
   ["ramen", /\bramen\b/],
   ["gyoza", /\bgyoz[ae]\b/],
-  ["bao", /\bbao\b/],
   ["dim sum", /\bdim\s*sum\b/],
   ["hummus", /\bhummus\b/],
   ["falafel", /\bfalafel\b/],
@@ -83,7 +82,7 @@ const PIATTI: [string, RegExp][] = [
 // Frase che critica, nega o confronta: "la carbonara non era un granché", "supplì freddi", "carbonara ok ma
 // nulla di speciale", "la migliore resta quella di Roscioli" (revisore 20/11). Meglio perdere un piatto buono
 // che mostrarne uno con una frase contro.
-const CRITICA = /\b(?:purtroppo|peccato|pero|ma|unic[ao]\s+pecca|delud|delusion|scott[aoie]\b|insipid|sciap|gommos|bruciat|cott[aoie]\s+troppo|crud[ao]\s+dentro|salat[aoie]|unt[aoie]\b|fredd[aoie]|pessim|scars[aoie]|mediocr|banal|normal[ei]|nulla|niente|non\b|nemmeno|neanche|neppure|senza\s+infamia|evitate|evitare|sconsigli|mai\s+piu|cosi\s+cosi|nella\s+media|sotto\s+le\s+aspettative|aspettativ|un\s+po'?\s+(?:troppo|poco)|troppo|poco|meno|migliore|migliori|meglio|peggio|peggiore|altrove|rispetto|invece|resta\s+quell|caro|car[ie]\b|esagerat|mi\s+aspettavo|pensavo|vegan[aoie]|vegetarian[aoie]|anche|but|not|bland|overcooked|salty|cold|disappoint|average|mediocre)\b/;
+const CRITICA = /\b(?:purtroppo|peccato|pero|ma|unic[ao]\s+pecca|delud|delusion|scott[aoie]\b|insipid|sciap|gommos|bruciat|cott[aoie]\s+troppo|crud[ao]\s+dentro|salat[aoie]|unt[aoie]\b|fredd[aoie]|pessim|scars[aoie]|mediocr|banal|normal[ei]|nulla|niente|non\b|nemmeno|neanche|neppure|senza\s+infamia|evitate|evitare|sconsigli|mai\s+piu|cosi\s+cosi|nella\s+media|sotto\s+le\s+aspettative|aspettativ|un\s+po'?\s+(?:troppo|poco)|troppo|poco|meno|migliore|migliori|meglio|peggio|peggiore|altrove|rispetto|invece|resta\s+quell|caro|car[ie]\b|esagerat|mi\s+aspettavo|pensavo|vegan[aoie]|vegetarian[aoie]|anche|tuttavia|mica|nessun|pesant|asciutt|grumos|slegat|finit[aoie]\b|esaurit|buona\s+fortuna|but|not|never|too|though|bland|overcooked|salty|cold|disappoint|average|mediocre)\b/;
 // E deve dire che è buono: un piatto solo nominato ("In menù c'è anche la carbonara", "abbiamo preso
 // amatriciana e cacio e pepe") non è un consiglio (revisore 20/11).
 const POSITIVA = /\b(?:ottim|buon|squisit|delizios|eccezional|perfett|top\b|super\b|memorabil|da\s+provare|consigl|imperdibil|spettacol|fantastic|strepitos|favolos|divin|incredibil|cremos|sublim|da\s+applausi|da\s+manuale|da\s+urlo|eccellent|sontuos|meraviglios|stupend|fenomenal|squisitezza|great|amazing|delicious|excellent|perfect|must)/;
@@ -93,12 +92,51 @@ function piano(t: string): string {
   return t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[’`]/g, "'");
 }
 
+// Frasi intere: si spezza solo su punto, esclamativo e "…" finale. Domande e puntini sospensivi restano nella
+// frase e poi la scartano ("Carbonara ottima? Direi di no", "Ottima carbonara... se ti piace la colla": revisore 2, 20/11).
 function frasi(testo: string): string[] {
   return testo
     .replace(/\s+/g, " ")
-    .split(/(?<=[.!?…])\s+|\s*\.{2,}\s*|\n/)
+    .split(/(?<=[^.][.!]|…)\s+/)
     .map((f) => f.trim())
     .filter((f) => f.length >= 8);
+}
+
+// Pezzi della frase tra virgole, due punti e punti e virgola: piatto e lode devono stare nello stesso pezzo
+// ("Abbiamo preso carbonara e amatriciana: amatriciana ottima" loda l'amatriciana, non la carbonara).
+function pezzi(frase: string): string[] {
+  // Le parentesi sono un pezzo a sé ("filetti di baccalà IMPERDIBILI"), e il resto si legge senza di loro
+  // ("Rigatoni con la pajata e bollito (fuori menù) eccezionali").
+  const dentro = [...frase.matchAll(/\(([^)]*)\)/g)].map((m) => m[1]);
+  const fuori = frase.replace(/\([^)]*\)/g, " ");
+  return [...fuori.split(/[,;:]|\s[-–]\s/), ...dentro].map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
+}
+// Un pezzo che è solo una lode ("Supplì filante, buonissimo"): vale per il pezzo prima.
+const SOLO_LODE = /^(?:(?:davvero|molto|proprio|veramente|semplicemente|assolutamente|tutto)\s+)?(?:ottim|buon|squisit|delizios|eccezional|perfett|top|super|memorabil|imperdibil|spettacolar|fantastic|strepitos|favolos|divin|sublim|eccellent|stupend|fenomenal)\w*[\s!.]*$/;
+
+// Una variante non è il piatto: "supplì cacio e pepe", "pizza cacio e pepe", "gelato al tiramisù", "carbonara di mare".
+const VARIANTE = /\b(?:gelat|gusto|pizz|suppl|di\s+mare|di\s+pesce|di\s+zucchin|di\s+verdur|vegan|vegetarian|rivisitat|gourmet|crema\s+al|torta\s+al)/;
+// Parole che sono anche nomi propri ("Ottima cena da Polpo e Pesce"): valgono solo scritte in minuscolo.
+const SOLO_MINUSCOLO = new Set(["polpo", "pinsa"]);
+const senzaAccenti = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’`]/g, "'");
+
+/** Il pezzo di frase che loda proprio questo piatto, o null. */
+function lode(frase: string, piatto: string, re: RegExp): boolean {
+  const tutta = piano(frase);
+  if (/[?]|\.\.|…./.test(frase) || CRITICA.test(tutta) || /n't\b/.test(tutta)) return false;
+  const pz = pezzi(frase);
+  return pz.some((pezzo, i) => {
+    const x = piano(pezzo);
+    const m = x.match(re);
+    if (!m) return false;
+    // Maiuscolo solo a inizio frase ("Polpo ottimo"); in mezzo è un nome ("cena da Polpo e Pesce").
+    if (SOLO_MINUSCOLO.has(piatto) && !re.test(senzaAccenti(pezzo)) && !(i === 0 && m.index === 0)) return false;
+    const resto = x.slice(0, m.index) + " " + x.slice((m.index ?? 0) + m[0].length);
+    // Un altro piatto nello stesso pezzo: non si sa quale dei due è lodato.
+    if (PIATTI.some(([altro, r2]) => altro !== piatto && r2.test(resto))) return false;
+    if (VARIANTE.test(resto)) return false;
+    return POSITIVA.test(x) || (pz[i + 1] != null && SOLO_LODE.test(piano(pz[i + 1])));
+  });
 }
 
 const MAX_PROVA = 150;
@@ -132,7 +170,7 @@ export function daOrdinare(
     let primo = Infinity;
     lette.forEach((r, i) => {
       if (r.rating != null && r.rating < 4) return;
-      const buona = frasi(r.text!).find((f) => { const x = piano(f); return re.test(x) && POSITIVA.test(x) && !CRITICA.test(x); });
+      const buona = frasi(r.text!).find((f) => lode(f, piatto, re));
       if (!buona) return;
       n++;
       if (p == null) { p = prova(buona, re); primo = i; }

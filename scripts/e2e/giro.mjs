@@ -11747,7 +11747,7 @@ else {
 {
   const dz = await import(new URL("../../src/lib/da-ordinare.ts", import.meta.url).href);
   const R = (...t) => t.map((text) => ({ text, rating: 5 }));
-  const d1 = dz.daOrdinare(R("Ottima la cacio e pepe, cremosa al punto giusto. Servizio veloce.", "Abbiamo preso Cacio&Pepe e supplì: tutto buonissimo!", "Locale piccolo e accogliente."), "Da Felice");
+  const d1 = dz.daOrdinare(R("Ottima la cacio e pepe, cremosa al punto giusto. Servizio veloce.", "Abbiamo preso la Cacio&Pepe: buonissima!", "Locale piccolo e accogliente."), "Da Felice");
   ok(d1?.piatto === "cacio e pepe" && d1.n === 2 && d1.di === 3 && d1.prova === "Ottima la cacio e pepe, cremosa al punto giusto.", `da ordinare: piatto in 2 recensioni su 3, frase copiata (${JSON.stringify(d1)})`);
   ok(dz.daOrdinare(R("La carbonara non era un granché.", "Carbonara scotta e salata.", "Peccato per la carbonara."), "X") === null, "da ordinare: mai da frasi che criticano il piatto");
   ok(dz.daOrdinare(R("Il trapizzino al pollo è top.", "Trapizzino da provare!"), "Trapizzino Testaccio") === null, "da ordinare: mai il piatto che dà il nome al locale");
@@ -11767,6 +11767,12 @@ else {
   for (const [a, b, msg] of [["Carbonara ok ma nulla di speciale.", "Carbonara buona ma normale."], ["Mi è piaciuta meno la carbonara, buona però.", "Carbonara buona, meno il resto."], ["Buona, ma la migliore carbonara resta quella di Roscioli.", "Carbonara buona, migliori altrove."]]) ok(dz.daOrdinare(R(a, b), "X") === null, `da ordinare: mai da frasi con 'ma', 'meno' o confronti (${a})`);
   ok(dz.daOrdinare(R("In menù c'è anche la carbonara.", "Abbiamo preso amatriciana e carbonara."), "X") === null, "da ordinare: un piatto solo nominato, senza lode, non conta");
   ok(dz.daOrdinare(R("La carbonara vegana è buonissima.", "Ottima la carbonara vegetariana."), "X") === null, "da ordinare: una variante (vegana, vegetariana) non è il piatto");
+  // Revisore 2 (20/11): la lode deve essere per questo piatto, nello stesso pezzo di frase; niente domande né puntini.
+  for (const [a, b] of [["Abbiamo preso carbonara e amatriciana: amatriciana ottima.", "Carbonara e gricia, la gricia era top."], ["Carbonara dimenticabile, ottimo il vino.", "Carbonara asciutta, dolci buoni."], ["Tutto ottimo tuttavia la carbonara era grumosa.", "Ottimo il vino, mica la carbonara."], ["Ottimo tutto, abbiamo saltato la carbonara.", "Buona fortuna con la carbonara."], ["The carbonara wasn't great.", "Didn't love the carbonara, the wine was great."], ["Carbonara ottima? Direi proprio di no.", "Ottima carbonara... se ti piace la colla!"]]) ok(dz.daOrdinare(R(a, b), "X") === null, `da ordinare: mai una lode a un altro piatto, contrazioni, domande o puntini (${a} / ${b})`);
+  ok(dz.daOrdinare(R("Ottimo servizio, cena da Polpo e Pesce.", "Bella serata da Polpo, tutto buonissimo."), "X") === null, "da ordinare: 'Polpo' con la maiuscola in mezzo alla frase è un nome, non il piatto");
+  ok(dz.daOrdinare(R("Supplì cacio e pepe ottimi.", "Pizza cacio e pepe buonissima."), "X") === null && dz.daOrdinare(R("Gelato al tiramisù ottimo.", "Ottimo il gelato al tiramisù."), "X") === null && dz.daOrdinare(R("Carbonara di mare ottima.", "Carbonara di mare buonissima."), "X") === null, "da ordinare: una variante (supplì cacio e pepe, gelato al tiramisù, carbonara di mare) non è il piatto");
+  ok(dz.daOrdinare(R("Carciofi alla giudea ottimi.", "Carciofo alla giudia buonissimo."), "X")?.n === 2, "da ordinare: 'giudea' e 'giudia' sono lo stesso carciofo");
+  { const t3 = dz.daOrdinare(R("Supplì filante, buonissimo.", "Rigatoni con la pajata e bollito (fuori menù) eccezionali.", "Il supplì è ottimo."), "X"); ok(t3?.piatto === "supplì" && t3.n === 2, `da ordinare: la lode subito dopo la virgola vale per il piatto (${t3?.piatto})`); }
   { const t2 = dz.daOrdinare(R("Gricia ottima.", "Gricia buonissima."), "X"); ok(t2?.n === 2 && t2.di === 2, "da ordinare: 2 su 2 (la scheda dice 'in tutte e 2 le recensioni lette')"); }
 
   if (!fakeUser) console.log("SKIP  da ordinare nella scheda: dev server senza E2E_FAKE_USER");
