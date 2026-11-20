@@ -25,7 +25,8 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 - **Numeri:** 7,5 milioni di dollari raccolti, oltre 250.000 utenti (fonti in `POSIZIONAMENTO.md`: dnyuz.com 21/7/2026, Dealroom, Fortune 25/6/2025).
 - **Da prendere:** copertine delle guide; ricerca per atmosfera (già fatte); l'avviso del tavolo liberato (solo con locali partner, dopo il 25/10).
 - **Migliorabile:** troppe cose nello stesso schermo; social in primo piano anche per chi vuole solo salvare; recensioni sullo store che parlano di navigazione confusa e schede vuote (vedi `POSIZIONAMENTO.md`). Noi: una cosa principale per schermata, ricerca su tutta Google, verdetto onesto, italiano.
-- Ultimo controllo: 19/10/2026
+- **20/11/2026:** confermati gli avvisi quando si libera un tavolo in un posto salvato e la ricerca AI sulle recensioni dei suoi utenti ([dnyuz, 21/7/2026](https://dnyuz.com/2026/07/21/a-startup-building-a-map-to-help-you-make-plans-with-friends-has-doubled-its-funding/)). **Risposta:** proposta 72 ("Dimmi quando c'è posto", dalla parola del titolare verificato, sui tuoi salvati).
+- Ultimo controllo: 20/11/2026
 
 ### Mapstr
 - **Cosa fa:** salva posti sulla mappa con tag; importa da Google Maps, CSV e KML; mappa condivisa che si apre dal browser senza app (`BACKLOG.md`, proposte del 12/10).
@@ -131,6 +132,7 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 ## Strumenti per ristoratori (B2B)
 
 ### TheFork e TheFork Manager
+- **20/11/2026:** acquisto da parte di American Express chiuso il 6/11 ([Tendance Hôtellerie](https://www.tendancehotellerie.fr/articles-breves/communique-de-presse/26011-article/thefork-ouvre-un-nouveau-chapitre-a-la-suite-de-la-finalisation-de-son-rachat-par-american-express)); prenotazione a voce con Alexa+, che ricorda i gusti di chi prenota ([TechPrincess](https://techprincess.it/thefork-alexa/)). API per partner indicata "disponibile a breve" da un catalogo, non da TheFork ([apis.io](https://apis.io/providers/thefork/)): da verificare prima della bozza in `PARTNER.md`. Nessuna novità trovata a novembre per Mapstr, Beli, Places, Albo e BestieBite.
 - **Cosa fa:** app di prenotazione per i clienti (con recensioni e promozioni) + gestionale per il ristorante (TheFork Manager). Garanzia con carta per i partner (`RICERCA-RISTORATORI.md`, riga 1).
 - **Numeri:** oltre 20.000 ristoranti partner in Italia (indagine estate 2025, [Quality Travel](https://www.qualitytravel.it/estate-2025-survey-thefork-la-vacanza-perfetta-e-a-tavola-per-il-64/169612)). Commissione piano base 2–4 € + IVA a coperto a cena (dato 2017, [La Rassegna](https://www.larassegna.it/scarica-pdf/prenotazioni-on-line-per-i-ristoratori-una-sfida-da-non-rimandare/)); aumento del 12,6% nel 2023 contestato da Fipe ([CorCom](https://www.corrierecomunicazioni.it/digital-economy/the-fork-le-commissioni-salgono-del-126-fipe-aumenti-ingiustificati/)).
 - **Da prendere:** prenotazione in pochi tocchi; garanzia con carta; conferme e promemoria.

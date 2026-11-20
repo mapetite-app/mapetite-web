@@ -16,6 +16,32 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 20/11/2026 (venerdì, CEO che chiude — tema: il piatto e l'ultimo minuto)
+
+### 71. "Il piatto del reel": il motivo per cui l'hai salvato, accanto a "Da ordinare"
+- **Problema:** `PROBLEMI.md` 10 e 22: chi salva da un reel spesso ricorda solo il piatto, e la scheda non lo dice.
+- **Cosa fa:** al salvataggio da un reel, se il titolo del video nomina un piatto dell'elenco di "Da ordinare" (proposta 51), lo si tiene con il salvato; nella scheda "Dal reel: la carbonara", e se le recensioni lette lo confermano "Da ordinare · carbonara · come nel reel". Mai dedotto: solo parole scritte nel titolo.
+- **Da dove nasce:** BestieBite fa vedere il piatto nei video, ma bisogna riguardarli ([App Store](https://apps.apple.com/app/id6444921443)); Corner e Mapstr salvano il posto, non il perché.
+- **Valore per l'utente:** il ricordo del reel torna intero. **Per il ristoratore:** sa quale piatto porta gente dai social (dato aggregato).
+- **Sforzo:** S/M (una colonna sul salvato: dato dell'utente, non di Google). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA.
+
+### 72. "Dimmi quando c'è posto" su un salvato
+- **Problema:** `PROBLEMI.md` 30: in Italia il 41% delle prenotazioni arriva meno di 4 ore prima ([Teleborsa, Quandoo](https://www.teleborsa.it/AMP/News/2026/02/19/fipe-e-quandoo-uniscono-le-forze-per-le-prenotazioni-online-111.html)); chi decide all'ultimo telefona a posti pieni.
+- **Cosa fa:** nella scheda di un salvato di un locale verificato, "🔔 Avvisami quando c'è posto": quando il titolare segna "stasera c'è posto" (proposta 1, già in produzione) arriva un avviso. Solo dalla parola del locale, mai stimato.
+- **Da dove nasce:** Corner ha lanciato gli avvisi quando si libera un tavolo in un posto salvato ([dnyuz, luglio 2026](https://dnyuz.com/2026/07/21/a-startup-building-a-map-to-help-you-make-plans-with-friends-has-doubled-its-funding/)), ma su posti qualsiasi e con i dati delle piattaforme; noi dai tuoi salvati e dalla parola del titolare.
+- **Valore per l'utente:** il posto che volevi provare, la sera giusta. **Per il ristoratore:** riempie i tavoli vuoti dell'ultimo minuto con chi l'aveva già scelto: è la "domanda qualificata" per cui pagherebbe.
+- **Sforzo:** M. **Costo Google/Haiku:** zero. Dipende dagli avvisi push accesi (`DA-FARE-LORENZO.md` voce 8); senza, si costruisce spenta.
+- **Stato proposto:** PRONTA (accesa solo dopo le chiavi degli avvisi).
+
+### 73. "Dove mangio la cacio e pepe?": il piatto come requisito della ricerca
+- **Problema:** `PROBLEMI.md` 22: chi cerca un piatto riceve posti che "fanno cucina romana", senza sapere chi lo fa bene.
+- **Cosa fa:** se la ricerca nomina un piatto dell'elenco di "Da ordinare", sulle card "✓ cacio e pepe · 3 recensioni su 5" con la frase al tocco (come i ✓ di oggi), e chi lo nomina sale tra i risultati già trovati da Google. Nessun posto nuovo, nessuna invenzione.
+- **Da dove nasce:** Google Ask Maps risponde a domande su piatti senza dire da dove lo sa ([blog Google, 16/11](https://blog.google/products-and-platforms/products/maps/ask-maps-holiday-travel-features-2026/)); Beli e Mapstr non cercano nelle recensioni. Noi: la prova sotto il dito.
+- **Valore per l'utente:** la ricerca rispetta il vincolo vero (VISIONE). **Per il ristoratore:** il suo piatto forte arriva a chi cerca proprio quello.
+- **Sforzo:** S/M (riusa `da-ordinare.ts` sul testo della richiesta e sui risultati). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA. Attenzione al ranking: si sposta solo tra i risultati già trovati, e conta la prova, non il numero di recensioni (niente premio ai più famosi).
+
 ## 19/11/2026 (giovedì, CEO che chiude — tema: Google Maps ora risponde dai tuoi salvati)
 
 ### 69. "C'è posto stasera", tra i tuoi salvati
@@ -188,7 +214,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** BestieBite fa vedere il piatto nei video, ma bisogna guardarli ([App Store](https://apps.apple.com/app/id6444921443)); nelle app viste nessuno lo scrive in una riga con la prova.
 - **Valore per l'utente:** sa cosa prendere prima di sedersi. **Per il ristoratore:** il suo piatto forte arriva a chi cerca proprio quello.
 - **Sforzo:** S/M (un campo in più nella sintesi già fatta, con la regola anti-invenzione). **Costo Google/Haiku:** zero chiamate in più; poche decine di token in uscita nella chiamata Haiku che c'è già.
-- **Stato proposto:** PRONTA dal 9/11.
+- **Stato proposto:** PRONTA dal 9/11. **20/11: costruita senza AI** (scelta del CEO: elenco di piatti veri e conteggio, zero token e niente da inventare), vedi BACKLOG.
 
 ### 52. "Prova il gesto": il primo salvataggio insegnato nel primo accesso
 - **Problema:** chi installa l'app non sa che si salva dal "Condividi" di Instagram o Maps; in una demo va spiegato a voce (VISIONE: niente che funzioni solo se sai dove cliccare).
