@@ -188,7 +188,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Beli ha l'obiettivo annuale di posti da provare ([Stanford Daily](https://stanforddaily.com/2026/01/20/from-one-beli-to-another-bringing-the-social-aspect-back-to-eating-out/)), ma su posti qualsiasi; noi sui posti che hai scelto tu, non sui più famosi.
 - **Valore per l'utente:** i salvati diventano uscite. **Per il ristoratore:** domanda vera da chi l'ha già salvato (dato aggregato per il lato ristoratori).
 - **Sforzo:** S. **Costo Google/Haiku:** zero (solo dati già salvati).
-- **Stato proposto:** PRONTA dal 9/11.
+- **Stato proposto:** PRONTA dal 9/11. **20/11: rimandata dal CEO.** Il giorno della visita (`visited_at`) si scrive solo se si salva "Com'è andata?" con una data: con "Ci sono stato" e "Salta" resta vuoto, quindi il conto "1 di 3 questo mese" direbbe meno del vero. Prima serve una scelta: scrivere oggi come giorno della visita a ogni "Ci sono stato" (tocca anche la regola delle recensioni della proposta 61, che conta la visita entro 30 giorni). Da fare insieme, con un revisore.
 
 ### 54. "Qualcosa non va?" per i tester
 - **Problema:** `PROBLEMI.md` 23: con il gruppo chiuso, i difetti che i tester incontrano si perdono in chat.
