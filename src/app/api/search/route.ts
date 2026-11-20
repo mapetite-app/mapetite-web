@@ -145,7 +145,7 @@ export async function POST(request: Request) {
   // Messi da parte dai riordini (VISIONE.md: il differenziatore deve vedersi): si dice all'utente.
   // gusti: in fondo per le diete del profilo (niente pesce, niente carne): il telefono li tiene in fondo
   // anche quando arriva l'ordine dell'AI (prima una pescheria "alto" tornava in cima).
-  const daParte: { turistici: string[]; fuori_tema: string[]; fuori_zona: string[]; gusti?: string[]; budget?: string[] } = { turistici: [], fuori_tema: [], fuori_zona: [] };
+  const daParte: { turistici: string[]; fuori_tema: string[]; fuori_zona: string[]; gusti?: string[]; budget?: string[]; abbassati?: string[] } = { turistici: [], fuori_tema: [], fuori_zona: [] };
 
   if (source === "world") {
     // Capire la richiesta prima di Google (solo ricerche in linguaggio naturale).
@@ -409,6 +409,8 @@ export async function POST(request: Request) {
       const { places, lowered } = lowerMassFromTop(query.trim(), risultati);
       if (lowered.length > 0) {
         risultati = places;
+        // Proposta 46 "Perché è qui": lo si dice nel pannello dei risultati (non è "messo da parte": resta in vista).
+        daParte.abbassati = lowered.slice(0, 3);
         console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} dopo i primi 3 (molte più recensioni degli altri): ${JSON.stringify(lowered)}`);
       }
     }
@@ -696,6 +698,19 @@ ESEMPI (input → output atteso):
       ...(source === "world" ? { firma: signCatalogEntry(p) } : {}),
     };
   });
+  // Proposta 46 (revisore 20/11): "l'ho messo dopo i primi 3" solo per chi è ancora nella lista, dopo i primi 3, e non
+  // è finito in fondo per altro (budget, città, fuori tema): lì lo dice già la sua riga.
+  if (daParte.abbassati?.length) {
+    const altrove = new Set([...daParte.turistici, ...daParte.fuori_tema, ...daParte.fuori_zona, ...(daParte.gusti ?? []), ...(daParte.budget ?? [])]);
+    // "Molte più recensioni della maggior parte di questi posti": vero sulla lista che il telefono riceve (revisore 3:
+    // la soglia di lowerMassFromTop è sui 20 di Google, prima del taglio a 12).
+    const conti = risultatiFinali.map((p) => p.userRatingCount ?? 0).sort((a, b) => a - b);
+    const mediana = conti[Math.floor(conti.length / 2)] ?? 0;
+    daParte.abbassati = daParte.abbassati.filter((n) => {
+      const at = risultatiFinali.findIndex((p) => p.name === n);
+      return !altrove.has(n) && at >= 3 && (risultatiFinali[at].userRatingCount ?? 0) > mediana * 2.5;
+    });
+  }
 
   // [search-funnel] diagnostica branch + Haiku. haiku = sintesi invocata (solo ramo
   // world con risultati); verdicts/matchReasons = quanti campi non vuoti ha prodotto.
@@ -754,7 +769,7 @@ ESEMPI (input → output atteso):
     risultati: risultatiFinali,
     filtri_usati: filtri,
     // "Per te": quali gusti del profilo hanno cambiato l'ordine (il telefono lo dice accanto a "messi da parte").
-    ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 || daParte.fuori_zona.length > 0 || (daParte.budget?.length ?? 0) > 0 || perTe.length > 0
+    ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 || daParte.fuori_zona.length > 0 || (daParte.budget?.length ?? 0) > 0 || perTe.length > 0 || (daParte.abbassati?.length ?? 0) > 0
       ? { da_parte: { ...daParte, ...(perTe.length > 0 ? { per_te: [...new Set(perTe)] } : {}) } }
       : {}),
     // Solo nel primo tempo: dati firmati per chiedere i verdetti.

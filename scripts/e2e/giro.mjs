@@ -1264,6 +1264,42 @@ await page.getByTestId("messi-da-parte").waitFor({ timeout: 5000 }).then(async (
 }, () => ok(false, "risultati: dice quali locali fuori dal quartiere ha messo in fondo"));
 await page.unroute("**/api/search");
 
+// Proposta 46 "Perché è qui" (20/11): il più famoso messo dopo i primi 3 è detto, solo quando è successo.
+const FOLLA_FAMOSO = FOLLA.map((x) => (x.id === "F4" ? { ...x, userRatingCount: 9000 } : x));
+await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: FOLLA_FAMOSO, da_parte: { turistici: [], fuori_tema: [], fuori_zona: [], abbassati: ["Folla 4"] } } }));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await (await esempio(page)).click();
+await apriOpzioni(page);
+await page.getByTestId("perche-ordine").waitFor({ timeout: 5000 }).then(async () => {
+  ok((await page.getByTestId("perche-ordine").textContent()) === "🧭 Folla 4 ha molte più recensioni della maggior parte di questi posti: l'ho messo dopo i primi 3. La fama da sola non fa salire.", "risultati: dice perché il più famoso non è in cima (proposta 46)");
+  ok(await page.getByTestId("messi-da-parte").count() === 0, "risultati: il più famoso abbassato non è 'messo da parte' (resta in vista)");
+  await shot("05e-perche-ordine");
+}, () => ok(false, "risultati: dice perché il più famoso non è in cima (proposta 46)"));
+await page.unroute("**/api/search");
+await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, da_parte: { turistici: [], fuori_tema: [], fuori_zona: [] } } }));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await (await esempio(page)).click();
+await apriOpzioni(page);
+await page.getByTestId("opzioni-pannello").waitFor({ timeout: 5000 }).catch(() => {});
+ok(await page.getByTestId("perche-ordine").count() === 0, "risultati: senza un famoso abbassato nessuna frase sull'ordine (mai generica)");
+await page.unroute("**/api/search");
+// Revisore 20/11: se il locale è tra i primi 3 della lista (o non c'è) la frase sarebbe falsa: non compare.
+await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: FOLLA, da_parte: { turistici: [], fuori_tema: [], fuori_zona: [], abbassati: ["Folla 2", "Tonnarello"] } } }));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await (await esempio(page)).click();
+await apriOpzioni(page);
+await page.getByTestId("opzioni-pannello").waitFor({ timeout: 5000 }).catch(() => {});
+ok(await page.getByTestId("perche-ordine").count() === 0, "risultati: nessuna frase sull'ordine per un locale tra i primi 3 o fuori dalla lista");
+await page.unroute("**/api/search");
+// Revisore 3 (20/11): nella lista mostrata non ha più di 2,5 volte le recensioni della mediana → niente frase.
+await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: FOLLA, da_parte: { turistici: [], fuori_tema: [], fuori_zona: [], abbassati: ["Folla 4"] } } }));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await (await esempio(page)).click();
+await apriOpzioni(page);
+await page.getByTestId("opzioni-pannello").waitFor({ timeout: 5000 }).catch(() => {});
+ok(await page.getByTestId("perche-ordine").count() === 0, "risultati: nessuna frase se tra i posti mostrati non ha molte più recensioni della maggior parte");
+await page.unroute("**/api/search");
+
 // 5g. Verdetti a gruppi (14/10): quelli delle prime card compaiono senza aspettare gli altri
 {
   await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, sintesi_pendente: { places: [{ id: "P1" }, { id: "P2" }, { id: "P3" }], token: "t", gruppi: [{ places: [{ id: "P1" }], token: "a" }, { places: [{ id: "P2" }, { id: "P3" }], token: "b" }] } } }));

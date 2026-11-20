@@ -204,3 +204,7 @@ Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornament
   > Oggetto: Mapetite × Osterie d'Italia — la Chiocciola dove le persone salvano i posti
   > Buongiorno, sono Lorenzo, founder di Mapetite, app italiana per salvare e ritrovare bar e ristoranti scoperti sui social, a Roma e Milano. Il nostro obiettivo è far emergere i locali buoni e non di massa, lo stesso spirito della vostra guida. Vorremmo mostrare la Chiocciola sulle schede dei locali premiati, con un link alla vostra app, così il premio arriva anche a chi non ha ancora la guida. Avreste 20 minuti per capire se e come è possibile?
   > Grazie, Lorenzo
+
+## Nota del 20/11 (CEO che chiude) — segnali da verificare, nessun contatto
+- **TheFork:** un catalogo di API indica un'API per partner "disponibile a breve" ([apis.io](https://apis.io/providers/thefork/)); non è un annuncio di TheFork. Dal 6/11 TheFork è di American Express. La bozza sopra resta valida; prima di mandarla, controllare il sito sviluppatori ufficiale.
+- **EveryBite** (dati verificati su menu e allergeni, [Verdict Foodservice](https://www.verdictfoodservice.com/newsletters/everybite-and-3owl-partner-to-offer-personalised-restaurant-menus/)): per ora solo USA, priorità bassa. Utile solo se un giorno serve "senza glutine confermato dal menu".
