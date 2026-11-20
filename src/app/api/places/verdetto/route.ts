@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { allowAi, clientKey } from "@/lib/ai-limit";
 import { recordEvent } from "@/lib/events";
-import { daOrdinare } from "@/lib/da-ordinare";
 
 // Verdetto Mapetite per un locale salvato che non ce l'ha ancora (importato da Google Maps, salvato
 // da un link...). VISIONE: il verdetto deve esserci SEMPRE. Si chiede quando si apre la sua scheda:
@@ -105,6 +104,5 @@ export async function POST(request: Request) {
     photoRef: place.photoRef,
     photoAuthor: place.photoAuthor ?? null,
     selectedReviews: selectQualityReviews(place.reviewItems ?? place.reviewTexts),
-    daOrdinare: daOrdinare(place.reviewItems ?? place.reviewTexts?.map((text) => ({ text })), place.name),
   });
 }

@@ -213,8 +213,6 @@ export type ListDetails = {
   matchReason: string | null;
   perTe?: string | null;
   requisiti?: { r: string; prova: string }[] | null;
-  // Proposta 73: con `chiesto` il piatto della ricerca è lodato in almeno 2 recensioni lette ("✓ cacio e pepe").
-  daOrdinare?: { piatto: string; chiesto?: true } | null;
   goFor: string[] | null;
   photoRef?: string | null;
   // Senza verdetto (oltre i primi 12 o se l'AI non risponde): descrizione o recensione di Google.
@@ -728,9 +726,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     const chiave = (r: string) => r.split(" ").map((w) => w.replace(/[aeio]$/, "")).join(" ");
     const n = new Map<string, { label: string; ids: Set<string> }>();
     for (const p of places) {
-      // Il piatto chiesto ("dove mangio la cacio e pepe"), lodato in almeno 2 recensioni lette: un requisito come gli altri.
-      const piatto = details?.[p.id]?.daOrdinare?.chiesto ? [{ r: details[p.id]!.daOrdinare!.piatto }] : [];
-      for (const { r } of [...piatto, ...(details?.[p.id]?.requisiti ?? [])]) {
+      for (const { r } of details?.[p.id]?.requisiti ?? []) {
         const k = chiave(r);
         const k2 = [...n.keys()].find((x) => x === k || x.endsWith(` ${k}`) || k.endsWith(` ${x}`)) ?? k;
         const cur = n.get(k2) ?? { label: r, ids: new Set<string>() };
@@ -1020,11 +1016,9 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               const goFor = d?.goFor ?? [];
               const corte = goFor.filter((c) => c.length <= 20);
               const chips = corte.length >= 2 && corte[0].length + corte[1].length <= 30 ? corte.slice(0, 2) : (corte.length > 0 ? corte : goFor).slice(0, 1);
-              // Proposta 73: il piatto chiesto, lodato in almeno 2 recensioni lette, prima di tutto (è la richiesta).
-              const piattoOk = d?.daOrdinare?.chiesto ? d.daOrdinare.piatto : null;
-              const similar = piattoOk ? null : similarTo?.(place.id) ?? null;
+              const similar = similarTo?.(place.id) ?? null;
               // Requisiti della richiesta confermati dalle recensioni (chiave B): si vede che li rispetta.
-              const req = similar ? [] : [...(piattoOk ? [piattoOk] : []), ...(d?.requisiti ?? []).map((x) => x.r).filter((r) => r !== piattoOk)].slice(0, 2);
+              const req = similar ? [] : (d?.requisiti ?? []).map((x) => x.r).slice(0, 2);
               return (
                 <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[calc(100vw-4.5rem)] max-w-sm shrink-0 snap-start transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
                   {onSave && (

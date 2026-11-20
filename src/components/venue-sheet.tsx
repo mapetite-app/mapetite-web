@@ -28,7 +28,6 @@ import ConfrontoFonti from "@/components/confronto-fonti";
 import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocaleStato } from "@/components/posto-locale";
 import { frasePrezzo } from "@/lib/prezzo-locale";
 import { fraseFreschezza } from "@/lib/freschezza-verdetto";
-import type { DaOrdinare } from "@/lib/da-ordinare";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 import { salvatoDa } from "@/lib/ricordo-salvato";
@@ -42,10 +41,6 @@ export const ACTION_TILE =
 // Mockup A: nome e verdetto in serif editoriale (Newsreader, già caricato in layout.tsx, come la home),
 // fondo carta caldo come la home nuova.
 const SERIF = "font-[family-name:var(--font-newsreader)]";
-// Chiave di "Da ordinare" nello stesso stato dei ✓ (una sola frase aperta per volta): non può essere un requisito.
-const PIATTO = "\u0000piatto";
-// Sotto il piatto, su una riga sua (niente "·" orfano a capo): "In 2 delle 5 recensioni lette", "In entrambe le recensioni lette".
-const contoPiatto = (n: number, di: number) => (n >= di ? (n === 2 ? "In entrambe le recensioni lette" : `In tutte e ${n} le recensioni lette`) : `In ${n} delle ${di} recensioni lette`);
 const PAPER = "bg-white"; // Lorenzo 5/11: niente più carta crema, bianco pieno come Places
 const TILE = `${ACTION_TILE} bg-white/10`;
 
@@ -102,8 +97,6 @@ export type Venue = {
   // Proposta 67: da quante recensioni Google parla il verdetto e la data (ISO) della più recente.
   recensioniN?: number | null;
   recensioneUltima?: string | null;
-  // Proposta 51: il piatto che almeno 2 recensioni lette nominano bene, con la frase che lo prova.
-  daOrdinare?: DaOrdinare | null;
 };
 
 type VenueSheetProps = {
@@ -257,7 +250,7 @@ export default function VenueSheet({
   // La frase si porta in vista SOLO quando si tocca un ✓ (prima ripartiva a ogni aggiornamento della scheda).
   useEffect(() => {
     if (!provaAperta) return;
-    document.querySelector("[data-testid=prova-recensione], [data-testid=prova-piatto]")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    document.querySelector("[data-testid=prova-recensione]")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [provaAperta]);
   const [visitAsked, setVisitAsked] = useState<{ id: string; at: number } | null>(null);
   const visitAskedAt = visitAsked?.id === venue.id ? visitAsked.at : null;
@@ -778,11 +771,10 @@ export default function VenueSheet({
         .map((r) => r.text?.trim() ?? "")
         .filter((t) => t.length >= 20 && t !== recensioneInVista)
         .map(a140),
-    // Con "Da ordinare" niente altre citazioni sotto: due frasi di recensione impilate si confondevano (revisore 2, 20/11).
-    )].slice(0, venue.daOrdinare ? 0 : 2);
+    )].slice(0, 2);
     // Nulla tra il verdetto e "Orari, contatti, recensioni": basta il filetto sotto il verdetto.
     const subitoDopoVerdetto = (headline != null || verdettoInArrivo || googleLine != null)
-      && (venue.requisiti?.length ?? 0) === 0 && !venue.daOrdinare && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
+      && (venue.requisiti?.length ?? 0) === 0 && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
     const hasOverview =
       showSynthesisBelow || matchReasonBelow || hasTags || goForChips.length > 0 || dontExpectChips.length > 0;
     const hasReviewsTab = hasReviews || communitySlot != null;
@@ -1110,37 +1102,13 @@ export default function VenueSheet({
               )}
             </div>
           )}
-          {/* "Da ordinare" (proposta 51): il piatto che almeno 2 recensioni Google lette nominano bene, con il conto
-              dichiarato. Sotto i ✓ della ricerca, che restano la conferma di quello che hai chiesto (revisore 20/11); un tocco mostra la frase (copiata, mai riscritta). Senza prova la riga non c'è. */}
-          {venue.daOrdinare && (
-            <div data-testid="da-ordinare" className={(venue.requisiti?.length ?? 0) > 0 ? "mt-2" : "mt-2.5"}>
-              <button
-                type="button"
-                aria-expanded={provaAperta === PIATTO}
-                onClick={() => setProvaAperta((x) => (x === PIATTO ? null : PIATTO))}
-                className="-mx-1 flex min-h-11 w-[calc(100%+0.5rem)] items-center gap-1.5 rounded-lg px-1 text-left text-[13.5px] font-sans leading-snug text-[#3d4248] active:bg-bg"
-              >
-                <span className="min-w-0">
-                  <b className="font-display font-semibold text-brand">Da ordinare</b> · <span className="font-semibold text-[#141414] underline decoration-[#cfd6d6] underline-offset-[3px]">{venue.daOrdinare.piatto}</span>
-                  {/* "su 5" da solo sembrava il totale del locale (revisore 20/11): si dice che sono quelle lette. */}
-                  <span className="block text-[12.5px] text-text-muted">{contoPiatto(venue.daOrdinare.n, venue.daOrdinare.di)}</span>
-                </span>
-              </button>
-              {provaAperta === PIATTO && (
-                <p data-testid="prova-piatto" className="mt-0.5 scroll-mb-28 text-[13.5px] font-sans leading-snug text-[#3d4248]">
-                  <span className={`${SERIF} italic text-[#141414]`}>«{venue.daOrdinare.prova}»</span>
-                  <span className="text-text-muted"> · da una recensione su Google</span>
-                </p>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Chi dei tuoi amici c'è stato: passaparola vero, solo tra chi segui. */}
         {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} className="mx-[22px] mt-4" />}
 
         {/* Le tue note (stato, Com'era, classifica, tag e nota): solo per i salvati, in vista. */}
-        {showPersonalBlock && personalBlock(true, true, (headline != null || verdettoInArrivo || googleLine != null) && (venue.requisiti?.length ?? 0) === 0 && !venue.daOrdinare && !perTeLine && !friendsData)}
+        {showPersonalBlock && personalBlock(true, true, (headline != null || verdettoInArrivo || googleLine != null) && (venue.requisiti?.length ?? 0) === 0 && !perTeLine && !friendsData)}
 
         {/* Locale non salvato senza barra Salva (scheda dall'assistente): le due scelte rapide aprono Salva. */}
         {!isSaved && onQuickSave && !saveSlot && (

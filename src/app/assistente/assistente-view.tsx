@@ -24,7 +24,6 @@ import { aggiungiGusti, fraseConZona, gustiDichiarati, gustiPerRicerca, gustoDa,
 import { caricaGusti, caricaZonaAbituale, gustiRicordati, ricordaGusti } from "@/lib/gusti-store";
 import { grantedPosition, readLastView } from "@/lib/last-view";
 import { cityNear } from "@/lib/named-city";
-import type { DaOrdinare } from "@/lib/da-ordinare";
 
 // ── Conversazione (solo nel telefono: sessionStorage) ──
 type Ask = { label: string; send: string };
@@ -141,7 +140,7 @@ type RawPlace = {
   selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
   goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null;
   // Proposta 67: da quante recensioni e di quando parla il verdetto (revisore 18/11: anche dalla prima risposta).
-  recensioniN?: number | null; recensioneUltima?: string | null; daOrdinare?: DaOrdinare | null;
+  recensioniN?: number | null; recensioneUltima?: string | null;
 };
 type Pending = { places: unknown[]; token: string; gruppi?: { places: unknown[]; token: string }[] } | null;
 type VerdictReply = { dettagli?: Record<string, Partial<Card>>; esclusi?: string[]; livelli?: Record<string, string> };
@@ -155,7 +154,7 @@ function toCard(p: RawPlace): Card {
     verdict: p.verdict ?? null, goFor: p.goFor ?? null, dontExpect: p.dontExpect ?? null, matchReason: p.matchReason ?? null,
     personalTags: null, personalNote: null, photoRef: p.photoRef ?? null, photoAuthor: p.photoAuthor ?? null,
     editorialSummary: p.editorialSummary ?? null,
-    recensioniN: p.recensioniN ?? null, recensioneUltima: p.recensioneUltima ?? null, daOrdinare: p.daOrdinare ?? null,
+    recensioniN: p.recensioniN ?? null, recensioneUltima: p.recensioneUltima ?? null,
   };
 }
 
