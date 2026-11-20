@@ -11773,7 +11773,11 @@ else {
   ok(dz.daOrdinare(R("Supplì cacio e pepe ottimi.", "Pizza cacio e pepe buonissima."), "X") === null && dz.daOrdinare(R("Gelato al tiramisù ottimo.", "Ottimo il gelato al tiramisù."), "X") === null && dz.daOrdinare(R("Carbonara di mare ottima.", "Carbonara di mare buonissima."), "X") === null, "da ordinare: una variante (supplì cacio e pepe, gelato al tiramisù, carbonara di mare) non è il piatto");
   ok(dz.daOrdinare(R("Carciofi alla giudea ottimi.", "Carciofo alla giudia buonissimo."), "X")?.n === 2, "da ordinare: 'giudea' e 'giudia' sono lo stesso carciofo");
   { const t3 = dz.daOrdinare(R("Supplì filante, buonissimo.", "Rigatoni con la pajata e bollito (fuori menù) eccezionali.", "Il supplì è ottimo."), "X"); ok(t3?.piatto === "supplì" && t3.n === 2, `da ordinare: la lode subito dopo la virgola vale per il piatto (${t3?.piatto})`); }
-  { const t2 = dz.daOrdinare(R("Gricia ottima.", "Gricia buonissima."), "X"); ok(t2?.n === 2 && t2.di === 2, "da ordinare: 2 su 2 (la scheda dice 'in tutte e 2 le recensioni lette')"); }
+  // Revisore 3 (20/11): critiche con tutte le desinenze, "tranne", ironia, varianti.
+  for (const f of ["Cacio e pepe pessima e servizio ottimo.", "Carbonara insipida e cameriere super gentile.", "La carbonara gommosa e il vino ottimo.", "Carbonara super salatissima.", "Ci hanno consigliato la carbonara, ci ha delusi.", "Tutto ottimo tranne la carbonara.", "Tutto buono eccetto la carbonara.", "La carbonara era ottima una volta, ora è cambiata.", "Carbonara ottima (si fa per dire).", "Carbonara 'ottima' tra virgolette.", "Carbonara da bocciare e servizio eccellente.", "Cacio e pepe ottima… quasi.", "The carbonara was great, the gricia was awful.", "Ottima carbonara, se ti piace la colla.", "Una carbonara perfetta per chi ama la panna."]) ok(dz.daOrdinare(R(f, f), "X") === null, `da ordinare: nessun piatto da '${f}'`);
+  ok(dz.daOrdinare(R("Polpette di melanzane buonissime.", "Polpette di melanzane ottime."), "X") === null && dz.daOrdinare(R("Il negroni sbagliato ottimo.", "Negroni sbagliato top."), "X") === null, "da ordinare: polpette di melanzane e negroni sbagliato sono varianti");
+  ok(dz.daOrdinare(R("Panna cotta buonissima.", "Ottima la panna cotta."), "X")?.piatto === "panna cotta", "da ordinare: la panna cotta resta un dolce (la 'panna' nella carbonara è una critica)");
+  { const t2 = dz.daOrdinare(R("Gricia ottima.", "Gricia buonissima."), "X"); ok(t2?.n === 2 && t2.di === 2, "da ordinare: 2 su 2 (la scheda dice 'In entrambe le recensioni lette')"); }
 
   if (!fakeUser) console.log("SKIP  da ordinare nella scheda: dev server senza E2E_FAKE_USER");
   else {
@@ -11796,7 +11800,7 @@ else {
     const riga = p.getByTestId("da-ordinare");
     await riga.waitFor({ timeout: 4000 }).catch(() => {});
     const t = ((await riga.textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim();
-    ok(t === "Da ordinare · cacio e pepe · in 3 delle 5 recensioni lette", `scheda: riga 'Da ordinare' con il conto dichiarato (${t || "assente"})`);
+    ok(t === "Da ordinare · cacio e pepeIn 3 delle 5 recensioni lette", `scheda: riga 'Da ordinare' con il conto dichiarato (${t || "assente"})`);
     const b = await riga.boundingBox();
     ok(b != null && b.y + b.height < 844 - 80 && b.height >= 44, `scheda: 'Da ordinare' nella prima schermata a 390×844, tocco alto almeno 44 (${Math.round((b?.y ?? 0) + (b?.height ?? 0))} px, h ${Math.round(b?.height ?? 0)})`);
     ok(await p.getByTestId("prova-piatto").count() === 0, "scheda: la frase della recensione si vede solo dopo il tocco");

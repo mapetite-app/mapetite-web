@@ -44,8 +44,8 @@ export const ACTION_TILE =
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 // Chiave di "Da ordinare" nello stesso stato dei ✓ (una sola frase aperta per volta): non può essere un requisito.
 const PIATTO = "\u0000piatto";
-// "in 2 delle 5 recensioni lette", "in tutte e 2 le recensioni lette".
-const contoPiatto = (n: number, di: number) => (n >= di ? `in tutte e ${n} le recensioni lette` : `in ${n} delle ${di} recensioni lette`);
+// Sotto il piatto, su una riga sua (niente "·" orfano a capo): "In 2 delle 5 recensioni lette", "In entrambe le recensioni lette".
+const contoPiatto = (n: number, di: number) => (n >= di ? (n === 2 ? "In entrambe le recensioni lette" : `In tutte e ${n} le recensioni lette`) : `In ${n} delle ${di} recensioni lette`);
 const PAPER = "bg-white"; // Lorenzo 5/11: niente più carta crema, bianco pieno come Places
 const TILE = `${ACTION_TILE} bg-white/10`;
 
@@ -1123,7 +1123,7 @@ export default function VenueSheet({
                 <span className="min-w-0">
                   <b className="font-display font-semibold text-brand">Da ordinare</b> · <span className="font-semibold text-[#141414] underline decoration-[#cfd6d6] underline-offset-[3px]">{venue.daOrdinare.piatto}</span>
                   {/* "su 5" da solo sembrava il totale del locale (revisore 20/11): si dice che sono quelle lette. */}
-                  <span className="text-text-muted"> <span className="whitespace-nowrap">· {contoPiatto(venue.daOrdinare.n, venue.daOrdinare.di)}</span></span>
+                  <span className="block text-[12.5px] text-text-muted">{contoPiatto(venue.daOrdinare.n, venue.daOrdinare.di)}</span>
                 </span>
               </button>
               {provaAperta === PIATTO && (

@@ -72,7 +72,7 @@ const PIATTI: [string, RegExp][] = [
   ["dim sum", /\bdim\s*sum\b/],
   ["hummus", /\bhummus\b/],
   ["falafel", /\bfalafel\b/],
-  ["tacos", /\btacos?\b/],
+  ["tacos", /\btacos\b/],
   ["pad thai", /\bpad\s*thai\b/],
   ["pastrami", /\bpastrami\b/],
   // Da bere (bar e cocktail bar)
@@ -82,7 +82,11 @@ const PIATTI: [string, RegExp][] = [
 // Frase che critica, nega o confronta: "la carbonara non era un granché", "supplì freddi", "carbonara ok ma
 // nulla di speciale", "la migliore resta quella di Roscioli" (revisore 20/11). Meglio perdere un piatto buono
 // che mostrarne uno con una frase contro.
-const CRITICA = /\b(?:purtroppo|peccato|pero|ma|unic[ao]\s+pecca|delud|delusion|scott[aoie]\b|insipid|sciap|gommos|bruciat|cott[aoie]\s+troppo|crud[ao]\s+dentro|salat[aoie]|unt[aoie]\b|fredd[aoie]|pessim|scars[aoie]|mediocr|banal|normal[ei]|nulla|niente|non\b|nemmeno|neanche|neppure|senza\s+infamia|evitate|evitare|sconsigli|mai\s+piu|cosi\s+cosi|nella\s+media|sotto\s+le\s+aspettative|aspettativ|un\s+po'?\s+(?:troppo|poco)|troppo|poco|meno|migliore|migliori|meglio|peggio|peggiore|altrove|rispetto|invece|resta\s+quell|caro|car[ie]\b|esagerat|mi\s+aspettavo|pensavo|vegan[aoie]|vegetarian[aoie]|anche|tuttavia|mica|nessun|pesant|asciutt|grumos|slegat|finit[aoie]\b|esaurit|buona\s+fortuna|but|not|never|too|though|bland|overcooked|salty|cold|disappoint|average|mediocre)\b/;
+// Due elenchi (revisore 3, 20/11): le parole brevi valgono solo intere ("ma", "non"); le radici prendono
+// tutte le desinenze ("pessim" → pessima, "insipid" → insipida, "delu" → deluso, delusi).
+const CRITICA_PAROLE = /\b(?:pero|ma|mica|non|nulla|niente|nessun[oa]?|nemmeno|neanche|neppure|anche|tuttavia|tranne|eccetto|salvo|invece|rispetto|altrove|troppo|poco|meno|meglio|peggio|quasi|caro|car[ie]|but|not|never|too|though|solo|except|bad|cold)\b/;
+const CRITICA_RADICI = /\b(?:purtropp|peccat|unic[ao]\s+pecca|delu|insipid|sciap|gommos|bruciat|bruciacchiat|scott[aoie]|stracott|cott[aoie]\s+troppo|crud[ao]\s+dentro|salat|salatissim|unt[aoie]|untissim|fredd|tiepid|pessim|scars|mediocr|banal|normal|senza\s+infamia|evit|sconsigl|bocci|dimentic|mai\s+piu|cosi\s+cosi|nella\s+media|sotto\s+le\s+aspettative|aspettativ|un\s+po'?\s+(?:troppo|poco)|migliore|migliori|peggior|resta\s+quell|esagerat|mi\s+aspettavo|pensav|vegan|vegetarian|asciutt|grumos|slegat|finit[aoie]\b|esaurit|acid|pesant|stopposa|buona\s+fortuna|una\s+volta|a\s+detta|si\s+fa\s+per\s+dire|tra\s+virgolette|altra\s+storia|cambiat|ora\s+e\b|bland|overcook|salty|disappoint|average|mediocre|awful|terribl|horribl|salvat|in\s+realta|surgelat|se\s+ti\s+piac|se\s+vi\s+piac|se\s+ami|colla\b|panna(?!\s*cotta))/;
+const critica = (x: string) => CRITICA_PAROLE.test(x) || CRITICA_RADICI.test(x) || /n't\b/.test(x) || /["“”«»']\s*(?:ottim|buon|perfett|top)/.test(x);
 // E deve dire che è buono: un piatto solo nominato ("In menù c'è anche la carbonara", "abbiamo preso
 // amatriciana e cacio e pepe") non è un consiglio (revisore 20/11).
 const POSITIVA = /\b(?:ottim|buon|squisit|delizios|eccezional|perfett|top\b|super\b|memorabil|da\s+provare|consigl|imperdibil|spettacol|fantastic|strepitos|favolos|divin|incredibil|cremos|sublim|da\s+applausi|da\s+manuale|da\s+urlo|eccellent|sontuos|meraviglios|stupend|fenomenal|squisitezza|great|amazing|delicious|excellent|perfect|must)/;
@@ -115,7 +119,7 @@ function pezzi(frase: string): string[] {
 const SOLO_LODE = /^(?:(?:davvero|molto|proprio|veramente|semplicemente|assolutamente|tutto)\s+)?(?:ottim|buon|squisit|delizios|eccezional|perfett|top|super|memorabil|imperdibil|spettacolar|fantastic|strepitos|favolos|divin|sublim|eccellent|stupend|fenomenal)\w*[\s!.]*$/;
 
 // Una variante non è il piatto: "supplì cacio e pepe", "pizza cacio e pepe", "gelato al tiramisù", "carbonara di mare".
-const VARIANTE = /\b(?:gelat|gusto|pizz|suppl|di\s+mare|di\s+pesce|di\s+zucchin|di\s+verdur|vegan|vegetarian|rivisitat|gourmet|crema\s+al|torta\s+al)/;
+const VARIANTE = /\b(?:gelat|gusto|pizz|suppl|di\s+mare|di\s+pesce|di\s+zucchin|di\s+verdur|di\s+melanzan|di\s+ceci|di\s+lenticchi|di\s+soia|sbagliat|analcolic|vegan|vegetarian|rivisitat|gourmet|crema\s+al|torta\s+al)/;
 // Parole che sono anche nomi propri ("Ottima cena da Polpo e Pesce"): valgono solo scritte in minuscolo.
 const SOLO_MINUSCOLO = new Set(["polpo", "pinsa"]);
 const senzaAccenti = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’`]/g, "'");
@@ -123,7 +127,7 @@ const senzaAccenti = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/
 /** Il pezzo di frase che loda proprio questo piatto, o null. */
 function lode(frase: string, piatto: string, re: RegExp): boolean {
   const tutta = piano(frase);
-  if (/[?]|\.\.|…./.test(frase) || CRITICA.test(tutta) || /n't\b/.test(tutta)) return false;
+  if (/[?]|\.\.|…/.test(frase) || critica(tutta)) return false;
   const pz = pezzi(frase);
   return pz.some((pezzo, i) => {
     const x = piano(pezzo);
