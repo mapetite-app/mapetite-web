@@ -1270,7 +1270,7 @@ await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
 await apriOpzioni(page);
 await page.getByTestId("perche-ordine").waitFor({ timeout: 5000 }).then(async () => {
-  ok((await page.getByTestId("perche-ordine").textContent()) === "🧭 Folla 4 ha molte più recensioni degli altri: l'ho messo dopo i primi 3. La fama da sola non fa salire.", "risultati: dice perché il più famoso non è in cima (proposta 46)");
+  ok((await page.getByTestId("perche-ordine").textContent()) === "🧭 Folla 4 ha molte più recensioni della maggior parte di questi posti: l'ho messo dopo i primi 3. La fama da sola non fa salire.", "risultati: dice perché il più famoso non è in cima (proposta 46)");
   ok(await page.getByTestId("messi-da-parte").count() === 0, "risultati: il più famoso abbassato non è 'messo da parte' (resta in vista)");
   await shot("05e-perche-ordine");
 }, () => ok(false, "risultati: dice perché il più famoso non è in cima (proposta 46)"));
