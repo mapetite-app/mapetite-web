@@ -3001,7 +3001,21 @@ export default function MapView({
             .map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map((x) => x.p);
           // Il numero nella pillola cala (12 → 10): lo si dice, con i nomi dietro la pillola (revisore del 1/11).
           const tolti = prev.risultati.slice(fermi).filter((p) => fuori.has(p.id)).map((p) => p.name);
-          return { ...prev, risultati: [...visti, ...dopo], fuoriTema: [...new Set([...(prev.fuoriTema ?? []), ...fuoriTema])], tolti: [...new Set([...(prev.tolti ?? []), ...tolti])] };
+          // Proposta 46 (revisore 20/11): il più famoso abbassato non torna tra i primi 3 con il giudizio dell'AI,
+          // e se sparisce (tolto) la frase non parla più di lui.
+          const ab = new Set(prev.daParte?.abbassati ?? []);
+          let nuova = [...visti, ...dopo];
+          if (ab.size > 0) {
+            const altri = nuova.filter((p) => !ab.has(p.name));
+            const su = nuova.filter((p) => ab.has(p.name));
+            if (altri.length >= 3) {
+              const out = [...altri];
+              for (const p of su) out.splice(Math.min(out.length, Math.max(3, nuova.indexOf(p))), 0, p);
+              nuova = out;
+            }
+          }
+          const daParte = prev.daParte && ab.size > 0 ? { ...prev.daParte, abbassati: [...ab].filter((n) => nuova.some((p) => p.name === n)) } : prev.daParte;
+          return { ...prev, daParte, risultati: nuova, fuoriTema: [...new Set([...(prev.fuoriTema ?? []), ...fuoriTema])], tolti: [...new Set([...(prev.tolti ?? []), ...tolti])] };
         });
       }
     } catch {

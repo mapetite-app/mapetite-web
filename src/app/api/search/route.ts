@@ -698,6 +698,12 @@ ESEMPI (input → output atteso):
       ...(source === "world" ? { firma: signCatalogEntry(p) } : {}),
     };
   });
+  // Proposta 46 (revisore 20/11): "l'ho messo dopo i primi 3" solo per chi è ancora nella lista, dopo i primi 3, e non
+  // è finito in fondo per altro (budget, città, fuori tema): lì lo dice già la sua riga.
+  if (daParte.abbassati?.length) {
+    const altrove = new Set([...daParte.turistici, ...daParte.fuori_tema, ...daParte.fuori_zona, ...(daParte.gusti ?? []), ...(daParte.budget ?? [])]);
+    daParte.abbassati = daParte.abbassati.filter((n) => !altrove.has(n) && risultatiFinali.findIndex((p) => p.name === n) >= 3);
+  }
 
   // [search-funnel] diagnostica branch + Haiku. haiku = sintesi invocata (solo ramo
   // world con risultati); verdicts/matchReasons = quanti campi non vuoti ha prodotto.
@@ -756,7 +762,7 @@ ESEMPI (input → output atteso):
     risultati: risultatiFinali,
     filtri_usati: filtri,
     // "Per te": quali gusti del profilo hanno cambiato l'ordine (il telefono lo dice accanto a "messi da parte").
-    ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 || daParte.fuori_zona.length > 0 || (daParte.budget?.length ?? 0) > 0 || perTe.length > 0
+    ...(daParte.turistici.length > 0 || daParte.fuori_tema.length > 0 || daParte.fuori_zona.length > 0 || (daParte.budget?.length ?? 0) > 0 || perTe.length > 0 || (daParte.abbassati?.length ?? 0) > 0
       ? { da_parte: { ...daParte, ...(perTe.length > 0 ? { per_te: [...new Set(perTe)] } : {}) } }
       : {}),
     // Solo nel primo tempo: dati firmati per chiedere i verdetti.

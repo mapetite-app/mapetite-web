@@ -24,7 +24,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** BestieBite fa vedere il piatto nei video, ma bisogna riguardarli ([App Store](https://apps.apple.com/app/id6444921443)); Corner e Mapstr salvano il posto, non il perché.
 - **Valore per l'utente:** il ricordo del reel torna intero. **Per il ristoratore:** sa quale piatto porta gente dai social (dato aggregato).
 - **Sforzo:** S/M (una colonna sul salvato: dato dell'utente, non di Google). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **20/11 sera: in attesa** (usa l'elenco dei piatti della 51, fermata). Si può fare da sola: il piatto scritto nel titolo del reel è un dato dell'utente, non di Google; ma senza la conferma delle recensioni vale solo "Dal reel: la carbonara".
 
 ### 72. "Dimmi quando c'è posto" su un salvato
 - **Problema:** `PROBLEMI.md` 30: in Italia il 41% delle prenotazioni arriva meno di 4 ore prima ([Teleborsa, Quandoo](https://www.teleborsa.it/AMP/News/2026/02/19/fipe-e-quandoo-uniscono-le-forze-per-le-prenotazioni-online-111.html)); chi decide all'ultimo telefona a posti pieni.
@@ -40,7 +40,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google Ask Maps risponde a domande su piatti senza dire da dove lo sa ([blog Google, 16/11](https://blog.google/products-and-platforms/products/maps/ask-maps-holiday-travel-features-2026/)); Beli e Mapstr non cercano nelle recensioni. Noi: la prova sotto il dito.
 - **Valore per l'utente:** la ricerca rispetta il vincolo vero (VISIONE). **Per il ristoratore:** il suo piatto forte arriva a chi cerca proprio quello.
 - **Sforzo:** S/M (riusa `da-ordinare.ts` sul testo della richiesta e sui risultati). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA, ma **prima verificare** se i ✓ della proposta 18 (`requisitiProvati` sulle parole chiave) la coprono già: con "cacio e pepe" tra le parole chiave il ✓ con la frase potrebbe esserci già. Attenzione al ranking: si sposta solo tra i risultati già trovati, e conta la prova, non il numero di recensioni (niente premio ai più famosi).
+- **Stato proposto:** PRONTA, ma **prima verificare** se i ✓ della proposta 18 (`requisitiProvati` sulle parole chiave) la coprono già: con "cacio e pepe" tra le parole chiave il ✓ con la frase potrebbe esserci già. Attenzione al ranking: si sposta solo tra i risultati già trovati, e conta la prova, non il numero di recensioni (niente premio ai più famosi). **20/11 sera: verificata** (i ✓ della ricerca sono spenti in produzione, `REQUISITI_PROVA`, e non accettano requisiti di 3 parole: non la coprono). **Costruita e fermata con la 51**, da cui dipende (commit `b108e472`).
 
 ## 19/11/2026 (giovedì, CEO che chiude — tema: Google Maps ora risponde dai tuoi salvati)
 
@@ -214,7 +214,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** BestieBite fa vedere il piatto nei video, ma bisogna guardarli ([App Store](https://apps.apple.com/app/id6444921443)); nelle app viste nessuno lo scrive in una riga con la prova.
 - **Valore per l'utente:** sa cosa prendere prima di sedersi. **Per il ristoratore:** il suo piatto forte arriva a chi cerca proprio quello.
 - **Sforzo:** S/M (un campo in più nella sintesi già fatta, con la regola anti-invenzione). **Costo Google/Haiku:** zero chiamate in più; poche decine di token in uscita nella chiamata Haiku che c'è già.
-- **Stato proposto:** PRONTA dal 9/11. **20/11: costruita senza AI** (scelta del CEO: elenco di piatti veri e conteggio, zero token e niente da inventare), vedi BACKLOG.
+- **Stato proposto:** PRONTA dal 9/11. **20/11: costruita senza AI** (scelta del CEO: elenco di piatti veri e conteggio, zero token e niente da inventare), vedi BACKLOG. **20/11 sera: FERMATA dal CEO.** Quarta bocciatura (revisore 4: 53 falsi su 77 frasi: "terribile", "nn era buona", "come no", "🙄", "da Roscioli", "anni fa"). Regola rovesciata (vale solo la frase breve "carbonara ottima") provata su 40 locali veri di Testaccio e Trastevere: 0 righe. La versione di prima: 3 su 40, di cui 2 dubbie ("fonduta di cacio e pepe" su un carciofo, "forse il piatto più buono"). Con le 5 recensioni che dà Google le regole danno o frasi false o niente. Codice nel commit `b108e472`. Se si riprende: solo con l'AI che legge le recensioni intere (dentro la chiamata dei verdetti) e il codice che controlla il piatto nell'elenco e la frase copiata.
 
 ### 52. "Prova il gesto": il primo salvataggio insegnato nel primo accesso
 - **Problema:** chi installa l'app non sa che si salva dal "Condividi" di Instagram o Maps; in una demo va spiegato a voce (VISIONE: niente che funzioni solo se sai dove cliccare).
@@ -251,7 +251,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per l'utente:** capisce in 10 secondi che Mapetite non è "il più famoso in cima" (VISIONE).
 - **Valore per il ristoratore:** il piccolo locale vede che non deve comprare recensioni per emergere.
 - **Sforzo:** S. **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA dal 9/11.
+- **Stato proposto:** PRONTA dal 9/11. **20/11 sera: costruita in versione ridotta** (scelta del CEO): nel pannello dei risultati "🧭 Tonnarello ha molte più recensioni degli altri: l'ho messo dopo i primi 3. La fama da sola non fa salire.", solo quando succede davvero. Niente frase generica sull'ordine: l'ordine parte da Google, che conta anche la fama, e una frase come "il numero di recensioni non fa salire nessuno" sarebbe falsa.
 
 ### 47. "Più tranquillo, più economico": correggi la ricerca con un tocco
 - **Problema:** dopo la prima lista, per cambiare un dettaglio si riscrive tutta la frase (`PROBLEMI.md`, 18: al momento della scelta non si ritrova il posto giusto).
