@@ -146,7 +146,7 @@ export async function POST(request: Request) {
   // Messi da parte dai riordini (VISIONE.md: il differenziatore deve vedersi): si dice all'utente.
   // gusti: in fondo per le diete del profilo (niente pesce, niente carne): il telefono li tiene in fondo
   // anche quando arriva l'ordine dell'AI (prima una pescheria "alto" tornava in cima).
-  const daParte: { turistici: string[]; fuori_tema: string[]; fuori_zona: string[]; gusti?: string[]; budget?: string[] } = { turistici: [], fuori_tema: [], fuori_zona: [] };
+  const daParte: { turistici: string[]; fuori_tema: string[]; fuori_zona: string[]; gusti?: string[]; budget?: string[]; abbassati?: string[] } = { turistici: [], fuori_tema: [], fuori_zona: [] };
   // Proposta 73: il piatto nominato nella frase ("dove mangio la cacio e pepe"). Solo ricerche libere nel mondo.
   const piattoChiesto = source === "world" && searchIntent === "natural" ? piattoNellaRichiesta(query) : null;
 
@@ -412,6 +412,8 @@ export async function POST(request: Request) {
       const { places, lowered } = lowerMassFromTop(query.trim(), risultati);
       if (lowered.length > 0) {
         risultati = places;
+        // Proposta 46 "Perché è qui": lo si dice nel pannello dei risultati (non è "messo da parte": resta in vista).
+        daParte.abbassati = lowered.slice(0, 3);
         console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} dopo i primi 3 (molte più recensioni degli altri): ${JSON.stringify(lowered)}`);
       }
     }

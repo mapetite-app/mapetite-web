@@ -1158,7 +1158,7 @@ export default function MapView({
   }, [userId]);
   // Card al centro del carosello B: il suo pin è evidenziato sulla mappa.
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[]; budget?: string[] } | null; fuoriTema?: string[]; tolti?: string[] } | null>(null);
+  const [aiSearch, setAiSearch] = useState<{ risultati: Place[]; filtri: AIFiltri | null; id?: number; query?: string; simileA?: string; daParte?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; gusti?: string[]; per_te?: string[]; budget?: string[]; abbassati?: string[] } | null; fuoriTema?: string[]; tolti?: string[] } | null>(null);
   // Ultima ricerca letta dalle risposte che arrivano dopo (consiglio): aggiornata a ogni cambio.
   const aiSearchRef = useRef(aiSearch);
   useEffect(() => { aiSearchRef.current = aiSearch; }, [aiSearch]);

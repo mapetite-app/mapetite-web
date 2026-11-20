@@ -61,7 +61,7 @@ export interface BottomSheetProps {
   // Cosa ha capito l'AI della richiesta (tipo, requisiti): "Ho capito: rooftop · romantico".
   understood?: string[];
   // Locali messi in fondo o lasciati fuori dalla ricerca (turistici, fuori tema): lo si dice.
-  setAside?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; per_te?: string[]; budget?: string[] } | null;
+  setAside?: { turistici: string[]; fuori_tema: string[]; fuori_zona?: string[]; per_te?: string[]; budget?: string[]; abbassati?: string[] } | null;
   // Punto della ricerca: il link condiviso la rifà lì (/mappa?q=…&at=lat,lng).
   shareAt?: { lat: number; lng: number } | null;
   // Frase vera da condividere quando il titolo è un'etichetta ("Altri come X"): chi apre il link rifà
@@ -769,6 +769,13 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
             // Budget scritto nella frase (5/11): in fondo, mai tolti; la fascia è quella di Google.
             (setAside.budget?.length ?? 0) > 0 ? `${setAside.turistici.length + setAside.fuori_tema.length + (setAside.fuori_zona?.length ?? 0) > 0 ? "e in fondo" : "Ho messo in fondo"} ${setAside.budget!.length === 1 ? "uno sopra il tuo budget" : `${setAside.budget!.length} sopra il tuo budget`} (${setAside.budget!.slice(0, 2).join(", ")}${setAside.budget!.length > 2 ? "…" : ""})` : null,
           ].filter(Boolean).join(" ")}
+        </p>
+      )}
+      {/* "Perché è qui" (proposta 46): il più famoso non apre la lista solo per la fama; resta in vista, dopo i primi 3.
+          Solo quando è successo davvero (src/lib/mainstream.ts, lowerMassFromTop): mai una frase generica sull'ordine. */}
+      {(setAside?.abbassati?.length ?? 0) > 0 && (
+        <p data-testid="perche-ordine" className="mt-1 text-xs font-sans text-text-muted">
+          🧭 {setAside!.abbassati!.length === 1 ? `${setAside!.abbassati![0]} ha` : `${setAside!.abbassati!.slice(0, 2).join(" e ")} hanno`} molte più recensioni degli altri: {setAside!.abbassati!.length === 1 ? "l'ho messo" : "li ho messi"} dopo i primi 3. La fama da sola non fa salire.
         </p>
       )}
       {removed.length > 0 && (
