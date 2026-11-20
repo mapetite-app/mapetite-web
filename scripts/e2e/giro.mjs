@@ -11742,6 +11742,64 @@ else {
   const r2 = await post("");
   ok(r1.status === 200 && r2.status === 400, `qualcosa non va: route 200 a testo valido, 400 a testo vuoto (${r1.status}, ${r2.status})`);
 }
+// Proposta 51 "Da ordinare" (20/11): il piatto che almeno 2 recensioni lette nominano bene, con la frase che lo prova.
+// Niente AI: elenco di piatti veri e conteggio; mai piatti generici, mai il piatto del nome, mai da frasi critiche.
+{
+  const dz = await import(new URL("../../src/lib/da-ordinare.ts", import.meta.url).href);
+  const R = (...t) => t.map((text) => ({ text, rating: 5 }));
+  const d1 = dz.daOrdinare(R("Ottima la cacio e pepe, cremosa al punto giusto. Servizio veloce.", "Abbiamo preso Cacio&Pepe e supplì: tutto buonissimo!", "Locale piccolo e accogliente."), "Da Felice");
+  ok(d1?.piatto === "cacio e pepe" && d1.n === 2 && d1.di === 3 && d1.prova === "Ottima la cacio e pepe, cremosa al punto giusto.", `da ordinare: piatto in 2 recensioni su 3, frase copiata (${JSON.stringify(d1)})`);
+  ok(dz.daOrdinare(R("La carbonara non era un granché.", "Carbonara scotta e salata.", "Peccato per la carbonara."), "X") === null, "da ordinare: mai da frasi che criticano il piatto");
+  ok(dz.daOrdinare(R("Il trapizzino al pollo è top.", "Trapizzino da provare!"), "Trapizzino Testaccio") === null, "da ordinare: mai il piatto che dà il nome al locale");
+  ok(dz.daOrdinare(R("Pizza buonissima.", "La pasta era ottima, la pizza anche."), "X") === null, "da ordinare: mai piatti generici (pizza, pasta)");
+  ok(dz.daOrdinare([{ text: "Tiramisù ottimo.", rating: 5 }, { text: "Tiramisù buono ma il resto no.", rating: 2 }], "X") === null, "da ordinare: le recensioni sotto le 4 stelle non contano");
+  ok(dz.daOrdinare(R("Supplì super croccante."), "X") === null && dz.daOrdinare(null, "X") === null, "da ordinare: una recensione sola non basta");
+  const d2 = dz.daOrdinare(R("Supplì super croccante.", "Suppli filante, buonissimo.", "La gricia era perfetta.", "Gricia da manuale."), "X");
+  ok(d2?.piatto === "supplì" && d2.n === 2 && d2.di === 4, `da ordinare: accenti e maiuscole contano uguale, a pari numero vince la recensione che viene prima (${d2?.piatto})`);
+  const lunga = "Siamo stati qui sabato sera con amici e abbiamo ordinato un po' di tutto tra antipasti e primi della tradizione romana e tra tutti i piatti i tonnarelli cacio e pepe erano davvero memorabili per cremosità e sapore, poi dolce.";
+  const d3 = dz.daOrdinare(R(lunga, "Cacio e pepe buonissima."), "X");
+  ok(d3 != null && d3.prova.length <= 152 && d3.prova.includes("cacio e pepe") && lunga.replace(/…/g, "").includes(d3.prova.replace(/^…|…$/g, "")), `da ordinare: prova lunga tagliata intorno al piatto, testo vero (${d3?.prova})`);
+
+  if (!fakeUser) console.log("SKIP  da ordinare nella scheda: dev server senza E2E_FAKE_USER");
+  else {
+    const mkT = (id, name, extra = {}) => mk(id, name, 41.877, 12.476, { category: "italian_restaurant", types: ["italian_restaurant"], rating: 4.6, userRatingCount: 900, ...extra });
+    const RIS = [mkT("D1", "Felice a Testaccio", { daOrdinare: { piatto: "cacio e pepe", n: 3, di: 5, prova: "Abbiamo scelto la celebre cacio e pepe, mantecata direttamente al tavolo." } }), mkT("D2", "Osteria Senza Piatto")];
+    const SY = { dettagli: { D1: { synthesis: "Trattoria storica.", tags: [], verdict: "Cucina romana di famiglia, sala sempre piena.", goFor: [], dontExpect: [], matchReason: null }, D2: { synthesis: "x", tags: [], verdict: "Piccola e vera.", goFor: [], dontExpect: [], matchReason: null } }, esclusi: [] };
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await c.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    await c.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"/>' }));
+    for (const t of ["saved_places", "place_synthesis", "profiles"]) await c.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+    await c.route("**/api/search", (r) => r.fulfill({ json: { risultati: RIS, filtri_usati: { categoria: "restaurant", parole_chiave: ["trattoria"], vicino_a_me: false, zona: "Testaccio" }, sintesi_pendente: { places: RIS.map((x) => ({ id: x.id })), token: "t51" } } }));
+    await c.route("**/api/search/synthesis", (r) => r.fulfill({ json: SY }));
+    const p = await c.newPage();
+    p.on("pageerror", (e) => errors.push(e.message));
+    await p.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); if (!localStorage.getItem("mapetite.prenota.popup")) localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
+    await p.goto(`${BASE}/mappa?q=${encodeURIComponent("trattoria a Testaccio")}`, { waitUntil: "networkidle" });
+    await p.getByText("Cucina romana di famiglia, sala sempre piena.").first().waitFor({ timeout: 8000 });
+    await p.locator("li[data-id=D1] [data-testid=card-risultato]").first().click();
+    await p.locator("h2", { hasText: "Felice a Testaccio" }).waitFor({ timeout: 6000 });
+    const riga = p.getByTestId("da-ordinare");
+    await riga.waitFor({ timeout: 4000 }).catch(() => {});
+    const t = ((await riga.textContent().catch(() => "")) ?? "").replace(/\s+/g, " ").trim();
+    ok(t === "Da ordinare · cacio e pepe · in 3 recensioni su 5", `scheda: riga 'Da ordinare' con il conto dichiarato (${t || "assente"})`);
+    const b = await riga.boundingBox();
+    ok(b != null && b.y + b.height < 844 - 80 && b.height >= 44, `scheda: 'Da ordinare' nella prima schermata a 390×844, tocco alto almeno 44 (${Math.round((b?.y ?? 0) + (b?.height ?? 0))} px, h ${Math.round(b?.height ?? 0)})`);
+    ok(await p.getByTestId("prova-piatto").count() === 0, "scheda: la frase della recensione si vede solo dopo il tocco");
+    await riga.locator("button").click();
+    const pv = ((await p.getByTestId("prova-piatto").textContent({ timeout: 2000 }).catch(() => "")) ?? "").trim();
+    ok(pv === "«Abbiamo scelto la celebre cacio e pepe, mantecata direttamente al tavolo.» · da una recensione su Google", `scheda: un tocco mostra la frase vera della recensione (${pv || "assente"})`);
+    ok((await riga.locator("button").getAttribute("aria-expanded")) === "true", "scheda: 'Da ordinare' dice se la frase è aperta (aria-expanded)");
+    await p.screenshot({ path: `${OUT}/93-da-ordinare.png` });
+    await riga.locator("button").click();
+    ok(await p.getByTestId("prova-piatto").count() === 0, "scheda: secondo tocco chiude la frase");
+    await p.keyboard.press("Escape").catch(() => {});
+    await p.getByRole("button", { name: /chiudi/i }).first().click().catch(() => {});
+    await p.locator("li[data-id=D2] [data-testid=card-risultato]").first().click().catch(() => {});
+    await p.locator("h2", { hasText: "Osteria Senza Piatto" }).waitFor({ timeout: 6000 }).catch(() => {});
+    ok(await p.getByTestId("da-ordinare").count() === 0, "scheda: senza prova nessuna riga 'Da ordinare'");
+    await c.close();
+  }
+}
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);

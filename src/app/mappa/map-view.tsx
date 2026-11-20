@@ -9,6 +9,7 @@ import Map, { Layer, Marker, Source } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import Supercluster from "supercluster";
 import { browserClient } from "@/lib/supabase/client-lazy";
+import type { DaOrdinare } from "@/lib/da-ordinare";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { nomeLeggibile } from "@/lib/nome-leggibile";
 import { vuoleConsiglio } from "@/lib/consiglio";
@@ -858,6 +859,8 @@ type VenueDetails = {
   // Proposta 67: da quante recensioni Google parla il verdetto e la data della più recente (ISO).
   recensioniN?: number | null;
   recensioneUltima?: string | null;
+  // Proposta 51: il piatto che almeno 2 recensioni lette nominano bene, con la frase che lo prova.
+  daOrdinare?: DaOrdinare | null;
 };
 
 const REFINEMENTS = ["+ economico", "+ con tavoli all'aperto", "+ aperto adesso", "+ poco turistico", "+ per un gruppo"];
@@ -1887,7 +1890,7 @@ export default function MapView({
           phone: d.phone ?? null, selectedReviews: d.selectedReviews ?? null, synthesis: d.synthesis ?? null,
           tags: d.tags ?? null, verdict: d.verdict, goFor: d.goFor ?? null, dontExpect: d.dontExpect ?? null,
           matchReason: null, photoRef: d.photoRef ?? null, photoAuthor: d.photoAuthor ?? null,
-          recensioniN: d.recensioniN ?? null, recensioneUltima: d.recensioneUltima ?? null,
+          recensioniN: d.recensioniN ?? null, recensioneUltima: d.recensioneUltima ?? null, daOrdinare: d.daOrdinare ?? null,
         };
         savedSynthRef.current = { ...savedSynthRef.current, [selectedSavedId]: det };
         setVenueDetails((prev) => ({ ...prev, [selectedSavedId]: { ...det, ...Object.fromEntries(Object.entries(prev[selectedSavedId] ?? {}).filter(([, v]) => v != null)) } }));
@@ -2081,7 +2084,7 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null; recensioniN?: number | null; recensioneUltima?: string | null;
+        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null; recensioniN?: number | null; recensioneUltima?: string | null; daOrdinare?: DaOrdinare | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
       const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null, types: p.types ?? null }));
@@ -2107,6 +2110,7 @@ export default function MapView({
           editorialSummary: p.editorialSummary ?? null,
           recensioniN: p.recensioniN ?? null,
           recensioneUltima: p.recensioneUltima ?? null,
+          daOrdinare: p.daOrdinare ?? null,
         };
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null, id: ticket });
@@ -2728,7 +2732,7 @@ export default function MapView({
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null; recensioniN?: number | null; recensioneUltima?: string | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null; recensioniN?: number | null; recensioneUltima?: string | null; daOrdinare?: DaOrdinare | null;
         };
         // "Altri come questo": il posto di partenza non torna tra i risultati (stesso id o stesso nome).
         const fuori = new Set(opts.simile?.escludi ?? []);
@@ -2771,6 +2775,7 @@ export default function MapView({
             editorialSummary: p.editorialSummary ?? null,
             recensioniN: p.recensioniN ?? null,
             recensioneUltima: p.recensioneUltima ?? null,
+            daOrdinare: p.daOrdinare ?? null,
           };
         }
         const id = ticket;

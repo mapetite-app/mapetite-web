@@ -28,6 +28,7 @@ import ConfrontoFonti from "@/components/confronto-fonti";
 import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocaleStato } from "@/components/posto-locale";
 import { frasePrezzo } from "@/lib/prezzo-locale";
 import { fraseFreschezza } from "@/lib/freschezza-verdetto";
+import type { DaOrdinare } from "@/lib/da-ordinare";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 import { salvatoDa } from "@/lib/ricordo-salvato";
@@ -41,6 +42,8 @@ export const ACTION_TILE =
 // Mockup A: nome e verdetto in serif editoriale (Newsreader, già caricato in layout.tsx, come la home),
 // fondo carta caldo come la home nuova.
 const SERIF = "font-[family-name:var(--font-newsreader)]";
+// Chiave di "Da ordinare" nello stesso stato dei ✓ (una sola frase aperta per volta): non può essere un requisito.
+const PIATTO = "\u0000piatto";
 const PAPER = "bg-white"; // Lorenzo 5/11: niente più carta crema, bianco pieno come Places
 const TILE = `${ACTION_TILE} bg-white/10`;
 
@@ -97,6 +100,8 @@ export type Venue = {
   // Proposta 67: da quante recensioni Google parla il verdetto e la data (ISO) della più recente.
   recensioniN?: number | null;
   recensioneUltima?: string | null;
+  // Proposta 51: il piatto che almeno 2 recensioni lette nominano bene, con la frase che lo prova.
+  daOrdinare?: DaOrdinare | null;
 };
 
 type VenueSheetProps = {
@@ -250,7 +255,7 @@ export default function VenueSheet({
   // La frase si porta in vista SOLO quando si tocca un ✓ (prima ripartiva a ogni aggiornamento della scheda).
   useEffect(() => {
     if (!provaAperta) return;
-    document.querySelector("[data-testid=prova-recensione]")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    document.querySelector("[data-testid=prova-recensione], [data-testid=prova-piatto]")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [provaAperta]);
   const [visitAsked, setVisitAsked] = useState<{ id: string; at: number } | null>(null);
   const visitAskedAt = visitAsked?.id === venue.id ? visitAsked.at : null;
@@ -774,7 +779,7 @@ export default function VenueSheet({
     )].slice(0, 2);
     // Nulla tra il verdetto e "Orari, contatti, recensioni": basta il filetto sotto il verdetto.
     const subitoDopoVerdetto = (headline != null || verdettoInArrivo || googleLine != null)
-      && (venue.requisiti?.length ?? 0) === 0 && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
+      && (venue.requisiti?.length ?? 0) === 0 && !venue.daOrdinare && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
     const hasOverview =
       showSynthesisBelow || matchReasonBelow || hasTags || goForChips.length > 0 || dontExpectChips.length > 0;
     const hasReviewsTab = hasReviews || communitySlot != null;
@@ -1077,6 +1082,30 @@ export default function VenueSheet({
             </p>
           )}
 
+          {/* "Da ordinare" (proposta 51): il piatto che almeno 2 recensioni Google lette nominano bene, con il conto
+              dichiarato; un tocco mostra la frase (copiata, mai riscritta). Senza prova la riga non c'è. */}
+          {venue.daOrdinare && (
+            <div data-testid="da-ordinare" className="mt-2">
+              <button
+                type="button"
+                aria-expanded={provaAperta === PIATTO}
+                onClick={() => setProvaAperta((x) => (x === PIATTO ? null : PIATTO))}
+                className="-mx-1 flex min-h-11 w-[calc(100%+0.5rem)] items-center gap-1.5 rounded-lg px-1 text-left text-[13.5px] font-sans leading-snug text-[#3d4248] active:bg-bg"
+              >
+                <span className="min-w-0">
+                  <b className="font-display font-semibold text-brand">Da ordinare</b> · <span className="font-semibold text-[#141414] underline decoration-[#cfd6d6] underline-offset-[3px]">{venue.daOrdinare.piatto}</span>
+                  <span className="text-text-muted"> · in {venue.daOrdinare.n} recensioni su {venue.daOrdinare.di}</span>
+                </span>
+              </button>
+              {provaAperta === PIATTO && (
+                <p data-testid="prova-piatto" className="mt-0.5 scroll-mb-28 text-[13.5px] font-sans leading-snug text-[#3d4248]">
+                  <span className={`${SERIF} italic text-[#141414]`}>«{venue.daOrdinare.prova}»</span>
+                  <span className="text-text-muted"> · da una recensione su Google</span>
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Requisiti della ricerca confermati: un tocco mostra la frase della recensione (copiata, mai riscritta). */}
           {(venue.requisiti?.length ?? 0) > 0 && (
             <div data-testid="requisiti-scheda" className="mt-3.5">
@@ -1108,7 +1137,7 @@ export default function VenueSheet({
         {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} className="mx-[22px] mt-4" />}
 
         {/* Le tue note (stato, Com'era, classifica, tag e nota): solo per i salvati, in vista. */}
-        {showPersonalBlock && personalBlock(true, true, (headline != null || verdettoInArrivo || googleLine != null) && (venue.requisiti?.length ?? 0) === 0 && !perTeLine && !friendsData)}
+        {showPersonalBlock && personalBlock(true, true, (headline != null || verdettoInArrivo || googleLine != null) && (venue.requisiti?.length ?? 0) === 0 && !venue.daOrdinare && !perTeLine && !friendsData)}
 
         {/* Locale non salvato senza barra Salva (scheda dall'assistente): le due scelte rapide aprono Salva. */}
         {!isSaved && onQuickSave && !saveSlot && (

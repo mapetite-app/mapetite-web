@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { searchGooglePlaces, type PlaceResult } from "@/lib/google-places";
 import { getSynthesis, SYNTHESIS_LIMIT, type PlaceSynthesis } from "@/lib/haiku-synthesis";
 import { selectQualityReviews } from "@/lib/review-selection";
+import { daOrdinare } from "@/lib/da-ordinare";
 import { extractSearchIntent, sanitizeIntent } from "@/lib/search-intent";
 import { inFondoPerPrezzo, prezzoMax } from "@/lib/budget";
 import { distanceMeters } from "@/lib/distance";
@@ -679,6 +680,8 @@ ESEMPI (input → output atteso):
       // Orari compatti per il foglio Prenota ("a quell'ora risulta chiuso"): dati Google solo da mostrare.
       orari: compattaOrari(regularPeriods),
       selectedReviews: selectQualityReviews(reviewItems ?? reviewTexts),
+      // "Da ordinare" (proposta 51): dalle recensioni Google lette, intere; calcolato ora e mai salvato.
+      daOrdinare: daOrdinare(reviewItems ?? reviewTexts?.map((text) => ({ text })), p.name),
       synthesis: s?.synthesis || null,
       tags: s?.tags?.length ? s.tags : rest.tags ?? null,
       verdict: s?.verdict || null,
