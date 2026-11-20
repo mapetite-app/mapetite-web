@@ -428,7 +428,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   }, [allPlaces, quick, quickFiltersOn, details, nearestFirst, origin, treOn, treLista]);
   // Proposta 46 (revisore 20/11): la frase vale solo se è vera nella lista com'è adesso: ordine della ricerca (niente
   // "Più vicini", filtri rapidi o "Scegli tra 3") e il locale davvero in vista dopo i primi 3.
-  const abbassati = nearestFirst || treOn || quickFiltersOn ? [] : (setAside?.abbassati ?? []).filter((n) => places.findIndex((p) => p.name === n) >= 3);
+  const abbassati = nearestFirst || treOn || (quickFiltersOn && quick.size > 0) ? [] : (setAside?.abbassati ?? []).filter((n) => places.findIndex((p) => p.name === n) >= 3);
   const treChiave = treOn ? treLista.map((t) => t.posto.id).join(",") : "";
   useEffect(() => {
     onTre?.(treChiave ? treChiave.split(",") : null);
@@ -774,7 +774,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           Solo quando è successo davvero (src/lib/mainstream.ts, lowerMassFromTop): mai una frase generica sull'ordine. */}
       {abbassati.length > 0 && (
         <p data-testid="perche-ordine" className="mt-1 text-xs font-sans text-text-muted">
-          🧭 {abbassati.length === 1 ? `${abbassati[0]} ha` : `${abbassati.slice(0, 2).join(" e ")}${abbassati.length > 2 ? "…" : ""} hanno`} molte più recensioni degli altri: {abbassati.length === 1 ? "l'ho messo" : "li ho messi"} dopo i primi 3. La fama da sola non fa salire.
+          🧭 {abbassati.length === 1 ? `${abbassati[0]} ha` : abbassati.length === 2 ? `${abbassati.join(" e ")} hanno` : `${abbassati.slice(0, 2).join(", ")} e altri hanno`} molte più recensioni degli altri: {abbassati.length === 1 ? "l'ho messo" : "li ho messi"} dopo i primi 3. La fama da sola non fa salire.
         </p>
       )}
       {removed.length > 0 && (
