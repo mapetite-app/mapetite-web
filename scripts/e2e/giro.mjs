@@ -1265,7 +1265,8 @@ await page.getByTestId("messi-da-parte").waitFor({ timeout: 5000 }).then(async (
 await page.unroute("**/api/search");
 
 // Proposta 46 "Perché è qui" (20/11): il più famoso messo dopo i primi 3 è detto, solo quando è successo.
-await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: FOLLA, da_parte: { turistici: [], fuori_tema: [], fuori_zona: [], abbassati: ["Folla 4"] } } }));
+const FOLLA_FAMOSO = FOLLA.map((x) => (x.id === "F4" ? { ...x, userRatingCount: 9000 } : x));
+await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: FOLLA_FAMOSO, da_parte: { turistici: [], fuori_tema: [], fuori_zona: [], abbassati: ["Folla 4"] } } }));
 await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
 await (await esempio(page)).click();
 await apriOpzioni(page);
@@ -1289,6 +1290,14 @@ await (await esempio(page)).click();
 await apriOpzioni(page);
 await page.getByTestId("opzioni-pannello").waitFor({ timeout: 5000 }).catch(() => {});
 ok(await page.getByTestId("perche-ordine").count() === 0, "risultati: nessuna frase sull'ordine per un locale tra i primi 3 o fuori dalla lista");
+await page.unroute("**/api/search");
+// Revisore 3 (20/11): nella lista mostrata non ha più di 2,5 volte le recensioni della mediana → niente frase.
+await page.route("**/api/search", (r) => r.fulfill({ json: { ...SEARCH_FAST, risultati: FOLLA, da_parte: { turistici: [], fuori_tema: [], fuori_zona: [], abbassati: ["Folla 4"] } } }));
+await page.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+await (await esempio(page)).click();
+await apriOpzioni(page);
+await page.getByTestId("opzioni-pannello").waitFor({ timeout: 5000 }).catch(() => {});
+ok(await page.getByTestId("perche-ordine").count() === 0, "risultati: nessuna frase se tra i posti mostrati non ha molte più recensioni della maggior parte");
 await page.unroute("**/api/search");
 
 // 5g. Verdetti a gruppi (14/10): quelli delle prime card compaiono senza aspettare gli altri

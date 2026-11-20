@@ -702,7 +702,14 @@ ESEMPI (input → output atteso):
   // è finito in fondo per altro (budget, città, fuori tema): lì lo dice già la sua riga.
   if (daParte.abbassati?.length) {
     const altrove = new Set([...daParte.turistici, ...daParte.fuori_tema, ...daParte.fuori_zona, ...(daParte.gusti ?? []), ...(daParte.budget ?? [])]);
-    daParte.abbassati = daParte.abbassati.filter((n) => !altrove.has(n) && risultatiFinali.findIndex((p) => p.name === n) >= 3);
+    // "Molte più recensioni della maggior parte di questi posti": vero sulla lista che il telefono riceve (revisore 3:
+    // la soglia di lowerMassFromTop è sui 20 di Google, prima del taglio a 12).
+    const conti = risultatiFinali.map((p) => p.userRatingCount ?? 0).sort((a, b) => a - b);
+    const mediana = conti[Math.floor(conti.length / 2)] ?? 0;
+    daParte.abbassati = daParte.abbassati.filter((n) => {
+      const at = risultatiFinali.findIndex((p) => p.name === n);
+      return !altrove.has(n) && at >= 3 && (risultatiFinali[at].userRatingCount ?? 0) > mediana * 2.5;
+    });
   }
 
   // [search-funnel] diagnostica branch + Haiku. haiku = sintesi invocata (solo ramo

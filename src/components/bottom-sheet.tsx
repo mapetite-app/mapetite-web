@@ -430,7 +430,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // "Più vicini", filtri rapidi o "Scegli tra 3") e il locale davvero in vista dopo i primi 3.
   // "Della maggior parte", non "degli altri" (revisore 3, 20/11): la soglia è 2,5 volte la mediana, e un locale ancora
   // più famoso può essere già più in basso.
-  const abbassati = nearestFirst || treOn || (quickFiltersOn && quick.size > 0) ? [] : (setAside?.abbassati ?? []).filter((n) => places.findIndex((p) => p.name === n) >= 3);
+  const abbassati = nearestFirst || treOn || (quickFiltersOn && quick.size > 0) ? [] : (setAside?.abbassati ?? []).filter((n) => {
+    // Anche qui, sulla lista com'è adesso (dopo le esclusioni dell'AI): più di 2,5 volte la mediana dei posti mostrati.
+    const at = places.findIndex((p) => p.name === n);
+    const conti = places.map((p) => details?.[p.id]?.userRatingCount ?? 0).sort((a, b) => a - b);
+    return at >= 3 && (details?.[places[at].id]?.userRatingCount ?? 0) > (conti[Math.floor(conti.length / 2)] ?? 0) * 2.5;
+  });
   const treChiave = treOn ? treLista.map((t) => t.posto.id).join(",") : "";
   useEffect(() => {
     onTre?.(treChiave ? treChiave.split(",") : null);
