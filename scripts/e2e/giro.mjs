@@ -11747,7 +11747,7 @@ else {
 {
   const dz = await import(new URL("../../src/lib/da-ordinare.ts", import.meta.url).href);
   const R = (...t) => t.map((text) => ({ text, rating: 5 }));
-  const d1 = dz.daOrdinare(R("Ottima la cacio e pepe, cremosa al punto giusto. Servizio veloce.", "Abbiamo preso la Cacio&Pepe: buonissima!", "Locale piccolo e accogliente."), "Da Felice");
+  const d1 = dz.daOrdinare(R("Ottima la cacio e pepe, cremosa al punto giusto. Servizio veloce.", "Cacio&Pepe buonissima!", "Locale piccolo e accogliente."), "Da Felice");
   ok(d1?.piatto === "cacio e pepe" && d1.n === 2 && d1.di === 3 && d1.prova === "Ottima la cacio e pepe, cremosa al punto giusto.", `da ordinare: piatto in 2 recensioni su 3, frase copiata (${JSON.stringify(d1)})`);
   ok(dz.daOrdinare(R("La carbonara non era un granché.", "Carbonara scotta e salata.", "Peccato per la carbonara."), "X") === null, "da ordinare: mai da frasi che criticano il piatto");
   ok(dz.daOrdinare(R("Il trapizzino al pollo è top.", "Trapizzino da provare!"), "Trapizzino Testaccio") === null, "da ordinare: mai il piatto che dà il nome al locale");
@@ -11758,10 +11758,11 @@ else {
   ok(d2?.piatto === "supplì" && d2.n === 2 && d2.di === 4, `da ordinare: accenti e maiuscole contano uguale, a pari numero vince la recensione che viene prima (${d2?.piatto})`);
   const lunga = "Siamo stati qui sabato sera con amici e abbiamo ordinato un po' di tutto tra antipasti e primi della tradizione romana e tra tutti i piatti i tonnarelli cacio e pepe erano davvero memorabili per cremosità e sapore, poi dolce.";
   const d3 = dz.daOrdinare(R(lunga, "Cacio e pepe buonissima."), "X");
-  ok(d3 != null && d3.prova.length <= 152 && d3.prova.includes("cacio e pepe") && lunga.replace(/…/g, "").includes(d3.prova.replace(/^…|…$/g, "")), `da ordinare: prova lunga tagliata intorno al piatto, testo vero (${d3?.prova})`);
+  // Revisore 4 (20/11 sera): vale solo la frase breve di un consiglio; una frase lunga può dire di tutto.
+  ok(d3 === null, `da ordinare: una frase lunga non conta come consiglio (${d3?.prova})`);
 
   // Revisore 20/11: piatto sbagliato da una parola sola, critiche e confronti, piatto solo nominato.
-  ok(dz.daOrdinare(R("Ottima la trippa alla vaccinara!", "Trippa alla vaccinara buonissima."), "X")?.piatto === "trippa", "da ordinare: 'trippa alla vaccinara' non diventa 'coda alla vaccinara'");
+  ok(dz.daOrdinare(R("Ottima la trippa alla vaccinara!", "Trippa alla vaccinara buonissima."), "X")?.piatto !== "coda alla vaccinara", "da ordinare: 'trippa alla vaccinara' non diventa 'coda alla vaccinara'");
   ok(dz.daOrdinare(R("Ottima cena, la Fiorentina ha vinto!", "Super serata, la fiorentina è top."), "X") === null, "da ordinare: 'la fiorentina' da sola non è la bistecca");
   ok(dz.daOrdinare(R("Baba ghanoush buonissimo.", "Ottimo il baba ghanoush."), "X") === null, "da ordinare: 'baba ghanoush' non è il babà");
   for (const [a, b, msg] of [["Carbonara ok ma nulla di speciale.", "Carbonara buona ma normale."], ["Mi è piaciuta meno la carbonara, buona però.", "Carbonara buona, meno il resto."], ["Buona, ma la migliore carbonara resta quella di Roscioli.", "Carbonara buona, migliori altrove."]]) ok(dz.daOrdinare(R(a, b), "X") === null, `da ordinare: mai da frasi con 'ma', 'meno' o confronti (${a})`);
@@ -11777,6 +11778,12 @@ else {
   for (const f of ["Cacio e pepe pessima e servizio ottimo.", "Carbonara insipida e cameriere super gentile.", "La carbonara gommosa e il vino ottimo.", "Carbonara super salatissima.", "Ci hanno consigliato la carbonara, ci ha delusi.", "Tutto ottimo tranne la carbonara.", "Tutto buono eccetto la carbonara.", "La carbonara era ottima una volta, ora è cambiata.", "Carbonara ottima (si fa per dire).", "Carbonara 'ottima' tra virgolette.", "Carbonara da bocciare e servizio eccellente.", "Cacio e pepe ottima… quasi.", "The carbonara was great, the gricia was awful.", "Ottima carbonara, se ti piace la colla.", "Una carbonara perfetta per chi ama la panna."]) ok(dz.daOrdinare(R(f, f), "X") === null, `da ordinare: nessun piatto da '${f}'`);
   ok(dz.daOrdinare(R("Polpette di melanzane buonissime.", "Polpette di melanzane ottime."), "X") === null && dz.daOrdinare(R("Il negroni sbagliato ottimo.", "Negroni sbagliato top."), "X") === null, "da ordinare: polpette di melanzane e negroni sbagliato sono varianti");
   ok(dz.daOrdinare(R("Panna cotta buonissima.", "Ottima la panna cotta."), "X")?.piatto === "panna cotta", "da ordinare: la panna cotta resta un dolce (la 'panna' nella carbonara è una critica)");
+  // Revisore 4 (20/11 sera): regola rovesciata, solo la forma breve "carbonara ottima"; ogni frase qui sotto non deve dare il piatto.
+  for (const f of ["Carbonara terribile e servizio ottimo.", "Amatriciana orribile e dolci ottimi.", "Amatriciana scadente e servizio super.", "Cacio e pepe immangiabile e personale gentilissimo e top.", "Carbonara sopravvalutata e prezzi ottimi.", "Tutti consigliano la carbonara, a noi ha fatto schifo.", "La carbonara nn era buona.", "Gricia buona, carbonara no.", "La carbonara era tutt'altro che ottima.", "Altro che carbonara buonissima.", "La carbonara è lontana dall'essere ottima.", "No great carbonara here, sadly.", "Tutti dicono che la carbonara è ottima. Non è vero, era scotta.", "Carbonara buonissima. Scherzo, era immangiabile.", "La carbonara buonissima! Peccato fosse fredda.", "Carbonara ottima!!! Come no!!!", "Per la carbonara buonissima andate da Roscioli, qui prendete la pizza.", "La carbonara top la fanno da Armando al Pantheon.", "Il cameriere ci ha detto che la carbonara è ottima, vedremo.", "Speravo in una carbonara ottima.", "Anni fa la carbonara era ottima.", "La carbonara era buonissima l'anno scorso.", "Carbonara ottima 🙄", "Carbonara top 👎", "Carbonara ottima, come no.", "Sì certo, carbonara buonissima.", "Carbonara ottima, nei sogni.", "Carbonara buona: 5/10.", "Carbonara di carciofi ottima.", "Tiramisù al pistacchio buonissimo.", "Abbiamo preso il tiramisù al bar accanto, buonissimo.", "La carbonara sarebbe stata ottima con più guanciale.", "The carbonara was overrated.", "I've heard great things about the carbonara."])
+    ok(dz.daOrdinare(R(f, f), "X") === null, `da ordinare: "${f}" non dà il piatto`);
+  for (const [f, atteso] of [["Negroni perfetto, barman bravissimo.", "negroni"], ["Pizza margherita e supplì, ottimo il supplì.", "supplì"], ["The carbonara was amazing.", "carbonara"], ["Carbonara da provare!", "carbonara"]])
+    ok(dz.daOrdinare(R(f, f), "X")?.piatto === atteso, `da ordinare: "${f}" dà ${atteso}`);
+  ok(dz.daOrdinare([{ text: "Carbonara ottima." }, { text: "Carbonara buonissima." }], "X") === null, "da ordinare: senza il voto della recensione non conta");
   { const t2 = dz.daOrdinare(R("Gricia ottima.", "Gricia buonissima."), "X"); ok(t2?.n === 2 && t2.di === 2, "da ordinare: 2 su 2 (la scheda dice 'In entrambe le recensioni lette')"); }
 
   if (!fakeUser) console.log("SKIP  da ordinare nella scheda: dev server senza E2E_FAKE_USER");
