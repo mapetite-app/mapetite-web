@@ -40,7 +40,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google Ask Maps risponde a domande su piatti senza dire da dove lo sa ([blog Google, 16/11](https://blog.google/products-and-platforms/products/maps/ask-maps-holiday-travel-features-2026/)); Beli e Mapstr non cercano nelle recensioni. Noi: la prova sotto il dito.
 - **Valore per l'utente:** la ricerca rispetta il vincolo vero (VISIONE). **Per il ristoratore:** il suo piatto forte arriva a chi cerca proprio quello.
 - **Sforzo:** S/M (riusa `da-ordinare.ts` sul testo della richiesta e sui risultati). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA. Attenzione al ranking: si sposta solo tra i risultati già trovati, e conta la prova, non il numero di recensioni (niente premio ai più famosi).
+- **Stato proposto:** PRONTA, ma **prima verificare** se i ✓ della proposta 18 (`requisitiProvati` sulle parole chiave) la coprono già: con "cacio e pepe" tra le parole chiave il ✓ con la frase potrebbe esserci già. Attenzione al ranking: si sposta solo tra i risultati già trovati, e conta la prova, non il numero di recensioni (niente premio ai più famosi).
 
 ## 19/11/2026 (giovedì, CEO che chiude — tema: Google Maps ora risponde dai tuoi salvati)
 
