@@ -10668,6 +10668,13 @@ if (fakeUser) {
     if (String(b.link).includes("Osteria")) return r.fulfill({ json: { stato: "riconosciuto", chiamate: 2, place: { id: "00000000-0000-4000-8000-000000000799", name: "Osteria Finta", address: "" } } });
     return r.fulfill({ json: { stato: "da_confermare", chiamate: 0, motivo: "Serve una ricerca su Google", nome: "Pizzeria Inventata" } });
   });
+  // Proposta 38: catalogo di Mapetite prima di Google. Simulato: conosce solo "Da Enzo al 29" e "Bar Nascosto".
+  const tcat = [];
+  await tctx.route("**/api/places/catalogo", (r) => {
+    const b = r.request().postDataJSON() ?? {};
+    tcat.push(b);
+    return r.fulfill({ json: { risultati: (b.items ?? []).map((it, i) => (/Enzo|Nascosto/.test(it.name) ? { id: `00000000-0000-4000-8000-0000000008${String(i).padStart(2, "0")}`, name: it.name, address: "", lat: 41.89, lng: 12.47 } : null)) } });
+  });
   const tp = await tctx.newPage();
   tp.on("pageerror", (e) => errors.push(e.message));
   await tp.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
@@ -10707,6 +10714,7 @@ if (fakeUser) {
   await tp.getByTestId("file-fatto").waitFor({ timeout: 8000 }).catch(() => {});
   ok(tfile.length === 2 && tfile.every((i) => typeof i.lat === "number" && !("url" in i) && i.googlePlaceId === null) && !tfile.some((i) => i.name.includes("Milano")), `file Takeout: al server solo nome e coordinate dei 2 posti di Roma, nessun Place ID inventato dal cid (${tfile.map((i) => i.name).join(", ")})`);
   ok(tprev.length === 2 && tprev.every((b) => b.budget <= 2), `file Takeout: i 2 posti del .csv passano dal riconoscimento con un tetto (${tprev.map((b) => b.budget).join(",")})`);
+  ok(tcat.length === 0, `file Takeout (proposta 38): lista senza città né posti con la posizione, zona ignota: il catalogo non si interroga (${tcat.length})`);
   if (process.env.E2E_DEBUG) console.log("DBG takeout", JSON.stringify(tins), JSON.stringify(tprev));
   for (let i = 0; i < 40 && !(tins.length === 3 && tins.some((r) => r.note?.includes("Giulia"))); i++) await tp.waitForTimeout(250);
   ok(tins.length === 3 && tins.every((r) => r.user_id === process.env.E2E_FAKE_USER && JSON.stringify(r.tags) === '["Da provare"]') && tins.some((r) => r.note?.includes("Giulia")), `file Takeout: 3 salvati in 📌 Da provare, con la nota del file (${JSON.stringify(tins.map((r) => r.tags))})`);
@@ -10738,6 +10746,27 @@ if (fakeUser) {
     ok((await tp.getByTestId("file-intro").count()) === 0, "file Takeout: a lavoro fatto la frase introduttiva sparisce");
     await tp.getByTestId("file-fatto").scrollIntoViewIfNeeded();
     await tp.screenshot({ path: `${OUT}/takeout-4-raccolte.png`, caret: "initial" });
+  }
+  // Proposta 38: lista con la città nel nome ("Roma da provare.csv"): i posti che il catalogo conosce (uno solo
+  // con quel nome a Roma) si salvano subito, gratis; solo gli altri passano da Google.
+  {
+    const n0 = tins.length, p0 = tprev.length, c0 = tcat.length;
+    await tp.getByTestId("file-input").setInputFiles([
+      { name: "Roma da provare.csv", mimeType: "text/csv", buffer: Buffer.from("Title,Note,URL,Tags,Comment\nTrattoria Da Enzo al 29,,https://www.google.com/maps/place/Da+Enzo/data=!4m2!3m1!1s0x0:0xE1,,\nBar Nascosto,,https://www.google.com/maps/place/Bar+Nascosto/data=!4m2!3m1!1s0x0:0xE2,,\nOsteria Finta,,https://www.google.com/maps/place/Osteria+Finta/data=!4m2!3m1!1s0x0:0xE3,,\n") },
+    ]);
+    await tp.getByTestId("file-salva").click();
+    await tp.getByTestId("file-fatto").waitFor({ timeout: 8000 }).catch(() => {});
+    for (let i = 0; i < 40 && tins.length - n0 < 3; i++) await tp.waitForTimeout(250);
+    const cat = tcat.slice(c0);
+    ok(cat.length === 1 && cat[0].citta === "Roma" && cat[0].items?.length === 3 && cat[0].items.every((it) => it.name && it.url) && !("lat" in cat[0].items[0]),
+      `file Takeout (proposta 38): i posti della lista vanno prima al catalogo, con la città dal nome del file (${JSON.stringify(cat.map((c) => [c.citta, c.items?.length]))})`);
+    const prev = tprev.slice(p0);
+    ok(prev.length === 1 && String(prev[0].link).includes("Osteria"), `file Takeout (proposta 38): a Google solo il posto che il catalogo non conosce (${prev.map((b) => b.link).join(" | ")})`);
+    ok(tins.length - n0 === 3 && tins.slice(n0).every((r) => JSON.stringify(r.tags) === '["Da provare","Roma da provare"]'), `file Takeout (proposta 38): salvati tutti e 3 nella raccolta della lista (${tins.length - n0})`);
+    const fatto38 = (await tp.getByTestId("file-fatto").textContent().catch(() => "")).replace(/\s+/g, " ");
+    ok(fatto38.includes("Salvati 3 posti") && fatto38.includes("2 trovati subito nel catalogo"), `file Takeout (proposta 38): l'esito dice quanti erano già nel catalogo ("${fatto38}")`);
+    await tp.getByTestId("file-fatto").scrollIntoViewIfNeeded();
+    await tp.screenshot({ path: `${OUT}/takeout-5-catalogo.png`, caret: "initial" });
   }
   // File sbagliato: messaggio chiaro, niente schermata vuota.
   await tp.reload({ waitUntil: "networkidle" });

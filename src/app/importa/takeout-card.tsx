@@ -14,6 +14,7 @@ import {
   kmzToKml, listMapping, parseTakeout, zoneCounts, SENZA_POSIZIONE,
   type TakeoutItem, type TakeoutSkipped,
 } from "@/lib/takeout";
+import { cityOfList, type Punto } from "@/lib/catalogo-match";
 
 // "Carica il file di Google Maps" (piano 3.2): tutto quello che uno ha salvato in Google Maps negli anni,
 // in un colpo. Il file si legge NEL TELEFONO (non va al server). Costi Google:
@@ -21,21 +22,25 @@ import {
 //  - posti dei .csv (solo titolo e link): al massimo MAX_CALLS chiamate per import con /api/places/link-preview
 //    (stesso tetto per link di "Incolla più link"); gli altri restano "da completare" in questo telefono e
 //    si completano MAX_CALLS alla volta, una volta al giorno. Mai una chiamata per riga.
+//  - prima di Google, i posti dei .csv si cercano nel catalogo di Mapetite (/api/places/catalogo, proposta 38):
+//    gratis, e solo se nella zona della lista c'è un locale soltanto con quel nome. Gli altri vanno a Google.
 
 const MAX_CALLS = 10;
 const CHUNK = 40;
 const QUEUE_KEY = "mapetite.takeout.da-completare";
 const LAST_KEY = "mapetite.takeout.ultimo-completamento";
+const PUNTI_KEY = "mapetite.takeout.punti-liste"; // lista → posizioni dei suoi posti già trovati (zona per il catalogo)
 const DAY = 20 * 60 * 60 * 1000;
 
-type Pending = { name: string; url: string; tags: string[]; note: string | null };
+type Pending = { name: string; url: string; tags: string[]; note: string | null; lista?: string };
+type PuntiListe = Map<string, Punto[]>;
 // Raccolta nata dal file (una per lista): posti davvero salvati con quel nome, per le copertine del "fatto".
 type Nata = { tag: string; count: number; emojis: string[]; names: string[]; ids: Set<string> };
 // I salvati che ci sono già: place_id → tag attuali (per aggiungere la lista senza toglierne nessuno).
 type SavedMap = Map<string, string[]>;
 type Row = { place_id: string; tags: string[]; note: string | null; name?: string };
 type Preview =
-  | { stato: "riconosciuto"; chiamate: number; place: { id: string } }
+  | { stato: "riconosciuto"; chiamate: number; place: { id: string; lat?: number; lng?: number } }
   | { stato: "da_confermare" | "non_riconosciuto"; chiamate: number };
 
 function readQueue(): Pending[] {
@@ -49,6 +54,44 @@ const subscribeQueue = (cb: () => void) => { window.addEventListener("mapetite-t
 const queueLength = () => readQueue().length;
 function stampRun() { try { localStorage.setItem(LAST_KEY, String(Date.now())); } catch { /* privata */ } }
 function lastRun(): number { try { return Number(localStorage.getItem(LAST_KEY) ?? 0) || 0; } catch { return 0; } }
+function readPunti(): PuntiListe {
+  try {
+    const o = JSON.parse(localStorage.getItem(PUNTI_KEY) ?? "{}") as Record<string, Punto[]>;
+    return new Map(Object.entries(o ?? {}).filter(([, v]) => Array.isArray(v)));
+  } catch { return new Map(); }
+}
+function writePunti(m: PuntiListe) {
+  try { localStorage.setItem(PUNTI_KEY, JSON.stringify(Object.fromEntries([...m].slice(-30).map(([k, v]) => [k, v.slice(-30)])))); } catch { /* privata */ }
+}
+const addPunto = (m: PuntiListe, lista: string | undefined, lat: unknown, lng: unknown) => {
+  if (!lista || typeof lat !== "number" || typeof lng !== "number") return;
+  const v = m.get(lista) ?? [];
+  if (v.length < 30) v.push({ lat, lng });
+  m.set(lista, v);
+};
+
+// Catalogo di Mapetite (proposta 38): per ogni lista, i suoi posti con la sua zona. Zero chiamate Google.
+// Nel dubbio il server risponde null e il posto va a Google come prima.
+async function catalogLookup(group: Pending[], lista: string, punti: Punto[]): Promise<(string | null)[]> {
+  const out: (string | null)[] = new Array(group.length).fill(null);
+  const citta = cityOfList(lista);
+  // Senza città né posti vicini né indirizzo nel link la zona è ignota: niente richiesta.
+  if (!citta && punti.length === 0 && !group.some((p) => /[?&](q|query)=[^&]*(,|%2C)/i.test(p.url))) return out;
+  for (let i = 0; i < group.length; i += CHUNK) {
+    const chunk = group.slice(i, i + CHUNK);
+    try {
+      const res = await fetch("/api/places/catalogo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: chunk.map((p) => ({ name: p.name, url: p.url })), citta, punti }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !Array.isArray(data?.risultati)) continue;
+      (data.risultati as ({ id?: string } | null)[]).forEach((r, j) => { if (typeof r?.id === "string") out[i + j] = r.id; });
+    } catch { /* il catalogo non risponde: si va a Google */ }
+  }
+  return out;
+}
 
 // Tag di tutte le liste in cui c'è il posto (stato e raccolta), senza doppioni.
 const tagsOf = (it: { lista: string; altreListe?: string[] }) => [
@@ -80,7 +123,7 @@ export default function TakeoutCard({ userId, titolo = true }: { userId: string 
   const [off, setOff] = useState<Set<string>>(new Set()); // zone escluse
   const [phase, setPhase] = useState<"idle" | "ready" | "saving" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState({ salvati: 0, gia: 0, attesa: 0, persi: 0 });
+  const [done, setDone] = useState({ salvati: 0, gia: 0, attesa: 0, persi: 0, catalogo: 0 });
   const [progress, setProgress] = useState(0);
   const [help, setHelp] = useState(false);
   const [now] = useState(() => Date.now());
@@ -182,7 +225,7 @@ export default function TakeoutCard({ userId, titolo = true }: { userId: string 
   };
 
   // Posti senza coordinate: link-preview con un tetto di MAX_CALLS chiamate; gli altri in coda nel telefono.
-  const resolveLinks = async (list: Pending[], saved: SavedMap) => {
+  const resolveLinks = async (list: Pending[], saved: SavedMap, punti: PuntiListe) => {
     let calls = 0, ok = 0, gia = 0, persi = 0;
     const rest: Pending[] = [];
     for (const p of list) {
@@ -191,6 +234,7 @@ export default function TakeoutCard({ userId, titolo = true }: { userId: string 
       const r = await previewLink(p.url, budget);
       calls += r.chiamate;
       if (r.stato === "riconosciuto") {
+        addPunto(punti, p.lista, r.place.lat, r.place.lng);
         const s = await insertSaved([{ place_id: r.place.id, tags: p.tags, note: p.note, name: p.name }], saved);
         ok += s.ok; gia += s.gia;
       } else if (r.stato === "da_confermare") rest.push(p);
@@ -199,13 +243,49 @@ export default function TakeoutCard({ userId, titolo = true }: { userId: string 
     return { ok, gia, persi, rest, calls };
   };
 
+  // Posti trovati nel catalogo: salvati subito; gli altri restano per Google.
+  const fromCatalog = async (list: Pending[], saved: SavedMap, punti: PuntiListe) => {
+    const groups = new Map<string, Pending[]>();
+    for (const p of list) groups.set(p.lista ?? "", [...(groups.get(p.lista ?? "") ?? []), p]);
+    let ok = 0, gia = 0, trovati = 0;
+    const rest: Pending[] = [];
+    for (const [lista, group] of groups) {
+      const ids = await catalogLookup(group, lista, punti.get(lista) ?? []);
+      const rows: Row[] = [];
+      group.forEach((p, i) => {
+        const id = ids[i];
+        if (id) rows.push({ place_id: id, tags: p.tags, note: p.note, name: p.name });
+        else rest.push(p);
+      });
+      if (rows.length) {
+        trovati += rows.length;
+        const s = await insertSaved(rows, saved);
+        ok += s.ok; gia += s.gia;
+      }
+    }
+    return { ok, gia, trovati, rest };
+  };
+
+  // Catalogo, poi Google (al massimo MAX_CALLS), poi di nuovo il catalogo per le liste che ora hanno
+  // una zona grazie ai posti appena trovati. Quello che resta aspetta in coda.
+  const resolvePending = async (list: Pending[], saved: SavedMap, punti: PuntiListe) => {
+    const first = await fromCatalog(list, saved, punti);
+    const before = new Map([...punti].map(([k, v]) => [k, v.length]));
+    const g = await resolveLinks(first.rest, saved, punti);
+    const grown = g.rest.filter((p) => p.lista && (punti.get(p.lista)?.length ?? 0) > (before.get(p.lista) ?? 0));
+    const again = grown.length ? await fromCatalog(grown, saved, punti) : { ok: 0, gia: 0, trovati: 0, rest: [] as Pending[] };
+    const rest = [...g.rest.filter((p) => !grown.includes(p)), ...again.rest];
+    writePunti(punti);
+    return { ok: first.ok + g.ok + again.ok, gia: first.gia + g.gia + again.gia, persi: g.persi, rest, catalogo: first.trovati + again.trovati };
+  };
+
   const saveAll = async () => {
     if (!userId || chosen.length === 0) return;
     setPhase("saving");
     setError(null);
     setProgress(0);
     nate.current = new Map();
-    let salvati = 0, gia = 0, persi = 0;
+    let salvati = 0, gia = 0, persi = 0, catalogo = 0;
     try {
       const saved = await loadSaved();
       const withCoords = chosen.filter((it) => it.lat != null && it.lng != null);
@@ -227,16 +307,19 @@ export default function TakeoutCard({ userId, titolo = true }: { userId: string 
         salvati += s.ok; gia += s.gia;
         setProgress(Math.min(withCoords.length, i + CHUNK) / chosen.length);
       }
-      const pending: Pending[] = chosen.filter((it) => it.lat == null && it.url).map((it) => ({ name: it.name, url: it.url!, tags: tagsOf(it), note: it.note }));
+      const pending: Pending[] = chosen.filter((it) => it.lat == null && it.url).map((it) => ({ name: it.name, url: it.url!, tags: tagsOf(it), note: it.note, lista: it.lista }));
       let attesa = 0;
       if (pending.length) {
-        const r = await resolveLinks(pending, saved);
-        salvati += r.ok; gia += r.gia; persi += r.persi;
+        // Zona di ogni lista: i suoi posti che hanno già la posizione (nel file o trovati in passato).
+        const punti = readPunti();
+        for (const it of withCoords) addPunto(punti, it.lista, it.lat, it.lng);
+        const r = await resolvePending(pending, saved, punti);
+        salvati += r.ok; gia += r.gia; persi += r.persi; catalogo = r.catalogo;
         attesa = r.rest.length;
         writeQueue([...readQueue(), ...r.rest]);
         stampRun();
       }
-      setDone({ salvati, gia, attesa, persi });
+      setDone({ salvati, gia, attesa, persi, catalogo });
       setRaccolte([...nate.current.values()].sort((a, b) => b.count - a.count));
       setPhase("done");
       // L'esito in vista (revisore 2/11: restava sotto la piega).
@@ -253,10 +336,10 @@ export default function TakeoutCard({ userId, titolo = true }: { userId: string 
     setPhase("saving");
     nate.current = new Map();
     const saved = await loadSaved();
-    const r = await resolveLinks(readQueue(), saved);
+    const r = await resolvePending(readQueue(), saved, readPunti());
     writeQueue(r.rest);
     stampRun();
-    setDone({ salvati: r.ok, gia: r.gia, attesa: r.rest.length, persi: r.persi });
+    setDone({ salvati: r.ok, gia: r.gia, attesa: r.rest.length, persi: r.persi, catalogo: r.catalogo });
     setRaccolte([...nate.current.values()].sort((a, b) => b.count - a.count));
     setPhase("done");
     trackFeature("import_file", { contesto: "completati", risultati: r.ok });
@@ -412,7 +495,7 @@ export default function TakeoutCard({ userId, titolo = true }: { userId: string 
                   <span aria-hidden>✅ </span>{done.salvati > 0 ? `${done.salvati === 1 ? "Salvato" : "Salvati"} ${done.salvati} ${done.salvati === 1 ? "posto" : "posti"}` : "Nessun posto nuovo"}
                 </p>
                 <p className="mt-1 text-xs text-text-muted">
-                  {[done.gia ? `${done.gia} li avevi già` : "", done.attesa && queued === 0 ? `${done.attesa} da completare` : "", done.persi ? `${done.persi} non trovati` : ""].filter(Boolean).join(" · ")}
+                  {[done.catalogo ? `${done.catalogo} ${done.catalogo === 1 ? "trovato" : "trovati"} subito nel catalogo` : "", done.gia ? `${done.gia} li avevi già` : "", done.attesa && queued === 0 ? `${done.attesa} da completare` : "", done.persi ? `${done.persi} non trovati` : ""].filter(Boolean).join(" · ")}
                 </p>
                 {raccolte.length === 0 && (
                   <Link href="/mappa?vista=salvati" className="mt-3 inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-display font-semibold text-white">
