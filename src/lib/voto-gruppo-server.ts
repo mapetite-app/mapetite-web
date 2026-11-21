@@ -14,7 +14,7 @@ export const VOTANTE_COOKIE = "mapetite_votante";
 // Solo in sviluppo con E2E_FAKE_USER (giro automatico): sondaggi in memoria del server, niente database.
 // I posti arrivano dal telefono già con nome e verdetto (solo qui: in produzione si leggono dal catalogo).
 const dev = () => process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER;
-type Finto = { codice: string; creatoDa: string; posti: VotoPosto[]; chiudeAlle: string; voti: Map<string, { nome: string; posto: string }> };
+type Finto = { codice: string; creatoDa: string; posti: VotoPosto[]; chiudeAlle: string; creato: string; voti: Map<string, { nome: string; posto: string }> };
 const g = globalThis as unknown as { __votiGruppoFinti?: Map<string, Finto> };
 const finti = (): Map<string, Finto> => (g.__votiGruppoFinti ??= new Map<string, Finto>());
 
@@ -54,6 +54,12 @@ export function zonaDi(p: { lat: number | null; lng: number | null; address: str
   return cityFromAddress(p.address);
 }
 
+// Dopo 30 giorni il voto non c'è più (nomi e id dei telefoni si cancellano: migrazione 20261121d).
+const DURATA_MS = 30 * 86_400_000;
+export function scaduto(creato: string, now: Date): boolean {
+  return now.getTime() - new Date(creato).getTime() > DURATA_MS;
+}
+
 export type PostoInArrivo = { id: string; nome: string; categoria: string | null; indirizzo: string | null; lat: number | null; lng: number | null; verdetto: string | null };
 
 /** Crea il sondaggio. "troppi" = tetto di MAX_AL_GIORNO in 24 ore raggiunto. */
@@ -62,7 +68,7 @@ export async function creaVoto(utente: string, posti: string[], chiudeAlle: Date
   if (dev()) {
     // Il tetto dei 10 al giorno è nel database (crea_voto_gruppo): qui no, il giro gira più volte di fila.
     finti().set(codice, {
-      codice, creatoDa: utente, chiudeAlle: chiudeAlle.toISOString(), voti: new Map(),
+      codice, creatoDa: utente, chiudeAlle: chiudeAlle.toISOString(), creato: new Date().toISOString(), voti: new Map(),
       posti: (fintiPosti ?? []).map((p) => ({ id: p.id, gid: UUID_RE.test(p.id) ? null : p.id, nome: p.nome, categoria: p.categoria, zona: zonaDi({ lat: p.lat, lng: p.lng, address: p.indirizzo }), lat: p.lat, lng: p.lng, verdetto: p.verdetto })),
     });
     return codice;
@@ -78,7 +84,7 @@ export async function creaVoto(utente: string, posti: string[], chiudeAlle: Date
 export async function leggiVoto(codice: string, viewer: string | null, votante: string | null, now = new Date()): Promise<VotoStato | null | "errore"> {
   if (dev()) {
     const f = finti().get(codice);
-    if (!f) return null;
+    if (!f || scaduto(f.creato, now)) return null;
     const voti = [...f.voti.values()];
     return {
       codice, chiudeAlle: f.chiudeAlle, chiuso: new Date(f.chiudeAlle) <= now, sonoIo: viewer === f.creatoDa, posti: f.posti,
@@ -86,12 +92,12 @@ export async function leggiVoto(codice: string, viewer: string | null, votante: 
     };
   }
   const admin = createAdminClient();
-  const { data: v, error } = await admin.from("voti_gruppo").select("id, creato_da, posti, chiude_alle").eq("codice", codice).maybeSingle<{ id: string; creato_da: string; posti: string[]; chiude_alle: string }>();
+  const { data: v, error } = await admin.from("voti_gruppo").select("id, creato_da, posti, chiude_alle, created_at").eq("codice", codice).maybeSingle<{ id: string; creato_da: string; posti: string[]; chiude_alle: string; created_at: string }>();
   if (error) { console.error(`[voto] lettura non riuscita ${error.code ?? ""} ${error.message}`); return "errore"; }
-  if (!v) return null;
+  if (!v || scaduto(v.created_at, now)) return null;
   const [{ data: luoghi, error: lErr }, { data: righe, error: vErr }] = await Promise.all([
     admin.from("places").select("id, name, category, address, lat, lng, google_place_id").in("id", v.posti),
-    admin.from("voti_gruppo_voti").select("votante, nome, posto, created_at").eq("voto_id", v.id).order("created_at", { ascending: true }).limit(MAX_VOTANTI),
+    admin.from("voti_gruppo_voti").select("votante, nome, posto, updated_at").eq("voto_id", v.id).order("updated_at", { ascending: true }).order("votante", { ascending: true }).limit(MAX_VOTANTI),
   ]);
   if (lErr || vErr) { console.error(`[voto] lettura posti/voti non riuscita ${(lErr ?? vErr)?.message}`); return "errore"; }
   type L = { id: string; name: string; category: string | null; address: string | null; lat: number | null; lng: number | null; google_place_id: string | null };

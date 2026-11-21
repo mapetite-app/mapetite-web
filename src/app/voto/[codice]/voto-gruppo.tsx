@@ -28,6 +28,15 @@ function salvaNome(n: string) {
   try { localStorage.setItem(NAME_KEY, n.slice(0, 40)); } catch { /* storage non disponibile */ }
 }
 
+// "Giulia e Marco", "Giulia, Marco e altri 3": con nomi lunghi la riga non si taglia a metà di un nome
+// senza dire quanti sono. I nomi lunghi si accorciano a 14 caratteri.
+export function chiHaVotato(chi: string[]): string {
+  const corto = (n: string) => (n.length > 14 ? `${n.slice(0, 13).trimEnd()}…` : n);
+  if (chi.length <= 2) return chi.map(corto).join(" e ");
+  const altri = chi.length - 2;
+  return `${corto(chi[0])}, ${corto(chi[1])} e ${altri === 1 ? "un altro" : `altri ${altri}`}`;
+}
+
 export default function VotoGruppo({ iniziale, foto, percorso, collegato }: { iniziale: VotoStato; foto: Record<string, string>; percorso: string; collegato: boolean }) {
   const [stato, setStato] = useState(iniziale);
   const [nome, setNome] = useState("");
@@ -167,7 +176,7 @@ export default function VotoGruppo({ iniziale, foto, percorso, collegato }: { in
                   </span>
                   {(tipo || p.zona) && <span className="truncate text-[13px] font-sans text-text-muted">{[tipo, p.zona].filter(Boolean).join(" · ")}</span>}
                   {p.verdetto && <span data-testid="voto-verdetto" className="mt-0.5 line-clamp-2 text-[13px] font-sans leading-snug text-text">{p.verdetto}</span>}
-                  {chi.length > 0 && <span data-testid="voto-chi" className="mt-auto truncate pt-1 text-[12px] font-sans font-medium text-brand">{chi.join(", ")}</span>}
+                  {chi.length > 0 && <span data-testid="voto-chi" title={chi.join(", ")} className="mt-auto truncate pt-1 text-[12px] font-sans font-medium text-brand">{chiHaVotato(chi)}</span>}
                 </span>
               </button>
             </li>
@@ -177,7 +186,8 @@ export default function VotoGruppo({ iniziale, foto, percorso, collegato }: { in
 
       {errore && <p role="alert" data-testid="voto-errore" className="px-5 pt-2 text-sm font-sans text-error">{errore}</p>}
 
-      <div className="mt-auto px-4 pt-4">
+      {/* Subito sotto i posti (prima stava in fondo allo schermo, con mezza pagina vuota in mezzo). */}
+      <div className="px-4 pt-4">
         {vince && stato.sonoIo ? (
           (() => {
             const p = stato.posti.find((x) => x.id === vince.id)!;
@@ -199,8 +209,13 @@ export default function VotoGruppo({ iniziale, foto, percorso, collegato }: { in
         ) : null}
         {/* Iscriversi è un invito alla fine, mai un obbligo per votare. */}
         {!collegato && (stato.mioVoto || stato.chiuso) && (
-          <Link data-testid="voto-iscriviti" href={withNext("/signup", percorso)} className="mt-2 flex min-h-11 items-center justify-center text-sm font-display font-semibold text-brand">
-            Fai anche tu la tua mappa su Mapetite →
+          <Link data-testid="voto-iscriviti" href={withNext("/signup", percorso)} className="mt-4 flex items-center gap-3 rounded-card bg-surface px-4 py-3.5 active:scale-[0.99]">
+            <span aria-hidden className="text-2xl">📍</span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-display text-[15px] font-semibold text-brand">Fai anche tu la tua mappa</span>
+              <span className="block text-[13px] font-sans text-text-muted">Salvi i posti dai reel e li ritrovi quando serve.</span>
+            </span>
+            <span aria-hidden className="font-display text-lg font-semibold text-brand">→</span>
           </Link>
         )}
       </div>
