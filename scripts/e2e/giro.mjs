@@ -10560,7 +10560,8 @@ else {
     await cp.reload({ waitUntil: "networkidle" });
     await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
     ok((await cp.getByTestId("recensione-form").count()) === 0 && (await txt(cp.getByTestId("recensione-visita-vecchia"))).includes("30 giorni"), "recensioni (proposta 74): visita di oltre 30 giorni fa → niente modulo, la riga lo dice");
-    ok((await cp.getByTestId("recensione-ci-sono-tornato").count()) === 0 && (await txt(cp.getByTestId("recensione-visita-vecchia"))).includes("↻ Ci sono tornato"), "recensioni (proposta 74): nessun secondo tasto 'Ci sono tornato', rimanda a quello del diario");
+    ok((await cp.getByTestId("recensione-ci-sono-tornato").count()) === 0 && (await cp.getByTestId("recensione-vai-mappa").getAttribute("href")) === `/mappa?salvato=${CID}`, "recensioni (proposta 74): nessun secondo tasto 'Ci sono tornato'; fuori dalla mappa 'Segnalalo dalla mappa' apre la scheda con il diario");
+    { const h = (await cp.getByTestId("recensione-vai-mappa").boundingBox())?.height ?? 0; ok(h >= 44, `recensioni (proposta 74): 'Segnalalo dalla mappa' alto almeno 44px (${Math.round(h)})`); }
     ok((await cp.getByTestId("community-vuota").count()) === 0, "recensioni (proposta 74): con la riga dei 30 giorni niente 'sii il primo a dire com'era'");
     await cp.getByTestId("recensione-visita-vecchia").scrollIntoViewIfNeeded();
     await cp.screenshot({ path: `${OUT}/98d-recensioni-visita-vecchia.png`, caret: "initial" });

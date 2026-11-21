@@ -279,7 +279,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
         <div data-testid="mia-recensione" className="mt-3 rounded-card border-2 border-accent/30 bg-surface p-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">La tua recensione</p>
-            {visitato && (
+            {visitato && !visitaVecchia && (
               <button type="button" onClick={() => { setEditing(true); setStatus("idle"); }} className="min-h-11 px-1 text-sm font-display font-semibold text-brand">
                 Modifica
               </button>
@@ -340,30 +340,34 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
       )}
       {rigaVecchia && (
         <div data-testid="recensione-visita-vecchia" className="mt-3 rounded-card border border-border bg-surface p-3">
-          <p className="text-sm font-sans text-text">
-            {mine ? "La visita è di più di 30 giorni fa: la recensione resta com'è." : "La visita è di più di 30 giorni fa: si recensisce entro 30 giorni."}
-          </p>
-          {/* Niente secondo "Ci sono tornato" (revisore 21/11: doppione del diario, che conta la visita e
-              fa scegliere il giorno): se il tasto del diario è nella scheda, ci si porta lì. */}
-          <p className="mt-1 text-sm font-sans text-text-muted">Ci sei tornato? Segnalo con «↻ Ci sono tornato».</p>
-          {tornatoInVista && (
+          <p className="text-sm font-sans text-text">La visita è di più di 30 giorni fa: si recensisce entro 30 giorni.</p>
+          {/* Niente secondo "Ci sono tornato" (revisore 21/11: doppione del diario, che conta la visita e fa scegliere
+              il giorno): nella scheda della mappa si porta al tasto del diario, altrove si apre la scheda nella mappa. */}
+          {tornatoInVista ? (
             <button
               type="button"
               data-testid="recensione-vai-tornato"
               onClick={() => {
                 const b = document.querySelector<HTMLElement>('[data-testid="diario-scheda-tornato"]');
-                b?.scrollIntoView({ block: "center", behavior: "smooth" });
-                b?.focus();
+                if (!b) return;
+                b.scrollIntoView({ block: "center", behavior: "smooth" });
+                b.focus();
+                // Segno visibile anche quando il tasto è già sullo schermo (revisore 21/11).
+                b.classList.add("ring-2", "ring-accent", "rounded-pill");
+                window.setTimeout(() => b.classList.remove("ring-2", "ring-accent", "rounded-pill"), 1500);
               }}
               className="mt-1 inline-flex min-h-11 items-center text-sm font-display font-semibold text-brand underline underline-offset-2"
             >
-              Segnalo qui sopra ↑
+              Ci sei tornato? Segnalalo qui sopra ↑
             </button>
-          )}
-          {mine && (
-            <button type="button" onClick={() => setEditing(false)} className="ml-2 mt-2 inline-flex min-h-11 items-center px-2 text-sm font-display font-semibold text-text-muted">
-              Annulla
-            </button>
+          ) : (
+            <Link
+              href={`/mappa?salvato=${c.placeId}`}
+              data-testid="recensione-vai-mappa"
+              className="mt-1 inline-flex min-h-11 items-center text-sm font-display font-semibold text-brand underline underline-offset-2"
+            >
+              Ci sei tornato? Segnalalo dalla mappa →
+            </Link>
           )}
         </div>
       )}
