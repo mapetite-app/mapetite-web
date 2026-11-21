@@ -620,7 +620,8 @@ const TAG_INVARIABILI = new Set(["tradizionale", "informale", "vivace"]);
 // "Messi da parte" senza il posto di partenza di "Altri come questo" (nomi, non id).
 function senzaNome<T extends Record<string, string[] | undefined>>(daParte: T | null, nome: string | null): T | null {
   if (!daParte || nome == null) return daParte;
-  return Object.fromEntries(Object.entries(daParte).map(([k, v]) => [k, Array.isArray(v) ? v.filter((n) => nomeChiave(n) !== nome) : v])) as T;
+  // "abbassati" contiene id (proposta 46, 21/11), non nomi: non si filtra qui.
+  return Object.fromEntries(Object.entries(daParte).map(([k, v]) => [k, Array.isArray(v) && k !== "abbassati" ? v.filter((n) => nomeChiave(n) !== nome) : v])) as T;
 }
 // Salvato con 👍, o visitato senza 👎: la scheda offre "Altri come questo".
 function piaciuto(tags: string[] | null | undefined): boolean {
@@ -1484,6 +1485,11 @@ export default function MapView({
   const zoneSalvati = salvatiMappaOn ? zoneDeiSalvati(displayedPlaces) : [];
   // Le card seguono l'ordine della lista solo sulla mappa dei salvati, senza ricerca né gruppo aperto.
   const ordineListaOn = salvatiMappaOn && clusterPlaces === null && ordineLista != null;
+  // Proposta 46 (21/11): nella lista di un gruppo di segnalini "dopo i primi 3" non vale (ordine diverso): niente frase.
+  const setAsideLista = useMemo(
+    () => (aiSearch?.daParte ? (clusterPlaces === null ? aiSearch.daParte : { ...aiSearch.daParte, abbassati: [] }) : null),
+    [aiSearch?.daParte, clusterPlaces],
+  );
   // I posti non presenti nella lista (es. trovati dopo con la ricerca) vanno in fondo, nel loro ordine.
   const posLista = ordineListaOn && ordineLista ? new globalThis.Map(ordineLista.map((id, i) => [id, i])) : null;
   const salvatiOrdinati = posLista
@@ -3002,19 +3008,19 @@ export default function MapView({
           // Il numero nella pillola cala (12 → 10): lo si dice, con i nomi dietro la pillola (revisore del 1/11).
           const tolti = prev.risultati.slice(fermi).filter((p) => fuori.has(p.id)).map((p) => p.name);
           // Proposta 46 (revisore 20/11): il più famoso abbassato non torna tra i primi 3 con il giudizio dell'AI,
-          // e se sparisce (tolto) la frase non parla più di lui.
+          // e se sparisce (tolto) la frase non parla più di lui. Per id (21/11).
           const ab = new Set(prev.daParte?.abbassati ?? []);
           let nuova = [...visti, ...dopo];
           if (ab.size > 0) {
-            const altri = nuova.filter((p) => !ab.has(p.name));
-            const su = nuova.filter((p) => ab.has(p.name));
+            const altri = nuova.filter((p) => !ab.has(p.id));
+            const su = nuova.filter((p) => ab.has(p.id));
             if (altri.length >= 3) {
               const out = [...altri];
               for (const p of su) out.splice(Math.min(out.length, Math.max(3, nuova.indexOf(p))), 0, p);
               nuova = out;
             }
           }
-          const daParte = prev.daParte && ab.size > 0 ? { ...prev.daParte, abbassati: [...ab].filter((n) => nuova.some((p) => p.name === n)) } : prev.daParte;
+          const daParte = prev.daParte && ab.size > 0 ? { ...prev.daParte, abbassati: [...ab].filter((id) => nuova.some((p) => p.id === id)) } : prev.daParte;
           return { ...prev, daParte, risultati: nuova, fuoriTema: [...new Set([...(prev.fuoriTema ?? []), ...fuoriTema])], tolti: [...new Set([...(prev.tolti ?? []), ...tolti])] };
         });
       }
@@ -4607,7 +4613,7 @@ export default function MapView({
           focusedId={focusId}
           understood={aiSearch?.filtri ? filtriParts(aiSearch.filtri).slice(0, 4) : []}
           capito={aiSearch?.filtri ? capitoBreve(aiSearch.filtri) : []}
-          setAside={aiSearch?.daParte ?? null}
+          setAside={setAsideLista}
           offTopic={aiSearch?.fuoriTema}
           removed={clusterPlaces === null ? aiSearch?.tolti : undefined}
           frase={frase}

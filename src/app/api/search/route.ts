@@ -406,11 +406,12 @@ export async function POST(request: Request) {
     }
     // Il più famoso non apre la lista solo perché è il più famoso: scende dopo i primi 3, resta in vista.
     if (searchIntent === "natural") {
-      const { places, lowered } = lowerMassFromTop(query.trim(), risultati);
+      const { places, lowered, loweredPlaces } = lowerMassFromTop(query.trim(), risultati);
       if (lowered.length > 0) {
         risultati = places;
         // Proposta 46 "Perché è qui": lo si dice nel pannello dei risultati (non è "messo da parte": resta in vista).
-        daParte.abbassati = lowered.slice(0, 3);
+        // Per id, non per nome (21/11): due sedi con lo stesso nome non si confondono.
+        daParte.abbassati = loweredPlaces.slice(0, 3).map((p) => p.id);
         console.log(`[search-mainstream] q=${JSON.stringify(query.trim().slice(0, 80))} dopo i primi 3 (molte più recensioni degli altri): ${JSON.stringify(lowered)}`);
       }
     }
@@ -706,9 +707,9 @@ ESEMPI (input → output atteso):
     // la soglia di lowerMassFromTop è sui 20 di Google, prima del taglio a 12).
     const conti = risultatiFinali.map((p) => p.userRatingCount ?? 0).sort((a, b) => a - b);
     const mediana = conti[Math.floor(conti.length / 2)] ?? 0;
-    daParte.abbassati = daParte.abbassati.filter((n) => {
-      const at = risultatiFinali.findIndex((p) => p.name === n);
-      return !altrove.has(n) && at >= 3 && (risultatiFinali[at].userRatingCount ?? 0) > mediana * 2.5;
+    daParte.abbassati = daParte.abbassati.filter((id) => {
+      const at = risultatiFinali.findIndex((p) => p.id === id);
+      return at >= 3 && !altrove.has(risultatiFinali[at].name) && (risultatiFinali[at].userRatingCount ?? 0) > mediana * 2.5;
     });
   }
 
