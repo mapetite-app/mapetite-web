@@ -6,6 +6,15 @@ Obiettivo: entro fine ottobre 2026 un'app che un gruppo ristretto di persone pos
 Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) · IN PR · FATTA.
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
+## SESSIONE DI SABATO 21/11 (22:05) — CEO apre e chiude
+- **CEO apre:** nessun commento nuovo di Lorenzo. Esito della #182 (minori della 56): **VALIDATA** (in produzione, approvata 8,6).
+- **Numeri di produzione (22:30):** 7 utenti, 0 accessi negli ultimi 7 giorni, 0 prove senza account, **0 locali verificati**, 0 telefoni con gli avvisi. Niente tester: la notifica ricorda a Lorenzo DA-FARE 3 e 9.
+- **Proposta 72 "Avvisami quando c'è posto" (FATTA, spenta):** in fondo a "Le tue note" di un salvato di un locale verificato il tasto "🔔 Avvisami quando c'è posto"; acceso diventa "🔔 Ti avviso quando c'è posto · Togli" (con gli avvisi del telefono spenti: "Telefono spento · Riaccendi · Togli"). Quando il titolare aggiunge giorni con posto dal pannello, chi lo segue riceve "Nome: stasera c'è posto · Lo dice il locale…" e il tocco apre la pagina del locale. Regole: solo a chi ha ancora il locale tra i salvati e non l'ha segnato "Non fa per me"; al massimo uno ogni 6 giorni per locale (righe prenotate in un solo UPDATE); togliere giorni non manda niente; fuori dalle 9–21 lo manda il cron delle 15; l'avviso scade a mezzanotte. Tabella `avvisi_posto` (solo UUID; il telefono inserisce solo persona e locale, niente update né truncate): migrazione `20261121f` **applicata in produzione**. Riga nuova in /privacy sugli avvisi (prima non c'era niente sugli avvisi push). Zero chiamate Google o AI.
+- **Resta invisibile** finché su Vercel non ci sono le chiavi degli avvisi (DA-FARE voce 8) e finché nessun locale è verificato.
+- **Revisore separato:** prima verifica 7,5, **bocciata** (avviso che restava dopo aver tolto il salvato o detto "Non fa per me", senza modo di spegnerlo; tasto sopra lo stato; stato acceso su due righe con una campanella ambigua; avvisi di notte). Tutto corretto. Seconda verifica: **8,5, APPROVATA**; corretti anche i suoi minori (insert limitato alle colonne, colonna aggiunta anche con `alter`, testo "Telefono spento", "Togli" 44×44).
+- **CEO chiude:** ricerche web già fatte alle 03:05 di oggi.
+- **Prossima sessione (in ordine):** (1) Domenica 22/11: guardare in produzione se è entrato qualcuno (se no, la notifica lo ripete). (2) Un'altra voce PRONTA di `PROPOSTE.md` che entri nel copione demo senza chiavi né locali verificati.
+
 ## SESSIONE DI SABATO 21/11 (18:05) — CEO apre e chiude
 - **CEO apre:** nessun commento nuovo di Lorenzo. Esito della #180 (74 "Recensioni come vuole la legge", 56 "Manda al gruppo"): **VALIDATA** entrambe (in produzione, approvate 8,5).
 - **Numeri di produzione (18:30):** 0 voti di gruppo, 0 prove senza account; negli ultimi 7 giorni 1 utente collegato e 123 visite anonime da una pagina sola ("prima volta"), quasi certamente i nostri controlli dopo ogni merge e anteprime dei link: non sono tester.
