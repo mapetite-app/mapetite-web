@@ -9,13 +9,16 @@ create table if not exists public.avvisi_posto (
   place_id uuid not null references public.places(id) on delete cascade,
   created_at timestamptz not null default now(),
   avvisato_at timestamptz,
+  -- true se il titolare ha segnato giorni nuovi fuori dalle 9–21: l'avviso lo manda il cron delle 15.
+  in_attesa boolean not null default false,
   primary key (user_id, place_id)
 );
 create index if not exists avvisi_posto_place_idx on public.avvisi_posto(place_id);
+create index if not exists avvisi_posto_attesa_idx on public.avvisi_posto(place_id) where in_attesa;
 alter table public.avvisi_posto enable row level security;
 drop policy if exists "avvisi_posto: i miei" on public.avvisi_posto;
 create policy "avvisi_posto: i miei" on public.avvisi_posto
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
--- Il telefono non scrive avvisato_at (lo fa solo il server): solo insert e delete, niente update.
+-- Il telefono non scrive avvisato_at né in_attesa (lo fa solo il server): solo insert e delete, niente update.
 revoke update on public.avvisi_posto from anon, authenticated;
 revoke all on public.avvisi_posto from anon;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, BellOff } from "lucide-react";
+import { Bell } from "lucide-react";
 import { accendiPush, chiavePubblica, statoPush, type PushStato } from "@/lib/push-client";
 import { trackFeature } from "@/lib/track";
 
@@ -53,6 +53,21 @@ export default function AvvisoPosto({ venueId }: { venueId: string }) {
     }
   };
 
+  // Avviso acceso ma avvisi del telefono spenti (dal profilo): si riaccendono senza toccare l'avviso del locale.
+  const riaccendi = async () => {
+    setBusy(true);
+    setErrore(null);
+    try {
+      await accendiPush();
+      setPush("acceso");
+    } catch (e) {
+      setErrore(e instanceof Error ? e.message : "Non ci sono riuscito: riprova.");
+      setPush(await statoPush().catch(() => "spento" as const));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div data-testid="avviso-posto" className="mt-2">
       {push === "ios_da_installare" ? (
@@ -60,11 +75,16 @@ export default function AvvisoPosto({ venueId }: { venueId: string }) {
       ) : push === "negato" && !on ? (
         <p className="text-xs text-text-muted">🔔 Avvisi bloccati nelle impostazioni del telefono.</p>
       ) : on ? (
+        // Revisore 21/11: stato corto e "Togli" scritto (una campanella barrata da sola sembrava uno stato).
         <p className="flex min-h-11 items-center gap-1.5 text-sm font-sans text-text-muted">
           <Bell size={14} className="shrink-0 text-brand" aria-hidden />
-          <span data-testid="avviso-posto-acceso" className="min-w-0 flex-1">Ti avviso quando il locale dice che c&apos;è posto</span>
-          <button type="button" onClick={cambia} disabled={busy} data-testid="avviso-posto-togli" aria-label="Togli l'avviso" className="inline-flex min-h-11 min-w-11 items-center justify-center text-text-muted disabled:opacity-60">
-            <BellOff size={16} aria-hidden />
+          <span data-testid="avviso-posto-acceso" className="min-w-0 truncate">{push === "acceso" ? "Ti avviso quando c'è posto" : "Avviso attivo, telefono spento"}</span>
+          <span aria-hidden>·</span>
+          {push !== "acceso" && push !== "negato" && (
+            <><button type="button" onClick={riaccendi} disabled={busy} data-testid="avviso-posto-riaccendi" className="inline-flex min-h-11 shrink-0 items-center font-display font-semibold text-brand disabled:opacity-60">Riaccendi</button><span aria-hidden>·</span></>
+          )}
+          <button type="button" onClick={cambia} disabled={busy} data-testid="avviso-posto-togli" className="inline-flex min-h-11 shrink-0 items-center font-display font-semibold text-brand disabled:opacity-60">
+            Togli
           </button>
         </p>
       ) : (

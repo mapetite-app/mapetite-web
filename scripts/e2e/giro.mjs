@@ -8701,13 +8701,23 @@ else {
       const primaIscr = iscr.filter((x) => x.m === "POST").length;
       await acc.click().catch(() => {});
       await ap.getByTestId("avviso-posto-acceso").waitFor({ timeout: 4000 }).catch(() => {});
-      ok(((await ap.getByTestId("avviso-posto-acceso").textContent().catch(() => "")) ?? "") === "Ti avviso quando il locale dice che c'è posto" && iscr.filter((x) => x.m === "POST").length === primaIscr + 1, "avviso c'è posto: il tocco accende gli avvisi del telefono (se spenti) e dice 'Ti avviso quando il locale dice che c'è posto'");
+      ok(((await ap.getByTestId("avviso-posto-acceso").textContent().catch(() => "")) ?? "") === "Ti avviso quando c'è posto" && iscr.filter((x) => x.m === "POST").length === primaIscr + 1, "avviso c'è posto: il tocco accende gli avvisi del telefono (se spenti) e dice 'Ti avviso quando c'è posto · Togli'");
       await ap.getByTestId("avviso-posto").screenshot({ path: `${OUT}/96c-avviso-posto-acceso.png` }).catch(() => {});
       await apriScheda();
-      ok(await ap.getByTestId("avviso-posto-acceso").isVisible().catch(() => false), "avviso c'è posto: riaprendo la scheda resta acceso (salvato sul server)");
+      // Pagina nuova: il servizio push finto riparte senza iscrizione, come un telefono con gli avvisi spenti dal profilo.
+      ok(((await ap.getByTestId("avviso-posto-acceso").textContent().catch(() => "")) ?? "") === "Avviso attivo, telefono spento" && await ap.getByTestId("avviso-posto-riaccendi").isVisible().catch(() => false), "avviso c'è posto: riaprendo la scheda resta acceso (salvato sul server) e, con gli avvisi del telefono spenti, lo dice con 'Riaccendi'");
+      { const n = iscr.filter((x) => x.m === "POST").length;
+        await ap.getByTestId("avviso-posto-riaccendi").click().catch(() => {});
+        await ap.waitForTimeout(500);
+        ok(((await ap.getByTestId("avviso-posto-acceso").textContent().catch(() => "")) ?? "") === "Ti avviso quando c'è posto" && iscr.filter((x) => x.m === "POST").length === n + 1, "avviso c'è posto: 'Riaccendi' riaccende gli avvisi del telefono"); }
+      { const b = await ap.getByTestId("avviso-posto-togli").boundingBox().catch(() => null);
+        ok(b != null && b.height >= 44, "avviso c'è posto: 'Togli' scritto, tocco da 44 px"); }
+      { const y = async (id) => (await ap.getByTestId(id).boundingBox().catch(() => null))?.y ?? -1;
+        ok(await y("avviso-posto") > await y("stato-salvato") && await y("stato-salvato") > 0, "avviso c'è posto: sta sotto 'Da provare / Ci sono stato' (azione secondaria)"); }
+      await ap.getByTestId("avviso-posto").screenshot({ path: `${OUT}/96d-avviso-posto-riacceso.png` }).catch(() => {});
       await ap.getByTestId("avviso-posto-togli").click().catch(() => {});
       await ap.getByTestId("avviso-posto-accendi").waitFor({ timeout: 4000 }).catch(() => {});
-      ok(await ap.getByTestId("avviso-posto-accendi").isVisible().catch(() => false), "avviso c'è posto: il tasto 🔕 lo toglie");
+      ok(await ap.getByTestId("avviso-posto-accendi").isVisible().catch(() => false), "avviso c'è posto: 'Togli' lo toglie");
       const bad = await ap.evaluate(async () => (await fetch("/api/avvisi-posto", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: "ChIJxyz", attivo: true }) })).status);
       ok(bad === 400, `avviso c'è posto: un id che non è un UUID → 400 (${bad})`);
       await actx.clearCookies({ name: "e2e_serate" }); }

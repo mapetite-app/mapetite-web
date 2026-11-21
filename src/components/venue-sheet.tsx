@@ -598,8 +598,6 @@ export default function VenueSheet({
             <span className="min-w-0 truncate">Te l&apos;ha consigliato <span className="font-display font-semibold text-brand">{consigliatoDa}</span></span>
           </p>
         )}
-        {/* Proposta 72: "Avvisami quando c'è posto", solo per i salvati di un locale verificato (parola del titolare). */}
-        {isSaved && !!userId && isUuid(venue.id) && infoLocale?.verificato && !personalTags?.includes("Non fa per me") && <AvvisoPosto venueId={venue.id} />}
         {withStatus && onVisitStatus && (
           <div className="mt-2 flex gap-2" data-testid="stato-salvato">
             {([["Da provare", "📌 Da provare"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => {
@@ -724,6 +722,9 @@ export default function VenueSheet({
             Modifica
           </button>
         )}
+        {/* Proposta 72: "Avvisami quando c'è posto", in fondo alle note (azione secondaria, revisore 21/11),
+            solo per i salvati di un locale verificato (parola del titolare). */}
+        {isSaved && !!userId && isUuid(venue.id) && infoLocale?.verificato && !personalTags?.includes("Non fa per me") && <AvvisoPosto venueId={venue.id} />}
       </div>
   );
 
