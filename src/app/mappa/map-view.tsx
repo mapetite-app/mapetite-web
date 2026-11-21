@@ -620,7 +620,8 @@ const TAG_INVARIABILI = new Set(["tradizionale", "informale", "vivace"]);
 // "Messi da parte" senza il posto di partenza di "Altri come questo" (nomi, non id).
 function senzaNome<T extends Record<string, string[] | undefined>>(daParte: T | null, nome: string | null): T | null {
   if (!daParte || nome == null) return daParte;
-  return Object.fromEntries(Object.entries(daParte).map(([k, v]) => [k, Array.isArray(v) ? v.filter((n) => nomeChiave(n) !== nome) : v])) as T;
+  // "abbassati" contiene id (proposta 46, 21/11), non nomi: non si filtra qui.
+  return Object.fromEntries(Object.entries(daParte).map(([k, v]) => [k, Array.isArray(v) && k !== "abbassati" ? v.filter((n) => nomeChiave(n) !== nome) : v])) as T;
 }
 // Salvato con 👍, o visitato senza 👎: la scheda offre "Altri come questo".
 function piaciuto(tags: string[] | null | undefined): boolean {
