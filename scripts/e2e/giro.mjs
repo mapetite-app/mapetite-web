@@ -10590,6 +10590,14 @@ else {
       const d = new Date("2026-11-21T10:00:00+01:00");
       ok(!visitaOltre30("2026-10-22", d) && visitaOltre30("2026-10-21", d) && !visitaOltre30(null, d) && !visitaOltre30("2026-12-01", d), "recensioni (proposta 74): 30 giorni esatti sì, 31 no, senza data o data futura non blocca");
     }
+    // Le recensioni del 5b tornano per i controlli che seguono (senza accesso).
+    await setC("e2e_community", {
+      recensioni: [
+        { id: "r1", rating: 5, comment: "Carbonara da applausi, chiedete il tavolo in fondo.", created_at: "2026-11-10T20:00:00Z", autore: { user_id: "u-giulia", handle: "giulia.rm", display_name: "Giulia" }, amico: true, visita: { mese: "2026-11-01" } },
+        { id: "r2", rating: 4, comment: null, created_at: "2026-10-12T20:00:00Z", autore: null, amico: false, visita: { mese: null } },
+      ],
+      mia: null, reel: [], reelPronti: true, possoRecensire: false,
+    });
   }
 
   // 6. Senza accesso: si leggono le recensioni, per scrivere serve "Accedi" (che riporta al locale).
