@@ -338,7 +338,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per il ristoratore:** nessuno diretto; più salvati = più domanda misurata nel pannello.
 - **Sforzo:** S/M (ricerca per nome normalizzato in `places`, solo corrispondenze uniche).
 - **Costo Google/Haiku:** in meno (ogni posto già noto risparmia 1 chiamata).
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA → **costruita il 21/11 e FERMATA dal CEO**: il catalogo di produzione ha 46 locali, il risparmio oggi è quasi zero. Codice sul branch `claude/tjde01-catalogo`; si accende quando il catalogo ha qualche centinaio di locali a Roma e Milano.
 
 ### 39. Dopo il file di Google: "Ecco le tue raccolte" come copertine
 - **Problema:** dopo l'import si vede solo "Salvati 23": non si capisce che le liste sono diventate raccolte.
