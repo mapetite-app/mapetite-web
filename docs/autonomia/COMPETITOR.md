@@ -9,6 +9,11 @@ Metro di giudizio (VISIONE): raccogli, organizza, ritrova, scegli. E il differen
 
 ## App per chi esce (consumer)
 
+### Nuove app "salva dal reel" (ultimo controllo 21/11/2026)
+- Sull'App Store ora ce ne sono molte: **Korka** (Instagram e TikTok su una mappa, acquisto una tantum per gli import illimitati: [App Store](https://apps.apple.com/app/id6762612703)), **Munchmark** (dal menu Condividi, riconosce il locale e prende i dati da Yelp: [App Store](https://apps.apple.com/app/munchmark/id6773109835)), **NextBite** ([App Store](https://apps.apple.com/us/app/id6767959568)), **ReelsMap** ([App Store](https://apps.apple.com/app/reelsmap/id6756835284)), **SpotSavor** ([App Store](https://apps.apple.com/mx/app/spotsavor/id6756197293)). Numeri di utenti: dato non trovato.
+- **Cosa vuol dire per noi:** salvare dal reel non basta più come differenza. Restano nostri il verdetto onesto, i posti non famosi messi avanti e l'italiano su Roma e Milano. Proposta 75.
+- **Beli** (ultimo controllo 21/11/2026): oltre 120 milioni di voti, 2 milioni di locali, voto da 1 a 10 per confronto ([Boston Globe, agosto 2026](https://www.bostonglobe.com/2026/08/04/lifestyle/beli-restaurant-rating-app/)). Niente di nuovo a novembre.
+
 ### Places (Raya) — riferimento principale di design
 - **Cosa fa:** guida curata: ogni posto è scelto a mano da "Curators". Chat per organizzare un'uscita o un viaggio, posti appena aperti, salvataggi, segui i curatori. Abbonamento a pagamento. ([App Store](https://apps.apple.com/us/app/places-curated-travel-guide/id6446208302))
 - **Da prendere:** look editoriale calmo; risposta AI scritta come un consiglio di un amico; card scure a foto piena sulla mappa; scheda con barra azioni fissa; foglio Salva "Voglio andarci / Ci sono stato" (screenshot `places-01`…`12`).

@@ -2,6 +2,31 @@
 
 Bilancio della settimana, scritto dalla prima sessione del sabato (regola del team gstack). Fonti: `git log` di `main`, PR, `BACKLOG.md`, database di produzione.
 
+## Settimana 14–20/11 (scritta sabato 21/11 alle 03:30, sessione delle 03:05)
+
+### Cosa è stato fatto
+- **In produzione (18 PR unite, #143–#174):** Salvati a copertine, profilo dell'amico e Prenota (richieste di Lorenzo dell'8/11, sbloccate il 14/11); inviti tra amici e "Scegli tra 3"; "Te l'ha consigliato Giulia"; lucchetto "Solo per me" su posti e raccolte; "Nessun tetto"; recensisce solo chi ha segnato la visita; "Quanto si spende davvero"; prezzo a testa detto dal locale; "Perché ti piacerà" e "Fuori dai miei gusti"; "L'avevi salvato perché…"; "Da quando parla il verdetto"; "Dai un feedback" per i tester; "Dove c'è posto" tra i salvati; "Perché è qui" sull'ordine dei risultati.
+- **Fermate dal CEO (4 su 4 voci che leggono il testo delle recensioni con regole):** 50 (lingua delle recensioni), 51 "Da ordinare", 60, 73 "il piatto chiesto". Con le 5 recensioni di Google le regole danno o frasi false o nessuna riga.
+- **Ferma da Lorenzo:** 70 "Scarica i tuoi salvati" (termini Google, DA-FARE voce 12).
+
+### Cosa è andato
+- **Ritmo:** una sessione ogni notte, nessun buco (la settimana prima ne aveva 5), PR unite quasi ogni notte.
+- **Il CEO ha fermato voci approvate dal design ma false sui dati veri** (50, 51): si è misurato su ricerche Google vere prima del merge, come vuole `VISIONE.md` ("mai inventare").
+
+### Cosa non è andato
+1. **Nessuno usa l'app.** Database di produzione al 21/11: 7 utenti in tutto, **0 nuovi e 0 accessi negli ultimi 7 giorni, 1 posto salvato, 0 segnalazioni** da "Dai un feedback". Abbiamo costruito 18 PR di dettagli (pillole, righe sotto il verdetto) per nessuno: il gruppo di tester di fine ottobre non è mai partito.
+2. **Troppe voci piccole e invisibili:** righe grigie sotto il verdetto, frasi nel pannello; nessuna si nota in una demo da 3 minuti.
+3. **Le voci sul testo delle recensioni sono state costruite 4 volte prima di capire che il dato non basta:** almeno 4 sessioni spese.
+
+### 3 cambi per la settimana dopo
+- **Niente voci nuove sul testo delle recensioni con regole** (bocciate 4 su 4): solo dati strutturati (Google, salvati, locale).
+- **Prima voce della settimana: ciò che porta i primi tester dentro** (DA-FARE voci 3 e 9: telefoni veri, account demo): il CEO lo ricorda a Lorenzo nella notifica, con i numeri del database.
+- **Ogni voce nuova deve vedersi nel copione demo di `DEMO.md`**; se non entra nel copione, passa dopo.
+
+### Revisione dei documenti del team
+- **`PROPOSTE.md`:** 66–73 nuove in settimana; fatte 46, 48, 54, 61, 62, 64–69; fermate 50, 51, 60, 73; 71 ferma (dipende dalla 51); 70 a Lorenzo. Prossime: 38 (catalogo per l'import, in corso il 21/11), 56 "Manda al gruppo".
+- **`COMPETITOR.md`, `PROBLEMI.md`, `PARTNER.md`:** aggiornati ogni giorno dal CEO che chiude (problemi 24–30); nessun contatto partito, giusto così. `PARTNER.md`: le bozze Quandoo/TheFork aspettano Lorenzo dall'8/11 (DA-FARE voce 10).
+
 ## Settimana 7–13/11 (scritta sabato 14/11 alle 18:50, sessione delle 18:05)
 
 ### Cosa è stato fatto
