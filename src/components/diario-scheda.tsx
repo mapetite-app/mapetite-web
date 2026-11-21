@@ -85,6 +85,8 @@ export default function DiarioScheda({ userId, place, coords = null }: { userId:
       if (res === "errore" && vista) res = await saveVisit(userId, place.id, { visite: tornato, visited_at: date });
       if (res === "errore") return false;
       setStato((s) => (s ? { ...s, visite: tornato, date: res === "ok" ? date : s.date, vista: vista ?? s.vista } : s));
+      // La sezione recensioni rilegge la data (proposta 74: si recensisce entro 30 giorni dalla visita).
+      if (res === "ok") window.dispatchEvent(new CustomEvent("mapetite:data-visita", { detail: { placeId: place.id, date } }));
       if (vista) trackFeature("visita_vista", { contesto: "tornato" });
       track("ci_sono_stato", { id: place.id }, { fonte: "tornato", visite: tornato });
       setTornato(null);
@@ -92,6 +94,7 @@ export default function DiarioScheda({ userId, place, coords = null }: { userId:
       const res = await saveVisit(userId, place.id, { visited_at: v.date });
       if (res === "errore") return false;
       setStato((s) => (s ? { ...s, colonna: res === "ok", date: res === "ok" ? v.date : null } : s));
+      if (res === "ok") window.dispatchEvent(new CustomEvent("mapetite:data-visita", { detail: { placeId: place.id, date: v.date } }));
     }
     // Con la riga della data, "Non ricordo" (null) vale: niente prova.
     if (tornato == null) void scriviVista(stato?.colonna ? v.date : dayKey(new Date()));

@@ -18,11 +18,12 @@ import { trackFeature } from "@/lib/track";
 type Luogo = { nome: string; citta: string | null; categoria: string | null };
 type Posto = { id: string; name: string; address: string; category: string | null; rating: number | null; userRatingCount: number | null; photoRef: string | null; photoAuthor: string | null };
 type Verdetto = { verdict: string; goFor: string[]; dontExpect: string[] };
-type Esito = { letto: Luogo; scritto: boolean; posto: Posto | null; candidato?: string | null; verdetto: Verdetto | null; risultati: unknown[]; dopo?: string };
+type Esito = { letto: Luogo; scritto: boolean; posto: Posto | null; candidato?: string | null; verdetto: Verdetto | null; risultati: unknown[]; dopo?: string; giorno?: string };
 // L'esito resta nel telefono: ricaricando la home si rivede (la prova del giorno è una sola).
 const ESITO_KEY = "mapetite.prova-reel";
+const oggi = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date());
 
-const remember = (k: string, v: unknown) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch { /* storage non disponibile */ } };
+const remember = (k: string, v: unknown) => { try { (k === ESITO_KEY ? localStorage : sessionStorage).setItem(k, JSON.stringify(v)); } catch { /* storage non disponibile */ } };
 
 export default function ProvaReel() {
   const [testo, setTesto] = useState("");
@@ -33,8 +34,9 @@ export default function ProvaReel() {
   const [esito, setEsito] = useState<Esito | null>(null);
   useEffect(() => {
     let e: Esito | null = null;
-    try { e = JSON.parse(sessionStorage.getItem(ESITO_KEY) ?? "null") as Esito | null; } catch { /* storage non disponibile */ }
-    if (!e?.letto || !e.dopo) return;
+    try { e = JSON.parse(localStorage.getItem(ESITO_KEY) ?? "null") as Esito | null; } catch { /* storage non disponibile */ }
+    // Solo l'esito di oggi (la prova si rifà domani): la PWA chiusa e riaperta lo ritrova.
+    if (!e?.letto || !e.dopo || e.giorno !== oggi()) return;
     const t = window.setTimeout(() => setEsito(e), 0);
     return () => window.clearTimeout(t);
   }, []);
@@ -57,8 +59,8 @@ export default function ProvaReel() {
       }
       // Dopo l'accesso (e il primo accesso, per chi è nuovo) si torna a "Salva dal reel" con nome e solo il
       // link del reel (il ritorno ha un tetto di 512 caratteri): lettura e ricerca sono già nel telefono.
-      const link = findReelLink(testo) ?? testo.trim().slice(0, 300);
-      const e: Esito = { ...(d as Esito), dopo: `/importa/condividi?${new URLSearchParams({ ...(nome.trim() ? { title: nome.trim() } : {}), text: link })}` };
+      const link = findReelLink(testo) ?? testo.trim().slice(0, 120);
+      const e: Esito = { ...(d as Esito), giorno: oggi(), dopo: `/importa/condividi?${new URLSearchParams({ ...(nome.trim() ? { title: nome.trim() } : {}), text: link })}` };
       setEsito(e);
       remember(ESITO_KEY, e);
       setChiediNome(null);
@@ -140,7 +142,7 @@ export default function ProvaReel() {
         <input
           value={testo}
           onChange={(e) => { setTesto(e.target.value); setErrore(null); }}
-          placeholder="Link del reel (Instagram, TikTok…)"
+          placeholder="Link di Instagram, TikTok o YouTube"
           aria-label="Link del reel"
           inputMode="url"
           data-testid="prova-link"
@@ -173,7 +175,7 @@ export default function ProvaReel() {
       {errore && (
         <p role="alert" data-testid="prova-errore" className="mt-2 rounded-btn bg-error/10 px-3 py-2 text-sm text-error">
           {errore.msg}
-          {errore.finita && <> <Link href="/signup" className="inline-flex min-h-11 items-center font-semibold underline">Crea l&apos;account</Link></>}
+          {errore.finita && <> <Link href={withNext("/signup", findReelLink(testo) ? `/importa/condividi?${new URLSearchParams({ text: findReelLink(testo)! })}` : "/importa")} className="inline-flex min-h-11 items-center font-semibold underline">Crea l&apos;account</Link></>}
         </p>
       )}
     </section>

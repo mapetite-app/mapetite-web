@@ -35,11 +35,12 @@ export async function saveReview(userId: string, placeId: string, rating: number
 export async function segnaCiSonoStato(userId: string, placeId: string): Promise<boolean> {
   const client = await browserClient().catch(() => null);
   if (!client) return false;
-  const { data, error } = await client.from("saved_places").select("tags").eq("user_id", userId).eq("place_id", placeId).maybeSingle();
+  const { data, error } = await client.from("saved_places").select("tags, visited_at").eq("user_id", userId).eq("place_id", placeId).maybeSingle();
   if (error) return false;
   if (data) {
     const tags = ((data.tags as string[] | null) ?? []).filter((t) => t !== "Da provare" && t !== "Già visitato");
-    const { error: e2 } = await client.from("saved_places").update({ tags: [...tags, "Già visitato"], visited_at: oggiRoma() }).eq("user_id", userId).eq("place_id", placeId);
+    // Proposta 74: la visita segnata da qui è di oggi, ma una data già scelta nel diario non si tocca.
+    const { error: e2 } = await client.from("saved_places").update({ tags: [...tags, "Già visitato"], ...(data.visited_at ? {} : { visited_at: oggiRoma() }) }).eq("user_id", userId).eq("place_id", placeId);
     return !e2;
   }
   const { error: e3 } = await client.from("saved_places").insert({ user_id: userId, place_id: placeId, tags: ["Già visitato"], visited_at: oggiRoma() });
@@ -48,14 +49,6 @@ export async function segnaCiSonoStato(userId: string, placeId: string): Promise
 
 // Giorno di oggi a Roma (AAAA-MM-GG), come il controllo dei 30 giorni nel database.
 export const oggiRoma = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-
-/** Proposta 74: "Ci sono tornato" quando la visita segnata ha più di 30 giorni: la data della visita diventa oggi. */
-export async function segnaNuovaVisita(userId: string, placeId: string): Promise<boolean> {
-  const client = await browserClient().catch(() => null);
-  if (!client) return false;
-  const { error } = await client.from("saved_places").update({ visited_at: oggiRoma() }).eq("user_id", userId).eq("place_id", placeId);
-  return !error;
-}
 
 /** Tabella o vista non ancora creata (migrazione 20261016_community da applicare). */
 export function isMissingTable(error: { code?: string; message?: string } | null | undefined): boolean {

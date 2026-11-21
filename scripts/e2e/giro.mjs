@@ -10560,13 +10560,15 @@ else {
     await cp.reload({ waitUntil: "networkidle" });
     await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
     ok((await cp.getByTestId("recensione-form").count()) === 0 && (await txt(cp.getByTestId("recensione-visita-vecchia"))).includes("30 giorni"), "recensioni (proposta 74): visita di oltre 30 giorni fa → niente modulo, la riga lo dice");
-    { const h = (await cp.getByTestId("recensione-ci-sono-tornato").boundingBox())?.height ?? 0; ok(h >= 44, `recensioni (proposta 74): 'Ci sono tornato da poco' alto almeno 44px (${Math.round(h)})`); }
+    ok((await cp.getByTestId("recensione-ci-sono-tornato").count()) === 0 && (await txt(cp.getByTestId("recensione-visita-vecchia"))).includes("↻ Ci sono tornato"), "recensioni (proposta 74): nessun secondo tasto 'Ci sono tornato', rimanda a quello del diario");
+    ok((await cp.getByTestId("community-vuota").count()) === 0, "recensioni (proposta 74): con la riga dei 30 giorni niente 'sii il primo a dire com'era'");
     await cp.getByTestId("recensione-visita-vecchia").scrollIntoViewIfNeeded();
     await cp.screenshot({ path: `${OUT}/98d-recensioni-visita-vecchia.png`, caret: "initial" });
-    await cp.getByTestId("recensione-ci-sono-tornato").click();
-    await cp.getByTestId("recensione-form").waitFor({ timeout: 4000 }).catch(() => {});
+    // "↻ Ci sono tornato" nel diario (data di oggi): la sezione recensioni si riapre senza ricaricare.
     const oggi = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-    ok(await cp.getByTestId("recensione-form").isVisible() && patch.at(-1)?.visited_at === oggi, `recensioni (proposta 74): 'Ci sono tornato' scrive la visita di oggi e apre il modulo (${JSON.stringify(patch.at(-1))})`);
+    await cp.evaluate(([placeId, date]) => window.dispatchEvent(new CustomEvent("mapetite:data-visita", { detail: { placeId, date } })), [CID, oggi]);
+    await cp.getByTestId("recensione-form").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await cp.getByTestId("recensione-form").isVisible() && (await cp.getByTestId("recensione-visita-vecchia").count()) === 0 && patch.length === 0, "recensioni (proposta 74): data della visita cambiata dal diario → il modulo si apre (nessuna scrittura da qui)");
     // Il server non lo sapeva (dato vecchio sul telefono): il database risponde 'visita_vecchia' → torna la riga.
     await setC("e2e_community", { recensioni: [], mia: null, reel: [], reelPronti: true, possoRecensire: true, visitaVecchia: false });
     await cctx.route("**/rest/v1/reviews**", (r) => r.request().method() === "POST" ? r.fulfill({ status: 400, json: { code: "P0001", message: "visita_vecchia", hint: "La recensione si scrive entro 30 giorni dalla visita" } }) : r.fallback());
@@ -11867,7 +11869,7 @@ else {
     ok(((await v.getByTestId("prova-salvalo").textContent()) ?? "").includes("scegli tu"), "prova senza account: senza posto sicuro il tasto è 'Crea l'account e scegli tu'"); }
   await v.screenshot({ path: `${OUT}/94a-prova-non-sicuro.png` });
   // Nome uguale: posto, verdetto e "Salvalo".
-  await v.evaluate(() => sessionStorage.removeItem("mapetite.prova-reel"));
+  await v.evaluate(() => localStorage.removeItem("mapetite.prova-reel"));
   await v.reload({ waitUntil: "networkidle" });
   risposta = "ok";
   await v.getByTestId("prova-link").fill("https://www.instagram.com/reel/DAbc123xyz/?igsh=abc " + "x".repeat(700));
@@ -11887,7 +11889,7 @@ else {
   await v.getByTestId("prova-esito").waitFor({ timeout: 4000 }).catch(() => {});
   ok(await v.getByTestId("prova-esito").isVisible(), "prova senza account: ricaricando la home l'esito resta");
   // Seconda prova nello stesso giorno: il server dice no, il telefono lo spiega e propone l'account.
-  await v.evaluate(() => sessionStorage.removeItem("mapetite.prova-reel"));
+  await v.evaluate(() => localStorage.removeItem("mapetite.prova-reel"));
   await v.reload({ waitUntil: "networkidle" });
   risposta = "fatta";
   await v.getByTestId("prova-link").fill("https://www.tiktok.com/@x/video/123");
