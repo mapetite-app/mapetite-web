@@ -130,6 +130,8 @@ export async function vota(codice: string, votante: string, nome: string, posto:
     f.voti.set(votante, { nome, posto });
     return "ok";
   }
+  // In produzione i posti sono UUID del catalogo: altro testo è un posto che non è nel voto (400, non 500).
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(posto)) return "posto";
   const { data, error } = await createAdminClient().rpc("vota_gruppo", { p_codice: codice, p_votante: votante, p_nome: nome, p_posto: posto, p_tetto: MAX_VOTANTI });
   if (error) { console.error(`[voto] voto non riuscito ${error.code ?? ""} ${error.message}`); return "errore"; }
   return (["ok", "nessuno", "chiuso", "posto", "pieno"] as const).find((x) => x === data) ?? "errore";
