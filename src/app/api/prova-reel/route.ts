@@ -15,29 +15,24 @@ import { isAutomated, recordEvent, ANON_COOKIE } from "@/lib/events";
 // il posto con il verdetto prima di registrarsi. Stessi pezzi di "Salva dal reel" (didascalia dal link
 // ufficiale di TikTok/YouTube, o il nome scritto a mano per Instagram; l'AI trova il locale; 1 Text
 // Search Google; verdetto dalla cache o da Haiku con le recensioni della stessa ricerca, zero Place
-// Details). Tetti: una prova al giorno per telefono (cookie) e PROVE_AL_GIORNO per tutta l'app, contate
-// nella tabella events come i verdetti, così le 50 ricerche Google al giorno restano agli utenti.
+// Details). Tetti: una prova al giorno per telefono (cookie), il limitatore per IP e PROVE_AL_GIORNO per tutta
+// l'app (tabella prove_reel, prenotazione atomica), così le 50 ricerche Google al giorno restano agli utenti.
 // Niente si salva: per salvarlo serve l'account ("Salvalo" porta alla registrazione con il link).
 const PROVE_AL_GIORNO = 5;
 const COOKIE = "mapetite_prova";
 const romeDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" });
 
-async function proveDiOggi(): Promise<number> {
-  if (process.env.NODE_ENV === "development") return 0; // in sviluppo gli eventi non si scrivono
+// Prenota una prova sul tetto di tutta l'app (funzione atomica, migrazione 20261121b): true = si può
+// cercare su Google. Su errore niente prova: il tetto non deve sparire se il database non risponde.
+async function prenotaProva(): Promise<boolean> {
+  if (process.env.NODE_ENV === "development") return true; // in sviluppo niente scritture nel database vero
   try {
-    const since = new Date(`${romeDay.format(new Date())}T00:00:00+02:00`).toISOString();
-    const { count, error } = await createAdminClient()
-      .from("events")
-      .select("id", { count: "exact", head: true })
-      .eq("type", "funzione")
-      .eq("props->>nome", "prova_reel")
-      .gte("created_at", since);
+    const { data, error } = await createAdminClient().rpc("prenota_prova_reel", { tetto: PROVE_AL_GIORNO });
     if (error) throw error;
-    return count ?? 0;
-  } catch (err) {
-    // Senza conteggio non si rischia la quota Google: niente prova.
-    console.error("[prova-reel] conteggio di oggi non riuscito:", err);
-    return PROVE_AL_GIORNO;
+    return data === true;
+  } catch (e) {
+    console.error("[prova-reel] prenotazione non riuscita:", e);
+    return false;
   }
 }
 
@@ -77,38 +72,45 @@ export async function POST(request: Request) {
   const luogo = letto?.luoghi?.[0] ?? (letto?.nome ? { nome: letto.nome, citta: letto.citta, categoria: letto.categoria } : null);
   if (!luogo) return err(422, "nome", "Qui non trovo il nome di un locale: scrivilo tu.");
 
-  // 2. Tetto di tutta l'app, poi la ricerca Google (l'unica chiamata a pagamento). L'evento si scrive
-  //    prima della chiamata: due prove insieme non superano il tetto.
-  if ((await proveDiOggi()) >= PROVE_AL_GIORNO) {
-    console.warn(`[prova-reel] tetto di ${PROVE_AL_GIORNO} prove al giorno raggiunto`);
+  // 2. Tetto di tutta l'app (prenotazione atomica), poi la ricerca Google (l'unica chiamata a pagamento).
+  if (!(await prenotaProva())) {
+    console.warn(`[prova-reel] tetto di ${PROVE_AL_GIORNO} prove al giorno raggiunto (o conteggio non riuscito)`);
     return err(429, "pieno", "Per oggi le prove sono finite: crea l'account e salvalo lo stesso.");
   }
-  await recordEvent({ type: "funzione", anonId: jar.get(ANON_COOKIE)?.value ?? null, props: { nome: "prova_reel", fonte: social ?? "nome" } });
-  jar.set(COOKIE, oggi, { maxAge: 60 * 60 * 24, sameSite: "lax", path: "/", httpOnly: true });
+  void recordEvent({ type: "funzione", anonId: jar.get(ANON_COOKIE)?.value ?? null, props: { nome: "prova_reel_server", fonte: social ?? "nome" } });
 
-  const query = [luogo.nome, luogo.citta].filter(Boolean).join(" ");
-  const trovati = await searchGooglePlaces(query).catch((e) => { console.error("[prova-reel] Google:", e); return null; });
+  // Il nome scritto a mano si cerca com'è (con la zona: "Da Felice Testaccio"); quello letto dal video con la città.
+  // Ordine di Google (rilevanza), non per voto: conta trovare proprio quel locale.
+  // Senza la città nel nome scritto Google può non trovare niente ("Felice a Testaccio" → nessun risultato).
+  const conCitta = (t: string) => (luogo.citta && !t.toLowerCase().includes(luogo.citta.toLowerCase()) ? `${t} ${luogo.citta}` : t);
+  const query = nome ? conCitta(nome) : [luogo.nome, luogo.citta].filter(Boolean).join(" ");
+  const trovati = await searchGooglePlaces(query, { sortMode: "relevance", locationMode: "none" }).catch((e) => { console.error("[prova-reel] Google:", e); return null; });
   if (!trovati) return err(502, "google", "Google Maps non risponde: riprova più tardi.");
-  // Prima un risultato con lo stesso nome; altrimenti il primo di Google, dichiarato ("Nel reel: «…».
-  // Su Google Maps trovo questo"): Google scrive spesso il nome con la zona ("Felice a Testaccio | ROMA").
-  const uguale = trovati.find((p) => sameName(luogo.nome, p.name)) ?? null;
-  const posto = uguale ?? trovati[0] ?? null;
-  console.log(`[prova-reel] letto ${JSON.stringify(query)} → ${posto ? `${posto.name}${uguale ? "" : " (nome diverso)"}` : "niente"} (${trovati.length} da Google)`);
-  if (!posto) return NextResponse.json({ letto: luogo, posto: null, sicuro: false, verdetto: null, risultati: [] });
+  jar.set(COOKIE, oggi, { maxAge: 60 * 60 * 24, sameSite: "lax", path: "/", httpOnly: true });
+  const firma = (p: (typeof trovati)[number]) => ({
+    id: p.id, name: p.name, address: p.address, lat: p.lat, lng: p.lng, category: p.category, rating: p.rating,
+    priceLevel: p.priceLevel, photoRef: p.photoRef, photoAuthor: p.photoAuthor ?? null, firma: signCatalogEntry(p),
+  });
+  // Solo un risultato con lo stesso nome è "il posto del reel". Altrimenti si dice che non siamo sicuri e si
+  // mostra il nome del candidato senza verdetto: mai il verdetto di un altro locale come se fosse la risposta.
+  // Il nome letto dall'AI o, se l'ha scritto la persona, il suo nome com'è ("Felice a Testaccio").
+  const uguale = trovati.find((p) => sameName(luogo.nome, p.name) || (nome !== "" && sameName(nome, p.name))) ?? null;
+  const risultati = [...(uguale ? [uguale] : []), ...trovati.filter((p) => p !== uguale)].slice(0, 5).map(firma);
+  console.log(`[prova-reel] ${JSON.stringify(query)} → ${uguale ? uguale.name : `nessun nome uguale (primo: ${trovati[0]?.name ?? "niente"})`} (${trovati.length} da Google)`);
+  if (!uguale) {
+    return NextResponse.json({ letto: luogo, scritto: Boolean(nome), posto: null, candidato: trovati[0]?.name ?? null, verdetto: null, risultati });
+  }
+  const posto = uguale;
 
   // 3. Verdetto: dalla cache se c'è, altrimenti Haiku con le recensioni già arrivate dalla ricerca.
   const s = (await getSynthesis([posto], "", null, { soloVerdetto: true }).catch(() => ({})) as Record<string, { verdict?: string; goFor?: string[]; dontExpect?: string[]; recensioniN?: number | null; recensioneUltima?: string | null }>)[posto.id];
-  const firmati = trovati.slice(0, 5).map((p) => ({
-    id: p.id, name: p.name, address: p.address, lat: p.lat, lng: p.lng, category: p.category, rating: p.rating,
-    priceLevel: p.priceLevel, photoRef: p.photoRef, photoAuthor: p.photoAuthor ?? null, firma: signCatalogEntry(p),
-  }));
   // I dati Google si mostrano e basta (mai salvati: termini Google, 3.2.3(b)).
   return NextResponse.json({
     letto: luogo,
-    posto: { ...firmati.find((p) => p.id === posto.id)!, userRatingCount: posto.userRatingCount },
-    sicuro: Boolean(uguale),
+    scritto: Boolean(nome),
+    posto: { ...risultati[0], userRatingCount: posto.userRatingCount },
     verdetto: s?.verdict ? { verdict: s.verdict, goFor: s.goFor ?? [], dontExpect: s.dontExpect ?? [], recensioniN: s.recensioniN ?? null, recensioneUltima: s.recensioneUltima ?? null } : null,
     // Gli stessi risultati, per non ripetere la ricerca dopo la registrazione (cache del telefono).
-    risultati: firmati,
+    risultati,
   });
 }

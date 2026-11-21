@@ -11840,7 +11840,9 @@ else {
     if (risposta === "nome") return r.fulfill({ status: 422, json: { codice: "nome", error: "Instagram non lascia leggere i reel alle altre app: scrivi il nome del locale che vedi nel video." } });
     if (risposta === "fatta") return r.fulfill({ status: 429, json: { codice: "fatta", error: "Hai già fatto la prova di oggi: crea l'account per salvarne quanti vuoi." } });
     const posto = { id: "PR1", name: "Felice a Testaccio | ROMA", address: "Via Mastro Giorgio 29, 00153 Roma RM, Italia", lat: 41.88, lng: 12.47, category: "Trattoria", rating: 4.3, userRatingCount: 9000, priceLevel: 2, photoRef: null, photoAuthor: null, firma: "f" };
-    return r.fulfill({ json: { letto: { nome: "Trattoria Da Felice", citta: "Roma", categoria: "trattoria" }, posto, sicuro: risposta !== "forse", verdetto: { verdict: "Classici romani fatti bene, prenotazione quasi obbligatoria.", goFor: ["cacio e pepe"], dontExpect: ["tavoli senza prenotazione"] }, risultati: [posto] } });
+    const letto = { nome: "Trattoria Da Felice", citta: "Roma", categoria: "trattoria" };
+    if (risposta === "forse") return r.fulfill({ json: { letto, scritto: true, posto: null, candidato: "Felice a Testaccio | ROMA", verdetto: null, risultati: [posto] } });
+    return r.fulfill({ json: { letto, scritto: true, posto: { ...posto, name: "Trattoria Da Felice" }, verdetto: { verdict: "Classici romani fatti bene, prenotazione quasi obbligatoria.", goFor: ["cacio e pepe"], dontExpect: ["tavoli senza prenotazione"] }, risultati: [posto] } });
   });
   await v.goto(`${BASE}/`, { waitUntil: "networkidle" });
   const box = v.getByTestId("prova-reel");
@@ -11860,23 +11862,39 @@ else {
   await v.getByTestId("prova-esito").waitFor({ timeout: 4000 }).catch(() => {});
   const ultimo = corpi[corpi.length - 1] ?? {};
   ok(ultimo.nome === "Trattoria Da Felice Roma" && ultimo.testo === "https://www.instagram.com/reel/DAbc123xyz/", `prova senza account: manda link e nome (${JSON.stringify(ultimo)})`);
-  ok(((await v.getByTestId("prova-verdetto").textContent().catch(() => "")) ?? "").includes("Classici romani"), "prova senza account: si vede il verdetto");
-  ok(await v.getByTestId("prova-forse").isVisible(), "prova senza account: nome diverso da quello del reel → lo dice ('Nel reel: «…»')");
+  { const t = (await v.getByTestId("prova-non-trovato").textContent().catch(() => "")) ?? "";
+    ok(t.includes("Non sono sicuro") && t.includes("Hai scritto") && t.includes("Felice a Testaccio") && (await v.getByTestId("prova-verdetto").count()) === 0, `prova senza account: nome diverso da quello cercato → 'Non sono sicuro', il candidato e niente verdetto (${t.slice(0, 120)})`);
+    ok(((await v.getByTestId("prova-salvalo").textContent()) ?? "").includes("scegli tu"), "prova senza account: senza posto sicuro il tasto è 'Crea l'account e scegli tu'"); }
+  await v.screenshot({ path: `${OUT}/94a-prova-non-sicuro.png` });
+  // Nome uguale: posto, verdetto e "Salvalo".
+  await v.evaluate(() => sessionStorage.removeItem("mapetite.prova-reel"));
+  await v.reload({ waitUntil: "networkidle" });
+  risposta = "ok";
+  await v.getByTestId("prova-link").fill("https://www.instagram.com/reel/DAbc123xyz/?igsh=abc " + "x".repeat(700));
+  await v.getByTestId("prova-vai").click();
+  await v.getByTestId("prova-esito").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(((await v.getByTestId("prova-verdetto").textContent().catch(() => "")) ?? "").includes("Classici romani") && ((await v.getByTestId("prova-salvalo").textContent()) ?? "").includes("Salvalo"), "prova senza account: nome uguale → verdetto e 'Salvalo nella tua mappa'");
   const href = (await v.getByTestId("prova-salvalo").getAttribute("href")) ?? "";
   const nxt = new URL(href, BASE).searchParams.get("next") ?? "";
-  ok(href.startsWith("/signup?next=") && nxt.startsWith("/importa/condividi?") && new URLSearchParams(nxt.split("?")[1]).get("text") === "https://www.instagram.com/reel/DAbc123xyz/", `prova senza account: 'Salvalo' porta alla registrazione e poi a Salva dal reel (${href})`);
+  ok(href.startsWith("/signup?next=") && nxt.startsWith("/importa/condividi?") && new URLSearchParams(nxt.split("?")[1]).get("text").startsWith("https://www.instagram.com/reel/DAbc123xyz") && nxt.length < 512, `prova senza account: 'Salvalo' porta alla registrazione e poi a Salva dal reel, solo il link anche con un testo lungo (${href.slice(0, 160)})`);
   { const h = (await v.getByTestId("prova-salvalo").boundingBox())?.height ?? 0; ok(h >= 44, `prova senza account: 'Salvalo' alto almeno 44px (${Math.round(h)})`); }
-  ok(await v.evaluate(() => Boolean(sessionStorage.getItem("mapetite.reel-letto:https://www.instagram.com/reel/DAbc123xyz/") && sessionStorage.getItem("mapetite.reel-ricerca:Trattoria Da Felice Roma"))), "prova senza account: lettura e ricerca tenute nel telefono (dopo l'accesso niente seconda chiamata)");
+  ok(await v.evaluate(() => Boolean(Object.keys(sessionStorage).some((k) => k.startsWith("mapetite.reel-letto:https://www.instagram.com/reel/DAbc123xyz")) && sessionStorage.getItem("mapetite.reel-ricerca:Trattoria Da Felice Roma"))), "prova senza account: lettura e ricerca tenute nel telefono (dopo l'accesso niente seconda chiamata)");
   { const sw = await v.evaluate(() => document.documentElement.scrollWidth); ok(sw <= 390, `prova senza account: niente scorrimento orizzontale (${sw})`); }
   await v.getByTestId("prova-esito").scrollIntoViewIfNeeded();
   await v.screenshot({ path: `${OUT}/94-prova-esito.png` });
+  // Ricaricando la home l'esito si rivede (la prova del giorno è una).
+  await v.reload({ waitUntil: "networkidle" });
+  await v.getByTestId("prova-esito").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await v.getByTestId("prova-esito").isVisible(), "prova senza account: ricaricando la home l'esito resta");
   // Seconda prova nello stesso giorno: il server dice no, il telefono lo spiega e propone l'account.
+  await v.evaluate(() => sessionStorage.removeItem("mapetite.prova-reel"));
   await v.reload({ waitUntil: "networkidle" });
   risposta = "fatta";
   await v.getByTestId("prova-link").fill("https://www.tiktok.com/@x/video/123");
   await v.getByTestId("prova-vai").click();
   await v.getByTestId("prova-errore").waitFor({ timeout: 4000 }).catch(() => {});
   ok(((await v.getByTestId("prova-errore").textContent().catch(() => "")) ?? "").includes("prova di oggi") && await v.getByTestId("prova-errore").getByRole("link", { name: "Crea l'account" }).isVisible(), "prova senza account: seconda prova del giorno → messaggio e 'Crea l'account'");
+  { const h = (await v.getByTestId("prova-errore").getByRole("link", { name: "Crea l'account" }).boundingBox())?.height ?? 0; ok(h >= 44, `prova senza account: 'Crea l'account' nell'errore alto almeno 44px (${Math.round(h)})`); }
   await vctx.close();
   // Con l'accesso (utente finto) la scheda non c'è.
   const lp = await ctx.newPage();
