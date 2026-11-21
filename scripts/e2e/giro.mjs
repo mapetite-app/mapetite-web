@@ -12097,7 +12097,7 @@ else {
   ok(/^\/voto\/[A-Za-z0-9]{18}$/.test(percorso), `raccolta: link del voto creato, senza foto (${percorso})`);
   await p.goto(`${BASE}${percorso}`, { waitUntil: "networkidle" });
   const nomi = (await p.getByTestId("voto-posto").locator("span.font-display.text-\\[15px\\]").allInnerTexts()).join(",");
-  ok(nomi === "Trattoria Due,Osteria Uno", `raccolta: il voto ha solo i 2 scelti (${nomi})`);
+  ok(nomi === "Osteria Uno,Trattoria Due", `raccolta: il voto ha solo i 2 scelti, nell'ordine della raccolta (${nomi})`);
   await rc.close();
 }
 // FINE-VOTO-GRUPPO
