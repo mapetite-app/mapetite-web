@@ -124,7 +124,7 @@ export default async function RaccoltaPage({ params }: Props) {
               da="raccolta"
               accediDa={`/raccolte/${encodeURIComponent(name)}`}
               toccoClass="inline-flex"
-              pillolaClass="inline-flex min-h-11 items-center rounded-pill border border-border px-4 text-sm font-display"
+              pillolaClass="inline-flex min-h-11 items-center rounded-pill px-4 text-sm font-display"
               provati={rows.filter((r) => r.tags.includes("Già visitato")).map((r) => r.placeId)}
               posti={rows.map((r) => ({
                 id: r.placeId, name: r.name, category: r.category, address: r.address,
@@ -148,7 +148,7 @@ export default async function RaccoltaPage({ params }: Props) {
         </div>
         {!shareable && !privata && (
           <p data-testid="raccolta-privata" className="mt-2 text-xs text-text-muted">
-            Per condividerla rendi pubblico il profilo (le note restano tue).
+            Per condividere la raccolta rendi pubblico il profilo (le note restano tue).
           </p>
         )}
       </header>

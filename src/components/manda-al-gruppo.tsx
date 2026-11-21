@@ -59,6 +59,8 @@ export default function MandaAlGruppo({ posti: tutti, toccoClass, pillolaClass, 
     const o = scelteOra();
     setOrari(o);
     if (!o.scelte.some((s) => s.id === scelta)) setScelta(o.predefinita);
+    // Dalla raccolta si riapre sulla scelta dei posti (il link di prima resta valido per chi l'ha già ricevuto).
+    if (scegliere && stato.fase === "fatto") setStato({ fase: "pronto" });
     setAperto(true);
     trackFeature("manda_gruppo_apri", { posti: tutti.length, da });
   };
