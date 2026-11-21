@@ -8,9 +8,12 @@ import { cleanReelUrl, reelSourceOf } from "@/lib/reel";
 
 export const COMMENT_MAX = 280;
 
-export type EsitoRecensione = "ok" | "serve-visita" | "errore";
+export type EsitoRecensione = "ok" | "serve-visita" | "visita-vecchia" | "errore";
 
-/** Pubblica (o aggiorna) la propria recensione. "serve-visita": il database chiede prima "Ci sono stato" (proposta 61). */
+/**
+ * Pubblica (o aggiorna) la propria recensione. "serve-visita": il database chiede prima "Ci sono stato" (proposta 61);
+ * "visita-vecchia": la visita ha più di 30 giorni (proposta 74, L. 34/2026).
+ */
 export async function saveReview(userId: string, placeId: string, rating: number, comment: string): Promise<EsitoRecensione> {
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) return "errore";
   const client = await browserClient().catch(() => null);
@@ -21,6 +24,7 @@ export async function saveReview(userId: string, placeId: string, rating: number
   );
   if (error) console.warn("[community] recensione non salvata:", error.message);
   if (error && /visita_mancante/.test(error.message ?? "")) return "serve-visita";
+  if (error && /visita_vecchia/.test(error.message ?? "")) return "visita-vecchia";
   return error ? "errore" : "ok";
 }
 
@@ -31,16 +35,20 @@ export async function saveReview(userId: string, placeId: string, rating: number
 export async function segnaCiSonoStato(userId: string, placeId: string): Promise<boolean> {
   const client = await browserClient().catch(() => null);
   if (!client) return false;
-  const { data, error } = await client.from("saved_places").select("tags").eq("user_id", userId).eq("place_id", placeId).maybeSingle();
+  const { data, error } = await client.from("saved_places").select("tags, visited_at").eq("user_id", userId).eq("place_id", placeId).maybeSingle();
   if (error) return false;
   if (data) {
     const tags = ((data.tags as string[] | null) ?? []).filter((t) => t !== "Da provare" && t !== "Già visitato");
-    const { error: e2 } = await client.from("saved_places").update({ tags: [...tags, "Già visitato"] }).eq("user_id", userId).eq("place_id", placeId);
+    // Proposta 74: la visita segnata da qui è di oggi, ma una data già scelta nel diario non si tocca.
+    const { error: e2 } = await client.from("saved_places").update({ tags: [...tags, "Già visitato"], ...(data.visited_at ? {} : { visited_at: oggiRoma() }) }).eq("user_id", userId).eq("place_id", placeId);
     return !e2;
   }
-  const { error: e3 } = await client.from("saved_places").insert({ user_id: userId, place_id: placeId, tags: ["Già visitato"] });
+  const { error: e3 } = await client.from("saved_places").insert({ user_id: userId, place_id: placeId, tags: ["Già visitato"], visited_at: oggiRoma() });
   return !e3;
 }
+
+// Giorno di oggi a Roma (AAAA-MM-GG), come il controllo dei 30 giorni nel database.
+export const oggiRoma = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
 /** Tabella o vista non ancora creata (migrazione 20261016_community da applicare). */
 export function isMissingTable(error: { code?: string; message?: string } | null | undefined): boolean {

@@ -10553,6 +10553,54 @@ else {
     ok((await cp.getByText("Salva in Mapetite").count()) === 0 && (await txt(cp.getByTestId("salvato-pubblico"))).includes("Tra i posti dove sei stato"), "recensioni (proposta 61): la barra 'Salva in Mapetite' diventa '✓ Tra i posti dove sei stato'");
     await cp.screenshot({ path: `${OUT}/98c-recensioni-segnato.png`, caret: "initial" }); }
 
+  // 5c. Proposta 74 (L. 34/2026): si recensisce entro 30 giorni dalla visita; "Ci sono tornato da poco" la riporta a oggi.
+  { const patch = [];
+    await cctx.route("**/rest/v1/saved_places**", (r) => { if (r.request().method() === "PATCH") { patch.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); } return r.fallback(); });
+    await setC("e2e_community", { recensioni: [], mia: null, reel: [], reelPronti: true, possoRecensire: true, visitaVecchia: true });
+    await cp.reload({ waitUntil: "networkidle" });
+    await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
+    ok((await cp.getByTestId("recensione-form").count()) === 0 && (await txt(cp.getByTestId("recensione-visita-vecchia"))).includes("30 giorni"), "recensioni (proposta 74): visita di oltre 30 giorni fa → niente modulo, la riga lo dice");
+    ok((await cp.getByTestId("recensione-ci-sono-tornato").count()) === 0 && (await cp.getByTestId("recensione-vai-mappa").getAttribute("href")) === `/mappa?salvato=${CID}`, "recensioni (proposta 74): nessun secondo tasto 'Ci sono tornato'; fuori dalla mappa 'Segnalalo dalla mappa' apre la scheda con il diario");
+    { const h = (await cp.getByTestId("recensione-vai-mappa").boundingBox())?.height ?? 0; ok(h >= 44, `recensioni (proposta 74): 'Segnalalo dalla mappa' alto almeno 44px (${Math.round(h)})`); }
+    ok((await cp.getByTestId("community-vuota").count()) === 0, "recensioni (proposta 74): con la riga dei 30 giorni niente 'sii il primo a dire com'era'");
+    await cp.getByTestId("recensione-visita-vecchia").scrollIntoViewIfNeeded();
+    await cp.screenshot({ path: `${OUT}/98d-recensioni-visita-vecchia.png`, caret: "initial" });
+    // "↻ Ci sono tornato" nel diario (data di oggi): la sezione recensioni si riapre senza ricaricare.
+    const oggi = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    await cp.evaluate(([placeId, date]) => window.dispatchEvent(new CustomEvent("mapetite:data-visita", { detail: { placeId, date } })), [CID, oggi]);
+    await cp.getByTestId("recensione-form").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await cp.getByTestId("recensione-form").isVisible() && (await cp.getByTestId("recensione-visita-vecchia").count()) === 0 && patch.length === 0, "recensioni (proposta 74): data della visita cambiata dal diario → il modulo si apre (nessuna scrittura da qui)");
+    // Il server non lo sapeva (dato vecchio sul telefono): il database risponde 'visita_vecchia' → torna la riga.
+    await setC("e2e_community", { recensioni: [], mia: null, reel: [], reelPronti: true, possoRecensire: true, visitaVecchia: false });
+    await cctx.route("**/rest/v1/reviews**", (r) => r.request().method() === "POST" ? r.fulfill({ status: 400, json: { code: "P0001", message: "visita_vecchia", hint: "La recensione si scrive entro 30 giorni dalla visita" } }) : r.fallback());
+    await cp.reload({ waitUntil: "networkidle" });
+    await cp.getByTestId("recensione-form").waitFor({ timeout: 5000 }).catch(() => {});
+    await cp.getByTestId("recensione-form").getByLabel("4 stelle").click();
+    await cp.getByTestId("recensione-form").getByRole("button", { name: "Pubblica" }).click();
+    await cp.getByTestId("recensione-visita-vecchia").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(await cp.getByTestId("recensione-visita-vecchia").isVisible() && (await cp.getByTestId("recensione-form").count()) === 0, "recensioni (proposta 74): il database dice 'visita_vecchia' → al posto del modulo la riga dei 30 giorni");
+    await cctx.unroute("**/rest/v1/reviews**");
+    await cctx.unroute("**/rest/v1/saved_places**");
+    await cctx.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [] }));
+    await cctx.route("**/rest/v1/reviews**", (r) => {
+      if (r.request().method() === "POST") { reviewPost = r.request().postDataJSON(); return r.fulfill({ status: 201, body: "" }); }
+      return r.fulfill({ json: [] });
+    });
+    const { visitaOltre30 } = await import(new URL("../../src/lib/visita-30.ts", import.meta.url).href).catch((e) => { ok(false, `proposta 74: src/lib/visita-30.ts importabile (${e.message})`); return {}; });
+    if (visitaOltre30) {
+      const d = new Date("2026-11-21T10:00:00+01:00");
+      ok(!visitaOltre30("2026-10-22", d) && visitaOltre30("2026-10-21", d) && !visitaOltre30(null, d) && !visitaOltre30("2026-12-01", d), "recensioni (proposta 74): 30 giorni esatti sì, 31 no, senza data o data futura non blocca");
+    }
+    // Le recensioni del 5b tornano per i controlli che seguono (senza accesso).
+    await setC("e2e_community", {
+      recensioni: [
+        { id: "r1", rating: 5, comment: "Carbonara da applausi, chiedete il tavolo in fondo.", created_at: "2026-11-10T20:00:00Z", autore: { user_id: "u-giulia", handle: "giulia.rm", display_name: "Giulia" }, amico: true, visita: { mese: "2026-11-01" } },
+        { id: "r2", rating: 4, comment: null, created_at: "2026-10-12T20:00:00Z", autore: null, amico: false, visita: { mese: null } },
+      ],
+      mia: null, reel: [], reelPronti: true, possoRecensire: false,
+    });
+  }
+
   // 6. Senza accesso: si leggono le recensioni, per scrivere serve "Accedi" (che riporta al locale).
   await setC("e2e_anonimo", 1);
   await cp.setViewportSize({ width: 390, height: 844 });
