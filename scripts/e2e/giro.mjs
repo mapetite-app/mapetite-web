@@ -11789,6 +11789,68 @@ else {
   const r2 = await post("");
   ok(r1.status === 200 && r2.status === 400, `qualcosa non va: route 200 a testo valido, 400 a testo vuoto (${r1.status}, ${r2.status})`);
 }
+
+// ─── Proposta 75: "Provalo senza account" (reel incollato in home, posto e verdetto prima di registrarsi) ───
+{
+  const vctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await vctx.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+  await vctx.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); } catch {} });
+  const v = await vctx.newPage();
+  const corpi = [];
+  let risposta = "nome";
+  await v.route("**/api/prova-reel", (r) => {
+    corpi.push(r.request().postDataJSON());
+    if (risposta === "nome") return r.fulfill({ status: 422, json: { codice: "nome", error: "Instagram non lascia leggere i reel alle altre app: scrivi il nome del locale che vedi nel video." } });
+    if (risposta === "fatta") return r.fulfill({ status: 429, json: { codice: "fatta", error: "Hai già fatto la prova di oggi: crea l'account per salvarne quanti vuoi." } });
+    const posto = { id: "PR1", name: "Felice a Testaccio | ROMA", address: "Via Mastro Giorgio 29, 00153 Roma RM, Italia", lat: 41.88, lng: 12.47, category: "Trattoria", rating: 4.3, userRatingCount: 9000, priceLevel: 2, photoRef: null, photoAuthor: null, firma: "f" };
+    return r.fulfill({ json: { letto: { nome: "Trattoria Da Felice", citta: "Roma", categoria: "trattoria" }, posto, sicuro: risposta !== "forse", verdetto: { verdict: "Classici romani fatti bene, prenotazione quasi obbligatoria.", goFor: ["cacio e pepe"], dontExpect: ["tavoli senza prenotazione"] }, risultati: [posto] } });
+  });
+  await v.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  const box = v.getByTestId("prova-reel");
+  ok(await box.isVisible(), "prova senza account: in home, senza accesso, c'è 'Hai visto un posto in un reel?'");
+  ok(await v.getByTestId("prova-vai").isDisabled(), "prova senza account: 'Fammi vedere' spento con il campo vuoto");
+  await v.getByTestId("prova-link").fill("ciao come stai");
+  await v.getByTestId("prova-vai").click();
+  ok(await v.getByTestId("prova-errore").isVisible() && corpi.length === 0, "prova senza account: testo senza link di un reel → messaggio, nessuna chiamata");
+  await v.getByTestId("prova-link").fill("https://www.instagram.com/reel/DAbc123xyz/");
+  await v.getByTestId("prova-vai").click();
+  await v.getByTestId("prova-chiedi-nome").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await v.getByTestId("prova-nome-campo").isVisible(), "prova senza account: Instagram → chiede il nome del locale");
+  await v.screenshot({ path: `${OUT}/93-prova-nome.png` });
+  risposta = "forse";
+  await v.getByTestId("prova-nome-campo").fill("Trattoria Da Felice Roma");
+  await v.getByTestId("prova-vai").click();
+  await v.getByTestId("prova-esito").waitFor({ timeout: 4000 }).catch(() => {});
+  const ultimo = corpi[corpi.length - 1] ?? {};
+  ok(ultimo.nome === "Trattoria Da Felice Roma" && ultimo.testo === "https://www.instagram.com/reel/DAbc123xyz/", `prova senza account: manda link e nome (${JSON.stringify(ultimo)})`);
+  ok(((await v.getByTestId("prova-verdetto").textContent().catch(() => "")) ?? "").includes("Classici romani"), "prova senza account: si vede il verdetto");
+  ok(await v.getByTestId("prova-forse").isVisible(), "prova senza account: nome diverso da quello del reel → lo dice ('Nel reel: «…»')");
+  const href = (await v.getByTestId("prova-salvalo").getAttribute("href")) ?? "";
+  const nxt = new URL(href, BASE).searchParams.get("next") ?? "";
+  ok(href.startsWith("/signup?next=") && nxt.startsWith("/importa/condividi?") && new URLSearchParams(nxt.split("?")[1]).get("text") === "https://www.instagram.com/reel/DAbc123xyz/", `prova senza account: 'Salvalo' porta alla registrazione e poi a Salva dal reel (${href})`);
+  { const h = (await v.getByTestId("prova-salvalo").boundingBox())?.height ?? 0; ok(h >= 44, `prova senza account: 'Salvalo' alto almeno 44px (${Math.round(h)})`); }
+  ok(await v.evaluate(() => Boolean(sessionStorage.getItem("mapetite.reel-letto:https://www.instagram.com/reel/DAbc123xyz/") && sessionStorage.getItem("mapetite.reel-ricerca:Trattoria Da Felice Roma"))), "prova senza account: lettura e ricerca tenute nel telefono (dopo l'accesso niente seconda chiamata)");
+  { const sw = await v.evaluate(() => document.documentElement.scrollWidth); ok(sw <= 390, `prova senza account: niente scorrimento orizzontale (${sw})`); }
+  await v.getByTestId("prova-esito").scrollIntoViewIfNeeded();
+  await v.screenshot({ path: `${OUT}/94-prova-esito.png` });
+  // Seconda prova nello stesso giorno: il server dice no, il telefono lo spiega e propone l'account.
+  await v.reload({ waitUntil: "networkidle" });
+  risposta = "fatta";
+  await v.getByTestId("prova-link").fill("https://www.tiktok.com/@x/video/123");
+  await v.getByTestId("prova-vai").click();
+  await v.getByTestId("prova-errore").waitFor({ timeout: 4000 }).catch(() => {});
+  ok(((await v.getByTestId("prova-errore").textContent().catch(() => "")) ?? "").includes("prova di oggi") && await v.getByTestId("prova-errore").getByRole("link", { name: "Crea l'account" }).isVisible(), "prova senza account: seconda prova del giorno → messaggio e 'Crea l'account'");
+  await vctx.close();
+  // Con l'accesso (utente finto) la scheda non c'è.
+  const lp = await ctx.newPage();
+  await lp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  ok((await lp.getByTestId("prova-reel").count()) === 0, "prova senza account: con l'accesso la scheda non si vede");
+  await lp.close();
+  // Route vera: senza testo 400, link non di un reel 400, Instagram senza nome 422 "nome" (nessuna chiamata Google).
+  const post = (b) => fetch(`${BASE}/api/prova-reel`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) });
+  const [a, b2, c] = await Promise.all([post({}), post({ testo: "https://example.com" }), post({ testo: "https://www.instagram.com/reel/DAbc123xyz/" })]);
+  ok(a.status === 400 && b2.status === 400 && c.status === 422 && (await c.json()).codice === "nome", `prova senza account: route 400/400/422 (${a.status}, ${b2.status}, ${c.status})`);
+}
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);

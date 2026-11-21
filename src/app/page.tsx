@@ -10,6 +10,7 @@ import { pulisciMappa, type MappaGusto } from "@/lib/mappa-gusto";
 import { ZONE } from "@/lib/gusti";
 import { getCategoryEmoji } from "@/lib/emoji";
 import HomeSearchInput from "@/components/home-search-input";
+import ProvaReel from "@/components/prova-reel";
 import BookingReminder from "@/components/booking-reminder";
 import DomandaSettimanale from "@/components/domanda-settimanale";
 import { createClient, getUser } from "@/lib/supabase/server";
@@ -129,6 +130,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ [
           </button>
         </Form>
         <HomePillole momento={ora.momento} weekend={ora.weekend} cittaProfilo={cittaProfilo} gusto={prof.gusto} />
+
+        {/* Proposta 75: chi non ha l'account prova subito con un reel e vede il verdetto prima di registrarsi. */}
+        {!loggedIn && !utenteFinto && <ProvaReel />}
 
         <div className="mt-4 empty:hidden">
           {/* Domanda settimanale (piano 7.6): una volta ogni 7 giorni, a chi è tornato almeno una volta. */}
