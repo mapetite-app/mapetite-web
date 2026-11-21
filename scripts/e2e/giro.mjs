@@ -447,6 +447,13 @@ ok((await page.getByTestId("posizione-card").innerText()) === `1 di ${await page
     ok(!!pts && !!con && sottoT(con) === 0 && con.punti.length === prima, `copertine dei Salvati: nessun puntino sotto il tondo con l'emoji e nessun posto tolto (${con ? con.punti.length : 0} puntini su ${prima}, ${sottoT(con)} sotto)`); } }
 // La frase non inventa (src/lib/frase-risultati.ts, senza server): il tipo solo se lo sono tutti per Google,
 // i conteggi dalle recensioni solo a verdetti arrivati, nessun aggettivo della richiesta dato a tutti.
+// Proposta 72 "Avvisami quando c'è posto": regole pure (quando si avvisa e con che parole).
+{ const se = await import(new URL("../../src/lib/serate.ts", import.meta.url).href);
+  const now = Date.parse("2026-11-24T12:00:00Z"); // martedì
+  const fresca = new Date(now - 86_400_000).toISOString(), vecchia = new Date(now - 70 * 86_400_000).toISOString();
+  ok(se.giorniNuovi(null, [2], now) && se.giorniNuovi({ giorni: [3], at: fresca }, [2, 3], now) && !se.giorniNuovi({ giorni: [2, 3], at: fresca }, [3], now) && !se.giorniNuovi({ giorni: [2], at: fresca }, [], now) && se.giorniNuovi({ giorni: [2], at: vecchia }, [2], now), "avviso c'è posto: parte solo se il titolare aggiunge giorni (o riconferma dopo la scadenza), mai togliendone");
+  const t1 = se.testoAvvisoPosto("Da Mario", [2], now), t2 = se.testoAvvisoPosto("Da Mario", [5], now);
+  ok(t1?.title === "Da Mario: stasera c'è posto" && t2?.title === "Da Mario: venerdì c'è posto" && t1?.body.startsWith("Lo dice il locale") && se.testoAvvisoPosto("X", [], now) === null, `avviso c'è posto: 'Da Mario: stasera c'è posto' · 'Lo dice il locale…' (${t1?.title} / ${t2?.title})`); }
 { const { fraseRisultati } = await import(new URL("../../src/lib/frase-risultati.ts", import.meta.url).href);
   const R = { name: "Da Enzo", category: "restaurant", types: ["italian_restaurant", "restaurant"] }, B = { name: "Santa Cocktail Club", category: "cocktail_bar", types: ["cocktail_bar", "bar", "restaurant"] };
   const sp = (x) => (x ?? "").replace(/\u00a0/g, " ");
@@ -8666,6 +8673,44 @@ else {
     await ap.waitForTimeout(400);
     ok((await riga.getAttribute("aria-checked")) === "false" && iscr.at(-1)?.m === "DELETE" && iscr.at(-1)?.body?.endpoint === "https://fcm.googleapis.com/fcm/send/abc", "avvisi: e si spengono, togliendo l'iscrizione dal server");
     await ap.getByTestId("profilo-account").screenshot({ path: `${OUT}/96-avvisi-profilo.png` });
+    // Proposta 72: "Avvisami quando c'è posto" nella scheda di un salvato, solo se il locale è verificato.
+    { const LP = "00000000-0000-4000-8000-000000007201";
+      const rowsP = [{ created_at: "2026-11-01T10:00:00Z", tags: ["Da provare"], note: null, consigliato_da: null, places: { id: LP, name: "Osteria Verificata", category: "restaurant", address: "Via di Prova 1, 00153 Roma RM, Italy", lat: 41.889, lng: 12.469, google_place_id: "GAP72", rating: 4.4, price_level: 2 } }];
+      for (const t of ["place_synthesis", "foto_locali", "contenuti_locali"]) await actx.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+      await actx.route("**/rest/v1/saved_places**", (r) => {
+        if (r.request().method() !== "GET") return r.fulfill({ status: 204, body: "" });
+        const u = decodeURIComponent(r.request().url());
+        if (u.includes("select=place_id")) return r.fulfill({ json: rowsP.map((x) => ({ place_id: x.places.id })) });
+        return r.fulfill({ json: u.includes("places(") ? rowsP : [] });
+      });
+      const apriScheda = async () => {
+        await ap.goto(`${BASE}/mappa?vista=salvati`, { waitUntil: "networkidle" }).catch(() => {});
+        await ap.getByTestId("salvato-riga").filter({ hasText: "Osteria Verificata" }).click({ timeout: 8000 }).catch(() => {});
+        await ap.getByTestId("tue-note").waitFor({ timeout: 5000 }).catch(() => {});
+        await ap.waitForTimeout(800);
+      };
+      await actx.addCookies([{ name: "e2e_serate", value: encodeURIComponent(JSON.stringify({ id: LP, verificato: false, giorni: [] })), url: BASE }]);
+      await apriScheda();
+      ok(await ap.getByTestId("tue-note").isVisible().catch(() => false) && (await ap.getByTestId("avviso-posto").count()) === 0, "avviso c'è posto: su un locale non verificato il tasto non c'è (nessuno può dire 'c'è posto')");
+      await actx.addCookies([{ name: "e2e_serate", value: encodeURIComponent(JSON.stringify({ id: LP, verificato: true, giorni: [] })), url: BASE }]);
+      await apriScheda();
+      const acc = ap.getByTestId("avviso-posto-accendi");
+      ok(await acc.isVisible().catch(() => false) && ((await acc.boundingBox().catch(() => null))?.height ?? 0) >= 44, "avviso c'è posto: nel salvato di un locale verificato 'Avvisami quando c'è posto' (44 px)");
+      await ap.getByTestId("avviso-posto").scrollIntoViewIfNeeded().catch(() => {});
+      await ap.screenshot({ path: `${OUT}/96b-avviso-posto.png`, caret: "initial" });
+      const primaIscr = iscr.filter((x) => x.m === "POST").length;
+      await acc.click().catch(() => {});
+      await ap.getByTestId("avviso-posto-acceso").waitFor({ timeout: 4000 }).catch(() => {});
+      ok(((await ap.getByTestId("avviso-posto-acceso").textContent().catch(() => "")) ?? "") === "Ti avviso quando il locale dice che c'è posto" && iscr.filter((x) => x.m === "POST").length === primaIscr + 1, "avviso c'è posto: il tocco accende gli avvisi del telefono (se spenti) e dice 'Ti avviso quando il locale dice che c'è posto'");
+      await ap.getByTestId("avviso-posto").screenshot({ path: `${OUT}/96c-avviso-posto-acceso.png` }).catch(() => {});
+      await apriScheda();
+      ok(await ap.getByTestId("avviso-posto-acceso").isVisible().catch(() => false), "avviso c'è posto: riaprendo la scheda resta acceso (salvato sul server)");
+      await ap.getByTestId("avviso-posto-togli").click().catch(() => {});
+      await ap.getByTestId("avviso-posto-accendi").waitFor({ timeout: 4000 }).catch(() => {});
+      ok(await ap.getByTestId("avviso-posto-accendi").isVisible().catch(() => false), "avviso c'è posto: il tasto 🔕 lo toglie");
+      const bad = await ap.evaluate(async () => (await fetch("/api/avvisi-posto", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: "ChIJxyz", attivo: true }) })).status);
+      ok(bad === 400, `avviso c'è posto: un id che non è un UUID → 400 (${bad})`);
+      await actx.clearCookies({ name: "e2e_serate" }); }
     await actx.close();
   }
 

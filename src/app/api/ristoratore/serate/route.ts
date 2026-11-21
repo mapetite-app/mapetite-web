@@ -1,12 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { puoGestireLocale } from "@/lib/ristoratore-accesso";
-import { pulisciGiorni } from "@/lib/serate";
+import { giorniNuovi, pulisciGiorni } from "@/lib/serate";
 import { pulisciApertoDal } from "@/lib/aperto-dal";
 import { pulisciOmaggio, type Omaggio } from "@/lib/omaggio";
 import { pulisciPrezzo, type Prezzo } from "@/lib/prezzo-locale";
+import { avvisaChiSegue } from "@/lib/push-server";
+
+// L'invio degli avvisi "c'è posto" (PROPOSTE.md 72) gira dopo la risposta: gli si lascia il tempo.
+export const maxDuration = 30;
 
 // "Serate tranquille" (POSIZIONAMENTO.md, proposta 1; migrazione 20261018_serate_tranquille.sql)
 // e "Aperto da poco" (PROPOSTE.md, proposta 7; migrazione 20261020_aperto_dal.sql): GET dà anche
@@ -92,6 +96,10 @@ export async function POST(request: Request) {
 
   if (!(await puoGestireLocale(id))) return NextResponse.json({ error: "Non puoi modificare questo locale" }, { status: 403 });
   const db = createAdminClient();
+  // Proposta 72: com'erano i giorni prima, per avvisare chi segue il locale solo se ne arrivano di nuovi.
+  const { data: prima } = conGiorni
+    ? await db.from("places").select("name, giorni_tranquilli, giorni_tranquilli_at").eq("id", id).maybeSingle<{ name: string | null; giorni_tranquilli: number[] | null; giorni_tranquilli_at: string | null }>()
+    : { data: null };
   const { data, error } = await db
     .from("places")
     .update({
@@ -109,6 +117,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Non sono riuscito a salvare. Riprova tra poco." }, { status: 500 });
   }
   if (!data?.length) return NextResponse.json({ error: "Prima serve la verifica del locale." }, { status: 409 });
+  if (conGiorni && prima?.name && giorniNuovi({ giorni: prima.giorni_tranquilli, at: prima.giorni_tranquilli_at }, giorni)) {
+    const nome = prima.name;
+    after(() => avvisaChiSegue(id, nome, giorni).catch((e) => console.warn("[avvisi-posto] invio:", e instanceof Error ? e.message : e)));
+  }
   // Solo quello che è stato scritto: un POST con il solo mese non dice niente delle serate.
   return NextResponse.json({ ...(conGiorni ? { giorni, at: giorni.length ? at : null } : {}), ...(conApertura ? { apertoDal } : {}), ...(conOmaggio ? { omaggio } : {}), ...(conPrezzo ? { prezzo } : {}) });
 }

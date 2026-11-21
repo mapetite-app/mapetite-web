@@ -1,4 +1,6 @@
 import webpush from "web-push";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { PAUSA_GIORNI, testoAvvisoPosto } from "@/lib/serate";
 
 // Invio degli avvisi push (proposta 6). Chiavi VAPID solo lato server: VAPID_PUBLIC_KEY,
 // VAPID_PRIVATE_KEY e VAPID_SUBJECT (un "mailto:"). Senza, niente avvisi e nessun errore.
@@ -66,4 +68,43 @@ export function avvisoDelGiorno(nomi: string[], sabato: boolean): Avviso {
     url: "/stasera",
     tag: "piano-del-giorno",
   };
+}
+
+// "Avvisami quando c'è posto" (PROPOSTE.md 72): il titolare di un locale verificato ha appena segnato giorni nuovi
+// con posto. Avvisa chi lo segue (avvisi_posto), al massimo una volta ogni 6 giorni per locale. Parte dopo la
+// risposta al titolare (after), con la chiave di servizio. Nessuna chiamata Google o AI.
+// Le righe si prenotano in un solo UPDATE (avvisato_at = adesso, solo se libere): due salvataggi di fila del
+// titolare non mandano due avvisi. Chi non è stato raggiunto (nessun telefono iscritto) torna com'era.
+export async function avvisaChiSegue(placeId: string, nome: string, giorni: number[]): Promise<{ inviati: number }> {
+  if (!pushConfigurato() || !process.env.SUPABASE_SECRET_KEY) return { inviati: 0 };
+  const testo = testoAvvisoPosto(nome, giorni);
+  if (!testo) return { inviati: 0 };
+  const admin = createAdminClient();
+  const adesso = new Date().toISOString();
+  const soglia = new Date(Date.now() - PAUSA_GIORNI * 86_400_000).toISOString();
+  const { data: righe, error } = await admin
+    .from("avvisi_posto")
+    .update({ avvisato_at: adesso })
+    .eq("place_id", placeId)
+    .or(`avvisato_at.is.null,avvisato_at.lte.${soglia}`)
+    .select("user_id");
+  if (error) { console.warn(`[avvisi-posto] prenotazione ${error.code ?? ""}`); return { inviati: 0 }; }
+  const utenti = (righe ?? []).map((r) => r.user_id as string);
+  if (utenti.length === 0) return { inviati: 0 };
+  const { data: subs } = await admin.from("push_subscriptions").select("id, user_id, endpoint, p256dh, auth").in("user_id", utenti);
+  const avviso: Avviso = { ...testo, url: `/locali/${placeId}`, tag: `posto-${placeId}` };
+  let inviati = 0;
+  const raggiunti = new Set<string>();
+  const scadute: string[] = [];
+  for (const s of subs ?? []) {
+    const esito = await inviaAvviso(s, avviso);
+    if (esito === "ok") { inviati++; raggiunti.add(s.user_id); }
+    if (esito === "scaduta") scadute.push(s.id);
+  }
+  if (scadute.length > 0) await admin.from("push_subscriptions").delete().in("id", scadute);
+  // Non raggiunti: l'avviso non è arrivato, quindi la pausa non parte (alla prossima occasione ci si riprova).
+  const mancati = utenti.filter((u) => !raggiunti.has(u));
+  if (mancati.length > 0) await admin.from("avvisi_posto").update({ avvisato_at: null }).eq("place_id", placeId).eq("avvisato_at", adesso).in("user_id", mancati);
+  console.log(`[avvisi-posto] locale=${placeId} prenotati=${utenti.length} iscrizioni=${subs?.length ?? 0} inviati=${inviati} scadute=${scadute.length}`);
+  return { inviati };
 }

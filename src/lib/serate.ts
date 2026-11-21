@@ -70,3 +70,21 @@ export function postoStasera(
   if (!info?.verificato || !seraValida(info.at, now)) return false;
   return pulisciGiorni(info.giorni).includes(oggiARoma(now));
 }
+
+// "Avvisami quando c'è posto" (PROPOSTE.md 72): quando avvisare chi segue un locale e con che parole.
+
+export const PAUSA_GIORNI = 6; // al massimo un avviso ogni 6 giorni per persona e locale
+
+/** Il titolare ha aggiunto almeno un giorno con posto rispetto a prima? (un'informazione scaduta conta come nessun giorno) */
+export function giorniNuovi(prima: { giorni: unknown; at: string | null } | null, dopo: number[], now: number = Date.now()): boolean {
+  const vecchi = prima && seraValida(prima.at, now) ? new Set(pulisciGiorni(prima.giorni)) : new Set<number>();
+  return pulisciGiorni(dopo).some((g) => !vecchi.has(g));
+}
+
+/** Testo dell'avviso: "Da Mario: stasera c'è posto" · "Lo dice il locale. L'avevi salvato." */
+export function testoAvvisoPosto(nome: string, giorni: number[], now: number = Date.now()): { title: string; body: string } | null {
+  const f = frasePosto({ verificato: true, giorni, at: new Date(now).toISOString() }, now);
+  if (!f) return null;
+  return { title: `${nome}: ${f.charAt(0).toLowerCase()}${f.slice(1)}`, body: "Lo dice il locale. L'avevi salvato: apri orari e numero." };
+}
+

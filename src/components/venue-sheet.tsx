@@ -26,6 +26,7 @@ import { VisitaContext } from "@/lib/visita-context";
 import { votoOf, votoTag } from "@/lib/diario";
 import ConfrontoFonti from "@/components/confronto-fonti";
 import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocaleStato } from "@/components/posto-locale";
+import AvvisoPosto from "@/components/avviso-posto";
 import { frasePrezzo } from "@/lib/prezzo-locale";
 import { fraseFreschezza } from "@/lib/freschezza-verdetto";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
@@ -597,6 +598,8 @@ export default function VenueSheet({
             <span className="min-w-0 truncate">Te l&apos;ha consigliato <span className="font-display font-semibold text-brand">{consigliatoDa}</span></span>
           </p>
         )}
+        {/* Proposta 72: "Avvisami quando c'è posto", solo per i salvati di un locale verificato (parola del titolare). */}
+        {isSaved && !!userId && isUuid(venue.id) && infoLocale?.verificato && !personalTags?.includes("Non fa per me") && <AvvisoPosto venueId={venue.id} />}
         {withStatus && onVisitStatus && (
           <div className="mt-2 flex gap-2" data-testid="stato-salvato">
             {([["Da provare", "📌 Da provare"], ["Già visitato", "✓ Ci sono stato"]] as const).map(([tag, label]) => {
