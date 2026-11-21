@@ -217,7 +217,8 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
   // Recensione nuova (o modifica chiesta) con la visita di oltre 30 giorni fa: al posto del modulo la riga della legge.
   const rigaVecchia = canWrite && visitato && visitaVecchia && (editing || !mine);
   // Il tasto "↻ Ci sono tornato" del diario è nella stessa scheda (mappa): la riga ci porta lì.
-  const tornatoInVista = rigaVecchia && typeof document !== "undefined" && document.querySelector('[data-testid="diario-scheda-tornato"]') != null;
+  // Dal contesto della scheda, non cercando nella pagina (revisore 21/11 pomeriggio: le recensioni potevano arrivare prima del diario).
+  const tornatoInVista = rigaVecchia && scheda != null;
   // Riga "Qui recensisce solo chi c'è stato" con il suo tasto: anche per un posto non ancora nel database
   // quando la scheda sa segnarlo (revisore 16/11 sera: "Salva il locale" spingeva a un salvataggio che non basta).
   const rigaVisita = userId != null && !visitato && (c.placeId != null || scheda?.segna != null || scheda?.vai != null);
@@ -340,7 +341,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
       )}
       {rigaVecchia && (
         <div data-testid="recensione-visita-vecchia" className="mt-3 rounded-card border border-border bg-surface p-3">
-          <p className="text-sm font-sans text-text">La visita è di più di 30 giorni fa: si recensisce entro 30 giorni.</p>
+          <p className="text-sm font-sans text-text">La tua visita è di oltre un mese fa: si recensisce entro 30 giorni.</p>
           {/* Niente secondo "Ci sono tornato" (revisore 21/11: doppione del diario, che conta la visita e fa scegliere
               il giorno): nella scheda della mappa si porta al tasto del diario, altrove si apre la scheda nella mappa. */}
           {tornatoInVista ? (

@@ -10553,7 +10553,7 @@ else {
     ok((await cp.getByText("Salva in Mapetite").count()) === 0 && (await txt(cp.getByTestId("salvato-pubblico"))).includes("Tra i posti dove sei stato"), "recensioni (proposta 61): la barra 'Salva in Mapetite' diventa '✓ Tra i posti dove sei stato'");
     await cp.screenshot({ path: `${OUT}/98c-recensioni-segnato.png`, caret: "initial" }); }
 
-  // 5c. Proposta 74 (L. 34/2026): si recensisce entro 30 giorni dalla visita; "Ci sono tornato da poco" la riporta a oggi.
+  // 5c. Proposta 74 (L. 34/2026): si recensisce entro 30 giorni dalla visita; "↻ Ci sono tornato" del diario la riporta a oggi.
   { const patch = [];
     await cctx.route("**/rest/v1/saved_places**", (r) => { if (r.request().method() === "PATCH") { patch.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); } return r.fallback(); });
     await setC("e2e_community", { recensioni: [], mia: null, reel: [], reelPronti: true, possoRecensire: true, visitaVecchia: true });
