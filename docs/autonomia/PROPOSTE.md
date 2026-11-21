@@ -25,6 +25,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per l'utente:** recensioni di cui fidarsi. **Per il ristoratore:** regole chiare e un modo per segnalare. **Per l'app:** argomento per i ristoratori e per gli investitori (conformità già pronta).
 - **Sforzo:** S (data della visita già salvata, `visited_at`; un controllo nel trigger, oggi sospeso, e uno nella lettura). **Costo Google/Haiku:** zero.
 - **Stato proposto:** PRONTA per i 30 giorni e i 2 anni; la segnalazione dal pannello dopo (serve rivedere `/privacy`, DA-FARE voce 11). Prima di costruire: capire perché il trigger `reviews_da_visita` è stato sospeso (`20261116e`).
+- **Esito (21/11, sessione delle 10:05):** il trigger era stato riacceso con la proposta 61 (`20261116f`, verificato sul database: esiste). Costruita la parte dei 30 giorni e dei 2 anni (migrazione `20261121_recensioni_legge`); la verifica resta dichiarativa (la data della visita la sceglie chi l'ha segnata). Esito del revisore nel BACKLOG.
 
 ### 75. "Provalo senza account": incolla un reel nella pagina d'ingresso e vedi il posto con il verdetto
 - **Problema:** retro del 21/11: 7 utenti, 0 accessi in 7 giorni. Le app che salvano da Instagram ora sono tante (Korka, NextBite, Munchmark, ReelsMap, SpotSavor: [App Store](https://apps.apple.com/app/id6762612703), [NextBite](https://apps.apple.com/us/app/id6767959568), [Munchmark](https://apps.apple.com/app/munchmark/id6773109835)): chi arriva deve vedere in 10 secondi cosa abbiamo in più (il verdetto onesto, i posti non famosi).
@@ -32,6 +33,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per l'utente:** capisce subito. **Per l'app:** i tester entrano dopo aver visto il risultato, non prima. **Per il ristoratore:** nessuno diretto.
 - **Sforzo:** S/M (il salvataggio dal reel esiste; serve la versione senza account con un tetto). **Costo Google/Haiku:** al massimo 1 ricerca e 1 verdetto per prova, dentro le quote; tetto giornaliero complessivo (es. 5 prove al giorno per tutti) per non toccare i 50 di Google.
 - **Stato proposto:** PRONTA, verificando prima che il primo accesso non lo faccia già (passo "incolla un reel").
+- **Esito (21/11, sessione delle 10:05):** il primo accesso chiede già l'account (`/onboarding` rimanda a `/signup`): non lo faceva. Costruita in home per chi non ha l'account; tetto atomico di 5 prove al giorno (tabella `prove_reel`, migrazione `20261121b`). Esito del revisore nel BACKLOG.
 
 ### 71. "Il piatto del reel": il motivo per cui l'hai salvato, accanto a "Da ordinare"
 - **Problema:** `PROBLEMI.md` 10 e 22: chi salva da un reel spesso ricorda solo il piatto, e la scheda non lo dice.
