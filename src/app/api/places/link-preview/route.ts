@@ -17,7 +17,7 @@ import { findPlaceBasic, findPlaceId, placeEssentials, resolveShortLink } from "
 // Il link corto (maps.app.goo.gl) si apre seguendo il solo redirect: non è un'API e non costa.
 
 type Preview =
-  | { stato: "riconosciuto"; chiamate: number; place: { id: string; name: string; address: string } }
+  | { stato: "riconosciuto"; chiamate: number; place: { id: string; name: string; address: string; lat: number; lng: number } }
   | { stato: "da_confermare"; chiamate: number; motivo: string; nome: string | null }
   | { stato: "non_riconosciuto"; chiamate: number; motivo: string; nome?: string | null; lista?: true };
 
@@ -27,7 +27,8 @@ const GOOGLE_DOWN = "Google non risponde in questo momento: riprova tra poco.";
 const ok = (p: StoredPlace, chiamate: number, address?: string): Preview => ({
   stato: "riconosciuto",
   chiamate,
-  place: { id: p.id, name: p.name, address: p.address || address || "" },
+  // La posizione serve al telefono per cercare nel catalogo gli altri posti della stessa lista (proposta 38).
+  place: { id: p.id, name: p.name, address: p.address || address || "", lat: p.lat, lng: p.lng },
 });
 const later = (nome: string | null, chiamate = 0, motivo = "Serve una ricerca su Google: toccalo per riconoscerlo."): Preview =>
   ({ stato: "da_confermare", chiamate, motivo, nome });
