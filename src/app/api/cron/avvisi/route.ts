@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { avvisoDelGiorno, avvisoPrenotazioneDomani, avvisoPrenotazioneOggi, inviaAvviso, pushConfigurato, type Avviso } from "@/lib/push-server";
+import { avvisaChiSegue, avvisoDelGiorno, avvisoPrenotazioneDomani, avvisoPrenotazioneOggi, inviaAvviso, pushConfigurato, type Avviso } from "@/lib/push-server";
+import { pulisciGiorni, seraValida } from "@/lib/serate";
 import { oggiRoma } from "@/lib/stasera";
 
 // Avviso del giorno (proposta 6; dall'8/11 prima il tavolo di oggi), una volta al giorno dal cron di Vercel (vercel.json): a chi ha
@@ -75,7 +76,17 @@ export async function GET(request: Request) {
     avvisi.set(r.user_id, avvisoPrenotazioneDomani(d.placeName, typeof d.time === "string" ? d.time : null));
     domaniN++;
   }
-  if (avvisi.size === 0) return NextResponse.json({ inviati: 0 });
+  // Proposta 72: gli avvisi "c'è posto" segnati dal titolare fuori dalle 9–21 (in_attesa) partono ora,
+  // con i giorni di oggi. Avviso a parte (tag suo), con la stessa pausa di 6 giorni per locale.
+  let postoN = 0;
+  const { data: attesa } = await admin.from("avvisi_posto").select("place_id").eq("in_attesa", true).limit(500);
+  for (const placeId of new Set((attesa ?? []).map((r) => r.place_id as string))) {
+    const { data: loc } = await admin.from("places").select("name, verified_at, giorni_tranquilli, giorni_tranquilli_at").eq("id", placeId).maybeSingle<{ name: string | null; verified_at: string | null; giorni_tranquilli: number[] | null; giorni_tranquilli_at: string | null }>();
+    const giorni = pulisciGiorni(loc?.giorni_tranquilli);
+    if (loc?.name && loc.verified_at && giorni.length > 0 && seraValida(loc.giorni_tranquilli_at)) postoN += (await avvisaChiSegue(placeId, loc.name, giorni)).inviati;
+    else await admin.from("avvisi_posto").update({ in_attesa: false }).eq("place_id", placeId);
+  }
+  if (avvisi.size === 0) return NextResponse.json({ inviati: postoN });
 
   const { data: subs } = await admin.from("push_subscriptions").select("id, user_id, endpoint, p256dh, auth").in("user_id", [...avvisi.keys()]);
   let inviati = 0;
@@ -86,6 +97,6 @@ export async function GET(request: Request) {
     if (esito === "scaduta") scadute.push(s.id);
   }
   if (scadute.length > 0) await admin.from("push_subscriptions").delete().in("id", scadute);
-  console.log(`[cron-avvisi] ${oggi} persone=${avvisi.size} oggi=${oggiN} domani=${domaniN} iscrizioni=${subs?.length ?? 0} inviati=${inviati} scadute=${scadute.length}`);
-  return NextResponse.json({ inviati, scadute: scadute.length });
+  console.log(`[cron-avvisi] ${oggi} persone=${avvisi.size} oggi=${oggiN} domani=${domaniN} posto=${postoN} iscrizioni=${subs?.length ?? 0} inviati=${inviati} scadute=${scadute.length}`);
+  return NextResponse.json({ inviati: inviati + postoN, scadute: scadute.length });
 }

@@ -1,4 +1,6 @@
 import webpush from "web-push";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { PAUSA_GIORNI, testoAvvisoPosto } from "@/lib/serate";
 
 // Invio degli avvisi push (proposta 6). Chiavi VAPID solo lato server: VAPID_PUBLIC_KEY,
 // VAPID_PRIVATE_KEY e VAPID_SUBJECT (un "mailto:"). Senza, niente avvisi e nessun errore.
@@ -19,10 +21,10 @@ function prepara() {
 }
 
 /** "ok", "scaduta" (il telefono ha tolto l'iscrizione: va cancellata) o "errore". */
-export async function inviaAvviso(sub: Iscrizione, avviso: Avviso): Promise<"ok" | "scaduta" | "errore"> {
+export async function inviaAvviso(sub: Iscrizione, avviso: Avviso, ttl: number = 6 * 3600): Promise<"ok" | "scaduta" | "errore"> {
   prepara();
   try {
-    await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, JSON.stringify(avviso), { TTL: 6 * 3600, urgency: "normal" });
+    await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, JSON.stringify(avviso), { TTL: ttl, urgency: "normal" });
     return "ok";
   } catch (e) {
     const status = (e as { statusCode?: number }).statusCode;
@@ -66,4 +68,76 @@ export function avvisoDelGiorno(nomi: string[], sabato: boolean): Avviso {
     url: "/stasera",
     tag: "piano-del-giorno",
   };
+}
+
+function oraRoma(): { h: number; m: number } {
+  const [h, m] = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date()).split(":").map(Number);
+  return { h, m };
+}
+/** Dalle 9 alle 21 di Roma: le ore in cui un avviso "c'è posto" non disturba. */
+export function oraDaAvvisi(): boolean {
+  const { h } = oraRoma();
+  return h >= 9 && h < 21;
+}
+function secondiAMezzanotte(): number {
+  const { h, m } = oraRoma();
+  return (24 * 60 - (h * 60 + m)) * 60;
+}
+
+// "Avvisami quando c'è posto" (PROPOSTE.md 72): il titolare di un locale verificato ha appena segnato giorni nuovi
+// con posto. Avvisa chi lo segue (avvisi_posto), al massimo una volta ogni 6 giorni per locale. Parte dopo la
+// risposta al titolare (after), con la chiave di servizio. Nessuna chiamata Google o AI.
+// Le righe si prenotano in un solo UPDATE (avvisato_at = adesso, solo se libere): due salvataggi di fila del
+// titolare non mandano due avvisi. Chi non è stato raggiunto (nessun telefono iscritto) torna com'era.
+export async function avvisaChiSegue(placeId: string, nome: string, giorni: number[]): Promise<{ inviati: number; rimandato?: boolean }> {
+  if (!pushConfigurato() || !process.env.SUPABASE_SECRET_KEY) return { inviati: 0 };
+  // Fuori dalle 9–21 di Roma niente avvisi (revisore 21/11): il locale resta "in attesa" e lo manda il cron
+  // delle 15 (/api/cron/avvisi), con le parole di quel giorno.
+  if (!oraDaAvvisi()) {
+    await createAdminClient().from("avvisi_posto").update({ in_attesa: true }).eq("place_id", placeId);
+    return { inviati: 0, rimandato: true };
+  }
+  const testo = testoAvvisoPosto(nome, giorni);
+  if (!testo) return { inviati: 0 };
+  const admin = createAdminClient();
+  const adesso = new Date().toISOString();
+  const soglia = new Date(Date.now() - PAUSA_GIORNI * 86_400_000).toISOString();
+  const { data: righe, error } = await admin
+    .from("avvisi_posto")
+    .update({ avvisato_at: adesso, in_attesa: false })
+    .eq("place_id", placeId)
+    .or(`avvisato_at.is.null,avvisato_at.lte.${soglia}`)
+    .select("user_id");
+  if (error) { console.warn(`[avvisi-posto] prenotazione ${error.code ?? ""}`); return { inviati: 0 }; }
+  // Chi è ancora in pausa non resta "in attesa": l'occasione è passata.
+  await admin.from("avvisi_posto").update({ in_attesa: false }).eq("place_id", placeId).eq("in_attesa", true);
+  const prenotati = (righe ?? []).map((r) => r.user_id as string);
+  if (prenotati.length === 0) return { inviati: 0 };
+  // Solo chi ha ancora il locale tra i salvati: tolto il salvato, l'avviso non parte più.
+  // Né a chi l'ha segnato "Non fa per me" (il tasto per toglierlo lì non c'è: revisore 21/11).
+  const { data: ancora } = await admin.from("saved_places").select("user_id, tags").eq("place_id", placeId).in("user_id", prenotati);
+  const salvati = new Set(((ancora ?? []) as { user_id: string; tags: string[] | null }[]).filter((r) => !r.tags?.includes("Non fa per me")).map((r) => r.user_id));
+  const utenti = prenotati.filter((u) => salvati.has(u));
+  if (utenti.length === 0) {
+    await admin.from("avvisi_posto").update({ avvisato_at: null }).eq("place_id", placeId).eq("avvisato_at", adesso).in("user_id", prenotati);
+    return { inviati: 0 };
+  }
+  const { data: subs } = await admin.from("push_subscriptions").select("id, user_id, endpoint, p256dh, auth").in("user_id", utenti);
+  const avviso: Avviso = { ...testo, url: `/locali/${placeId}`, tag: `posto-${placeId}` };
+  // "Stasera c'è posto" vale fino a mezzanotte: un avviso arrivato dopo sarebbe falso (revisore 21/11).
+  const ttl = Math.max(3600, secondiAMezzanotte());
+  let inviati = 0;
+  const raggiunti = new Set<string>();
+  const scadute: string[] = [];
+  for (const s of subs ?? []) {
+    const esito = await inviaAvviso(s, avviso, ttl);
+    if (esito === "ok") { inviati++; raggiunti.add(s.user_id); }
+    if (esito === "scaduta") scadute.push(s.id);
+  }
+  if (scadute.length > 0) await admin.from("push_subscriptions").delete().in("id", scadute);
+  // Non raggiunti: l'avviso non è arrivato, quindi la pausa non parte (alla prossima occasione ci si riprova).
+  const mancati = prenotati.filter((u) => !raggiunti.has(u));
+  if (mancati.length > 0) await admin.from("avvisi_posto").update({ avvisato_at: null }).eq("place_id", placeId).eq("avvisato_at", adesso).in("user_id", mancati);
+  console.log(`[avvisi-posto] locale=${placeId} prenotati=${utenti.length} iscrizioni=${subs?.length ?? 0} inviati=${inviati} scadute=${scadute.length}`);
+  return { inviati };
 }
