@@ -7,6 +7,7 @@ import Avatar from "@/components/avatar";
 import { personName, profilePath } from "@/lib/handle";
 import { track, trackFeature } from "@/lib/track";
 import { COMMENT_MAX, addReel, saveReview, segnaCiSonoStato } from "@/lib/community-write";
+import { visitaOltre30 } from "@/lib/visita-30";
 import { reelSourceOf, seenOn, type ReelSource } from "@/lib/reel";
 import type { Community, CommunityReel, CommunityReview } from "@/lib/community";
 import type { Voto } from "@/lib/diario";
@@ -157,6 +158,17 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
   // Proposta 61: "Ci sono stato" segnato da qui (pagina del locale, assistente); errore del database "serve la visita".
   const [segnato, setSegnato] = useState<"no" | "attendo" | "ok" | "errore">("no");
   const [serveVisita, setServeVisita] = useState(false);
+  // Proposta 74 (L. 34/2026): visita di oltre 30 giorni fa, dal server o dalla risposta del database.
+  const [vecchia, setVecchia] = useState<"server" | "si" | "no">("server");
+  // La data cambiata dal diario della scheda ("↻ Ci sono tornato", data della visita): si ricontrolla qui.
+  useEffect(() => {
+    const su = (e: Event) => {
+      const d = (e as CustomEvent<{ placeId?: string; date?: string | null }>).detail;
+      if (d?.placeId && d.placeId === data?.c.placeId) setVecchia(visitaOltre30(d.date ?? null) ? "si" : "no");
+    };
+    window.addEventListener("mapetite:data-visita", su);
+    return () => window.removeEventListener("mapetite:data-visita", su);
+  }, [data?.c.placeId]);
   const [editing, setEditing] = useState(false);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -199,7 +211,14 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
   // Dalla mappa vale il tasto della scheda (dato vivo); altrove il server, il voto 👍/👎 o il tasto qui sotto.
   // Se il database ha risposto "serve la visita" (dato vecchio sul telefono), si torna alla riga con il tasto.
   const visitato = !serveVisita && ((scheda?.visitato ?? null) ?? (c.possoRecensire || voto != null || segnato === "ok"));
-  const formOpen = canWrite && visitato && (editing || !mine);
+  // Appena segnato "Ci sono stato" da qui la visita è di oggi: il dato del server non vale più.
+  const visitaVecchia = vecchia === "server" ? Boolean(c.visitaVecchia) && segnato !== "ok" : vecchia === "si";
+  const formOpen = canWrite && visitato && !visitaVecchia && (editing || !mine);
+  // Recensione nuova (o modifica chiesta) con la visita di oltre 30 giorni fa: al posto del modulo la riga della legge.
+  const rigaVecchia = canWrite && visitato && visitaVecchia && (editing || !mine);
+  // Il tasto "↻ Ci sono tornato" del diario è nella stessa scheda (mappa): la riga ci porta lì.
+  // Dal contesto della scheda, non cercando nella pagina (revisore 21/11 pomeriggio: le recensioni potevano arrivare prima del diario).
+  const tornatoInVista = rigaVecchia && scheda != null;
   // Riga "Qui recensisce solo chi c'è stato" con il suo tasto: anche per un posto non ancora nel database
   // quando la scheda sa segnarlo (revisore 16/11 sera: "Salva il locale" spingeva a un salvataggio che non basta).
   const rigaVisita = userId != null && !visitato && (c.placeId != null || scheda?.segna != null || scheda?.vai != null);
@@ -211,6 +230,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
     setStatus("saving");
     const esito = await saveReview(userId!, c.placeId!, rating, comment);
     setServeVisita(esito === "serve-visita");
+    if (esito === "visita-vecchia") { setVecchia("si"); setStatus("idle"); return; }
     // Il database dice che la visita non c'è (revisore 16/11 sera): via la conferma, torna la riga col tasto.
     if (esito === "serve-visita") setSegnato("no");
     if (esito !== "ok") { setStatus("error"); return; }
@@ -260,7 +280,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
         <div data-testid="mia-recensione" className="mt-3 rounded-card border-2 border-accent/30 bg-surface p-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-display font-semibold uppercase tracking-wide text-accent">La tua recensione</p>
-            {visitato && (
+            {visitato && !visitaVecchia && (
               <button type="button" onClick={() => { setEditing(true); setStatus("idle"); }} className="min-h-11 px-1 text-sm font-display font-semibold text-brand">
                 Modifica
               </button>
@@ -318,6 +338,39 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
             )}
           </div>
         </form>
+      )}
+      {rigaVecchia && (
+        <div data-testid="recensione-visita-vecchia" className="mt-3 rounded-card border border-border bg-surface p-3">
+          <p className="text-sm font-sans text-text">La tua visita è di oltre un mese fa: si recensisce entro 30 giorni.</p>
+          {/* Niente secondo "Ci sono tornato" (revisore 21/11: doppione del diario, che conta la visita e fa scegliere
+              il giorno): nella scheda della mappa si porta al tasto del diario, altrove si apre la scheda nella mappa. */}
+          {tornatoInVista ? (
+            <button
+              type="button"
+              data-testid="recensione-vai-tornato"
+              onClick={() => {
+                const b = document.querySelector<HTMLElement>('[data-testid="diario-scheda-tornato"]');
+                if (!b) return;
+                b.scrollIntoView({ block: "center", behavior: "smooth" });
+                b.focus();
+                // Segno visibile anche quando il tasto è già sullo schermo (revisore 21/11).
+                b.classList.add("ring-2", "ring-accent", "rounded-pill");
+                window.setTimeout(() => b.classList.remove("ring-2", "ring-accent", "rounded-pill"), 1500);
+              }}
+              className="mt-1 inline-flex min-h-11 items-center text-sm font-display font-semibold text-brand underline underline-offset-2"
+            >
+              Ci sei tornato? Segnalalo qui sopra ↑
+            </button>
+          ) : (
+            <Link
+              href={`/mappa?salvato=${c.placeId}`}
+              data-testid="recensione-vai-mappa"
+              className="mt-1 inline-flex min-h-11 items-center text-sm font-display font-semibold text-brand underline underline-offset-2"
+            >
+              Ci sei tornato? Segnalalo dalla mappa →
+            </Link>
+          )}
+        </div>
       )}
       {userId == null && (
         <p className="mt-2 text-sm font-sans text-text-muted">
@@ -410,7 +463,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
         </>
       ) : !mine && !(userId != null && c.placeId == null) ? (
         // Chi non può ancora scrivere ha già "Salva il locale per lasciare la tua recensione": niente seconda frase (collaudo 23/10).
-        <p data-testid="community-vuota" className="mt-2 text-sm font-sans text-text-muted">Ancora nessuna recensione: sii il primo a dire com&apos;era.</p>
+        !rigaVecchia && <p data-testid="community-vuota" className="mt-2 text-sm font-sans text-text-muted">Ancora nessuna recensione: sii il primo a dire com&apos;era.</p>
       ) : null}
 
       {/* Foto scattate dagli altri membri, ciascuna con "Foto di <nome>". */}

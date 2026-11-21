@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { visitaOltre30 } from "@/lib/visita-30";
 import { createClient } from "@/lib/supabase/server";
 import { followedIds, viewerId } from "@/lib/social";
 import { reelSourceOf, type ReelSource } from "@/lib/reel";
@@ -41,6 +42,7 @@ export type Community = {
   mieFoto: FotoUtente[]; // le proprie (anche private: contano per il massimo di 3)
   fotoPronte: boolean; // tabella foto_locali presente
   possoRecensire: boolean; // chi guarda ha "Ci sono stato" su questo posto (proposta 61)
+  visitaVecchia?: boolean; // la sua visita ha una data di oltre 30 giorni fa: niente recensione nuova (proposta 74)
 };
 
 export const EMPTY_COMMUNITY: Community = { placeId: null, recensioni: [], mia: null, reel: [], reelPronti: false, viewer: false, foto: [], mieFoto: [], fotoPronte: false, possoRecensire: false };
@@ -115,7 +117,7 @@ export async function loadCommunity(id: string): Promise<Community> {
     viewer ? fotoMie(viewer, [placeId]) : Promise.resolve(null),
     // Proposta 61: si recensisce solo da "Ci sono stato" (lo stesso controllo lo fa il database).
     viewer
-      ? supabase.from("saved_places").select("tags").eq("user_id", viewer).eq("place_id", placeId).maybeSingle<{ tags: string[] | null }>()
+      ? supabase.from("saved_places").select("tags, visited_at").eq("user_id", viewer).eq("place_id", placeId).maybeSingle<{ tags: string[] | null; visited_at?: string | null }>()
       : Promise.resolve({ data: null, error: null }),
   ]);
   // Senza la migrazione 20261116b (colonne mancanti) si rilegge come prima.
@@ -171,5 +173,7 @@ export async function loadCommunity(id: string): Promise<Community> {
     mieFoto: mie?.foto.get(placeId) ?? [],
     fotoPronte: mie?.pronte ?? false,
     possoRecensire: (visita.data?.tags ?? []).includes("Già visitato"),
+    visitaVecchia: (visita.data?.tags ?? []).includes("Già visitato") && visitaOltre30(visita.data?.visited_at ?? null),
   };
 }
+

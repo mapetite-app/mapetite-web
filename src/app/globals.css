@@ -74,6 +74,18 @@ html[data-primo-accesso] {
   --nav-height-mobile: 0px;
 }
 
+/* Pagina del voto di "Manda al gruppo" (proposta 56) sul telefono: chi arriva da WhatsApp ha una cosa sola da
+   fare, votare. Niente barra dell'app (e niente spazio riservato), come il primo accesso. */
+@media (max-width: 767px) {
+  html:has(main[data-voto]) {
+    --nav-height-mobile: 0px;
+    --nav-sporgenza: 0px;
+  }
+  html:has(main[data-voto]) [data-app-nav] {
+    display: none;
+  }
+}
+
 /* Su desktop la nav è in alto: nessun ingombro dal fondo, offset azzerato. */
 @media (min-width: 768px) {
   :root {

@@ -24,7 +24,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** [Gambero Rosso](https://www.gamberorosso.it/notizie/attualita/recensioni-false-ristoranti-nuove-regole/), [Il Post](https://www.ilpost.it/2026/04/07/nuove-regole-recensioni-false-ingannevoli-online-ristoranti-hotel/). Nessun concorrente consumer (Beli, Corner, Mapstr) lo dice.
 - **Valore per l'utente:** recensioni di cui fidarsi. **Per il ristoratore:** regole chiare e un modo per segnalare. **Per l'app:** argomento per i ristoratori e per gli investitori (conformità già pronta).
 - **Sforzo:** S (data della visita già salvata, `visited_at`; un controllo nel trigger, oggi sospeso, e uno nella lettura). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA per i 30 giorni e i 2 anni; la segnalazione dal pannello dopo (serve rivedere `/privacy`, DA-FARE voce 11). Prima di costruire: capire perché il trigger `reviews_da_visita` è stato sospeso (`20261116e`).
+- **Stato proposto:** PRONTA per i 30 giorni e i 2 anni; la segnalazione dal pannello dopo (serve rivedere `/privacy`, DA-FARE voce 11). Prima di costruire: capire perché il trigger `reviews_da_visita` è stato sospeso (`20261116e`). **FATTA il 21/11** (sessione delle 14:05, revisore 8,5).
 - **Esito (21/11, sessione delle 10:05):** il trigger era stato riacceso con la proposta 61 (`20261116f`, verificato sul database: esiste). Costruita la parte dei 30 giorni e dei 2 anni (migrazione `20261121_recensioni_legge`); la verifica resta dichiarativa (la data della visita la sceglie chi l'ha segnata). Esito del revisore nel BACKLOG.
 
 ### 75. "Provalo senza account": incolla un reel nella pagina d'ingresso e vedi il posto con il verdetto
@@ -187,7 +187,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** WhatsApp ha i sondaggi ([Money.it](https://www.money.it/come-fare-sondaggio-su-whatsapp)) e sta aggiungendo la chiusura a orario ([Smartworld](https://www.smartworld.it/news/whatsapp-gruppi-novita-sondaggi-tutti-creazione-rapida.html)); Corner e Albo condividono liste, ma non fanno votare chi non ha l'app. Noi uniamo i due pezzi, con il verdetto onesto dentro.
 - **Valore per l'utente:** la serata decisa in chat in pochi minuti. **Per l'app:** ogni link porta amici nuovi che vedono Mapetite funzionare senza installarlo. **Per il ristoratore:** un gruppo già deciso a uscire che vota il suo locale (dato aggregato per il pannello).
 - **Sforzo:** M (pagina pubblica del voto, una tabella voti con limiti anti-abuso, riuso dei gruppi esistenti). **Costo Google/Haiku:** zero chiamate in più (foto solo dei 3 posti, entro la quota foto di 200/giorno).
-- **Stato proposto:** PRONTA (con un revisore di design: la pagina del voto deve stare in una schermata a 390×844).
+- **Stato proposto:** PRONTA (con un revisore di design: la pagina del voto deve stare in una schermata a 390×844). **FATTA il 21/11** (sessione delle 14:05, revisore 8,5; da una raccolta: non ancora).
 
 ### 57. "Chiocciola Slow Food" sulla scheda, con un accordo con Slow Food Editore
 - **Problema:** VISIONE: far emergere i posti non di massa ma buoni; oggi lo deduciamo solo dalle recensioni Google (`PROBLEMI.md` 22).

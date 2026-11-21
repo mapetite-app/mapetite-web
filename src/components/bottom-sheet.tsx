@@ -17,6 +17,7 @@ import { isStateTag, sortTags, STATE_TAGS, tagLabel } from "@/lib/tags";
 import { searchFeedbackMailto } from "@/lib/feedback";
 import { trackFeature } from "@/lib/track";
 import UtileFeedback from "@/components/utile-feedback";
+import MandaAlGruppo from "@/components/manda-al-gruppo";
 import { cityFromAddress } from "@/lib/city";
 import { MIN_POSTI_TRE, MIN_SCELTI, candidatiTre, etichettaMotivo, scegliTre, tuttiDiversi, type Motivo } from "@/lib/scegli-tre";
 
@@ -218,6 +219,9 @@ export type ListDetails = {
   // Senza verdetto (oltre i primi 12 o se l'AI non risponde): descrizione o recensione di Google.
   editorialSummary?: string | null;
   selectedReviews?: { text: string; rating?: number | null }[] | null;
+  // Dalla ricerca (VenueDetails): solo per "Prenota" a voto chiuso di "Manda al gruppo", ricordati nel telefono.
+  phone?: string | null;
+  websiteUri?: string | null;
 };
 
 // Riga di ripiego quando manca il verdetto: solo fatti di Google, mai testo inventato.
@@ -699,6 +703,17 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           {treOn ? <><svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg>Tutti i {treTutti}</> : <><svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-accent" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>Scegli tra {treN}</>}
           </span>
         </button>
+      )}
+      {/* Proposta 56: con i tre davanti, "Manda al gruppo" li fa votare su WhatsApp (subito dopo "Tutti i N"). */}
+      {treOn && (
+        <MandaAlGruppo
+          toccoClass={TOCCO}
+          pillolaClass={PILLOLA}
+          posti={treLista.map(({ posto: p }) => {
+            const d = details?.[p.id];
+            return { id: p.id, name: p.name, category: p.category, address: p.address, lat: p.lat, lng: p.lng, verdict: d?.verdict ?? null, photoRef: d?.photoRef ?? null, phone: d?.phone ?? null, websiteUri: d?.websiteUri ?? null };
+          })}
+        />
       )}
       {/* Revisori 14 e 15/11: con la scelta accesa i filtri restano tutti in vista: toccarne uno cambia i tre davanti
           ai tuoi occhi (la scelta è fatta tra i rimasti), invece di sparire. */}
