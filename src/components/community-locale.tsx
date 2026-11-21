@@ -6,7 +6,7 @@ import { Play, Plus } from "lucide-react";
 import Avatar from "@/components/avatar";
 import { personName, profilePath } from "@/lib/handle";
 import { track, trackFeature } from "@/lib/track";
-import { COMMENT_MAX, addReel, saveReview, segnaCiSonoStato } from "@/lib/community-write";
+import { COMMENT_MAX, addReel, saveReview, segnaCiSonoStato, segnaNuovaVisita } from "@/lib/community-write";
 import { reelSourceOf, seenOn, type ReelSource } from "@/lib/reel";
 import type { Community, CommunityReel, CommunityReview } from "@/lib/community";
 import type { Voto } from "@/lib/diario";
@@ -157,6 +157,8 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
   // Proposta 61: "Ci sono stato" segnato da qui (pagina del locale, assistente); errore del database "serve la visita".
   const [segnato, setSegnato] = useState<"no" | "attendo" | "ok" | "errore">("no");
   const [serveVisita, setServeVisita] = useState(false);
+  // Proposta 74 (L. 34/2026): visita di oltre 30 giorni fa, dal server o dalla risposta del database.
+  const [vecchia, setVecchia] = useState<"server" | "si" | "no" | "attendo" | "errore">("server");
   const [editing, setEditing] = useState(false);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -199,7 +201,11 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
   // Dalla mappa vale il tasto della scheda (dato vivo); altrove il server, il voto 👍/👎 o il tasto qui sotto.
   // Se il database ha risposto "serve la visita" (dato vecchio sul telefono), si torna alla riga con il tasto.
   const visitato = !serveVisita && ((scheda?.visitato ?? null) ?? (c.possoRecensire || voto != null || segnato === "ok"));
-  const formOpen = canWrite && visitato && (editing || !mine);
+  // Appena segnato "Ci sono stato" da qui la visita è di oggi: il dato del server non vale più.
+  const visitaVecchia = vecchia === "server" ? Boolean(c.visitaVecchia) && segnato !== "ok" : vecchia !== "no";
+  const formOpen = canWrite && visitato && !visitaVecchia && (editing || !mine);
+  // Recensione nuova (o modifica chiesta) con la visita di oltre 30 giorni fa: al posto del modulo la riga della legge.
+  const rigaVecchia = canWrite && visitato && visitaVecchia && (editing || !mine);
   // Riga "Qui recensisce solo chi c'è stato" con il suo tasto: anche per un posto non ancora nel database
   // quando la scheda sa segnarlo (revisore 16/11 sera: "Salva il locale" spingeva a un salvataggio che non basta).
   const rigaVisita = userId != null && !visitato && (c.placeId != null || scheda?.segna != null || scheda?.vai != null);
@@ -211,6 +217,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
     setStatus("saving");
     const esito = await saveReview(userId!, c.placeId!, rating, comment);
     setServeVisita(esito === "serve-visita");
+    if (esito === "visita-vecchia") { setVecchia("si"); setStatus("idle"); return; }
     // Il database dice che la visita non c'è (revisore 16/11 sera): via la conferma, torna la riga col tasto.
     if (esito === "serve-visita") setSegnato("no");
     if (esito !== "ok") { setStatus("error"); return; }
@@ -318,6 +325,33 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
             )}
           </div>
         </form>
+      )}
+      {rigaVecchia && (
+        <div data-testid="recensione-visita-vecchia" className="mt-3 rounded-card border border-border bg-surface p-3">
+          <p className="text-sm font-sans text-text">
+            {mine ? "La visita è di più di 30 giorni fa: la recensione resta com'è." : "La visita è di più di 30 giorni fa: si recensisce entro 30 giorni."}
+          </p>
+          <button
+            type="button"
+            data-testid="recensione-ci-sono-tornato"
+            disabled={vecchia === "attendo"}
+            onClick={async () => {
+              setVecchia("attendo");
+              const ok = await segnaNuovaVisita(userId!, c.placeId!);
+              setVecchia(ok ? "no" : "errore");
+              if (ok) track("ci_sono_stato", { id: c.placeId! }, { fonte: "tornato_recensione", contesto });
+            }}
+            className="mt-2 inline-flex min-h-11 items-center rounded-pill border border-brand bg-white px-5 text-sm font-display font-semibold text-brand active:scale-95 disabled:opacity-60"
+          >
+            {vecchia === "attendo" ? "Segno…" : "✓ Ci sono tornato da poco"}
+          </button>
+          {vecchia === "errore" && <p role="alert" className="mt-1 text-xs font-sans text-error">Non sono riuscito a segnarlo. Riprova.</p>}
+          {mine && (
+            <button type="button" onClick={() => setEditing(false)} className="ml-2 mt-2 inline-flex min-h-11 items-center px-2 text-sm font-display font-semibold text-text-muted">
+              Annulla
+            </button>
+          )}
+        </div>
       )}
       {userId == null && (
         <p className="mt-2 text-sm font-sans text-text-muted">
