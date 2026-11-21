@@ -89,8 +89,16 @@ export async function avvisaChiSegue(placeId: string, nome: string, giorni: numb
     .or(`avvisato_at.is.null,avvisato_at.lte.${soglia}`)
     .select("user_id");
   if (error) { console.warn(`[avvisi-posto] prenotazione ${error.code ?? ""}`); return { inviati: 0 }; }
-  const utenti = (righe ?? []).map((r) => r.user_id as string);
-  if (utenti.length === 0) return { inviati: 0 };
+  const prenotati = (righe ?? []).map((r) => r.user_id as string);
+  if (prenotati.length === 0) return { inviati: 0 };
+  // Solo chi ha ancora il locale tra i salvati: tolto il salvato, l'avviso non parte più.
+  const { data: ancora } = await admin.from("saved_places").select("user_id").eq("place_id", placeId).in("user_id", prenotati);
+  const salvati = new Set((ancora ?? []).map((r) => r.user_id as string));
+  const utenti = prenotati.filter((u) => salvati.has(u));
+  if (utenti.length === 0) {
+    await admin.from("avvisi_posto").update({ avvisato_at: null }).eq("place_id", placeId).eq("avvisato_at", adesso).in("user_id", prenotati);
+    return { inviati: 0 };
+  }
   const { data: subs } = await admin.from("push_subscriptions").select("id, user_id, endpoint, p256dh, auth").in("user_id", utenti);
   const avviso: Avviso = { ...testo, url: `/locali/${placeId}`, tag: `posto-${placeId}` };
   let inviati = 0;
@@ -103,7 +111,7 @@ export async function avvisaChiSegue(placeId: string, nome: string, giorni: numb
   }
   if (scadute.length > 0) await admin.from("push_subscriptions").delete().in("id", scadute);
   // Non raggiunti: l'avviso non è arrivato, quindi la pausa non parte (alla prossima occasione ci si riprova).
-  const mancati = utenti.filter((u) => !raggiunti.has(u));
+  const mancati = prenotati.filter((u) => !raggiunti.has(u));
   if (mancati.length > 0) await admin.from("avvisi_posto").update({ avvisato_at: null }).eq("place_id", placeId).eq("avvisato_at", adesso).in("user_id", mancati);
   console.log(`[avvisi-posto] locale=${placeId} prenotati=${utenti.length} iscrizioni=${subs?.length ?? 0} inviati=${inviati} scadute=${scadute.length}`);
   return { inviati };

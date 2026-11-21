@@ -50,6 +50,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per l'utente:** il posto che volevi provare, la sera giusta. **Per il ristoratore:** riempie i tavoli vuoti dell'ultimo minuto con chi l'aveva già scelto: è la "domanda qualificata" per cui pagherebbe.
 - **Sforzo:** M. **Costo Google/Haiku:** zero. Dipende dagli avvisi push accesi (`DA-FARE-LORENZO.md` voce 8); senza, si costruisce spenta.
 - **Stato proposto:** PRONTA (accesa solo dopo le chiavi degli avvisi).
+- **Esito (21/11, sessione delle 22:05):** costruita. In "Le tue note" di un salvato di un locale verificato il tasto "🔔 Avvisami quando c'è posto"; quando il titolare aggiunge giorni con posto dal pannello, chi lo segue (e ha ancora il locale tra i salvati) riceve "Nome: stasera c'è posto · Lo dice il locale", al massimo uno ogni 6 giorni per locale (righe prenotate in un solo UPDATE: due salvataggi di fila non mandano due avvisi). Togliere giorni non manda niente. Tabella `avvisi_posto` (solo UUID, migrazione `20261121f`). Resta invisibile finché mancano le chiavi degli avvisi (DA-FARE voce 8) e finché nessun locale è verificato (in produzione: 0 al 21/11).
 
 ### 73. "Dove mangio la cacio e pepe?": il piatto come requisito della ricerca
 - **Problema:** `PROBLEMI.md` 22: chi cerca un piatto riceve posti che "fanno cucina romana", senza sapere chi lo fa bene.
