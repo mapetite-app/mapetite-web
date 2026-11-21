@@ -11,6 +11,8 @@ Aggiornato con le funzioni dal 1/11 al 7/11. I testi tra virgolette sono quelli 
 5. **2:15 — Raccogli in un gesto (25 s).** Salvati → **+** (in alto a destra, "Aggiungi un posto") → **"Incolla un link"** (legge gli appunti): in 2 s "✅ Salvato in Mapetite: <nome>" con "Apri sulla mappa". Dì: "Il reel non si perde più. E tutti i salvati di Google Maps entrano insieme con 'Tutti i salvati di Google Maps'." (Oggi la conferma non mostra la foto.)
 6. **2:40 — Ritrova (20 s).** Account Sofia, **Salvati**: città in alto (solo con posti in due città), cerca "romantico", in alto a destra il menu dell'ordine → **"Da più tempo"** ("i posti che aspettano da mesi"). Poi scrivi una domanda, es. **"dove porto una ragazza stasera?"** (con una parola sola il tasto non compare) → **"Chiedi ai tuoi posti"**: 3 posti in circa 3 s. Chiudi: "Raccogli, ritrova, scegli. Tutto in un'app."
 
+**Passo in più se c'è tempo (21/11): decidere in gruppo (30 s).** Dopo la ricerca del passo 3, tocca **"Scegli tra 3"** e poi **"Manda al gruppo"** → "Crea il link" → **"Manda"** (WhatsApp). Apri il link su un secondo telefono: si vota con il nome, senza app, e si vede chi ha votato cosa. Dì: "Non devo convincere nessuno a scaricare l'app: votano dal link, e il voto lo vince il posto giusto, non il più famoso." Funziona anche da una raccolta (Profilo → raccolta → "Manda al gruppo", scegli 2 o 3 posti).
+
 **Se qualcosa va storto:** quota Google finita → cerca tra i salvati; AI ferma → i risultati Google restano, i posti già visti hanno il verdetto. Mai indirizzi con `?beta=` ("Ti porterei qui" è ancora in prova). Non ricaricare la pagina della mappa dopo una ricerca: la ricerca si perde e rifarla costa una ricerca Google.
 
 ## Prova dal vivo 8/11 (voce 7b)

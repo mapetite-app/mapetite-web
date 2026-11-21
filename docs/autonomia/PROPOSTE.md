@@ -277,7 +277,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Valore per l'utente:** dalla prima lista al posto giusto in due tocchi.
 - **Valore per il ristoratore:** domanda più precisa ("tranquillo", "economico") nei numeri della zona.
 - **Sforzo:** M. **Costo Google/Haiku:** una Text Search in più per tocco (quota 50/giorno: "spendere meno" e "più vicino" filtrano i risultati già arrivati senza Google, solo "più tranquillo" ne usa una).
-- **Stato proposto:** PRONTA dal 9/11.
+- **Stato proposto:** PRONTA dal 9/11. **21/11 sera: già coperta, il CEO la chiude.** Con una ricerca attiva, sotto la barra ci sono le "aggiunte rapide" (`REFINEMENTS` in `map-view.tsx`: un tocco aggiunge il vincolo alla frase e rifà la ricerca), più "Affina" nel pannello e i filtri rapidi "Aperto ora", "Fino a €€", "Voto 4,5+" che non chiamano Google. La parte che mancherebbe (chip scelti dall'AI) costerebbe una chiamata Haiku in più per ricerca senza vantaggio visibile.
 
 ## 4/11/2026 (notte, sessione 22:05 del 3/11, CEO che chiude — tema Mappa)
 
