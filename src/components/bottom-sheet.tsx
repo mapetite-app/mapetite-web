@@ -430,11 +430,12 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   // "Più vicini", filtri rapidi o "Scegli tra 3") e il locale davvero in vista dopo i primi 3.
   // "Della maggior parte", non "degli altri" (revisore 3, 20/11): la soglia è 2,5 volte la mediana, e un locale ancora
   // più famoso può essere già più in basso.
-  const abbassati = nearestFirst || treOn || (quickFiltersOn && quick.size > 0) ? [] : (setAside?.abbassati ?? []).filter((n) => {
+  // Per id (21/11): due sedi con lo stesso nome non si confondono; qui si passa al nome solo per scriverlo.
+  const abbassati = nearestFirst || treOn || (quickFiltersOn && quick.size > 0) ? [] : (setAside?.abbassati ?? []).flatMap((id) => {
     // Anche qui, sulla lista com'è adesso (dopo le esclusioni dell'AI): più di 2,5 volte la mediana dei posti mostrati.
-    const at = places.findIndex((p) => p.name === n);
+    const at = places.findIndex((p) => p.id === id);
     const conti = places.map((p) => details?.[p.id]?.userRatingCount ?? 0).sort((a, b) => a - b);
-    return at >= 3 && (details?.[places[at].id]?.userRatingCount ?? 0) > (conti[Math.floor(conti.length / 2)] ?? 0) * 2.5;
+    return at >= 3 && (details?.[places[at].id]?.userRatingCount ?? 0) > (conti[Math.floor(conti.length / 2)] ?? 0) * 2.5 ? [places[at].name] : [];
   });
   const treChiave = treOn ? treLista.map((t) => t.posto.id).join(",") : "";
   useEffect(() => {
@@ -781,7 +782,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
           Solo quando è successo davvero (src/lib/mainstream.ts, lowerMassFromTop): mai una frase generica sull'ordine. */}
       {abbassati.length > 0 && (
         <p data-testid="perche-ordine" className="mt-1 text-xs font-sans text-text-muted">
-          🧭 {abbassati.length === 1 ? `${abbassati[0]} ha` : abbassati.length === 2 ? `${abbassati.join(" e ")} hanno` : `${abbassati.slice(0, 2).join(", ")} e ${abbassati.length === 3 ? "un altro" : `altri ${abbassati.length - 2}`} hanno`} molte più recensioni della maggior parte di questi posti: {abbassati.length === 1 ? "l'ho messo" : "li ho messi"} dopo i primi 3. La fama da sola non fa salire.
+          🧭 {abbassati.length === 1 ? `${abbassati[0]} ha` : abbassati.length === 2 ? `${abbassati.join(" e ")} hanno` : `${abbassati.slice(0, 2).join(", ")} e ${abbassati.length === 3 ? "un altro" : `altri ${abbassati.length - 2}`} hanno`} molte più recensioni della maggior parte: {abbassati.length === 1 ? "resta" : "restano"} dopo i primi 3, la fama da sola non fa salire.
         </p>
       )}
       {removed.length > 0 && (

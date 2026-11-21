@@ -98,8 +98,8 @@ const HUGE_COUNT = 8000;
 export function lowerMassFromTop<T extends { name: string; userRatingCount: number | null; rating?: number | null }>(
   query: string,
   places: T[],
-): { places: T[]; lowered: string[] } {
-  if (places.length <= TOP_FREE || wantsOffTheBeatenPath(query)) return { places, lowered: [] };
+): { places: T[]; lowered: string[]; loweredPlaces: T[] } {
+  if (places.length <= TOP_FREE || wantsOffTheBeatenPath(query)) return { places, lowered: [], loweredPlaces: [] };
   const counts = places.map((p) => p.userRatingCount ?? 0).sort((a, b) => a - b);
   const median = counts[Math.floor(counts.length / 2)] ?? 0;
   const limit = Math.max(HUGE_COUNT, median * RATIO);
@@ -107,14 +107,14 @@ export function lowerMassFromTop<T extends { name: string; userRatingCount: numb
   const named = (p: T) => nameWords(p.name).some((w) => !GENERIC.has(w) && q.has(w));
   const isHuge = (p: T) => (p.userRatingCount ?? 0) > limit && !named(p);
   const top = places.slice(0, TOP_FREE);
-  if (!top.some(isHuge)) return { places, lowered: [] };
+  if (!top.some(isHuge)) return { places, lowered: [], loweredPlaces: [] };
   const others = places.filter((p) => !isHuge(p));
   // Servono abbastanza alternative per riempire le prime posizioni, altrimenti non si tocca nulla.
-  if (others.length < TOP_FREE) return { places, lowered: [] };
+  if (others.length < TOP_FREE) return { places, lowered: [], loweredPlaces: [] };
   const lowered = top.filter(isHuge);
   const head = others.slice(0, TOP_FREE);
   const rest = places.filter((p) => !head.includes(p));
-  return { places: [...head, ...rest], lowered: lowered.map((p) => p.name) };
+  return { places: [...head, ...rest], lowered: lowered.map((p) => p.name), loweredPlaces: lowered };
 }
 
 // Esclusione dell'AI per un requisito che la frase non contiene. Visto dal vivo il 18/10: "trattoria a
