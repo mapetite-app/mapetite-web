@@ -104,7 +104,13 @@ export default function PlacePhoto({
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         // Già in cache: il "load" può arrivare prima che React lo ascolti, quindi si controlla anche qui.
-        ref={(img) => { if (img?.complete && img.naturalWidth > 0 && loadedSrc !== src) { setLoadedSrc(src); onLoad?.(); } }}
+        // Se invece è già fallita prima che React ascoltasse (pagine disegnate dal server, foto scaduta),
+        // l'evento "error" è perso: senza questo restava l'icona rotta al posto dell'emoji.
+        ref={(img) => {
+          if (!img?.complete) return;
+          if (img.naturalWidth > 0) { if (loadedSrc !== src) { setLoadedSrc(src); onLoad?.(); } return; }
+          if (img.currentSrc && attempt?.ref !== photoRef) img.dispatchEvent(new Event("error"));
+        }}
         onLoad={() => { if (loadedSrc !== src) { setLoadedSrc(src); onLoad?.(); } }}
         data-caricata={loadedSrc === src ? "true" : undefined}
         onError={() => {

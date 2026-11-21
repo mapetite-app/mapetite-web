@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Send, X } from "lucide-react";
+import { Check, Send, X } from "lucide-react";
 import CondividiLink from "@/components/condividi-link";
 import { firmaPer } from "@/lib/catalog-firme";
 import { trackFeature } from "@/lib/track";
@@ -14,31 +14,55 @@ import { ricordaVoto } from "@/lib/voto-gruppo-memoria";
 // "Manda al gruppo" (proposta 56): dai tre di "Scegli tra 3" un link da mandare su WhatsApp. Chi lo apre
 // vota con un tocco senza account. Qui si sceglie solo quando si chiude il voto; poi "Manda" apre il menu
 // di condivisione del telefono (o copia il link). Nessuna chiamata a Google o all'AI.
+// Da una raccolta (minori della 56) i posti possono essere più di 3: nel foglio si toccano i 2 o 3 da votare,
+// già scelti i primi 3 ancora da provare.
 
 export type PostoDaMandare = {
-  id: string; name: string; category: string | null; address: string | null; lat: number; lng: number;
+  id: string; name: string; category: string | null; address: string | null; lat: number | null; lng: number | null;
   verdict: string | null; photoRef: string | null; phone: string | null; websiteUri: string | null;
 };
 
 const subscribeNothing = () => () => {};
 
-export default function MandaAlGruppo({ posti, toccoClass, pillolaClass }: { posti: PostoDaMandare[]; toccoClass: string; pillolaClass: string }) {
+const MAX_SCELTI = 3;
+
+function primiTre(tutti: PostoDaMandare[], provati?: string[]): string[] {
+  const daProvare = tutti.filter((p) => !provati?.includes(p.id));
+  return [...daProvare, ...tutti.filter((p) => provati?.includes(p.id))].slice(0, MAX_SCELTI).map((p) => p.id);
+}
+
+export default function MandaAlGruppo({ posti: tutti, toccoClass, pillolaClass, da = "mappa", provati, accediDa = "/mappa" }: {
+  posti: PostoDaMandare[]; toccoClass: string; pillolaClass: string;
+  // Da dove si manda (per i numeri) e i posti già provati (si propongono per ultimi).
+  da?: "mappa" | "raccolta"; provati?: string[]; accediDa?: string;
+}) {
+  const scegliere = tutti.length > MAX_SCELTI;
+  const [scelti, setScelti] = useState<string[]>(() => primiTre(tutti, provati));
+  const posti = scegliere ? tutti.filter((p) => scelti.includes(p.id)) : tutti;
   const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
   const [aperto, setAperto] = useState(false);
   const [{ scelte, predefinita }, setOrari] = useState(() => scelteOra());
   const [scelta, setScelta] = useState<Scelta>(predefinita);
   const [stato, setStato] = useState<{ fase: "pronto" } | { fase: "invio" } | { fase: "fatto"; path: string } | { fase: "errore"; msg: string; accedi?: boolean }>({ fase: "pronto" });
   // Il link vale per questi posti: con altri tre (filtro cambiato) si ricomincia.
-  const chiave = posti.map((p) => p.id).join(",");
+  const chiave = tutti.map((p) => p.id).join(",");
   const [perChiave, setPerChiave] = useState(chiave);
-  if (perChiave !== chiave) { setPerChiave(chiave); setStato({ fase: "pronto" }); }
+  if (perChiave !== chiave) { setPerChiave(chiave); setStato({ fase: "pronto" }); setScelti(primiTre(tutti, provati)); }
+  const tocca = (id: string) => {
+    if (stato.fase === "invio") return;
+    setStato({ fase: "pronto" }); // con altri posti il link di prima non vale più
+    setScelti((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length >= MAX_SCELTI ? s : [...s, id]));
+  };
+  const pochi = posti.length < 2;
 
   const apri = () => {
     const o = scelteOra();
     setOrari(o);
     if (!o.scelte.some((s) => s.id === scelta)) setScelta(o.predefinita);
+    // Dalla raccolta si riapre sulla scelta dei posti (il link di prima resta valido per chi l'ha già ricevuto).
+    if (scegliere && stato.fase === "fatto") setStato({ fase: "pronto" });
     setAperto(true);
-    trackFeature("manda_gruppo_apri", { posti: posti.length });
+    trackFeature("manda_gruppo_apri", { posti: tutti.length, da });
   };
 
   const crea = async () => {
@@ -62,7 +86,7 @@ export default function MandaAlGruppo({ posti, toccoClass, pillolaClass }: { pos
       // Le foto viaggiano nel link (mai salvate da noi): la pagina le accetta solo se sono di quei posti.
       const f = posti.flatMap((p) => (p.photoRef && uuidDi.has(p.id) ? [`f=${encodeURIComponent(p.photoRef)}`] : []));
       setStato({ fase: "fatto", path: `/voto/${data.codice}${f.length ? `?${f.join("&")}` : ""}` });
-      trackFeature("manda_gruppo", { posti: posti.length, scelta });
+      trackFeature("manda_gruppo", { posti: posti.length, scelta, da });
     } catch {
       setStato({ fase: "errore", msg: "Sei offline? Riprova tra poco." });
     }
@@ -81,6 +105,38 @@ export default function MandaAlGruppo({ posti, toccoClass, pillolaClass }: { pos
             <X size={20} aria-hidden />
           </button>
         </div>
+        {scegliere && stato.fase !== "fatto" ? (
+          <>
+            <p className="mt-4 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">
+              Scegline 2 o 3 · <span data-testid="manda-gruppo-scelti">{posti.length} di {MAX_SCELTI}</span>
+            </p>
+            <ul className="mt-1 max-h-[38dvh] overflow-y-auto" aria-label="Posti da votare">
+              {tutti.map((p) => {
+                const on = scelti.includes(p.id);
+                const pieno = !on && scelti.length >= MAX_SCELTI;
+                return (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={on}
+                      aria-disabled={pieno}
+                      data-testid="manda-gruppo-posto"
+                      onClick={() => tocca(p.id)}
+                      className={`flex min-h-11 w-full items-center gap-3 py-1 text-left text-[15px] font-sans text-text ${pieno ? "opacity-45" : ""}`}
+                    >
+                      <span aria-hidden className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${on ? "border-brand bg-brand text-white" : "border-border"}`}>
+                        {on && <Check size={14} strokeWidth={3} />}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                      {provati?.includes(p.id) && <span className="shrink-0 text-xs font-sans text-text-muted">Provato</span>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        ) : (
         <ol className="mt-3 space-y-1">
           {posti.map((p, i) => (
             <li key={p.id} className="flex items-center gap-2 text-[15px] font-sans text-text">
@@ -89,6 +145,7 @@ export default function MandaAlGruppo({ posti, toccoClass, pillolaClass }: { pos
             </li>
           ))}
         </ol>
+        )}
         {stato.fase !== "fatto" ? (
           <>
             <p className="mt-4 text-xs font-display font-semibold uppercase tracking-wide text-text-muted">Si chiude</p>
@@ -110,17 +167,17 @@ export default function MandaAlGruppo({ posti, toccoClass, pillolaClass }: { pos
             {stato.fase === "errore" && (
               <p role="alert" data-testid="manda-gruppo-errore" className="mt-3 text-sm font-sans text-error">
                 {stato.msg}{" "}
-                {stato.accedi && <Link href={withNext("/login", "/mappa")} className="font-display font-semibold text-brand underline underline-offset-2">Accedi</Link>}
+                {stato.accedi && <Link href={withNext("/login", accediDa)} className="font-display font-semibold text-brand underline underline-offset-2">Accedi</Link>}
               </p>
             )}
             <button
               type="button"
               data-testid="manda-gruppo-crea"
               onClick={() => void crea()}
-              disabled={stato.fase === "invio"}
+              disabled={stato.fase === "invio" || pochi}
               className="mt-4 flex min-h-13 w-full items-center justify-center gap-2 rounded-pill bg-accent px-6 font-display text-base font-semibold text-white shadow-float active:scale-[0.98] disabled:opacity-70"
             >
-              {stato.fase === "invio" ? "Preparo il link…" : "Crea il link"}
+              {stato.fase === "invio" ? "Preparo il link…" : pochi ? "Scegline almeno 2" : "Crea il link"}
             </button>
           </>
         ) : (
@@ -137,7 +194,7 @@ export default function MandaAlGruppo({ posti, toccoClass, pillolaClass }: { pos
 
   return (
     <>
-      <button type="button" data-testid="manda-gruppo" onClick={apri} aria-label={`Manda al gruppo i ${posti.length} posti da votare`} className={toccoClass}>
+      <button type="button" data-testid="manda-gruppo" onClick={apri} aria-label={scegliere ? "Manda al gruppo: scegli 2 o 3 posti da votare" : `Manda al gruppo i ${posti.length} posti da votare`} className={toccoClass}>
         {/* Come "Scegli tra 3": pillola chiara con l'icona corallo (una sola azione forte per schermo, DESIGN.md). */}
         <span className={`${pillolaClass} gap-1.5 font-semibold bg-surface text-brand`}>
           <Send size={13} aria-hidden className="shrink-0 text-accent" />Manda al gruppo

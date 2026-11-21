@@ -4,6 +4,7 @@ import { ArrowLeft, Lock, Map as MapIcon } from "lucide-react";
 import MappaPersonaLazy from "@/components/mappa-persona-lazy";
 import CondividiLink from "@/components/condividi-link";
 import RaccoltaAzioni from "@/components/raccolta-azioni";
+import MandaAlGruppo from "@/components/manda-al-gruppo";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
@@ -109,13 +110,28 @@ export default async function RaccoltaPage({ params }: Props) {
           )}
         </div>
 
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           {privata ? null : shareable ? (
             <CondividiLink path={shareable} cosa="raccolta" title={`${name} · Mapetite`} text={`La mia raccolta “${name}” su Mapetite`} testId="condividi-raccolta" variant="solid" />
           ) : (
             <Link href="/profilo#profilo-pubblico" data-testid="condividi-raccolta-privata" className="inline-flex min-h-11 items-center rounded-pill border border-border bg-white px-4 text-sm font-display font-semibold text-brand">
               Condividi
             </Link>
+          )}
+          {/* Minori della 56: "dove andiamo?" con i posti di una raccolta (anche privata: il voto mostra solo i 2-3 scelti). */}
+          {rows.length >= 2 && (
+            <MandaAlGruppo
+              da="raccolta"
+              accediDa={`/raccolte/${encodeURIComponent(name)}`}
+              toccoClass="inline-flex"
+              pillolaClass="inline-flex min-h-11 items-center rounded-pill px-4 text-sm font-display"
+              provati={rows.filter((r) => r.tags.includes("Già visitato")).map((r) => r.placeId)}
+              posti={rows.map((r) => ({
+                id: r.placeId, name: r.name, category: r.category, address: r.address,
+                lat: r.lat != null ? Number(r.lat) : null, lng: r.lng != null ? Number(r.lng) : null,
+                verdict: r.verdict ?? null, photoRef: null, phone: null, websiteUri: null,
+              }))}
+            />
           )}
           {/* Con la mini-mappa qui sotto, è lei ad aprire la mappa: niente pulsante doppio (Semplificare, 18/10). */}
           {spots.length === 0 && (
@@ -132,7 +148,7 @@ export default async function RaccoltaPage({ params }: Props) {
         </div>
         {!shareable && !privata && (
           <p data-testid="raccolta-privata" className="mt-2 text-xs text-text-muted">
-            Per condividerla rendi pubblico il profilo (le note restano tue).
+            Per condividere la raccolta rendi pubblico il profilo (le note restano tue).
           </p>
         )}
       </header>

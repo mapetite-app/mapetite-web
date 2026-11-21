@@ -11993,12 +11993,38 @@ else {
   const m = await amico("Marco");
   await m.p.locator("[data-testid=voto-posto][data-id=T1]").click();
   await m.p.locator("[data-testid=voto-posto][data-id=T1] [data-testid=voto-chi]").filter({ hasText: "Marco" }).waitFor({ timeout: 4000 }).catch(() => {});
-  ok((await m.p.locator("[data-testid=voto-posto][data-id=T1] [data-testid=voto-chi]").innerText().catch(() => "")) === "Giulia, Marco", "voto: si vede chi ha votato cosa");
+  ok((await m.p.locator("[data-testid=voto-posto][data-id=T1] [data-testid=voto-chi]").innerText().catch(() => "")) === "Giulia e Marco", "voto: si vede chi ha votato cosa");
   { const sw = await m.p.evaluate(() => document.documentElement.scrollWidth);
     const fondo = await m.p.evaluate(() => Math.max(...[...document.querySelectorAll("[data-testid=voto-posto], [data-testid=voto-iscriviti]")].map((e) => e.getBoundingClientRect().bottom)));
     const barra = await m.p.locator("[data-app-nav]").first().isVisible().catch(() => false);
     ok(sw <= 390 && fondo <= 844 && !barra, `voto: tutto in una schermata 390×844 senza scorrere né barra dell'app (largo ${sw}, fondo ${Math.round(fondo)}, barra ${barra})`); }
   await m.p.screenshot({ path: `${OUT}/96-voto-amico.png` });
+  // Minori della 56 (21/11 sera): niente mezza pagina vuota tra i posti e l'aiuto; la card d'invito subito sotto.
+  { const fondoPosti = await m.p.evaluate(() => Math.max(...[...document.querySelectorAll("[data-testid=voto-posto]")].map((e) => e.getBoundingClientRect().bottom)));
+    const aiuto = await m.p.getByTestId("voto-aiuto").boundingBox();
+    ok(!!aiuto && aiuto.y - fondoPosti < 40, `voto: l'aiuto sta subito sotto i posti, non in fondo allo schermo (${Math.round((aiuto?.y ?? 0) - fondoPosti)}px)`); }
+  // Con 4 votanti e nomi lunghi: "Giulia, Marco e altri 2", mai un nome tagliato a metà senza il conto.
+  { const lunghi = [];
+    for (const n of ["Massimiliano Alessandro", "Bartolomea Francesca"]) { const x = await amico(n); await x.p.locator("[data-testid=voto-posto][data-id=T1]").click(); await x.p.locator("[data-testid=voto-posto][data-id=T1][aria-pressed=true]").waitFor({ timeout: 4000 }).catch(() => {}); lunghi.push(x); }
+    await m.p.reload({ waitUntil: "networkidle" });
+    const riga = m.p.locator("[data-testid=voto-posto][data-id=T1] [data-testid=voto-chi]");
+    const testo = (await riga.innerText().catch(() => "")).trim();
+    const tagliata = await riga.evaluate((e) => e.scrollWidth > e.clientWidth + 1).catch(() => true);
+    ok(testo === "Giulia, Marco e altri 2" && !tagliata, `voto: con 4 votanti "Giulia, Marco e altri 2", riga intera (${testo}, tagliata ${tagliata})`);
+    // I due voti in più non devono cambiare il vincitore atteso più sotto (T1 resta primo).
+    for (const x of lunghi) await x.c.close(); }
+  // Foto scaduta (il proxy risponde errore): al posto dell'icona rotta l'emoji del tipo.
+  { const c = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await c.route("**/api/places/photo**", (r) => r.fulfill({ status: 404, body: "" }));
+    await c.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    await c.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+    const p = await c.newPage();
+    await p.goto(`${BASE}${percorso}`, { waitUntil: "networkidle" });
+    await p.waitForTimeout(500);
+    const rotte = await p.locator("[data-testid=voto-posto] img").count();
+    const emoji = await p.locator("[data-testid=voto-posto] span[aria-hidden].text-3xl").count();
+    ok(rotte === 0 && emoji === 3, `voto: foto che non arriva → emoji, niente icona rotta (img ${rotte}, emoji ${emoji})`);
+    await c.close(); }
   // La route: nome vuoto o troppo lungo 400, posto fuori dal voto 400, codice inesistente 404; crea solo chi ha l'account.
   { const r = m.c.request;
     const [a, b, c, d, e] = await Promise.all([
@@ -12026,6 +12052,53 @@ else {
   ok((await m.p.getByTestId("voto-prenota").count()) === 0 && await m.p.getByTestId("voto-iscriviti").isVisible() && tardi.status() === 409, `voto chiuso: l'amico vede chi ha vinto e l'invito, non vota più (${tardi.status()})`);
   await ctx.clearCookies({ name: "e2e_voto_ora" }).catch(() => {});
   await g.c.close(); await m.c.close(); await mp.close();
+}
+// Minori della 56 (21/11 sera): "Manda al gruppo" da una raccolta. Con più di 3 posti nel foglio si scelgono
+// 2 o 3 (già scelti i primi 3 da provare); il link porta solo quelli.
+{ const rpid = (n) => `00000000-0000-4000-8000-0000000009${n}`;
+  const R = "Via Po, 2/a, 00198 Roma RM, Italy";
+  const pl = (n, name, extra = {}) => ({ id: rpid(n), name, category: "restaurant", address: R, lat: 41.9 + Number(n) / 1000, lng: 12.49, ...extra });
+  const profilo = { email: "giulia@example.com", reviews: [], saved: [
+    { created_at: "2026-11-05", tags: ["Cena", "Già visitato"], note: null, places: pl("01", "Osteria Uno", { verdict: "Cucina di casa." }) },
+    { created_at: "2026-11-04", tags: ["Cena"], note: null, places: pl("02", "Trattoria Due") },
+    { created_at: "2026-11-03", tags: ["Cena"], note: null, places: pl("03", "Pizzeria Tre") },
+    { created_at: "2026-11-02", tags: ["Cena"], note: null, places: pl("04", "Enoteca Quattro") },
+    { created_at: "2026-11-01", tags: ["Cena"], note: null, places: pl("05", "Bistrot Cinque") },
+  ] };
+  const rc = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await rc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await rc.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await rc.route("**/rest/v1/place_synthesis**", (r) => r.fulfill({ json: [] }));
+  await rc.route("**/rest/v1/profiles**", (r) => r.fulfill({ json: [] }));
+  await rc.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(profilo)), url: BASE }]);
+  const p = await rc.newPage();
+  await p.goto(`${BASE}/raccolte/Cena`, { waitUntil: "networkidle" });
+  const tasto = p.getByTestId("manda-gruppo");
+  ok(await tasto.isVisible() && ((await tasto.boundingBox())?.height ?? 0) >= 44, "raccolta: c'è 'Manda al gruppo' (alto almeno 44px)");
+  { const w = await p.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `raccolta: con 'Manda al gruppo' niente scorrimento orizzontale (${w})`); }
+  await p.screenshot({ path: `${OUT}/98a-raccolta-manda-gruppo.png` });
+  await tasto.click();
+  const f = p.getByTestId("manda-gruppo-foglio");
+  await f.waitFor({ timeout: 3000 });
+  const scelti = async () => (await f.locator("[data-testid=manda-gruppo-posto][aria-checked=true]").allInnerTexts()).map((t) => t.replace(/Provato$/, "").trim());
+  ok((await f.getByTestId("manda-gruppo-posto").count()) === 5 && (await scelti()).join(",") === "Trattoria Due,Pizzeria Tre,Enoteca Quattro", `raccolta: nel foglio tutti e 5, già scelti i primi 3 da provare (${(await scelti()).join(",")})`);
+  { const quarto = f.locator("[data-testid=manda-gruppo-posto]").filter({ hasText: "Bistrot Cinque" });
+    const spento = (await quarto.getAttribute("aria-disabled")) === "true";
+    await quarto.click({ force: true });
+    ok(spento && (await scelti()).length === 3, "raccolta: al massimo 3 (il quarto è spento e il tocco non aggiunge)"); }
+  await p.screenshot({ path: `${OUT}/98b-raccolta-manda-gruppo-foglio.png` });
+  await f.locator("[data-testid=manda-gruppo-posto]").filter({ hasText: "Pizzeria Tre" }).click();
+  await f.locator("[data-testid=manda-gruppo-posto]").filter({ hasText: "Enoteca Quattro" }).click();
+  ok((await scelti()).length === 1 && await f.getByTestId("manda-gruppo-crea").isDisabled(), "raccolta: con un posto solo 'Crea il link' è spento");
+  await f.locator("[data-testid=manda-gruppo-posto]").filter({ hasText: "Osteria Uno" }).click();
+  await f.getByTestId("manda-gruppo-crea").click();
+  await f.getByTestId("manda-gruppo-pronto").waitFor({ timeout: 5000 }).catch(() => {});
+  const percorso = (await f.getByTestId("manda-gruppo-vedi").getAttribute("href").catch(() => "")) ?? "";
+  ok(/^\/voto\/[A-Za-z0-9]{18}$/.test(percorso), `raccolta: link del voto creato, senza foto (${percorso})`);
+  await p.goto(`${BASE}${percorso}`, { waitUntil: "networkidle" });
+  const nomi = (await p.getByTestId("voto-posto").locator("span.font-display.text-\\[15px\\]").allInnerTexts()).join(",");
+  ok(nomi === "Osteria Uno,Trattoria Due", `raccolta: il voto ha solo i 2 scelti, nell'ordine della raccolta (${nomi})`);
+  await rc.close();
 }
 // FINE-VOTO-GRUPPO
 await browser.close();
