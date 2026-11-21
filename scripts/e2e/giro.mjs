@@ -11869,6 +11869,117 @@ else {
   const [a, b2, c] = await Promise.all([post({}), post({ testo: "https://example.com" }), post({ testo: "https://www.instagram.com/reel/DAbc123xyz/" })]);
   ok(a.status === 400 && b2.status === 400 && c.status === 422 && (await c.json()).codice === "nome", `prova senza account: route 400/400/422 (${a.status}, ${b2.status}, ${c.status})`);
 }
+// INIZIO-VOTO-GRUPPO
+// Proposta 56 "Manda al gruppo" (21/11): dai tre di "Scegli tra 3" un link per votare senza account. In sviluppo i
+// sondaggi stanno in memoria del server (niente database); "adesso" si sposta con il cookie e2e_voto_ora.
+{ const sei = [
+    mk("T1", "Trattoria Prima", 41.9, 12.49, { category: "trattoria", rating: 4.6, userRatingCount: 900 }),
+    mk("T2", "Trattoria Seconda", 41.9005, 12.491, { category: "trattoria", rating: 4.5, userRatingCount: 2400 }),
+    mk("T3", "Osteria Piccola", 41.903, 12.495, { category: "osteria", rating: 4.7, userRatingCount: 110 }),
+    mk("T4", "Pizzeria Quarta", 41.897, 12.486, { category: "pizzeria", rating: 4.4, userRatingCount: 700 }),
+    mk("T5", "Bar Quinto", 41.905, 12.5, { category: "bar", rating: 4.3, userRatingCount: 300 }),
+    mk("T6", "Trattoria Sesta", 41.899, 12.488, { category: "trattoria", rating: 4.5, userRatingCount: 1500, businessStatus: "CLOSED_PERMANENTLY" }),
+  ];
+  const verdetti = { dettagli: { T1: { verdict: "Cacio e pepe fatta come si deve, porzioni oneste." }, T3: { verdict: "Pochi tavoli, cucina di casa e vino sfuso buono." }, T4: { verdict: "Pizza alta e soffice, si aspetta un po' il sabato." } }, esclusi: [] };
+  let ricerche = 0;
+  const mp = await ctx.newPage();
+  await mp.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
+  await mp.route("**/api/search", (r) => { ricerche++; return r.fulfill({ json: { ...SEARCH_FAST, risultati: sei, sintesi_pendente: { places: [], token: "x" } } }); });
+  await mp.route("**/api/search/synthesis", (r) => r.fulfill({ json: verdetti }));
+  await mp.goto(`${BASE}/mappa`, { waitUntil: "networkidle" });
+  await (await esempio(mp)).click();
+  await mp.locator("ul.snap-x li[data-id=T1]").waitFor({ timeout: 5000 });
+  await mp.waitForTimeout(1500);
+  ok((await mp.getByTestId("manda-gruppo").count()) === 0, "manda al gruppo: con la lista intera il tasto non c'è");
+  await mp.getByTestId("filtri-mappa").getByTestId("scegli-tre").click();
+  await mp.waitForTimeout(300);
+  const tasto = mp.getByTestId("filtri-mappa").getByTestId("manda-gruppo");
+  const ordine = await mp.getByTestId("filtri-mappa").locator("button").evaluateAll((els) => els.map((e) => e.dataset.testid ?? ""));
+  ok(await tasto.isVisible() && ordine[1] === "manda-gruppo", `manda al gruppo: con i tre davanti, subito dopo "Tutti i N" (${ordine.slice(0, 3).join(", ")})`);
+  { const h = (await tasto.boundingBox())?.height ?? 0; ok(h >= 44, `manda al gruppo: tasto alto almeno 44px (${Math.round(h)})`); }
+  await mp.screenshot({ path: `${OUT}/95a-manda-gruppo-tasto.png` });
+  await tasto.click();
+  const foglio = mp.getByTestId("manda-gruppo-foglio");
+  await foglio.waitFor({ timeout: 3000 });
+  const ore = await foglio.getByTestId("manda-gruppo-ora").allInnerTexts();
+  const scelta = await foglio.locator("[data-testid=manda-gruppo-ora][aria-checked=true]").innerText().catch(() => "");
+  ok(ore.length >= 1 && ore[0] === "Tra 2 ore" && /^(Ore 20|Ore 21|Tra 2 ore)$/.test(scelta), `manda al gruppo: si sceglie quando si chiude, con una scelta già fatta (${ore.join(" / ")} · '${scelta}')`);
+  ok((await foglio.locator("ol li").allInnerTexts()).map((t) => t.replace(/^\d+\s*/, "").trim()).join(",") === "Trattoria Prima,Osteria Piccola,Pizzeria Quarta", "manda al gruppo: nel foglio i tre posti in ordine");
+  await mp.screenshot({ path: `${OUT}/95b-manda-gruppo-foglio.png` });
+  await foglio.getByTestId("manda-gruppo-crea").click();
+  await foglio.getByTestId("manda-gruppo-pronto").waitFor({ timeout: 5000 }).catch(() => {});
+  const percorso = (await foglio.getByTestId("manda-gruppo-vedi").getAttribute("href").catch(() => "")) ?? "";
+  const codice = /^\/voto\/([A-Za-z0-9]{16,32})\?/.exec(percorso)?.[1] ?? "";
+  ok(codice.length === 18 && (percorso.match(/[?&]f=/g) ?? []).length === 3, `manda al gruppo: link /voto/<codice di 18> con le 3 foto nel link (${percorso.slice(0, 40)}…)`);
+  ok(await foglio.getByTestId("manda-gruppo-manda").isVisible() && ricerche === 1, `manda al gruppo: "Manda" pronto, nessuna ricerca in più (${ricerche})`);
+  // Chi ha proposto apre il voto: i tre posti con verdetto, "Rimanda" in alto.
+  await mp.goto(`${BASE}${percorso}`, { waitUntil: "networkidle" });
+  ok((await mp.getByTestId("voto-posto").count()) === 3 && (await mp.getByTestId("voto-verdetto").count()) === 3 && await mp.getByTestId("voto-rimanda").isVisible(), "voto: chi propone vede i tre posti con il verdetto e 'Rimanda'");
+  // Un amico senza account (cookie e2e_anonimo): nome, un tocco, vede chi ha votato cosa.
+  const amico = async (nome) => {
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await c.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+    await c.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    await c.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }]);
+    const p = await c.newPage();
+    await p.goto(`${BASE}${percorso}`, { waitUntil: "networkidle" });
+    if (nome) await p.getByTestId("voto-nome").fill(nome);
+    return { c, p };
+  };
+  const g = await amico("");
+  const gp = g.p;
+  ok((await gp.getByTestId("voto-posto").count()) === 3 && (await gp.locator('[data-testid=voto-posto] img[src*="/api/places/photo"]').count()) === 3 && (await gp.getByTestId("voto-rimanda").count()) === 0, "voto: l'amico senza account vede i tre posti con le foto (dal link), niente 'Rimanda'");
+  await gp.locator("[data-testid=voto-posto][data-id=T3]").click();
+  await gp.getByTestId("voto-errore").waitFor({ timeout: 3000 }).catch(() => {});
+  ok(((await gp.getByTestId("voto-errore").textContent().catch(() => "")) ?? "").includes("nome") && (await gp.getByTestId("voto-chi").count()) === 0, "voto: senza nome il voto non parte e chiede il nome");
+  await gp.getByTestId("voto-nome").fill("Giulia");
+  await gp.locator("[data-testid=voto-posto][data-id=T3]").click();
+  await gp.locator("[data-testid=voto-posto][data-id=T3] [data-testid=voto-chi]").waitFor({ timeout: 4000 }).catch(() => {});
+  ok((await gp.locator("[data-testid=voto-posto][data-id=T3] [data-testid=voto-chi]").innerText().catch(() => "")) === "Giulia" && (await gp.locator("[data-testid=voto-posto][data-id=T3]").getAttribute("aria-pressed")) === "true", "voto: un tocco e il voto c'è, con il nome di chi ha votato");
+  ok(await gp.getByTestId("voto-iscriviti").isVisible() && ((await gp.getByTestId("voto-iscriviti").getAttribute("href")) ?? "").startsWith("/signup?next=%2Fvoto%2F"), "voto: dopo il voto l'invito a iscriversi (mai prima, mai obbligatorio)");
+  // Cambio idea: il voto si sposta, sempre uno per telefono.
+  await gp.locator("[data-testid=voto-posto][data-id=T1]").click();
+  await gp.locator("[data-testid=voto-posto][data-id=T1] [data-testid=voto-chi]").waitFor({ timeout: 4000 }).catch(() => {});
+  ok((await gp.getByTestId("voto-chi").allInnerTexts()).join("|") === "Giulia" && (await gp.locator("[data-testid=voto-posto][data-id=T1]").getAttribute("aria-pressed")) === "true", "voto: cambiando voto resta un voto per telefono");
+  // Un secondo amico: due voti su Trattoria Prima.
+  const m = await amico("Marco");
+  await m.p.locator("[data-testid=voto-posto][data-id=T1]").click();
+  await m.p.locator("[data-testid=voto-posto][data-id=T1] [data-testid=voto-chi]").filter({ hasText: "Marco" }).waitFor({ timeout: 4000 }).catch(() => {});
+  ok((await m.p.locator("[data-testid=voto-posto][data-id=T1] [data-testid=voto-chi]").innerText().catch(() => "")) === "Giulia, Marco", "voto: si vede chi ha votato cosa");
+  { const sw = await m.p.evaluate(() => document.documentElement.scrollWidth);
+    const fondo = await m.p.evaluate(() => Math.max(...[...document.querySelectorAll("[data-testid=voto-posto], [data-testid=voto-iscriviti]")].map((e) => e.getBoundingClientRect().bottom)));
+    const barra = await m.p.locator("[data-app-nav]").first().isVisible().catch(() => false);
+    ok(sw <= 390 && fondo <= 844 && !barra, `voto: tutto in una schermata 390×844 senza scorrere né barra dell'app (largo ${sw}, fondo ${Math.round(fondo)}, barra ${barra})`); }
+  await m.p.screenshot({ path: `${OUT}/96-voto-amico.png` });
+  // La route: nome vuoto o troppo lungo 400, posto fuori dal voto 400, codice inesistente 404; crea solo chi ha l'account.
+  { const r = m.c.request;
+    const [a, b, c, d, e] = await Promise.all([
+      r.post(`${BASE}/api/voto/${codice}`, { data: { nome: " ", posto: "T1" } }),
+      r.post(`${BASE}/api/voto/${codice}`, { data: { nome: "x".repeat(31), posto: "T1" } }),
+      r.post(`${BASE}/api/voto/${codice}`, { data: { nome: "Luca", posto: "T6" } }),
+      r.post(`${BASE}/api/voto/ABCDEFGHJKLMNPQRST`, { data: { nome: "Luca", posto: "T1" } }),
+      r.post(`${BASE}/api/voto`, { data: { scelta: "2h", posti: [{ id: "T1" }, { id: "T3" }] } }),
+    ]);
+    ok(a.status() === 400 && b.status() === 400 && c.status() === 400 && d.status() === 404 && e.status() === 401, `voto: route 400/400/400/404 e senza account non si crea (${[a, b, c, d, e].map((x) => x.status()).join(", ")})`); }
+  { const p2 = await m.c.newPage(); await p2.goto(`${BASE}/voto/ABCDEFGHJKLMNPQRST`, { waitUntil: "networkidle" }); ok(await p2.getByTestId("voto-non-trovato").isVisible(), "voto: link inesistente → 'Questo voto non c'è più'"); await p2.close(); }
+  // All'ora scelta: chi ha proposto vede il vincitore e "Prenota" (telefono ricordato nel suo telefono, nessuna chiamata).
+  const dopo = new Date(Date.now() + 2 * 86_400_000).toISOString();
+  await ctx.addCookies([{ name: "e2e_voto_ora", value: dopo, url: BASE }]);
+  await mp.reload({ waitUntil: "networkidle" });
+  const primo = await mp.getByTestId("voto-posto").first().getAttribute("data-id");
+  ok((await mp.getByTestId("voto-pagina").getAttribute("data-chiuso")) === "1" && primo === "T1" && (await mp.locator("[data-testid=voto-posto][data-id=T1] [data-testid=voto-vince]").count()) === 1 && (await mp.getByTestId("voto-titolo").innerText()).trim() === "Si va qui", `voto chiuso: il vincitore in cima con "Vince" (${primo})`);
+  ok(((await mp.getByTestId("voto-prenota").innerText().catch(() => "")) ?? "").trim() === "Prenota" && (await mp.getByTestId("voto-nome").count()) === 0, "voto chiuso: chi ha proposto ha 'Prenota', niente più campo nome");
+  await mp.screenshot({ path: `${OUT}/97-voto-chiuso.png` });
+  await mp.getByTestId("voto-prenota").click().catch(() => {});
+  ok(await mp.getByTestId("foglio-prenota").waitFor({ timeout: 3000 }).then(() => true, () => false), "voto chiuso: 'Prenota' apre il foglio Prenota di sempre");
+  await m.c.addCookies([{ name: "e2e_voto_ora", value: dopo, url: BASE }]);
+  await m.p.reload({ waitUntil: "networkidle" });
+  const tardi = await m.c.request.post(`${BASE}/api/voto/${codice}`, { data: { nome: "Marco", posto: "T3" } });
+  ok((await m.p.getByTestId("voto-prenota").count()) === 0 && await m.p.getByTestId("voto-iscriviti").isVisible() && tardi.status() === 409, `voto chiuso: l'amico vede chi ha vinto e l'invito, non vota più (${tardi.status()})`);
+  await ctx.clearCookies({ name: "e2e_voto_ora" }).catch(() => {});
+  await g.c.close(); await m.c.close(); await mp.close();
+}
+// FINE-VOTO-GRUPPO
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);
