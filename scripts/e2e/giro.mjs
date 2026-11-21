@@ -8705,13 +8705,13 @@ else {
       await ap.getByTestId("avviso-posto").screenshot({ path: `${OUT}/96c-avviso-posto-acceso.png` }).catch(() => {});
       await apriScheda();
       // Pagina nuova: il servizio push finto riparte senza iscrizione, come un telefono con gli avvisi spenti dal profilo.
-      ok(((await ap.getByTestId("avviso-posto-acceso").textContent().catch(() => "")) ?? "") === "Avviso attivo, telefono spento" && await ap.getByTestId("avviso-posto-riaccendi").isVisible().catch(() => false), "avviso c'è posto: riaprendo la scheda resta acceso (salvato sul server) e, con gli avvisi del telefono spenti, lo dice con 'Riaccendi'");
+      ok(((await ap.getByTestId("avviso-posto-acceso").textContent().catch(() => "")) ?? "") === "Telefono spento" && await ap.getByTestId("avviso-posto-riaccendi").isVisible().catch(() => false), "avviso c'è posto: riaprendo la scheda resta acceso (salvato sul server) e, con gli avvisi del telefono spenti, lo dice con 'Riaccendi'");
       { const n = iscr.filter((x) => x.m === "POST").length;
         await ap.getByTestId("avviso-posto-riaccendi").click().catch(() => {});
         await ap.waitForTimeout(500);
         ok(((await ap.getByTestId("avviso-posto-acceso").textContent().catch(() => "")) ?? "") === "Ti avviso quando c'è posto" && iscr.filter((x) => x.m === "POST").length === n + 1, "avviso c'è posto: 'Riaccendi' riaccende gli avvisi del telefono"); }
       { const b = await ap.getByTestId("avviso-posto-togli").boundingBox().catch(() => null);
-        ok(b != null && b.height >= 44, "avviso c'è posto: 'Togli' scritto, tocco da 44 px"); }
+        ok(b != null && b.height >= 44 && b.width >= 44, "avviso c'è posto: 'Togli' scritto, tocco da 44×44 px"); }
       { const y = async (id) => (await ap.getByTestId(id).boundingBox().catch(() => null))?.y ?? -1;
         ok(await y("avviso-posto") > await y("stato-salvato") && await y("stato-salvato") > 0, "avviso c'è posto: sta sotto 'Da provare / Ci sono stato' (azione secondaria)"); }
       await ap.getByTestId("avviso-posto").screenshot({ path: `${OUT}/96d-avviso-posto-riacceso.png` }).catch(() => {});

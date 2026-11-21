@@ -78,12 +78,12 @@ export default function AvvisoPosto({ venueId }: { venueId: string }) {
         // Revisore 21/11: stato corto e "Togli" scritto (una campanella barrata da sola sembrava uno stato).
         <p className="flex min-h-11 items-center gap-1.5 text-sm font-sans text-text-muted">
           <Bell size={14} className="shrink-0 text-brand" aria-hidden />
-          <span data-testid="avviso-posto-acceso" className="min-w-0 truncate">{push === "acceso" ? "Ti avviso quando c'è posto" : "Avviso attivo, telefono spento"}</span>
+          <span data-testid="avviso-posto-acceso" className="min-w-0 truncate">{push === "acceso" ? "Ti avviso quando c'è posto" : "Telefono spento"}</span>
           <span aria-hidden>·</span>
           {push !== "acceso" && push !== "negato" && (
-            <><button type="button" onClick={riaccendi} disabled={busy} data-testid="avviso-posto-riaccendi" className="inline-flex min-h-11 shrink-0 items-center font-display font-semibold text-brand disabled:opacity-60">Riaccendi</button><span aria-hidden>·</span></>
+            <><button type="button" onClick={riaccendi} disabled={busy} data-testid="avviso-posto-riaccendi" className="inline-flex min-h-11 min-w-11 shrink-0 justify-center items-center font-display font-semibold text-brand disabled:opacity-60">Riaccendi</button><span aria-hidden>·</span></>
           )}
-          <button type="button" onClick={cambia} disabled={busy} data-testid="avviso-posto-togli" className="inline-flex min-h-11 shrink-0 items-center font-display font-semibold text-brand disabled:opacity-60">
+          <button type="button" onClick={cambia} disabled={busy} data-testid="avviso-posto-togli" className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center font-display font-semibold text-brand disabled:opacity-60">
             Togli
           </button>
         </p>

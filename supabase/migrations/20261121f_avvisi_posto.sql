@@ -19,6 +19,10 @@ alter table public.avvisi_posto enable row level security;
 drop policy if exists "avvisi_posto: i miei" on public.avvisi_posto;
 create policy "avvisi_posto: i miei" on public.avvisi_posto
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
--- Il telefono non scrive avvisato_at né in_attesa (lo fa solo il server): solo insert e delete, niente update.
-revoke update on public.avvisi_posto from anon, authenticated;
+alter table public.avvisi_posto add column if not exists in_attesa boolean not null default false;
+-- Il telefono non scrive avvisato_at né in_attesa (lo fa solo il server): legge, inserisce solo persona e locale,
+-- cancella. Niente update.
 revoke all on public.avvisi_posto from anon;
+revoke insert, update, truncate, references, trigger on public.avvisi_posto from authenticated;
+grant select, delete on public.avvisi_posto to authenticated;
+grant insert (user_id, place_id) on public.avvisi_posto to authenticated;
