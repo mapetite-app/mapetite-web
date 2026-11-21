@@ -12082,8 +12082,10 @@ else {
   await f.waitFor({ timeout: 3000 });
   const scelti = async () => (await f.locator("[data-testid=manda-gruppo-posto][aria-checked=true]").allInnerTexts()).map((t) => t.replace(/Provato$/, "").trim());
   ok((await f.getByTestId("manda-gruppo-posto").count()) === 5 && (await scelti()).join(",") === "Trattoria Due,Pizzeria Tre,Enoteca Quattro", `raccolta: nel foglio tutti e 5, già scelti i primi 3 da provare (${(await scelti()).join(",")})`);
-  await f.locator("[data-testid=manda-gruppo-posto]").filter({ hasText: "Bistrot Cinque" }).click();
-  ok((await scelti()).length === 3, "raccolta: al massimo 3 (il quarto tocco non aggiunge)");
+  { const quarto = f.locator("[data-testid=manda-gruppo-posto]").filter({ hasText: "Bistrot Cinque" });
+    const spento = (await quarto.getAttribute("aria-disabled")) === "true";
+    await quarto.click({ force: true });
+    ok(spento && (await scelti()).length === 3, "raccolta: al massimo 3 (il quarto è spento e il tocco non aggiunge)"); }
   await p.screenshot({ path: `${OUT}/98b-raccolta-manda-gruppo-foglio.png` });
   await f.locator("[data-testid=manda-gruppo-posto]").filter({ hasText: "Pizzeria Tre" }).click();
   await f.locator("[data-testid=manda-gruppo-posto]").filter({ hasText: "Enoteca Quattro" }).click();
