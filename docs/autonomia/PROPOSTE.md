@@ -16,6 +16,17 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 22/11/2026 (domenica sera, richieste di Lorenzo in chat)
+
+### 78. "Potrebbe piacerti anche" sotto la scheda di ogni locale
+- **Problema:** chi guarda un posto che gli piace deve rifare una ricerca per trovarne di simili. "Altri come questo" oggi c'è solo sui salvati con 👍 o "Ci sono stato", ed è un tasto che fa una ricerca Google nuova.
+- **Cosa fa:** in fondo alla scheda di qualsiasi locale, una riga "Potrebbe piacerti anche" con 3–4 card che scorrono di lato (foto o emoji, nome, zona, una parola sul perché: "stessa cucina", "stessa spesa", "a 400 m"). Un tocco apre la scheda di quel locale.
+- **Da dove prendere i posti, senza chiamate Google nuove:** (1) gli altri risultati della ricerca in corso non ancora aperti; (2) i locali del catalogo Mapetite già arricchiti (verdetti già pagati), vicini e simili per tipo, cucina, prezzo ed etichette; (3) i salvati degli amici. Ordine: somiglianza con il locale aperto e con i gusti della persona, **mai per numero di recensioni** (VISIONE: i famosi in fondo, come nella ricerca). Mai un posto chiuso, già 👎 o già salvato. Se non ci sono almeno 2 posti davvero simili la riga non compare: niente riempitivi.
+- **Da dove nasce:** Google Maps ("Le persone cercano anche"), TheFork e Places mostrano simili per popolarità; noi per gusto e somiglianza, con i posti non mainstream.
+- **Valore per l'utente:** dalla scheda al prossimo posto in un tocco, senza ricominciare. **Valore per il ristoratore:** visibilità davanti a chi sta già scegliendo un posto come il suo; dato per il pannello ("ti hanno visto da un locale simile").
+- **Sforzo:** M. **Costo:** zero Google e zero Haiku (dati già nel database e nella ricerca); foto, se usate, nella quota di 200 al giorno, altrimenti emoji.
+- **Stato proposto:** PRONTA, **prima voce** (Lorenzo, 22/11 sera: "quando uno sceglie un locale poi sotto ti compaia potrebbe piacerti anche").
+
 ## 22/11/2026 (domenica, sessione 03:05, CEO che chiude — tema: dal reel al tavolo)
 
 ### 76. "Arrivati dai reel" nel pannello del ristoratore
