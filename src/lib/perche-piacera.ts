@@ -39,7 +39,7 @@ const GENERICHE = new Set(["ristorante", "ristorante italiano", "ristorante medi
 const ZONA_M = 1000;
 // Un esempio a centinaia di km (un viaggio) resta valido per il tipo, ma non per la zona.
 
-function tipo(p: { category: string | null; name: string }, etichetta: Etichetta): string | null {
+export function tipo(p: { category: string | null; name: string }, etichetta: Etichetta): string | null {
   const l = etichetta(p.category, p.name);
   if (!l) return null;
   const k = l.trim().toLowerCase();
@@ -90,7 +90,7 @@ function primaParola(k: string): string | null {
 // Revisore 3 (18/11): "Trapizzino Ponte Milvio" e "Trapizzino Testaccio", "Sushiko Prati" e "Sushiko Monti", "L'Elementare"
 // e "L’Elementare": stessa insegna anche senza separatore e con l'apostrofo tipografico. Basta la prima parola distintiva
 // uguale: nel dubbio il posto non si cita (meglio nessuna riga che un'altra sede dello stesso posto).
-function stessaInsegna(a: string, b: string): boolean {
+export function stessaInsegna(a: string, b: string): boolean {
   const x = insegna(a), y = insegna(b);
   if (!x || !y) return false;
   if (x === y) return true;
@@ -161,4 +161,90 @@ export function percheTiPiacera(target: PostoSimile, salvati: PostoSimile[], eti
   // Il tipo è già scritto sopra il nome (revisori 18/11: "trattoria" ripetuta, ": colazione" poco italiano):
   // con il solo tipo la frase finisce col nome.
   return pezzi.length > 0 ? `Come ${chi}, tra i posti che ti sono piaciuti: ${pezzi.join(", ")}` : `Come ${chi}, tra i posti che ti sono piaciuti`;
+}
+
+// Proposta 78 "Potrebbe piacerti anche": sotto la scheda di un locale, 2–4 posti davvero simili, solo da dati già in
+// memoria (altri risultati della ricerca, catalogo Mapetite). Zero chiamate Google o AI.
+// - Simile = stesso tipo non generico (Trattoria come Trattoria). Con un tipo generico ("Ristorante") vale solo
+//   la stessa categoria Google insieme alla stessa fascia di prezzo e a meno di 1 km: nel dubbio niente.
+// - Sempre nella stessa zona larga (3 km): un "simile" dall'altra parte della città non aiuta a scegliere stasera.
+// - Mai il posto stesso, un'altra sede della stessa insegna, un posto chiuso, uno già salvato (quindi mai un 👎) o già aperto.
+// - Ordine per somiglianza e gusto, MAI per numero di recensioni (VISIONE): i posti di massa vanno in fondo.
+// - Meno di 2 posti davvero simili: nessuna riga (niente riempitivi).
+export type CandidatoSimile = PostoSimile & {
+  types?: string[] | null;
+  userRatingCount?: number | null;
+  rating?: number | null;
+  photoRef?: string | null;
+};
+export type Simile = { posto: CandidatoSimile; perche: string };
+
+const SIMILI_ZONA_M = 3000;
+const MASSA_MIN = 3000; // come MASS_MIN_COUNT di mainstream.ts
+
+function metri(m: number): string {
+  if (m < 950) return `a ${Math.max(100, Math.round(m / 100) * 100)} m`; // 960 m non diventa "a 1000 m"
+  return `a ${(Math.round(m / 100) / 10).toLocaleString("it-IT")} km`;
+}
+
+export function similiA(
+  target: CandidatoSimile,
+  candidati: CandidatoSimile[],
+  opts: {
+    etichetta: Etichetta;
+    escludi: (p: CandidatoSimile) => boolean; // già salvato, già aperto
+    tipiAmati?: Set<string>; // tipi (minuscoli) dei salvati che ti sono piaciuti
+    max?: number;
+  },
+): Simile[] {
+  if (typeof target.name !== "string" || !Number.isFinite(target.lat) || !Number.isFinite(target.lng)) return [];
+  if (target.businessStatus === "CLOSED_PERMANENTLY") return [];
+  const t = tipo(target, opts.etichetta);
+  const visti = new Set<string>();
+  const scelti: { p: CandidatoSimile; score: number; d: number; perche: string; massa: boolean }[] = [];
+  // Massa rispetto ai candidati stessi (come massPredicate): tante recensioni rispetto agli altri, o tante con un voto mediocre.
+  const counts = candidati.map((p) => p.userRatingCount ?? 0).sort((a, b) => a - b);
+  const mediana = counts[Math.floor(counts.length / 2)] ?? 0;
+  const limite = Math.max(MASSA_MIN, mediana * 2.5);
+  for (const p of candidati) {
+    if (typeof p.name !== "string" || p.name.trim() === "" || p.id === target.id || visti.has(p.id)) continue;
+    if (p.businessStatus === "CLOSED_PERMANENTLY" || p.businessStatus === "CLOSED_TEMPORARILY") continue;
+    if (p.tags?.includes(NON_FA_PER_ME) || opts.escludi(p)) continue;
+    if (stessaInsegna(p.name, target.name)) continue;
+    const d = distanceMeters(p, target);
+    if (!(d <= SIMILI_ZONA_M)) continue;
+    const tp = tipo(p, opts.etichetta);
+    const stessoPrezzo = p.priceLevel != null && target.priceLevel != null && p.priceLevel === target.priceLevel;
+    let score = 0;
+    let perche: string;
+    if (t) {
+      if (tp !== t) continue;
+      score = 3;
+      // Il tipo e una sola ragione in più: vicinissimo, altrimenti stessa spesa, altrimenti la distanza.
+      perche = `${opts.etichetta(p.category, p.name) ?? "Stesso tipo"} · ${d < 700 || !stessoPrezzo ? metri(d) : "stessa spesa"}`;
+    } else {
+      // Tipo generico: stessa categoria Google, stessa spesa e vicino, tutti e tre.
+      if (!target.category || p.category !== target.category || !stessoPrezzo || d > 1000) continue;
+      score = 2;
+      perche = `Stessa spesa · ${metri(d)}`;
+    }
+    if (stessoPrezzo) score += 2;
+    else if (p.priceLevel != null && target.priceLevel != null && Math.abs(p.priceLevel - target.priceLevel) === 1) score += 0.5;
+    score += d < 500 ? 2 : d < 1000 ? 1.5 : d < 2000 ? 0.5 : 0;
+    if (tp && opts.tipiAmati?.has(tp)) score += 1;
+    const n = p.userRatingCount ?? 0;
+    const massa = n > limite || (n >= MASSA_MIN && p.rating != null && p.rating < 4.3);
+    visti.add(p.id);
+    scelti.push({ p, score, d, perche, massa });
+  }
+  if (scelti.length < 2) return [];
+  scelti.sort((a, b) => Number(a.massa) - Number(b.massa) || b.score - a.score || a.d - b.d);
+  // Due sedi della stessa insegna tra i simili: solo la prima.
+  const out: Simile[] = [];
+  for (const s of scelti) {
+    if (out.some((o) => stessaInsegna(o.posto.name, s.p.name))) continue;
+    out.push({ posto: s.p, perche: s.perche });
+    if (out.length >= (opts.max ?? 4)) break;
+  }
+  return out.length >= 2 ? out : [];
 }

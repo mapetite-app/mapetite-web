@@ -124,6 +124,8 @@ type VenueSheetProps = {
   // Prenota: locali della stessa ricerca da proporre se a quell'ora questo è chiuso; aprendo uno di
   // loro il foglio Prenota si apre già (autoBook) con gli stessi dati.
   bookingAlternatives?: BookingAlternative[];
+  // Proposta 78: "Potrebbe piacerti anche" in fondo alla scheda (la passa map-view, solo con 2+ posti simili).
+  similiSlot?: React.ReactNode;
   onBookAlternative?: (id: string, details: BookingDetails) => void;
   autoBook?: boolean;
   onBookingClosed?: () => void;
@@ -169,6 +171,7 @@ export default function VenueSheet({
   onClose,
   saveSlot,
   communitySlot,
+  similiSlot,
   origin = null,
   userPos = null,
   onVisitStatus,
@@ -1332,6 +1335,8 @@ export default function VenueSheet({
           </div>
         </div>
 
+        {similiSlot}
+
         {bookingOpen && (
           <BookingSheet
             place={{ id: googlePlaceId ?? venue.id, name, phone, websiteUri, openNow, lat, lng, orari: venue.orari ?? null }}
@@ -1631,6 +1636,7 @@ export default function VenueSheet({
           <div className="mt-2"><SchedaVisitaContext.Provider value={schedaVisita}>{communitySlot}</SchedaVisitaContext.Provider></div>
         </div>
       )}
+      {similiSlot}
 
       {/* 7. BARRA AZIONI FLOTTANTE: sempre visibile in fondo alla scheda mentre si scorre. */}
       {variant === "a" && (
