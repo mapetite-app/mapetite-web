@@ -5,17 +5,22 @@ import Link from "next/link";
 import { trackFeature } from "@/lib/track";
 import { zipTextFiles } from "@/lib/zip-leggi";
 import { IG_FILE_SALVATI, parseInstagram, type IgSalvato } from "@/lib/instagram-salvati";
+import { indizioLocale, nomeDaAccount, sembraLocale } from "@/lib/instagram-locali";
 
 // "Salvati di Instagram" (proposta 30): il file che Meta fa scaricare (zip, JSON o HTML) si legge NEL
 // TELEFONO e non va mai al server. Ne esce l'elenco dei post e dei reel salvati; "Salva" apre il flusso
 // già esistente "Salva dal reel" con quel link (/importa/condividi?url=…). Nessuna ricerca Google finché
 // la persona non conferma lì; nel database, come oggi, solo il link del reel collegato al posto salvato.
 // L'elenco resta in questo telefono (localStorage) con le righe già aperte, per continuare un'altra volta.
+// Seconda parte: gli account che dal nome sembrano locali ("trattoriadamario") stanno in "Locali", uno per
+// riga; "Trova" passa a "Salva dal reel" anche il nome leggibile ("Trattoria da Mario, Roma"), che lo
+// cerca subito (1 lettura AI + 1 ricerca Google, come scriverlo a mano) e chiede sempre "È questo?".
 
 const KEY = "mapetite.instagram.salvati";
 const EVENT = "mapetite-instagram";
 const PAGE = 30;
 const MAX_ITEMS = 3000;
+const LOCALI = "\u0000locali"; // pillola "Locali": non può essere il nome di una raccolta
 
 type Store = { items: IgSalvato[]; aperti: string[] };
 
@@ -63,7 +68,8 @@ async function readFiles(files: File[]): Promise<{ name: string; text: string }[
 export default function InstagramCard({ userId }: { userId: string | null }) {
   const raw = useSyncExternalStore(subscribe, readRaw, () => null);
   const store = useMemo(() => parseStore(raw), [raw]);
-  const [filtro, setFiltro] = useState<string | null>(null);
+  // undefined = scelta di partenza: "Locali" se ce ne sono, altrimenti "Tutti".
+  const [scelta, setFiltro] = useState<string | null | undefined>(undefined);
   const [quanti, setQuanti] = useState(PAGE);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
@@ -82,7 +88,7 @@ export default function InstagramCard({ userId }: { userId: string | null }) {
       return;
     }
     writeStore({ items, aperti: store?.aperti ?? [] });
-    setFiltro(null);
+    setFiltro(undefined);
     setQuanti(PAGE);
     trackFeature("import_instagram", { contesto: "letti", risultati: items.length, fonte: files.some((f) => /\.zip$/i.test(f.name)) ? "zip" : /\.json$/i.test(files[0].name) ? "json" : "html" });
   };
@@ -94,7 +100,25 @@ export default function InstagramCard({ userId }: { userId: string | null }) {
     for (const it of items) for (const r of it.raccolte) m.set(r, (m.get(r) ?? 0) + 1);
     return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "it"));
   }, [items]);
-  const visibili = filtro ? items.filter((it) => it.raccolte.includes(filtro)) : items;
+  // Un account per riga, con il suo post più recente (l'elenco è già dal più recente) e quanti ne hai salvati.
+  const locali = useMemo(() => {
+    const m = new Map<string, { autore: string; primo: IgSalvato; codici: string[]; raccolte: Set<string> }>();
+    for (const it of items) {
+      if (!it.autore || !sembraLocale(it.autore)) continue;
+      const k = it.autore.toLowerCase();
+      const a = m.get(k) ?? { autore: it.autore, primo: it, codici: [], raccolte: new Set<string>() };
+      a.codici.push(it.codice);
+      for (const r of it.raccolte) a.raccolte.add(r);
+      m.set(k, a);
+    }
+    return [...m.values()].sort((a, b) => b.codici.length - a.codici.length);
+  }, [items]);
+  const filtro = scelta === undefined ? (locali.length > 0 ? LOCALI : null) : scelta;
+  const inLocali = filtro === LOCALI;
+  const visibili = filtro && !inLocali ? items.filter((it) => it.raccolte.includes(filtro)) : items;
+  const localeDi = (it: IgSalvato) => (it.autore && sembraLocale(it.autore) ? locali.find((a) => a.autore.toLowerCase() === it.autore!.toLowerCase()) ?? null : null);
+  const trovaHref = (it: IgSalvato, raccolte: Iterable<string>) =>
+    `/importa/condividi?url=${encodeURIComponent(it.url)}&title=${encodeURIComponent(indizioLocale(it.autore!, [...raccolte]))}`;
   const tuttiReel = items.length > 0 && items.every((it) => it.tipo === "reel");
   const nAperti = items.filter((it) => aperti.has(it.codice)).length;
 
@@ -102,7 +126,7 @@ export default function InstagramCard({ userId }: { userId: string | null }) {
   const apri = (it: IgSalvato) => {
     if (store && !aperti.has(it.codice)) writeStore({ items: store.items, aperti: [...store.aperti, it.codice] });
     try { window.history.replaceState(window.history.state, "", `${window.location.pathname}#da-instagram`); } catch { /* niente */ }
-    trackFeature("import_instagram", { contesto: "apri", stato: aperti.has(it.codice) ? "riaperto" : "nuovo" });
+    trackFeature("import_instagram", { contesto: localeDi(it) ? "trova" : "apri", stato: aperti.has(it.codice) ? "riaperto" : "nuovo" });
   };
 
   if (!userId) {
@@ -155,14 +179,16 @@ export default function InstagramCard({ userId }: { userId: string | null }) {
             </button>
           </div>
           <p className="text-sm text-text-muted" data-testid="ig-sotto">
-            Apri il reel e scrivi il nome del posto (o fai uno screenshot): lo trovo io{nAperti > 0 ? ` · ${nAperti} ${nAperti === 1 ? "aperto" : "aperti"}` : ""}.
+            {inLocali
+              ? "Account che dal nome sembrano locali: tocca Trova e lo cerco su Google Maps."
+              : `Apri il reel e scrivi il nome del posto (o fai uno screenshot): lo trovo io${nAperti > 0 ? ` · ${nAperti} ${nAperti === 1 ? "aperto" : "aperti"}` : ""}.`}
           </p>
           {error && <p className="mt-3 rounded-btn bg-error/10 px-4 py-3 text-sm text-error" data-testid="ig-errore">{error}</p>}
 
-          {raccolte.length > 0 && (
+          {(raccolte.length > 0 || locali.length > 0) && (
             // Una riga sola che scorre di lato: con tante raccolte l'elenco resta in vista.
             <div className="-mx-5 mt-3 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none]" role="group" aria-label="Raccolte di Instagram">
-              {[[null, items.length] as const, ...raccolte].map(([r, n]) => {
+              {[...(locali.length > 0 ? [[LOCALI, locali.length] as const] : []), [null, items.length] as const, ...raccolte].map(([r, n]) => {
                 const on = filtro === r;
                 return (
                   <button
@@ -173,7 +199,7 @@ export default function InstagramCard({ userId }: { userId: string | null }) {
                     data-testid="ig-raccolta"
                     className={`min-h-10 max-w-[70%] shrink-0 truncate whitespace-nowrap rounded-pill border px-3 text-sm font-medium ${on ? "border-brand bg-brand text-white" : "border-border bg-white text-text"}`}
                   >
-                    {r ?? "Tutti"} · {n}
+                    {r === LOCALI ? "🍽️ Locali" : r ?? "Tutti"} · {n}
                   </button>
                 );
               })}
@@ -181,7 +207,31 @@ export default function InstagramCard({ userId }: { userId: string | null }) {
           )}
 
           <ul className="mt-3 divide-y divide-border border-t border-border" data-testid="ig-righe">
-            {visibili.slice(0, quanti).map((it) => {
+            {inLocali && locali.slice(0, quanti).map((a) => {
+              const fatto = a.codici.some((c) => aperti.has(c));
+              return (
+                <li key={a.autore} className="flex min-h-16 items-center gap-3 py-2.5" data-testid="ig-riga" data-locale="1">
+                  <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface text-lg">🍽️</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-medium text-text">{nomeDaAccount(a.autore)}</span>
+                    <span className="block truncate text-xs text-text-muted">
+                      @{a.autore}{a.codici.length > 1 ? ` · ${a.codici.length} post` : ""}
+                    </span>
+                  </span>
+                  <Link
+                    href={trovaHref(a.primo, a.raccolte)}
+                    onClick={() => apri(a.primo)}
+                    data-testid="ig-trova"
+                    data-aperto={fatto ? "1" : undefined}
+                    aria-label={`${fatto ? "Già cercato, cerca di nuovo" : "Trova"}: ${nomeDaAccount(a.autore)}`}
+                    className={`inline-flex min-h-10 shrink-0 items-center rounded-pill px-4 text-sm font-display font-semibold ${fatto ? "bg-surface text-text-muted" : "bg-brand text-white"}`}
+                  >
+                    {fatto ? "✓ Cercato" : "Trova"}
+                  </Link>
+                </li>
+              );
+            })}
+            {!inLocali && visibili.slice(0, quanti).map((it) => {
               const fatto = aperti.has(it.codice);
               const sotto = [dataBreve(it.salvatoIl), filtro ? null : it.raccolte[0]].filter(Boolean).join(" · ");
               return (
@@ -196,22 +246,22 @@ export default function InstagramCard({ userId }: { userId: string | null }) {
                     {sotto && <span className="block truncate text-xs text-text-muted">{sotto}</span>}
                   </span>
                   <Link
-                    href={`/importa/condividi?url=${encodeURIComponent(it.url)}`}
+                    href={localeDi(it) ? trovaHref(it, it.raccolte) : `/importa/condividi?url=${encodeURIComponent(it.url)}`}
                     onClick={() => apri(it)}
                     data-testid="ig-salva"
                     data-aperto={fatto ? "1" : undefined}
-                    aria-label={`${fatto ? "Aperto, riapri" : "Apri"}: ${it.autore ? `@${it.autore}` : "post di Instagram"}`}
+                    aria-label={`${fatto ? "Aperto, riapri" : localeDi(it) ? "Trova" : "Apri"}: ${it.autore ? `@${it.autore}` : "post di Instagram"}`}
                     className={`inline-flex min-h-10 shrink-0 items-center rounded-pill px-4 text-sm font-display font-semibold ${fatto ? "bg-surface text-text-muted" : "border border-brand bg-white text-brand"}`}
                   >
-                    {fatto ? "✓ Aperto" : "Apri"}
+                    {fatto ? "✓ Aperto" : localeDi(it) ? "Trova" : "Apri"}
                   </Link>
                 </li>
               );
             })}
           </ul>
-          {visibili.length > quanti && (
+          {(inLocali ? locali.length : visibili.length) > quanti && (
             <button type="button" onClick={() => setQuanti((q) => q + PAGE)} className="mt-2 min-h-11 w-full rounded-pill border border-border bg-white text-sm font-display font-semibold text-brand" data-testid="ig-altri">
-              Mostra altri {Math.min(PAGE, visibili.length - quanti)}
+              Mostra altri {Math.min(PAGE, (inLocali ? locali.length : visibili.length) - quanti)}
             </button>
           )}
         </div>
