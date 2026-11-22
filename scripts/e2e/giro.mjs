@@ -12027,6 +12027,8 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
   ok(sim([...base, P("g", "Trattoria Milano", "restaurant", { lat: 45.46, lng: 9.19 })]) === "a,b", "simili: mai oltre 3 km");
   ok(sim(base, { escludi: (p) => p.id === "a" }) === "", "simili: un salvato o già aperto non conta, e con uno solo la riga sparisce");
   const massa = [P("m", "Trattoria Famosissima", "restaurant", { lat: 41.8891, userRatingCount: 30000 }), ...base.map((p) => ({ ...p, userRatingCount: 200 }))];
+  { const g = pp.similiA(T, base, { etichetta: cl.etichettaNota, escludi: () => false, tipiAmati: new Set(["trattoria"]) });
+    ok(g[0]?.perche === "Il tuo genere · a 100 m", `simili: un tipo che ti è piaciuto si dice nel perché (${g[0]?.perche})`); }
   ok(sim(massa) === "a,b,m", `simili: il posto di massa va in fondo anche se più vicino (${sim(massa)})`);
   const gen = pp.similiA(P("x", "Ristorante X", "italian_restaurant"), [P("y", "Ristorante Y", "italian_restaurant", { lat: 41.8892 }), P("z", "Ristorante Z", "italian_restaurant", { lat: 41.8894, priceLevel: 3 }), P("w", "Ristorante W", "italian_restaurant", { lat: 41.8896 })], { etichetta: cl.etichettaNota, escludi: () => false });
   ok(gen.map((s) => s.posto.id).join(",") === "y,w" && gen[0].perche === "Stessa spesa · a 100 m", `simili: tipo generico solo con stessa categoria, stessa spesa e vicino (${gen.map((s) => s.posto.id + ":" + s.perche).join(", ")})`);

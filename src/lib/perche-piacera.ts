@@ -221,7 +221,9 @@ export function similiA(
       if (tp !== t) continue;
       score = 3;
       // Il tipo e una sola ragione in più: vicinissimo, altrimenti stessa spesa, altrimenti la distanza.
-      perche = `${opts.etichetta(p.category, p.name) ?? "Stesso tipo"} · ${d < 700 || !stessoPrezzo ? metri(d) : "stessa spesa"}`;
+      // Revisore 22/11: se è un tipo che ti è piaciuto si dice (il gusto si vede, non solo l'ordine).
+      const testa = tp && opts.tipiAmati?.has(tp) ? "Il tuo genere" : opts.etichetta(p.category, p.name) ?? "Stesso tipo";
+      perche = `${testa} · ${d < 700 || !stessoPrezzo ? metri(d) : "stessa spesa"}`;
     } else {
       // Tipo generico: stessa categoria Google, stessa spesa e vicino, tutti e tre.
       if (!target.category || p.category !== target.category || !stessoPrezzo || d > 1000) continue;

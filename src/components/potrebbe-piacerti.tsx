@@ -32,12 +32,12 @@ export default function PotrebbePiacerti({ posti, onOpen }: { posti: PostoPiacer
                 onClick={() => onOpen(p.id)}
                 className="block w-full text-left active:scale-[0.98] transition-transform"
               >
-                <span className="relative flex h-[100px] w-full items-center justify-center overflow-hidden rounded-[16px] bg-bg text-4xl">
+                <span className="relative flex h-[100px] w-full items-center justify-center overflow-hidden rounded-[16px] bg-brand/[0.07] text-4xl ring-1 ring-inset ring-border">
                   {p.photoRef
                     ? <PlacePhoto photoRef={p.photoRef} alt="" className="h-full w-full object-cover" fallback={<span aria-hidden>{emoji}</span>} />
                     : <span aria-hidden>{emoji}</span>}
                 </span>
-                <span className="mt-1.5 line-clamp-2 font-display text-[14px] font-semibold leading-snug text-text">{nomeLeggibile(p.name)}</span>
+                <span className="mt-1.5 line-clamp-2 min-h-[2.6em] font-display text-[14px] font-semibold leading-snug text-text">{nomeLeggibile(p.name)}</span>
                 <span data-testid="simile-perche" className="mt-0.5 block truncate text-xs font-sans text-text-muted">{p.perche}</span>
               </button>
             </li>

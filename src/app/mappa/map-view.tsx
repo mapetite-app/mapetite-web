@@ -1092,6 +1092,9 @@ export default function MapView({
   // Verdetti dei salvati (place_synthesis, per UUID): restano anche quando una ricerca
   // sostituisce venueDetails.
   const savedSynthRef = useRef<Record<string, VenueDetails>>({});
+  // Proposta 78: verdetti già pagati dei locali del catalogo (place_synthesis), tenuti anche dopo una ricerca nuova
+  // (revisore 22/11: venivano cancellati e il simile si apriva senza verdetto).
+  const catalogoSynthRef = useRef<Record<string, VenueDetails>>({});
   const [viewState, setViewState] = useState({ longitude: 12.4964, latitude: 41.9028, zoom: 11 });
   // Misure della mappa a schermo, per tenere i nomi dei segnalini dentro il bordo (vedi latiEtichette).
   const [mapBox, setMapBox] = useState<{ w: number; h: number } | null>(null);
@@ -1643,6 +1646,7 @@ export default function MapView({
         const uuids = Object.keys(det);
         if (uuids.length === 0) return;
         // Il verdetto già pagato resta: aprendo il simile la scheda lo mostra subito, senza chiedere a Google.
+        catalogoSynthRef.current = { ...catalogoSynthRef.current, ...det };
         setVenueDetails((prev) => ({ ...Object.fromEntries(uuids.map((u) => [u, det[u]])), ...prev }));
         setPlaceUuids((prev) => ({ ...Object.fromEntries(Object.entries(perGoogle).filter(([, u]) => det[u])), ...prev }));
         setCatalogoConVerdetto((prev) => new Set([...prev, ...uuids]));
@@ -1658,7 +1662,7 @@ export default function MapView({
       ...p, userRatingCount: venueDetails[p.id]?.userRatingCount ?? null, photoRef: venueDetails[p.id]?.photoRef ?? null,
     })) : [];
     const giaInRicerca = new Set(daRicerca.map((p) => placeUuids[p.id]).filter(Boolean));
-    const daCatalogo: CandidatoSimile[] = places.filter((p) => catalogoConVerdetto.has(p.id) && !giaInRicerca.has(p.id));
+    const daCatalogo: CandidatoSimile[] = places.filter((p) => catalogoConVerdetto.has(p.id) && venueDetails[p.id]?.verdict && !giaInRicerca.has(p.id));
     const selUuid = resolveUuid(selected.id);
     return similiA(target, [...daRicerca, ...daCatalogo], {
       etichetta: etichettaNota,
@@ -2187,7 +2191,7 @@ export default function MapView({
         };
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null, id: ticket });
-      setVenueDetails({ ...savedSynthRef.current, ...details });
+      setVenueDetails({ ...catalogoSynthRef.current, ...savedSynthRef.current, ...details });
       // Come per la ricerca AI: la mappa si sposta sui risultati. Con il raggio si vede tutto il cerchio.
       if (withRadius && places.length > 0) {
         const dLat = ((f.radiusKm as number) * 1000) / 111_320;
@@ -2853,7 +2857,7 @@ export default function MapView({
         const id = ticket;
         setClusterPlaces(null); setFilterError(null);
         setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q, simileA: opts.simile?.nome, daParte: senzaNome(data.da_parte ?? null, nomeFuori) });
-        setVenueDetails({ ...savedSynthRef.current, ...details }); setFilters(EMPTY_FILTERS);
+        setVenueDetails({ ...catalogoSynthRef.current, ...savedSynthRef.current, ...details }); setFilters(EMPTY_FILTERS);
         dispatch({ type: "OPEN_LIST" });
         setQuickFilters(new Set());
       setMovedSinceSearch(false);
