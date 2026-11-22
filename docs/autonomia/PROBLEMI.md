@@ -7,7 +7,7 @@ Continua `RICERCA-RISTORATORI.md` (base di Lorenzo del 17/10). Qui ogni problema
 - **DAVVERO, in futuro:** cosa serve (partner, integrazioni, pagamenti, accordi, norme).
 - **Primo passo** e **chi lo fa**: "team" (sessioni di sviluppo) oppure "Lorenzo/Roberto" (contatti, contratti, soldi).
 
-Ultimo aggiornamento: 18/11/2026.
+Ultimo aggiornamento: 22/11/2026.
 
 ---
 
@@ -296,3 +296,10 @@ Ultimo aggiornamento: 18/11/2026.
 - **Cosa facciamo oggi:** le recensioni di Mapetite le scrive solo chi ha segnato "Ci sono stato" (#157; il controllo sul database è sospeso dalla migrazione `20261116e`); il verdetto dice da quando parlano le recensioni Google (proposta 67).
 - **In futuro:** proposta 74 (le recensioni di Mapetite seguono la legge: entro 30 giorni dalla visita, nascoste dopo 2 anni, segnalazione motivata dal pannello del locale). Un argomento per i ristoratori: "su Mapetite recensisce solo chi c'è stato, nei tempi della legge".
 
+
+## 32. "Mi trovano su Instagram ma non so quale video funziona; il cliente vede il reel e poi lo perde" — 22/11 (CEO che chiude)
+- **Chi lo ha:** entrambi.
+- **Quanto pesa:** Instagram genera il 14% delle prenotazioni, Google il 9,5%, Facebook il 4,7%, TikTok il 2,6%; il marketing digitale incide sul 31% (Incrementoo, circa 212.000 prenotazioni di gennaio–agosto 2025 in 300 ristoranti, [BeverFood](https://www.beverfood.com/ristorazione-2025-prenotazioni-digitali-e-fidelizzazione/)). Il 33,8% delle prenotazioni ha variazioni, disdette o mancate presentazioni (stessa fonte). Quanti reel salvati non diventano mai una visita: dato non trovato.
+- **OGGI nell'app:** "Salva il primo posto" nel primo accesso (proposta 52, fatta il 22/11): il gesto del reel insegnato nel primo minuto. Proposta 76 (S): "Arrivati dai reel" nel pannello del ristoratore, solo conteggi da 3 in su.
+- **DAVVERO, in futuro:** salvataggio dal DM di Instagram (proposta 77, API Meta); prenotazione dentro l'app con un partner (proposta 63, Quandoo/TheFork) così il reel diventa tavolo senza uscire.
+- **Primo passo:** team (76); Lorenzo (77 e 63).

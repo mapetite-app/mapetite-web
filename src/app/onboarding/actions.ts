@@ -9,6 +9,7 @@ import { dieteValide, gustiDaTipi, pulisciMappa, queryPerTe, type MappaGusto } f
 import { ZONE } from "@/lib/gusti";
 import { amatiValidi, oraDiRoma, ordinePerOra, tipoLocale } from "@/lib/tipi-locale";
 import { safeNext, withNext } from "@/lib/next-path";
+import { primoLink } from "@/lib/primo-link";
 import { cleanInviteCode, isFriendCode } from "@/lib/invito";
 import { anteprimaInvito, loadAmici } from "@/lib/social";
 
@@ -20,7 +21,9 @@ interface OnboardingData {
   // Città dove esce di solito (seconda schermata): va in profiles.city, se la colonna c'è.
   city?: string | null;
   // "importa": l'ultima schermata ha proposto di portare i salvati da Google Maps.
-  dest?: "importa" | null;
+  dest?: "importa" | "condividi" | null;
+  // "condividi" (proposta 52, "Salva il primo posto"): il link incollato, si riapre in "Salva dal reel" / da Maps.
+  link?: string | null;
   // Dove tornare dopo l'onboarding (link condiviso, pagina che chiedeva l'accesso).
   next?: string | null;
   // Mappa del gusto (sprint 25/10): zone, tipi di posto 👍/👎, "famosi o chicche?", diete.
@@ -36,11 +39,15 @@ export async function completeOnboarding({
   city,
   dest,
   next,
+  link: linkRaw,
   gusto: gustoRaw,
   diete: dieteRaw,
 }: OnboardingData): Promise<{ error: string } | { login: string } | never> {
   // Arriva dal client: si rivalida come qualsiasi input.
   const back = safeNext(next);
+  // Il link incollato si ricontrolla qui: solo un reel o un posto di Maps, mai un indirizzo qualsiasi.
+  const trovato = dest === "condividi" && typeof linkRaw === "string" ? primoLink(linkRaw) : null;
+  const primo = trovato && "link" in trovato ? trovato.link : null;
   const citta = cleanCity(city);
   // Tutto si rivalida: solo valori che l'app conosce (zone, tipi, cucine, atmosfere, occasioni, spesa, diete).
   const mappa = pulisciMappa(gustoRaw, (z) => ZONE.some((x) => x.nome === z && (!citta || x.citta === citta)));
@@ -62,7 +69,7 @@ export async function completeOnboarding({
 
   // Solo in sviluppo con E2E_FAKE_USER (giro automatico): niente scritture, solo il percorso.
   if (process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER && !(await cookies()).get("e2e_anonimo")) {
-    goOn(gusti, citta, dest, back, mappa);
+    goOn(gusti, citta, dest, back, mappa, primo);
   }
 
   const supabase = await createClient();
@@ -120,7 +127,7 @@ export async function completeOnboarding({
     if (dErr) console.error("[onboarding] diete:", dErr.message);
   }
 
-  goOn(gusti, citta, dest, back, mappa);
+  goOn(gusti, citta, dest, back, mappa, primo);
 }
 
 // Inviti tra amici (14/11, rifatti dopo la revisione): il primo accesso mostra chi ti ha invitato e chiede
@@ -193,7 +200,9 @@ export async function accettaInvito(raw: unknown, nomeRaw?: unknown): Promise<Es
 // Revisore 7/11: chi tocca prima "Ristorante" non deve partire da "Ristorante a Roma" se ha scelto anche le pizzerie.
 const GENERICI = new Set(["ristorante", "fast-food"]);
 
-function goOn(gusti: Parameters<typeof tasteQuery>[0], citta: string | null, dest: OnboardingData["dest"], back: string | null, mappa: MappaGusto): never {
+function goOn(gusti: Parameters<typeof tasteQuery>[0], citta: string | null, dest: OnboardingData["dest"], back: string | null, mappa: MappaGusto, primo: string | null = null): never {
+  // "Salva il primo posto": si apre la pagina del link condiviso, che legge il reel o il posto e lo salva.
+  if (dest === "condividi" && primo) redirect(`/importa/condividi?${new URLSearchParams({ text: primo })}`);
   // "Importa i tuoi salvati da Google Maps": /importa si apre con "Incolla più link" in cima.
   if (dest === "importa") redirect("/importa?da=benvenuto");
 
