@@ -6,6 +6,15 @@ Obiettivo: entro fine ottobre 2026 un'app che un gruppo ristretto di persone pos
 Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) · IN PR · FATTA.
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
+## SESSIONE DI DOMENICA 22/11 (14:05) — CEO apre e chiude
+- **CEO apre:** nessun commento nuovo di Lorenzo. Esito della #187 (proposta 30 "Salvati di Instagram"): **VALIDATA** (in produzione, approvata 8,5). DA-FARE 13 (prova con il file vero) ancora aperta.
+- **Proposta 30, seconda parte (FATTA):** nei salvati di Instagram gli account che dal nome sembrano locali ("trattoriadamario", "osteria_bella", "bar_basso") stanno nella pillola «🍽️ Locali», scelta di partenza: una riga per account con il nome leggibile («Trattoria da Mario», @account, «· 3 post») e «Trova». Trova apre «Salva dal reel» con il nome e la città (dal nome o dalla raccolta, es. «Roma food»): 1 lettura AI e 1 ricerca Google, poi sempre «È questo?», con la riga «Dal nome dell'account @…» (non «Nel reel»). Riconoscimento solo con regole sul nome, nel telefono (`src/lib/instagram-locali.ts`): «bar/pub/cafe» solo da soli, a fine parola o con una città; esclusi plurali, guide, testate, pagine generiche. Zero chiamate finché non si tocca Trova.
+- **Minore della 52 (FATTA):** se l'accesso scade mentre si incolla il primo posto, il link resta in attesa e lo ritrova Importa.
+- **Revisore 1:** 8,3, **bocciata** (falsi positivi: enrico_bartolini, bargello, rome_restaurants, trattoriamagazine; «Nel reel» per un nome che viene dall'account); tutto corretto. **Revisore 2 (nuovo):** **8,6, APPROVATA**, nessun bloccante; applicati i minori (pagine generiche, «Cercato» anche in Tutti). Minori lasciati: locali veri scartati da parole brevi (lab, fan, giro), cognomi spezzati («Macelleria da Mini»), emoji 🍽️ pallida nel Chromium del test.
+- **Verifiche:** tsc OK, eslint 12 come su main, build Vercel dell'anteprima READY (la build locale in copia non parte per il collegamento a node_modules). Giro: vedi PR.
+- **Prossima sessione (in ordine):** (1) se Lorenzo ha provato il suo file di Instagram (DA-FARE 13), correggere il lettore su quello. (2) Minori della 30: parole brevi in `CREATOR` solo come pezzo intero; «da/dal» solo davanti a un nome noto. (3) Un'altra voce PRONTA di `PROPOSTE.md` che entri nel copione demo.
+- **CEO chiude:** ricerche web già fatte alle 03:05 di oggi. Ricerche Google vere oggi: 4 (nessuna in questa sessione).
+
 ## SESSIONE DI DOMENICA 22/11 (10:05) — CEO apre e chiude
 - **CEO apre:** nessun commento nuovo di Lorenzo. Esito della #185 (proposta 52 "Salva il primo posto"): **VALIDATA** (in produzione, approvata 8,6).
 - **Numeri di produzione (10:30):** 7 utenti, 0 accessi negli ultimi 7 giorni, 36 salvati, 0 reel collegati, 0 prove senza account, 0 locali verificati. Ancora nessun tester (DA-FARE 3 e 9).
