@@ -61,14 +61,17 @@ const TIME_KEY = /time|timestamp|date|data|ora|fecha|zeit|datum|heure/i;
 type Obj = Record<string, unknown>;
 const isObj = (x: unknown): x is Obj => typeof x === "object" && x !== null && !Array.isArray(x);
 
-// Quanti link di Instagram ci sono dentro (si conta fino a 2: basta sapere se è uno solo).
-function countLinks(x: unknown, depth = 0): number {
-  if (depth > 8) return 0;
-  if (typeof x === "string") return IG_LINK.test(x) ? 1 : 0;
-  const vals = Array.isArray(x) ? x : isObj(x) ? Object.values(x) : [];
-  let n = 0;
-  for (const y of vals) { n += countLinks(y, depth + 1); if (n >= 2) return 2; }
-  return n;
+// Quanti link di Instagram DIVERSI ci sono dentro (si conta fino a 2: basta sapere se è uno solo). Revisore 22/11:
+// nel formato con label_values lo stesso link sta in "value" e in "href", e contarlo due volte perdeva autore e data.
+function countLinks(x: unknown): number {
+  const visti = new Set<string>();
+  const giro = (y: unknown, depth: number): void => {
+    if (depth > 8 || visti.size >= 2) return;
+    if (typeof y === "string") { const m = y.match(IG_LINK); if (m) visti.add(m[2]); return; }
+    for (const z of Array.isArray(y) ? y : isObj(y) ? Object.values(y) : []) giro(z, depth + 1);
+  };
+  giro(x, 0);
+  return Math.min(visti.size, 2);
 }
 const hasLink = (x: unknown) => countLinks(x) > 0;
 

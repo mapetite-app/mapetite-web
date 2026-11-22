@@ -10979,6 +10979,16 @@ if (fakeUser) {
   const aaa = en.items.find((i) => i.codice === "AAA111aaa");
   ok(aaa?.raccolte.join() === "Roma food" && aaa.salvatoIl === 1700000001000 && en.items.find((i) => i.codice === "CCC333ccc")?.raccolte.join() === "Caffè Milano" && en.raccolte.length === 2,
     `instagram: raccolte da saved_collections, accenti di Meta rimessi a posto (${en.raccolte.join(" | ")})`);
+  // Revisore 22/11: formato con label_values (stesso link in "value" e "href"): autore e data non si perdono.
+  { const lv = ig.parseInstagram([{ name: "saved_posts.json", text: JSON.stringify({ saved_saved_media: [{ label_values: [{ label: "URL", value: "https://www.instagram.com/reel/ABCDE12345/", href: "https://www.instagram.com/reel/ABCDE12345/" }, { label: "Username", value: "trattoria.mario" }], timestamp_value: 1730000000 }] }) }]);
+    ok(lv.items.length === 1 && lv.items[0].autore === "trattoria.mario" && lv.items[0].salvatoIl === 1730000000000, `instagram: formato label_values con autore e data (${JSON.stringify(lv.items[0])})`); }
+  // Revisore 22/11: zip che si gonfia (300 MB di zeri, dimensione dichiarata falsa) → saltato, senza bloccare.
+  { const { deflateRawSync } = await import("node:zlib");
+    const raw = deflateRawSync(Buffer.alloc(300 * 1024 * 1024)); const nm = Buffer.from("saved_posts.json");
+    const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(8, 8); lh.writeUInt32LE(raw.length, 18); lh.writeUInt32LE(100, 22); lh.writeUInt16LE(nm.length, 26);
+    const zb = Buffer.concat([lh, nm, raw]); const t0 = Date.now();
+    const out = await zl.zipTextFiles(zb.buffer.slice(zb.byteOffset, zb.byteOffset + zb.length), /json$/);
+    ok(out.length === 0 && Date.now() - t0 < 5000, `instagram: zip che si gonfia oltre 15 MB saltato (${out.length} file, ${Date.now() - t0} ms)`); }
   const it = ig.parseInstagram([{ name: "post_salvati.json", text: IG_IT }]);
   ok(it.items.length === 1 && it.items[0].autore === "osteria_bella" && it.items[0].salvatoIl === 1720000000000 && it.items[0].tipo === "reel", "instagram: JSON con chiavi in italiano ('Salvato il')");
   const ht = ig.parseInstagram([{ name: "saved_posts.html", text: IG_HTML }]);

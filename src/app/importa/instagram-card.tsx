@@ -45,7 +45,7 @@ const dataBreve = (ms: number | null) =>
 async function readFiles(files: File[]): Promise<{ name: string; text: string }[]> {
   const out: { name: string; text: string }[] = [];
   for (const f of files.slice(0, 10)) {
-    if (f.size > 200 * 1024 * 1024) continue;
+    if (f.size > 100 * 1024 * 1024) continue;
     try {
       if (/\.zip$/i.test(f.name) || f.type.includes("zip")) {
         const buf = await f.arrayBuffer();
@@ -155,7 +155,7 @@ export default function InstagramCard({ userId }: { userId: string | null }) {
             </button>
           </div>
           <p className="text-sm text-text-muted" data-testid="ig-sotto">
-            Tocca Salva su quelli con un locale{nAperti > 0 ? ` · ${nAperti} ${nAperti === 1 ? "aperto" : "aperti"}` : ""}.
+            Apri il reel e scrivi il nome del posto (o fai uno screenshot): lo trovo io{nAperti > 0 ? ` · ${nAperti} ${nAperti === 1 ? "aperto" : "aperti"}` : ""}.
           </p>
           {error && <p className="mt-3 rounded-btn bg-error/10 px-4 py-3 text-sm text-error" data-testid="ig-errore">{error}</p>}
 
@@ -200,10 +200,10 @@ export default function InstagramCard({ userId }: { userId: string | null }) {
                     onClick={() => apri(it)}
                     data-testid="ig-salva"
                     data-aperto={fatto ? "1" : undefined}
-                    aria-label={`${fatto ? "Aperto, riapri" : "Salva"}: ${it.autore ? `@${it.autore}` : "post di Instagram"}`}
+                    aria-label={`${fatto ? "Aperto, riapri" : "Apri"}: ${it.autore ? `@${it.autore}` : "post di Instagram"}`}
                     className={`inline-flex min-h-10 shrink-0 items-center rounded-pill px-4 text-sm font-display font-semibold ${fatto ? "bg-surface text-text-muted" : "border border-brand bg-white text-brand"}`}
                   >
-                    {fatto ? "✓ Aperto" : "Salva"}
+                    {fatto ? "✓ Aperto" : "Apri"}
                   </Link>
                 </li>
               );
