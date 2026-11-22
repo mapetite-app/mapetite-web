@@ -10999,11 +10999,14 @@ if (fakeUser) {
   ok(zf.length === 2 && ig.parseInstagram(zf).items.length === 4, `instagram: zip del download letto nel telefono, solo i file dei salvati (${zf.map((f) => f.name).join(", ")})`);
   ok(ig.parseInstagram([{ name: "x.json", text: '{"ciao":1}' }]).items.length === 0 && ig.parseInstagram([{ name: "x.html", text: "<p>niente</p>" }]).items.length === 0, "instagram: file senza salvati, elenco vuoto");
   { const il = await import(new URL("../../src/lib/instagram-locali.ts", import.meta.url).href);
-    const si = ["trattoriadamario", "osteria_bella", "barmilano", "sushizen.roma", "pizzeriabella", "caffemexico", "ristorante.da.enzo", "forno_campo_de_fiori"];
-    const no = ["creator.food", "pizza.roma", "romeeats", "giulia.mangia", "barbara.rossi", "pubblico", "gamberorosso", "trattoria.lover", "osteriaguide", "", null];
+    const si = ["trattoriadamario", "osteria_bella", "barmilano", "sushizen.roma", "pizzeriabella", "caffemexico", "ristorante.da.enzo", "forno_campo_de_fiori", "bar_basso", "sushibar_roma", "taverna.degli.amici", "pubroma", "baroccoristorante"];
+    // Revisore 22/11: nomi di persona e città con "bar", guide e testate, plurali.
+    const no = ["creator.food", "pizza.roma", "romeeats", "giulia.mangia", "barbara.rossi", "pubblico", "gamberorosso", "trattoria.lover", "osteriaguide", "", null,
+      "enrico_bartolini", "bartolomeo", "bartolo_mario", "barzini", "bargello", "bardolino", "barcolana", "barrique_wine", "barcelona_trip", "barmanitalia", "barletta.city",
+      "rome_restaurants", "restaurantguru", "trattoriamagazine", "osteria_news", "pizzeriamania", "restaurant.week", "pubquiz_roma", "pubrock_band"];
     ok(si.every(il.sembraLocale) && !no.some(il.sembraLocale), `instagram locali: dal nome sì ${si.filter((h) => !il.sembraLocale(h)).join(",") || "tutti"}, no ${no.filter(il.sembraLocale).join(",") || "nessuno"}`);
-    const nomi = [["trattoriadamario", ["Roma food"]], ["osteriadellalumaca", []], ["sushizen.roma", []], ["barmilano", ["Caffè Milano"]], ["caffemexico", ["Napoli 2024"]]].map(([h, r]) => il.indizioLocale(h, r)).join(" | ");
-    ok(nomi === "Trattoria da Mario, Roma | Osteria della Lumaca | Sushi Zen Roma | Bar Milano | Caffè Mexico, Napoli", `instagram locali: nome leggibile e città dalla raccolta (${nomi})`); }
+    const nomi = [["trattoriadamario", ["Roma food"]], ["osteriadellalumaca", []], ["sushizen.roma", []], ["barmilano", ["Caffè Milano"]], ["caffemexico", ["Napoli 2024"]], ["taverna.degli.amici", ["Rome trip"]], ["baroccoristorante", []]].map(([h, r]) => il.indizioLocale(h, r)).join(" | ");
+    ok(nomi === "Trattoria da Mario, Roma | Osteria della Lumaca | Sushi Zen Roma | Bar Milano | Caffè Mexico, Napoli | Taverna degli Amici, Roma | Barocco Ristorante", `instagram locali: nome leggibile e città dalla raccolta (${nomi})`); }
 
   if (fakeUser) {
     const ictx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -11033,7 +11036,7 @@ if (fakeUser) {
       `instagram: in "Locali" solo gli account-locale, con nome leggibile, @account e "Trova" (${loc})`);
     ok((await ic.getByTestId("ig-sotto").textContent()).includes("tocca Trova"), "instagram: in 'Locali' una frase dice cosa fa Trova");
     const trovaMario = righe.filter({ hasText: "@trattoriadamario" }).getByTestId("ig-trova");
-    ok((await trovaMario.getAttribute("href")) === `/importa/condividi?url=${encodeURIComponent("https://www.instagram.com/reel/AAA111aaa/")}&title=${encodeURIComponent("Trattoria da Mario, Roma")}`, `instagram: 'Trova' passa link e nome con la città della raccolta (${await trovaMario.getAttribute("href")})`);
+    ok((await trovaMario.getAttribute("href")) === `/importa/condividi?url=${encodeURIComponent("https://www.instagram.com/reel/AAA111aaa/")}&title=${encodeURIComponent("Trattoria da Mario, Roma")}&account=trattoriadamario`, `instagram: 'Trova' passa link e nome con la città della raccolta (${await trovaMario.getAttribute("href")})`);
     ok(await ip.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "instagram 390px: 'Locali' senza scorrimento orizzontale");
     await ic.scrollIntoViewIfNeeded();
     await ip.screenshot({ path: `${OUT}/instagram-5-locali.png`, caret: "initial" });
@@ -11088,6 +11091,8 @@ if (fakeUser) {
       await ip.getByTestId("reel-trovato").waitFor({ timeout: 8000 }).catch(() => {});
       ok(capT.length === 1 && capT[0]?.caption === "Trattoria da Mario, Roma" && srcT.length === 1 && /Trattoria da Mario/.test(srcT[0]?.query ?? ""), `instagram Trova: una lettura del nome e una ricerca (${JSON.stringify(capT)} ${JSON.stringify(srcT)})`);
       ok(await ip.getByTestId("reel-trovato").isVisible() && !icalls.slice(w0).some((u) => u.includes("/rest/v1/")), "instagram Trova: chiede 'È questo?' e non salva da solo");
+      const prov = await ip.getByTestId("reel-provenienza").textContent().catch(() => "");
+      ok(prov === "Dal nome dell'account @trattoriadamario", `instagram Trova: la scheda dice da dove viene il nome, non 'Nel reel' (${prov})`);
       await ip.screenshot({ path: `${OUT}/instagram-6-trova.png`, caret: "initial" });
       await ictx.unroute("**/api/import-caption");
       await ictx.unroute("**/api/places/search");

@@ -118,7 +118,7 @@ export default function InstagramCard({ userId }: { userId: string | null }) {
   const visibili = filtro && !inLocali ? items.filter((it) => it.raccolte.includes(filtro)) : items;
   const localeDi = (it: IgSalvato) => (it.autore && sembraLocale(it.autore) ? locali.find((a) => a.autore.toLowerCase() === it.autore!.toLowerCase()) ?? null : null);
   const trovaHref = (it: IgSalvato, raccolte: Iterable<string>) =>
-    `/importa/condividi?url=${encodeURIComponent(it.url)}&title=${encodeURIComponent(indizioLocale(it.autore!, [...raccolte]))}`;
+    `/importa/condividi?url=${encodeURIComponent(it.url)}&title=${encodeURIComponent(indizioLocale(it.autore!, [...raccolte]))}&account=${encodeURIComponent(it.autore!)}`;
   const tuttiReel = items.length > 0 && items.every((it) => it.tipo === "reel");
   const nAperti = items.filter((it) => aperti.has(it.codice)).length;
 
@@ -180,14 +180,14 @@ export default function InstagramCard({ userId }: { userId: string | null }) {
           </div>
           <p className="text-sm text-text-muted" data-testid="ig-sotto">
             {inLocali
-              ? "Account che dal nome sembrano locali: tocca Trova e lo cerco su Google Maps."
+              ? "Dal nome sembrano locali: tocca Trova."
               : `Apri il reel e scrivi il nome del posto (o fai uno screenshot): lo trovo io${nAperti > 0 ? ` · ${nAperti} ${nAperti === 1 ? "aperto" : "aperti"}` : ""}.`}
           </p>
           {error && <p className="mt-3 rounded-btn bg-error/10 px-4 py-3 text-sm text-error" data-testid="ig-errore">{error}</p>}
 
           {(raccolte.length > 0 || locali.length > 0) && (
             // Una riga sola che scorre di lato: con tante raccolte l'elenco resta in vista.
-            <div className="-mx-5 mt-3 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none]" role="group" aria-label="Raccolte di Instagram">
+            <div className="-mx-5 mt-3 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none]" role="group" aria-label="Filtri">
               {[...(locali.length > 0 ? [[LOCALI, locali.length] as const] : []), [null, items.length] as const, ...raccolte].map(([r, n]) => {
                 const on = filtro === r;
                 return (
@@ -224,7 +224,7 @@ export default function InstagramCard({ userId }: { userId: string | null }) {
                     data-testid="ig-trova"
                     data-aperto={fatto ? "1" : undefined}
                     aria-label={`${fatto ? "Già cercato, cerca di nuovo" : "Trova"}: ${nomeDaAccount(a.autore)}`}
-                    className={`inline-flex min-h-10 shrink-0 items-center rounded-pill px-4 text-sm font-display font-semibold ${fatto ? "bg-surface text-text-muted" : "bg-brand text-white"}`}
+                    className={`inline-flex min-h-10 shrink-0 items-center rounded-pill px-4 text-sm font-display font-semibold ${fatto ? "bg-surface text-text-muted" : "border border-brand bg-white text-brand"}`}
                   >
                     {fatto ? "✓ Cercato" : "Trova"}
                   </Link>
