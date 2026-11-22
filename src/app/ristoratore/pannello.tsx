@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BadgeCheck, Check, ChevronDown, ChevronRight, MapPin, Megaphone, Sparkles, X } from "lucide-react";
 import { categoryLabel } from "@/lib/category-label";
 import { displayAddress } from "@/lib/city";
-import { cosaDiconoINumeri, mostraPersone, SOGLIA, TREND_ESEMPIO, type Azione, type PannelloRistoratore, type RistLocale, type TrendFascia, type Voce } from "@/lib/ristoratore";
+import { cosaDiconoINumeri, mostraPersone, SOGLIA, sottoReel, TREND_ESEMPIO, type Azione, type PannelloRistoratore, type RistLocale, type TrendFascia, type Voce } from "@/lib/ristoratore";
 import { adattoAllaRicerca, RICERCHE_DEMO, SPONSOR_DEMO } from "@/lib/evidenza";
 import TracciaFunzione from "@/components/traccia-funzione";
 import Schede from "./schede";
@@ -367,6 +367,7 @@ export default function Pannello({
   serate = { giorni: [], at: null },
   prenotazioni = null,
   passaparola = 0,
+  reel = null,
 }: {
   p: PannelloRistoratore;
   locale: RistLocale;
@@ -380,6 +381,8 @@ export default function Pannello({
   prenotazioni?: { tavoli: number; diParola: number; persone: number; personeParola: number } | null;
   // Proposta 58: tra chi ti vuole provare, quanti l'hanno salvato su consiglio di un amico. Solo il numero, mai chi.
   passaparola?: number;
+  // Proposta 76: persone che nel periodo ti hanno salvato da un reel, per fonte. Solo conteggi, mai chi o quale video.
+  reel?: { persone: number; perFonte: Voce[] } | null;
 }) {
   const categoria = categoryLabel(locale.category);
   const az = (t: Azione["tipo"]) => p.azioni.find((a) => a.tipo === t)!;
@@ -395,6 +398,8 @@ export default function Pannello({
   // "Di parola" solo se sia chi lo è sia chi non lo è sono almeno SOGLIA persone: il locale conosce i
   // nomi di chi ha prenotato, con meno saprebbe chi ha mancato un tavolo (anche altrove).
   const parola = tavoli && tavoli.personeParola >= SOGLIA && tavoli.persone - tavoli.personeParola >= SOGLIA ? tavoli.diParola : null;
+  // Arrivati dai reel (proposta 76): solo da SOGLIA persone, come gli altri numeri.
+  const daReel = reel && reel.persone >= SOGLIA ? reel : null;
   const primaTavoli = attesa.persone > 0 || risposte >= SOGLIA || p.disdette.n > 0;
   const panoramica = (
     <>
@@ -462,13 +467,20 @@ export default function Pannello({
         </section>
       )}
 
-      {frasi.length > 0 && (
+      {(frasi.length > 0 || daReel) && (
         <section data-testid="pannello-insight" className="mt-3 rounded-card border border-accent/30 bg-accent-light/60 p-4">
           <h2 className="flex items-center gap-1.5 text-[11px] font-display font-semibold uppercase tracking-wide text-accent">
             <Sparkles size={13} aria-hidden />Cosa ti dicono i numeri
           </h2>
           <ul className="mt-2 space-y-1.5">
             {frasi.map((f) => <li key={f} className="text-[15px] font-sans leading-snug text-text">{f}</li>)}
+            {/* Arrivati dai reel (proposta 76, PROBLEMI.md 32): se i video che parlano di te portano gente. Qui e non nel
+                riquadro scuro: la prima schermata resta 4 numeri e "Cosa ti dicono i numeri" (feedback 16/10). */}
+            {daReel && (
+              <li data-testid="pannello-reel" className="text-[15px] font-sans leading-snug text-text">
+                {daReel.persone.toLocaleString("it-IT")} persone ti hanno salvato da un reel negli ultimi {p.giorni}{"\u00a0"}giorni{sottoReel(daReel) ? ` (${sottoReel(daReel)})` : ""}.
+              </li>
+            )}
           </ul>
         </section>
       )}

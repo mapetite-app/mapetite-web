@@ -414,3 +414,41 @@ export function cosaDiconoINumeri(p: PannelloRistoratore): string[] {
   const fissi = p.tornati >= SOGLIA ? [`${p.tornati.toLocaleString("it-IT")} persone di Mapetite sono tornate da te 2 o più volte: sono i tuoi clienti fissi.`] : [];
   return [...out.slice(0, 2), ...fissi];
 }
+
+// Proposta 76 "Arrivati dai reel": persone che nel periodo hanno salvato il locale da un reel o un video
+// (contenuti_locali: solo link e fonte). Conta come "dal reel" solo il video collegato entro un giorno dal
+// salvataggio (chi aggiunge un video settimane dopo non è arrivato dal reel). Una persona = una volta, con la
+// fonte del primo video. Righe col lucchetto o salvato tolto: non contano (come gli altri numeri del pannello).
+// Al telefono arriva solo il conteggio, e sotto SOGLIA persone il pannello non lo scrive.
+export type RistReel = { user_id: string; place_id: string; fonte: string; created_at: string };
+export const FONTI_REEL = ["Instagram", "TikTok", "YouTube"] as const;
+const GIORNO_MS = 86_400_000;
+export function daiReel(reel: RistReel[], salvati: RistSalvataggio[], placeId: string, giorni: number, now: number = Date.now()): { persone: number; perFonte: Voce[] } {
+  const salvatoIl = new Map<string, number>();
+  for (const r of salvati) if (r.place_id === placeId && !r.privato) salvatoIl.set(r.user_id, Date.parse(r.created_at));
+  const da = now - giorni * GIORNO_MS;
+  const primo = new Map<string, { t: number; fonte: string }>();
+  for (const c of reel) {
+    const t = Date.parse(c.created_at);
+    const s = salvatoIl.get(c.user_id);
+    if (c.place_id !== placeId || !(FONTI_REEL as readonly string[]).includes(c.fonte) || !Number.isFinite(t) || s == null || !Number.isFinite(s)) continue;
+    if (t < da || t > now || Math.abs(t - s) > GIORNO_MS) continue;
+    const prima = primo.get(c.user_id);
+    if (!prima || t < prima.t) primo.set(c.user_id, { t, fonte: c.fonte });
+  }
+  const conta = new Map<string, number>();
+  for (const { fonte } of primo.values()) conta.set(fonte, (conta.get(fonte) ?? 0) + 1);
+  const perFonte = [...conta].map(([chiave, n]) => ({ chiave, volte: n, persone: n })).sort((a, b) => b.persone - a.persone || FONTI_REEL.indexOf(a.chiave as never) - FONTI_REEL.indexOf(b.chiave as never));
+  return { persone: primo.size, perFonte };
+}
+
+// Riga sotto il numero: "8 da Instagram · 4 da TikTok"; con una fonte sola "tutti da Instagram". Revisore 22/11: le
+// fonti si escludono a vicenda, quindi nessuna parte sotto SOGLIA (nemmeno per differenza dal totale): fonti piccole
+// raccolte in "altri video" se insieme fanno almeno SOGLIA, altrimenti niente seconda riga.
+export function sottoReel(r: { persone: number; perFonte: Voce[] }): string | undefined {
+  if (r.perFonte.length === 1) return `tutti da ${r.perFonte[0].chiave}`;
+  const grandi = r.perFonte.filter((f) => f.persone >= SOGLIA);
+  const resto = r.persone - grandi.reduce((n, f) => n + f.persone, 0);
+  if (grandi.length === 0 || (resto > 0 && resto < SOGLIA)) return undefined;
+  return [...grandi.map((f) => `${f.persone.toLocaleString("it-IT")} da ${f.chiave}`), ...(resto > 0 ? [`${resto.toLocaleString("it-IT")} da altri video`] : [])].join(" · ");
+}

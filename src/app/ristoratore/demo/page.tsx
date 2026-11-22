@@ -23,5 +23,9 @@ export default async function RistoratoreDemoPage({ searchParams }: { searchPara
   const prenotazioni = sp.beta !== "-tavoli" ? { tavoli, diParola: Math.round(tavoli * 0.45), persone: tavoli - Math.round(tavoli * 0.15), personeParola: Math.round(tavoli * 0.4) } : null;
   // Proposta 58: tra chi ti vuole provare, su consiglio di un amico; inventati come il resto (circa uno su cinque).
   const passaparola = Math.round(p.inAttesa.persone / 5);
-  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato base="/ristoratore/demo" demo prenotazioni={prenotazioni} passaparola={passaparola} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
+  // Proposta 76: salvati da un reel nel periodo, inventati come il resto (due su tre da Instagram).
+  const daReel = Math.round(giorni * 0.4);
+  const ig = Math.round((daReel * 2) / 3);
+  const reel = { persone: daReel, perFonte: [{ chiave: "Instagram", volte: ig, persone: ig }, { chiave: "TikTok", volte: daReel - ig, persone: daReel - ig }].filter((f) => f.persone > 0) };
+  return <Pannello reel={reel} p={p} locale={dati.locale} citta={dati.citta} verificato base="/ristoratore/demo" demo prenotazioni={prenotazioni} passaparola={passaparola} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
 }
