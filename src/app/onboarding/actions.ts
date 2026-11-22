@@ -21,7 +21,9 @@ interface OnboardingData {
   // Città dove esce di solito (seconda schermata): va in profiles.city, se la colonna c'è.
   city?: string | null;
   // "importa": l'ultima schermata ha proposto di portare i salvati da Google Maps.
-  dest?: "importa" | "condividi" | null;
+  // "gesto": si entra in "Salva il primo posto": i gusti si salvano subito, senza uscire dal primo accesso
+  // (revisore 22/11: chi va su Instagram a condividere un reel non deve perdere il profilo).
+  dest?: "importa" | "condividi" | "gesto" | null;
   // "condividi" (proposta 52, "Salva il primo posto"): il link incollato, si riapre in "Salva dal reel" / da Maps.
   link?: string | null;
   // Dove tornare dopo l'onboarding (link condiviso, pagina che chiedeva l'accesso).
@@ -42,7 +44,7 @@ export async function completeOnboarding({
   link: linkRaw,
   gusto: gustoRaw,
   diete: dieteRaw,
-}: OnboardingData): Promise<{ error: string } | { login: string } | never> {
+}: OnboardingData): Promise<{ error: string } | { login: string } | { ok: true } | never> {
   // Arriva dal client: si rivalida come qualsiasi input.
   const back = safeNext(next);
   // Il link incollato si ricontrolla qui: solo un reel o un posto di Maps, mai un indirizzo qualsiasi.
@@ -69,6 +71,7 @@ export async function completeOnboarding({
 
   // Solo in sviluppo con E2E_FAKE_USER (giro automatico): niente scritture, solo il percorso.
   if (process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER && !(await cookies()).get("e2e_anonimo")) {
+    if (dest === "gesto") return { ok: true };
     goOn(gusti, citta, dest, back, mappa, primo);
   }
 
@@ -127,6 +130,7 @@ export async function completeOnboarding({
     if (dErr) console.error("[onboarding] diete:", dErr.message);
   }
 
+  if (dest === "gesto") return { ok: true };
   goOn(gusti, citta, dest, back, mappa, primo);
 }
 

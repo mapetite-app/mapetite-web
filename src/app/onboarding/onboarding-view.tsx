@@ -402,6 +402,15 @@ function Benvenuto({ next, initial, ripreso, nomeNoto, rifalla }: { next: string
     setGiu((p) => p.filter((x) => x !== ultimo));
   };
 
+  // "Salva il primo posto": entrando, i gusti si salvano subito sul server (senza uscire dal primo accesso),
+  // così chi va su Instagram a condividere un reel non li perde. Se non va (rete, accesso scaduto) restano
+  // nella bozza e li salva la fine, come prima.
+  const entraNelGesto = () => {
+    setListaIncollata(false);
+    setStep(PASSO_GESTO);
+    void completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest: "gesto", next, gusto, diete: maxVisto >= PASSO_DIETE ? diete : undefined }).catch(() => {});
+  };
+
   const finish = async (dest: "importa" | "condividi" | null, link: string | null = null) => {
     setSubmitting(dest ?? "mappa");
     setError(null);
@@ -431,7 +440,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto, rifalla }: { next: string
       router.push(result.login);
       return;
     }
-    if (result?.error) {
+    if (result && "error" in result) {
       saveDraft(draftNow);
       setError(result.error);
       setSubmitting(null);
@@ -485,7 +494,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto, rifalla }: { next: string
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <button
             type="button"
-            onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => (s === PASSO_GESTO ? (invito ? PASSO_INVITO : PASSO_CAPITO) : s === PASSO_SCOPERTA && saltaTipi ? PASSO_AMATI : s - 1)); }}
+            onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => (s === PASSO_GESTO ? (setListaIncollata(false), invito ? PASSO_INVITO : PASSO_CAPITO) : s === PASSO_SCOPERTA && saltaTipi ? PASSO_AMATI : s - 1)); }}
             disabled={step === 0}
             aria-label={tornaFrase ? "Torna alla frase" : "Indietro"}
             className="-ml-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center text-[#141414] disabled:opacity-0"
@@ -522,7 +531,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto, rifalla }: { next: string
 
       {/* Contenuto */}
       {/* Revisore 7/11: nella frase, con le righe aperte, l'ultima nota finiva sotto i due tasti fissi. */}
-      <div className={`mx-auto w-full max-w-lg flex-1 px-6 pt-3 ${step >= PASSO_CAPITO ? "pb-[calc(11rem+env(safe-area-inset-bottom))]" : "pb-32"}`}>
+      <div className={`mx-auto w-full max-w-lg flex-1 px-6 pt-3 ${step === PASSO_GESTO ? "pb-[calc(9rem+env(safe-area-inset-bottom))]" : step >= PASSO_CAPITO ? "pb-[calc(11rem+env(safe-area-inset-bottom))]" : "pb-32"}`}>
         {/* Il passo dell'invito: in alto chi invita, come nella pagina d'invito (revisore 15/11: era mezzo vuoto). */}
         {step === PASSO_INVITO && invito && (
           <div data-testid="invito-avatar" className="mb-4">
@@ -951,7 +960,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto, rifalla }: { next: string
             </>
           ) : conGesto && step !== PASSO_GESTO ? (
             // Dopo la frase (o la risposta all'invito) viene "Salva il primo posto".
-            <button type="button" data-testid="capito-gesto" onClick={() => setStep(PASSO_GESTO)} className={TASTO_PIENO}>
+            <button type="button" data-testid="capito-gesto" onClick={entraNelGesto} className={TASTO_PIENO}>
               Continua <ArrowRight size={18} aria-hidden />
             </button>
           ) : step === PASSO_GESTO ? (
