@@ -442,8 +442,13 @@ export function daiReel(reel: RistReel[], salvati: RistSalvataggio[], placeId: s
   return { persone: primo.size, perFonte };
 }
 
-// Riga sotto il numero: "8 da Instagram · 4 da TikTok"; con una fonte sola "tutti da Instagram".
-export function sottoReel(r: { persone: number; perFonte: Voce[] }): string {
-  if (r.perFonte.length === 1) return `${r.persone === 1 ? "da" : "tutti da"} ${r.perFonte[0].chiave}`;
-  return r.perFonte.map((f) => `${f.persone.toLocaleString("it-IT")} da ${f.chiave}`).join(" · ");
+// Riga sotto il numero: "8 da Instagram · 4 da TikTok"; con una fonte sola "tutti da Instagram". Revisore 22/11: le
+// fonti si escludono a vicenda, quindi nessuna parte sotto SOGLIA (nemmeno per differenza dal totale): fonti piccole
+// raccolte in "altri video" se insieme fanno almeno SOGLIA, altrimenti niente seconda riga.
+export function sottoReel(r: { persone: number; perFonte: Voce[] }): string | undefined {
+  if (r.perFonte.length === 1) return `tutti da ${r.perFonte[0].chiave}`;
+  const grandi = r.perFonte.filter((f) => f.persone >= SOGLIA);
+  const resto = r.persone - grandi.reduce((n, f) => n + f.persone, 0);
+  if (grandi.length === 0 || (resto > 0 && resto < SOGLIA)) return undefined;
+  return [...grandi.map((f) => `${f.persone.toLocaleString("it-IT")} da ${f.chiave}`), ...(resto > 0 ? [`${resto.toLocaleString("it-IT")} da altri video`] : [])].join(" · ");
 }

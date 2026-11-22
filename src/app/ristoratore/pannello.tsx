@@ -445,7 +445,7 @@ export default function Pannello({
                 )}
                 {/* Arrivati dai reel (proposta 76, PROBLEMI.md 32): se i video che parlano di te portano gente. */}
                 {daReel && (
-                  <Riga testId="pannello-reel" numero={`🎬 ${daReel.persone.toLocaleString("it-IT")}`} testo="ti hanno salvato da un reel" sotto={sottoReel(daReel)} />
+                  <Riga testId="pannello-reel" numero={`🎬 ${daReel.persone.toLocaleString("it-IT")}`} testo="salvataggi da un reel" sotto={sottoReel(daReel)} />
                 )}
                 {/* Tavoli liberati per tempo (PROBLEMI.md 1): "Non vado più" invece di non presentarsi. */}
                 {p.disdette.n > 0 && (
