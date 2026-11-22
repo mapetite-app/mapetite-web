@@ -257,7 +257,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Albo ha una schermata che insegna a salvare dal "Condividi" dentro il primo accesso, ma il suo primo accesso è lungo e finisce con la prova a pagamento ([ScreensDesign](https://screensdesign.com/showcase/albo-save-organise)). Noi: una schermata sola, gratis, con il salvataggio vero.
 - **Valore per l'utente:** il primo posto salvato nel primo minuto. **Per il ristoratore:** nessuno diretto.
 - **Sforzo:** S (riusa `reel-save.tsx` e la pagina Importa). **Costo Google/Haiku:** zero, salvo la ricerca del link incollato (come oggi).
-- **Stato proposto:** PRONTA dal 9/11 (con un revisore di design: deve stare in una schermata a 390×844).
+- **Stato proposto:** PRONTA dal 9/11 (con un revisore di design: deve stare in una schermata a 390×844). **FATTA il 22/11** (sessione delle 03:05: passo facoltativo "Salva il primo posto" dopo la frase; vedi BACKLOG).
 
 ## 6/11/2026 (notte, sessione 03:05, CEO che chiude — tema Grafica e Salvati). Fino all'8/11 restano ferme (piano di Lorenzo): si fanno dopo.
 

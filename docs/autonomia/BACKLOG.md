@@ -6,6 +6,14 @@ Obiettivo: entro fine ottobre 2026 un'app che un gruppo ristretto di persone pos
 Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) · IN PR · FATTA.
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
+## SESSIONE DI DOMENICA 22/11 (03:05) — CEO apre e chiude
+- **CEO apre:** nessun commento nuovo di Lorenzo. Esito della #184 (proposta 72 "Avvisami quando c'è posto"): **VALIDATA** (in produzione, spenta finché mancano le chiavi degli avvisi; approvata 8,5).
+- **Numeri di produzione (03:30):** 7 utenti, 0 accessi negli ultimi 7 giorni, 0 iscritti negli ultimi 2 giorni, 0 prove senza account, 0 avvisi. Ancora nessun tester: la notifica lo ripete (DA-FARE 3 e 9).
+- **Proposta 52 "Salva il primo posto" (nel primo accesso):** dopo "Ecco cosa ho capito di te" (e dopo l'invito, se c'è) "Continua" porta a un passo facoltativo: telefono disegnato con un reel e il foglio Condividi che sale, 3 passi (Condividi → Copia link → Torna qui; su Android con l'app installata Condividi → Mapetite), tasto corallo "Incolla il link" (se il telefono non lascia leggere gli appunti si apre il campo). Un reel o un posto di Maps aprono "Salva dal reel"/"Salva da Google Maps" (`/importa/condividi`), che lo legge e lo salva come sempre; una lista di Maps dice "È una lista" e accende "Porta qui tutti i tuoi salvati". In basso "Mostrami i posti per me →" (la fine di prima). Al posto del contatore "Facoltativo". Non c'è per chi rifà il profilo né per chi deve tornare a una pagina (`next`). Il server ricontrolla il link (`src/lib/primo-link.ts`). Zero chiamate Google/AI in più. Evento nuovo `benvenuto_primo_posto`.
+- **Revisore 1:** 8,0, **bocciata** (la fine con i posti per te diventava "Più tardi"; metà schermo vuota); corretto (telefono disegnato, "Mostrami i posti per me"). Revisore 1, seconda verifica: 8,5 ma **bocciata** (a 360×740 con una lista il tasto nuovo finiva sotto i tasti in basso, ed era un doppione); corretto (una riga, si accende "Porta qui").
+- **CEO chiude:** 3 ricerche web: `COMPETITOR.md` (Pintra, Eat List, Drawer; il primo salvataggio nel primo minuto come "momento magico"), problema 32 in `PROBLEMI.md` (Instagram porta il 14% delle prenotazioni), proposte 76 "Arrivati dai reel" nel pannello del ristoratore (PRONTA) e 77 "Mandalo a Mapetite" in un DM Instagram (DA DECIDERE LORENZO). `PARTNER.md`: niente di nuovo.
+- **Ricerche Google vere oggi (dalle 9:00 del 21/11):** 4 (nessuna in questa sessione).
+
 ## SESSIONE DI SABATO 21/11 (22:05) — CEO apre e chiude
 - **CEO apre:** nessun commento nuovo di Lorenzo. Esito della #182 (minori della 56): **VALIDATA** (in produzione, approvata 8,6).
 - **Numeri di produzione (22:30):** 7 utenti, 0 accessi negli ultimi 7 giorni, 0 prove senza account, **0 locali verificati**, 0 telefoni con gli avvisi. Niente tester: la notifica ricorda a Lorenzo DA-FARE 3 e 9.
