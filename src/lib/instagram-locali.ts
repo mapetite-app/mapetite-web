@@ -15,7 +15,11 @@ const LOCALE = [
   "cocktailbar", "speakeasy", "pastificio", "gastronomia", "cremeria", "pub", "bar", "caffe", "cafe", "forno",
 ];
 // Segni di creator, guide e pagine di consigli: se ci sono, non è un locale.
-const CREATOR = /food|eat|mangi|magn|blog|lover|guide|guida|travel|tips|critic|review|recens|gram|hunter|addict|diar|journal|explor|secret|best|top|tour|giro|chef|influenc|consigli|insider|life|vibes|daily|fan|magazine|news|mania|guru|week|quiz|band|trip|masterclass|academy|school|scuola|corso|award|festival|club|lab|media|tv|radio|channel|ital|italy|official|ufficiale|finder|ranking|classic|queen|king/;
+const CREATOR = /food|mangi|magn|blog|lover|guide|guida|travel|critic|review|recens|gram|hunter|addict|diar|journal|explor|secret|chef|influenc|consigli|insider|vibes|daily|magazine|mania|guru|quiz|masterclass|academy|school|scuola|corso|award|festival|media|radio|channel|ital|official|ufficiale|finder|ranking|classic|queen/;
+// Parole brevi da creator che stanno dentro tanti nomi veri ("labella", "girolamo", "fanti", "toppi", "tvardo"):
+// contano solo come pezzo intero ("trattoria_top") o attaccate a una parola-locale ("bestpizzeria", "pizzerialab").
+const CREATOR_BREVI = ["eat", "eats", "tips", "best", "top", "tour", "giro", "life", "fan", "fans", "news", "week", "band", "trip", "club", "lab", "tv", "king"];
+const CREATOR_BREVI_RE = new RegExp(`^(${CREATOR_BREVI.join("|")})(.+)$|^(.+?)(${CREATOR_BREVI.join("|")})$`);
 // Città (anche in inglese: "trattoria_mario_rome") → come si scrive in italiano.
 const CITTA: Record<string, string> = {
   roma: "Roma", rome: "Roma", milano: "Milano", milan: "Milano", napoli: "Napoli", naples: "Napoli", torino: "Torino", turin: "Torino",
@@ -25,6 +29,20 @@ const CITTA: Record<string, string> = {
 };
 const NOMI_CITTA = Object.keys(CITTA).sort((a, b) => b.length - a.length);
 const UNIONI = ["dalla", "della", "delle", "degli", "alla", "alle", "agli", "dal", "del", "dei", "dai", "al", "ai", "da", "di", "il", "la", "lo", "le", "de"];
+
+// "da"/"dal"/"dalla" si staccano solo davanti a un nome noto ("trattoriadamario" → "da Mario"); altrimenti è
+// spesso un cognome o un nome intero ("macelleriadamini", "trattoriadavide", "osteriadalmasso").
+const NOMI_NOTI = new Set([
+  "mario", "enzo", "gino", "pino", "nino", "ciro", "peppe", "peppino", "tonino", "gigi", "lucia", "maria", "rosa", "teresa",
+  "nonna", "nonno", "zia", "zio", "nanni", "checco", "cesare", "romolo", "remo", "felice", "franco", "carlo", "piero",
+  "pietro", "paolo", "luigi", "giggi", "sergio", "bruno", "aldo", "alfredo", "armando", "augusto", "beppe", "angelo",
+  "antonio", "toto", "totò", "sabatino", "settimio", "marco", "luca", "andrea", "giulio", "giovanni", "vittorio", "nerone",
+  "lorenzo", "michele", "giacomo", "vincenzo", "salvatore", "tommaso", "matteo", "filippo", "sandro", "giorgio", "renato",
+  "giuseppe", "pasquale", "gennaro", "nennella", "concettina", "carmela", "anna", "angela", "giovanna", "lina", "pina",
+  "nella", "elena", "sora", "sor", "baffo", "biagio", "otello", "guido", "dino", "lino", "ugo", "edoardo", "emma", "sara",
+  "pescatore", "cavaliere", "moro", "bolognese", "toscano", "napoletano", "barone", "conte", "marchese", "papa", "re",
+]);
+const DA = new Set(["da", "dal", "dalla"]);
 
 const LOCALE_RE = new RegExp(LOCALE.sort((a, b) => b.length - a.length).join("|"), "g");
 // "bar", "pub", "cafe" stanno dentro troppi nomi ("enrico_bartolini", "bargello", "pubblico"): valgono solo da
@@ -50,13 +68,22 @@ function paroleLocale(pezzo: string): { w: string; i: number }[] {
   return out;
 }
 
+// Un pezzo del nome che è una parola breve da creator, o una parola-locale con una di quelle davanti o dietro.
+function creatorBreve(pezzo: string): boolean {
+  if (CREATOR_BREVI.includes(pezzo)) return true;
+  const m = CREATOR_BREVI_RE.exec(pezzo);
+  if (!m) return false;
+  const resto = m[2] ?? m[3] ?? "";
+  return LOCALE.some((w) => (m[2] ? resto.startsWith(w) : resto.endsWith(w))) || NOMI_CITTA.includes(resto);
+}
+
 // Minuscolo, senza "@" e senza ".it"/".com" finali ("trattoriamaria.it").
 const pulito = (autore: string) => autore.toLowerCase().replace(/^@/, "").replace(/\.(it|com|eu)$/, "");
 
 export function sembraLocale(autore: string | null | undefined): boolean {
   if (!autore) return false;
   const h = pulito(autore);
-  if (h.length < 3 || CREATOR.test(h)) return false;
+  if (h.length < 3 || CREATOR.test(h) || h.split(/[._-]+/).some(creatorBreve)) return false;
   // Una parola-locale da sola ("pizzeria", "bar") è una pagina generica, non un posto da cercare.
   if (LOCALE.includes(h.replace(/[._-]+/g, ""))) return false;
   return h.split(/[._-]+/).filter(Boolean).some((p) => paroleLocale(p).length > 0);
@@ -73,7 +100,8 @@ export function nomeDaAccount(autore: string): string {
     for (const c of NOMI_CITTA) resto = resto.replace(new RegExp(`(\\S{3,})${c}$`), `$1 ${c}`);
     for (const w of resto.split(/\s+/).filter(Boolean)) {
       const u = UNIONI.includes(w) ? undefined : UNIONI.find((x) => w.startsWith(x) && w.length - x.length >= 3);
-      if (u && parole.length > 0 && LOCALE.includes(parole[parole.length - 1])) parole.push(u, w.slice(u.length));
+      const resto = u ? w.slice(u.length) : "";
+      if (u && parole.length > 0 && LOCALE.includes(parole[parole.length - 1]) && (!DA.has(u) || NOMI_NOTI.has(resto))) parole.push(u, resto);
       else parole.push(w);
     }
   }
