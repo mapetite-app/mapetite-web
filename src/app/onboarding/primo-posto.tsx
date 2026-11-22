@@ -4,7 +4,6 @@ import { useRef, useState, useSyncExternalStore } from "react";
 import { ArrowRight } from "lucide-react";
 import { readInstalled, readPhone } from "@/app/importa/salva-da-telefono";
 import { primoLink } from "@/lib/primo-link";
-import { LISTA_MSG } from "@/lib/maps-link";
 import { trackFeature } from "@/lib/track";
 
 // "Salva il primo posto" (proposta 52): l'ultimo passo del primo accesso insegna il gesto con cui si salva
@@ -13,7 +12,7 @@ import { trackFeature } from "@/lib/track";
 // link condiviso (la stessa del "Condividi"), che legge il reel o il posto come sempre.
 const noop = () => () => {};
 
-export default function PrimoPosto({ onSalva, onImporta, busy }: { onSalva: (link: string) => void; onImporta: () => void; busy: boolean }) {
+export default function PrimoPosto({ onSalva, onLista, busy, salvo }: { onSalva: (link: string) => void; onLista: (si: boolean) => void; busy: boolean; salvo: boolean }) {
   const phone = useSyncExternalStore(noop, readPhone, () => null);
   const installed = useSyncExternalStore(noop, readInstalled, () => false);
   // Su Android con l'app installata Mapetite è nel menu Condividi; altrimenti si copia il link e si incolla.
@@ -31,7 +30,6 @@ export default function PrimoPosto({ onSalva, onImporta, busy }: { onSalva: (lin
       ];
   const [campo, setCampo] = useState<string | null>(null);
   const [errore, setErrore] = useState<string | null>(null);
-  const [lista, setLista] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const prova = (testo: string) => {
@@ -42,8 +40,10 @@ export default function PrimoPosto({ onSalva, onImporta, busy }: { onSalva: (lin
       onSalva(r.link);
       return true;
     }
-    setLista(r?.tipo === "lista");
-    setErrore(r?.tipo === "lista" ? LISTA_MSG : testo.trim() ? "Non è il link di un reel o di un posto su Google Maps." : null);
+    // Una lista: una riga sola e il tasto "Porta qui tutti i tuoi salvati" qui sotto si accende (revisore 22/11:
+    // un secondo tasto era un doppione e a 360 px finiva sotto i tasti in basso).
+    onLista(r?.tipo === "lista");
+    setErrore(r?.tipo === "lista" ? "È una lista: portala con il tasto qui sotto." : testo.trim() ? "Non è il link di un reel o di un posto su Google Maps." : null);
     return false;
   };
 
@@ -105,7 +105,7 @@ export default function PrimoPosto({ onSalva, onImporta, busy }: { onSalva: (lin
           disabled={busy}
           className={`mt-4 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl px-6 font-display text-[17px] font-semibold transition-opacity active:scale-[0.98] disabled:opacity-60 ${diretto ? "border-2 border-accent bg-white text-accent" : "bg-accent text-white shadow-float"}`}
         >
-          <span aria-hidden>📋</span> {busy ? "Apro il posto…" : diretto ? "Hai già copiato un link? Incolla" : "Incolla il link"}
+          <span aria-hidden>📋</span> {salvo ? "Apro il posto…" : diretto ? "Incolla un link" : "Incolla il link"}
         </button>
       ) : (
         <form
@@ -116,7 +116,7 @@ export default function PrimoPosto({ onSalva, onImporta, busy }: { onSalva: (lin
             ref={inputRef}
             data-testid="primo-posto-campo"
             value={campo}
-            onChange={(e) => { setCampo(e.target.value); setErrore(null); }}
+            onChange={(e) => { setCampo(e.target.value); setErrore(null); onLista(false); }}
             inputMode="url"
             autoComplete="off"
             aria-label="Link del reel o del posto"
@@ -125,16 +125,11 @@ export default function PrimoPosto({ onSalva, onImporta, busy }: { onSalva: (lin
             className="min-h-[52px] min-w-0 flex-1 rounded-2xl border-2 border-border bg-white px-4 text-[16px] font-sans text-text outline-none focus:border-brand aria-[invalid=true]:border-error"
           />
           <button type="submit" data-testid="primo-posto-salva" disabled={busy || !campo.trim()} aria-label="Salva" className="flex min-h-[52px] min-w-[52px] items-center justify-center rounded-2xl bg-accent px-4 font-display text-[16px] font-semibold text-white disabled:opacity-40">
-            {busy ? "…" : <ArrowRight size={20} aria-hidden />}
+            {salvo ? "…" : <ArrowRight size={20} aria-hidden />}
           </button>
         </form>
       )}
       {errore && <p role="alert" data-testid="primo-posto-errore" className="mt-2 text-sm text-error">{errore}</p>}
-      {lista && (
-        <button type="button" data-testid="primo-posto-liste" onClick={onImporta} disabled={busy} className="-ml-1 mt-1 flex min-h-11 items-center gap-1 self-start px-1 font-display text-[15px] font-semibold text-brand">
-          Porta le liste con il file di Google <ArrowRight size={16} aria-hidden />
-        </button>
-      )}
     </section>
   );
 }

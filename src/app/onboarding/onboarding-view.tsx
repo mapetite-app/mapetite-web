@@ -242,6 +242,8 @@ function Benvenuto({ next, initial, ripreso, nomeNoto, rifalla }: { next: string
   // Il passo più avanti visto: le diete si mandano solo se la persona ha visto la loro domanda
   // (saltandola restano quelle di prima); "famosi o chicche" proposto dai 👍 e visto vale come scelta.
   const [maxVisto, setMaxVisto] = useState(initial?.step ?? 0);
+  // "Salva il primo posto": incollata una lista di Maps, si accende "Porta qui tutti i tuoi salvati".
+  const [listaIncollata, setListaIncollata] = useState(false);
   const [submitting, setSubmitting] = useState<"importa" | "mappa" | "condividi" | null>(null);
   // Invito che collega da solo e "Fatti trovare dagli amici" (Lorenzo 14/11: "non riesco a trovare nessuno").
   // Invito di un amico: chi invita (codice + nome) e a che punto è la risposta.
@@ -886,7 +888,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto, rifalla }: { next: string
             )}
           </section>
         )}
-        {step === PASSO_GESTO && <PrimoPosto busy={!!submitting} onSalva={(link) => void finish("condividi", link)} onImporta={() => void finish("importa")} />}
+        {step === PASSO_GESTO && <PrimoPosto busy={!!submitting} salvo={submitting === "condividi"} onSalva={(link) => void finish("condividi", link)} onLista={setListaIncollata} />}
       </div>
 
       {/* Pulsanti in basso, fissi sul fondo dello schermo (primo accesso a schermo intero, senza la barra dell'app). */}
@@ -963,7 +965,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto, rifalla }: { next: string
                 data-testid="benvenuto-importa-si"
                 onClick={() => finish("importa")}
                 disabled={!!submitting}
-                className="mt-1 flex min-h-11 w-full items-center justify-center font-display text-[15px] font-semibold text-brand disabled:opacity-60"
+                className={`mt-1 flex min-h-11 w-full items-center justify-center rounded-2xl font-display text-[15px] font-semibold text-brand transition-colors disabled:opacity-60 ${listaIncollata ? "bg-brand/10 ring-2 ring-brand" : ""}`}
               >
                 {submitting === "importa" ? "Un attimo…" : "Porta qui tutti i tuoi salvati, gratis"}
               </button>

@@ -9906,8 +9906,7 @@ else {
   ok(((await ip.getByTestId("primo-posto-errore").textContent().catch(() => "")) ?? "").includes("Non è il link") && new URL(ip.url()).pathname === "/onboarding", "primo posto: un testo senza link dice che non è un link, e si resta qui");
   await ip.getByTestId("primo-posto-campo").fill("https://www.google.com/maps/placelists/list/AbCdEfGh123");
   await ip.getByTestId("primo-posto-salva").click();
-  ok(((await ip.getByTestId("primo-posto-errore").textContent().catch(() => "")) ?? "").includes("lista di Google Maps"), "primo posto: una lista di Maps spiega che si porta con il file di Google");
-  ok(await ip.getByTestId("primo-posto-liste").isVisible(), "primo posto: con una lista, un tocco porta all'import con il file di Google");
+  ok(((await ip.getByTestId("primo-posto-errore").textContent().catch(() => "")) ?? "").includes("È una lista") && /ring-2/.test((await ip.getByTestId("benvenuto-importa-si").getAttribute("class")) ?? ""), "primo posto: una lista di Maps dice in una riga di usare 'Porta qui tutti i tuoi salvati', che si accende");
   await ip.getByTestId("primo-posto-campo").fill("Guarda questo video https://www.tiktok.com/@roma.mangia/video/7300000000000000001?is_from_webapp=1");
   await ip.getByTestId("primo-posto-salva").click();
   await ip.waitForURL(/\/importa\/condividi/, { timeout: 8000 }).catch(() => {});
