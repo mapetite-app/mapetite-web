@@ -33,7 +33,7 @@ import { mioNome } from "@/lib/share-place";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, etichettaNota, tipoGoogleSconosciuto } from "@/lib/category-label";
-import { percheTiPiacera, similiA, tipo as tipoSimile, MI_E_PIACIUTO, type CandidatoSimile } from "@/lib/perche-piacera";
+import { percheTiPiacera, similiA, statoCatalogo, tipo as tipoSimile, MI_E_PIACIUTO, type CandidatoSimile } from "@/lib/perche-piacera";
 import PotrebbePiacerti from "@/components/potrebbe-piacerti";
 import { ricordoSalvato } from "@/lib/ricordo-salvato";
 import { momentSuggestion, fetchWeather, type Weather } from "@/lib/moment";
@@ -1610,6 +1610,8 @@ export default function MapView({
   // Catalogo: si legge una volta per locale vicino e simile; solo chi ha un verdetto entra tra i candidati.
   const catalogoLetto = useRef(new Set<string>());
   const [catalogoConVerdetto, setCatalogoConVerdetto] = useState<Set<string>>(() => new Set());
+  // Minore della 78: prezzo e stato dei posti del catalogo, già nella tabella places (nessuna chiamata Google).
+  const [catalogoInfo, setCatalogoInfo] = useState<Record<string, { priceLevel: number | null; businessStatus: string | null }>>({});
   const tipiAmati = useMemo(() => new Set(savedPlaces
     .filter((p) => p.tags?.includes(MI_E_PIACIUTO) && !p.tags?.includes(OPINION_DISLIKE) && p.fuoriGusti !== true)
     .map((p) => tipoSimile(p, etichettaNota))
@@ -1625,9 +1627,18 @@ export default function MapView({
     void (async () => {
       try {
         const supabase = await browserClient();
-        const { data: righe } = await supabase.from("places").select("id, google_place_id").in("id", daLeggere.map((p) => p.id));
+        const { data: righe } = await supabase.from("places")
+          .select("id, google_place_id, price_level, business_status, business_status_at").in("id", daLeggere.map((p) => p.id));
         const perGoogle: Record<string, string> = {};
-        for (const r of righe ?? []) if (typeof r.google_place_id === "string" && r.google_place_id) perGoogle[r.google_place_id] = r.id as string;
+        const info: Record<string, { priceLevel: number | null; businessStatus: string | null }> = {};
+        for (const r of righe ?? []) {
+          if (typeof r.google_place_id !== "string" || !r.google_place_id) continue;
+          const stato = statoCatalogo(r.business_status as string | null, r.business_status_at as string | null);
+          // Chiuso per sempre (o da poco chiuso per ora): non diventa un simile, e il suo verdetto non si legge.
+          if (stato === "CLOSED_PERMANENTLY" || stato === "CLOSED_TEMPORARILY") continue;
+          perGoogle[r.google_place_id] = r.id as string;
+          info[r.id as string] = { priceLevel: typeof r.price_level === "number" ? r.price_level : null, businessStatus: stato };
+        }
         const google = Object.keys(perGoogle);
         if (google.length === 0) return;
         const { data: synth } = await supabase.from("place_synthesis")
@@ -1649,6 +1660,7 @@ export default function MapView({
         catalogoSynthRef.current = { ...catalogoSynthRef.current, ...det };
         setVenueDetails((prev) => ({ ...Object.fromEntries(uuids.map((u) => [u, det[u]])), ...prev }));
         setPlaceUuids((prev) => ({ ...Object.fromEntries(Object.entries(perGoogle).filter(([, u]) => det[u])), ...prev }));
+        setCatalogoInfo((prev) => ({ ...prev, ...Object.fromEntries(uuids.map((u) => [u, info[u]])) }));
         setCatalogoConVerdetto((prev) => new Set([...prev, ...uuids]));
       } catch {
         // Senza rete: restano solo i risultati della ricerca.
@@ -1662,7 +1674,9 @@ export default function MapView({
       ...p, userRatingCount: venueDetails[p.id]?.userRatingCount ?? null, photoRef: venueDetails[p.id]?.photoRef ?? null,
     })) : [];
     const giaInRicerca = new Set(daRicerca.map((p) => placeUuids[p.id]).filter(Boolean));
-    const daCatalogo: CandidatoSimile[] = places.filter((p) => catalogoConVerdetto.has(p.id) && venueDetails[p.id]?.verdict && !giaInRicerca.has(p.id));
+    const daCatalogo: CandidatoSimile[] = places
+      .filter((p) => catalogoConVerdetto.has(p.id) && venueDetails[p.id]?.verdict && !giaInRicerca.has(p.id))
+      .map((p) => ({ ...p, priceLevel: catalogoInfo[p.id]?.priceLevel ?? p.priceLevel ?? null, businessStatus: catalogoInfo[p.id]?.businessStatus ?? p.businessStatus ?? null }));
     const selUuid = resolveUuid(selected.id);
     return similiA(target, [...daRicerca, ...daCatalogo], {
       etichetta: etichettaNota,
@@ -1670,7 +1684,7 @@ export default function MapView({
       tipiAmati,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- isPlaceSaved/resolveUuid dipendono da savedIds e placeUuids
-  }, [selected, aiSearch, displayedPlaces, venueDetails, places, catalogoConVerdetto, placeUuids, apertiScheda, tipiAmati, savedPlaces]);
+  }, [selected, aiSearch, displayedPlaces, venueDetails, places, catalogoConVerdetto, catalogoInfo, placeUuids, apertiScheda, tipiAmati, savedPlaces]);
 
   // Segnale "apri_scheda" (una volta per locale aperto): vedi src/lib/track.ts.
   const trackedVenue = useRef<string | null>(null);

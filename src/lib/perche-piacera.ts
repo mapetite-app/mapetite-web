@@ -250,3 +250,13 @@ export function similiA(
   }
   return out.length >= 2 ? out : [];
 }
+
+// Minore della 78: stato del locale salvato nel catalogo (places.business_status, letto da Google quando il posto
+// passa da una ricerca). "Chiuso per sempre" vale sempre; "chiuso per ora" solo se letto negli ultimi 30 giorni,
+// perché un locale chiuso per ferie ad agosto a novembre è riaperto. Senza data: non si sa, come un posto aperto.
+export function statoCatalogo(stato: string | null | undefined, letto: string | null | undefined, ora = Date.now()): string | null {
+  if (stato === "CLOSED_PERMANENTLY") return stato;
+  if (stato !== "CLOSED_TEMPORARILY") return stato === "OPERATIONAL" ? stato : null;
+  const t = letto ? Date.parse(letto) : NaN;
+  return Number.isFinite(t) && ora - t < 30 * 86_400_000 ? stato : null;
+}
