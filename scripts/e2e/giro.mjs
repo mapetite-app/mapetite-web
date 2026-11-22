@@ -2015,16 +2015,16 @@ await shot("18-login");
 await page.goto(`${BASE}/signup`, { waitUntil: "networkidle" });
 ok(await page.getByText("Almeno 6 caratteri.").isVisible(), "registrazione: regola della password spiegata prima dell'errore");
 await page.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
-// Feedback 16/10 ("il dono della sintesi") e giro 1/11: un solo pulsante Incolla in cima, poi "Altri modi" in 3 righe compatte.
+// Feedback 16/10 ("il dono della sintesi") e giro 1/11: un solo pulsante Incolla in cima, poi "Altri modi" in righe compatte (4 dal 22/11: "Salvati di Instagram", proposta 30).
 ok(await page.getByTestId("importa-incolla").isVisible() && (await page.getByRole("button", { name: /Incolla/ }).count()) === 1, "importa: un solo pulsante Incolla, in cima");
 { const tiles = await page.getByTestId("importa-tessere").getByRole("button").allTextContents();
-  ok(tiles.length === 3 && ["Da uno screenshot", "Scrivi il nome", "Tutti i salvati di Google Maps"].every((t, i) => tiles[i]?.includes(t)), `importa: 3 righe Da uno screenshot · Scrivi il nome · Tutti i salvati di Google Maps (${tiles.length})`); }
+  ok(tiles.length === 4 && ["Da uno screenshot", "Scrivi il nome", "Tutti i salvati di Google Maps", "Salvati di Instagram"].every((t, i) => tiles[i]?.includes(t)), `importa: 4 righe Da uno screenshot · Scrivi il nome · Tutti i salvati di Google Maps · Salvati di Instagram (${tiles.length})`); }
 ok((await page.getByTestId("importa-tessera-maps").count()) === 0 && (await page.getByText("Da file di Google", { exact: true }).count()) === 0, "importa: niente tessera 'Da Google Maps' (doppione di Incolla, giro D50) né 'Da file di Google' (D51)");
 // Revisore 2/11 (quinto giro): "Scrivi o incolla a mano" nel riquadro era un doppione di "Scrivi il nome" (resta solo
 // la riga; il campo per i link compare da solo se Incolla non legge gli appunti). Righe "Altri modi" in Inter medio
 // color inchiostro, non Poppins teal. "Ultimi aggiunti": solo con salvati veri (qui zero salvati: non compare).
 { const look = await page.getByTestId("importa-tessera-titolo").evaluateAll((els) => els.map((e) => { const c = getComputedStyle(e); return { f: c.fontFamily.split(",")[0].replace(/"/g, ""), w: c.fontWeight, col: c.color }; }));
-  ok(look.length === 3 && look.every((x) => /Inter/i.test(x.f) && x.w === "500" && x.col !== "rgb(26, 60, 64)") && (await page.getByRole("button", { name: "Scrivi o incolla a mano" }).count()) === 0 && (await page.getByTestId("importa-ultimi").count()) === 0, `importa: righe 'Altri modi' in Inter medio inchiostro, niente 'Scrivi o incolla a mano', niente 'Ultimi aggiunti' senza salvati (${JSON.stringify(look[0])})`); }
+  ok(look.length === 4 && look.every((x) => /Inter/i.test(x.f) && x.w === "500" && x.col !== "rgb(26, 60, 64)") && (await page.getByRole("button", { name: "Scrivi o incolla a mano" }).count()) === 0 && (await page.getByTestId("importa-ultimi").count()) === 0, `importa: righe 'Altri modi' in Inter medio inchiostro, niente 'Scrivi o incolla a mano', niente 'Ultimi aggiunti' senza salvati (${JSON.stringify(look[0])})`); }
 { const pr = (n, name, category, tags) => ({ tags, created_at: `2026-10-${20 - n}`, places: { id: `00000000-0000-4000-8000-00000000030${n}`, name, category, address: "Via Tortona 1, 20144 Milano MI, Italy", lat: 45.45, lng: 9.16, google_place_id: `GM${n}` } });
   await page.route("**/rest/v1/saved_places**", (r) => r.fulfill({ json: [pr(1, "Trattoria Milanese Uno", "restaurant", null), pr(2, "Bar Due", "bar", ["Già visitato"]), pr(3, "Gelateria Tre", "ice_cream_shop", ["Da provare"])] }));
   // Verdetto già in archivio solo per il primo (revisore 2/11, terzo giro): gli altri restano senza, mai inventati.
@@ -10929,6 +10929,146 @@ if (fakeUser) {
   await tp.getByTestId("file-input").setInputFiles({ name: "foto.json", mimeType: "application/json", buffer: Buffer.from('{"ciao":1}') });
   ok((await tp.getByTestId("file-errore").textContent().catch(() => "")).includes("Non trovo posti"), "file Takeout: file senza posti spiegato");
   await tctx.close();
+}
+
+// 12b. Salvati di Instagram dal file di Meta (proposta 30): il file si legge nel telefono (mai al server),
+//      l'elenco resta nel telefono, "Salva" apre il flusso già esistente "Salva dal reel" con quel link.
+//      Il formato vero di Meta non è verificato su un file reale: si provano JSON inglese, chiavi italiane, HTML e zip.
+{
+  const ig = await import(new URL("../../src/lib/instagram-salvati.ts", import.meta.url).href);
+  const zl = await import(new URL("../../src/lib/zip-leggi.ts", import.meta.url).href);
+  const { deflateRawSync, crc32 } = await import("zlib");
+  // Zip finto come quello di Meta (cartelle, file compressi e una foto da saltare), costruito qui.
+  const fakeZip = (files) => {
+    const locals = [], centrals = [];
+    let off = 0;
+    for (const [name, content] of files) {
+      const raw = Buffer.from(content);
+      const data = deflateRawSync(raw);
+      const n = Buffer.from(name);
+      const crc = crc32 ? crc32(raw) : 0;
+      const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(8, 8); lh.writeUInt32LE(crc >>> 0, 14); lh.writeUInt32LE(data.length, 18); lh.writeUInt32LE(raw.length, 22); lh.writeUInt16LE(n.length, 26);
+      const ch = Buffer.alloc(46); ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(8, 10); ch.writeUInt32LE(crc >>> 0, 16); ch.writeUInt32LE(data.length, 20); ch.writeUInt32LE(raw.length, 24); ch.writeUInt16LE(n.length, 28); ch.writeUInt32LE(off, 42);
+      locals.push(lh, n, data); centrals.push(ch, n);
+      off += 30 + n.length + data.length;
+    }
+    const cd = Buffer.concat(centrals);
+    const end = Buffer.alloc(22); end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10); end.writeUInt32LE(cd.length, 12); end.writeUInt32LE(off, 16);
+    return Buffer.concat([...locals, cd, end]);
+  };
+  const IG_POSTS = JSON.stringify({ saved_saved_media: [
+    { title: "trattoriadamario", string_map_data: { "Saved on": { href: "https://www.instagram.com/reel/AAA111aaa/", timestamp: 1700000000 } } },
+    { title: "pizza.roma", string_map_data: { "Saved on": { href: "https://www.instagram.com/p/BBB222bbb/?igsh=abc", timestamp: 1710000000 } } },
+    { title: "trattoriadamario", string_map_data: { "Saved on": { href: "https://www.instagram.com/reel/AAA111aaa/", timestamp: 1600000000 } } },
+    { title: "creator.food", string_map_data: { "Saved on": { href: "https://www.instagram.com/reel/GGG777ggg/", timestamp: 1690000000 } } },
+  ] });
+  const IG_COLL = JSON.stringify({ saved_saved_collections: [
+    { title: "Collection", string_map_data: { Name: { value: "Roma food" }, "Creation Time": { timestamp: 1690000000 } } },
+    { string_map_data: { Name: { value: "trattoriadamario", href: "https://www.instagram.com/reel/AAA111aaa/" }, "Added Time": { timestamp: 1700000001 } } },
+    { title: "Collection", string_map_data: { Name: { value: "Caff" + String.fromCharCode(0xc3, 0xa8) + " Milano" } } },
+    { string_map_data: { Name: { value: "barmilano", href: "https://www.instagram.com/tv/CCC333ccc/" }, "Added Time": { timestamp: 1705000000 } } },
+  ] });
+  const IG_IT = JSON.stringify({ saved_saved_media: [
+    { title: "osteria_bella", string_map_data: { "Salvato il": { href: "https://www.instagram.com/reel/DDD444ddd/", timestamp: 1720000000 } } },
+  ] });
+  const IG_HTML = `<html><head><title>Post salvati</title></head><body><div class="pam"><h2 class="x">pizza.roma</h2><table><tr><td>Saved on</td><td><a target="_blank" href="https://www.instagram.com/reel/EEE555eee/">https://www.instagram.com/reel/EEE555eee/</a><div>Nov 3, 2023 9:15 pm</div></td></tr></table></div><div class="pam"><h2>bar_x</h2><table><tr><td>Salvato il</td><td><a href="https://www.instagram.com/p/FFF666fff/">https://www.instagram.com/p/FFF666fff/</a><div>3 dic 2024, 21:15</div></td></tr></table></div></body></html>`;
+
+  const en = ig.parseInstagram([{ name: "saved_posts.json", text: IG_POSTS }, { name: "saved_collections.json", text: IG_COLL }]);
+  ok(en.items.map((i) => i.codice).join(",") === "BBB222bbb,CCC333ccc,AAA111aaa,GGG777ggg" && en.items[0].url === "https://www.instagram.com/p/BBB222bbb/" && en.items[0].autore === "pizza.roma",
+    `instagram: JSON inglese, senza doppioni, dal più recente, link pulito (${en.items.map((i) => i.codice).join(",")})`);
+  const aaa = en.items.find((i) => i.codice === "AAA111aaa");
+  ok(aaa?.raccolte.join() === "Roma food" && aaa.salvatoIl === 1700000001000 && en.items.find((i) => i.codice === "CCC333ccc")?.raccolte.join() === "Caffè Milano" && en.raccolte.length === 2,
+    `instagram: raccolte da saved_collections, accenti di Meta rimessi a posto (${en.raccolte.join(" | ")})`);
+  // Revisore 22/11: formato con label_values (stesso link in "value" e "href"): autore e data non si perdono.
+  { const lv = ig.parseInstagram([{ name: "saved_posts.json", text: JSON.stringify({ saved_saved_media: [{ label_values: [{ label: "URL", value: "https://www.instagram.com/reel/ABCDE12345/", href: "https://www.instagram.com/reel/ABCDE12345/" }, { label: "Username", value: "trattoria.mario" }], timestamp_value: 1730000000 }] }) }]);
+    ok(lv.items.length === 1 && lv.items[0].autore === "trattoria.mario" && lv.items[0].salvatoIl === 1730000000000, `instagram: formato label_values con autore e data (${JSON.stringify(lv.items[0])})`); }
+  // Revisore 22/11: zip che si gonfia (300 MB di zeri, dimensione dichiarata falsa) → saltato, senza bloccare.
+  { const { deflateRawSync } = await import("node:zlib");
+    const raw = deflateRawSync(Buffer.alloc(300 * 1024 * 1024)); const nm = Buffer.from("saved_posts.json");
+    const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(8, 8); lh.writeUInt32LE(raw.length, 18); lh.writeUInt32LE(100, 22); lh.writeUInt16LE(nm.length, 26);
+    const zb = Buffer.concat([lh, nm, raw]); const t0 = Date.now();
+    const out = await zl.zipTextFiles(zb.buffer.slice(zb.byteOffset, zb.byteOffset + zb.length), /json$/);
+    ok(out.length === 0 && Date.now() - t0 < 5000, `instagram: zip che si gonfia oltre 15 MB saltato (${out.length} file, ${Date.now() - t0} ms)`); }
+  const it = ig.parseInstagram([{ name: "post_salvati.json", text: IG_IT }]);
+  ok(it.items.length === 1 && it.items[0].autore === "osteria_bella" && it.items[0].salvatoIl === 1720000000000 && it.items[0].tipo === "reel", "instagram: JSON con chiavi in italiano ('Salvato il')");
+  const ht = ig.parseInstagram([{ name: "saved_posts.html", text: IG_HTML }]);
+  ok(ht.items.length === 2 && ht.items[0].autore === "bar_x" && new Date(ht.items[0].salvatoIl).getFullYear() === 2024 && ht.items[1].autore === "pizza.roma" && new Date(ht.items[1].salvatoIl).getMonth() === 10,
+    `instagram: HTML (formato predefinito di Meta) con date in inglese e in italiano (${ht.items.map((i) => `${i.autore}@${i.salvatoIl}`).join(",")})`);
+  const zip = fakeZip([["your_instagram_activity/saved/saved_posts.json", IG_POSTS], ["your_instagram_activity/saved/saved_collections.json", IG_COLL], ["media/foto.jpg", "x".repeat(500)]]);
+  const zf = await zl.zipTextFiles(zip.buffer.slice(zip.byteOffset, zip.byteOffset + zip.length), ig.IG_FILE_SALVATI);
+  ok(zf.length === 2 && ig.parseInstagram(zf).items.length === 4, `instagram: zip del download letto nel telefono, solo i file dei salvati (${zf.map((f) => f.name).join(", ")})`);
+  ok(ig.parseInstagram([{ name: "x.json", text: '{"ciao":1}' }]).items.length === 0 && ig.parseInstagram([{ name: "x.html", text: "<p>niente</p>" }]).items.length === 0, "instagram: file senza salvati, elenco vuoto");
+
+  if (fakeUser) {
+    const ictx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    const iev = [];
+    const icalls = [];
+    await ictx.route("**/api/events", (r) => { iev.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+    await ictx.route(/\/api\/(places|import-caption)/, (r) => { icalls.push(r.request().url()); return r.fulfill({ status: 500, json: {} }); });
+    await ictx.route("**/rest/v1/**", (r) => { if (r.request().method() !== "GET") icalls.push(r.request().url()); return r.fulfill({ json: [] }); });
+    const ip = await ictx.newPage();
+    ip.on("pageerror", (e) => errors.push(e.message));
+    await ip.goto(`${BASE}/importa`, { waitUntil: "networkidle" });
+    await ip.getByTestId("importa-tessera-ig").click();
+    const ic = ip.getByTestId("importa-instagram");
+    const come = await ic.getByTestId("ig-come").textContent().catch(() => "");
+    ok(await ic.isVisible() && come.includes("Centro gestione account") && come.includes("Elementi salvati") && await ic.getByRole("button", { name: "Carica il file" }).isVisible(), `instagram: scheda con come scaricarlo in una riga e 'Carica il file' (${come.slice(0, 60)})`);
+    ok((await ip.getByTestId("ig-input").getAttribute("accept")).split(",").slice(0, 3).join() === ".zip,.json,.html", "instagram: accetta zip, JSON e HTML");
+    await ic.scrollIntoViewIfNeeded();
+    await ip.screenshot({ path: `${OUT}/instagram-1-scheda.png`, caret: "initial" });
+    const n0 = icalls.length;
+    await ip.getByTestId("ig-input").setInputFiles({ name: "instagram-mario-2026-11-22.zip", mimeType: "application/zip", buffer: zip });
+    await ic.getByTestId("ig-elenco").waitFor({ timeout: 5000 }).catch(() => {});
+    const ries = await ic.getByTestId("ig-riepilogo").textContent().catch(() => "");
+    const righe = ic.getByTestId("ig-riga");
+    ok(ries.replace(/\s+/g, " ") === "4 post salvati" && (await righe.count()) === 4, `instagram: dallo zip l'elenco dei salvati ("${ries}", ${await righe.count()} righe)`);
+    const prima = (await righe.first().textContent()).replace(/\s+/g, " ");
+    ok(prima.includes("@pizza.roma") && prima.includes("2024") && prima.includes("Apri"), `instagram: riga con @autore · data e 'Apri', dal più recente (${prima})`);
+    ok((await righe.nth(2).textContent()).includes("Roma food"), "instagram: la raccolta compare nella riga");
+    ok(icalls.length === n0, `instagram: leggere il file non chiama il server, né Google né il database (${icalls.length - n0})`);
+    const pills = (await ic.getByTestId("ig-raccolta").allTextContents()).join("|");
+    ok(pills === "Tutti · 4|Caffè Milano · 1|Roma food · 1", `instagram: pillole delle raccolte (${pills})`);
+    ok(await ip.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "instagram 390px: niente scorrimento orizzontale");
+    await ic.scrollIntoViewIfNeeded();
+    await ip.screenshot({ path: `${OUT}/instagram-2-elenco.png`, caret: "initial" });
+    await ic.getByRole("button", { name: "Roma food · 1" }).click();
+    ok((await righe.count()) === 1 && (await righe.first().textContent()).includes("@trattoriadamario"), "instagram: una pillola filtra la raccolta");
+    await ip.screenshot({ path: `${OUT}/instagram-3-raccolta.png`, caret: "initial" });
+    const salva = righe.first().getByTestId("ig-salva");
+    ok((await salva.getAttribute("href")) === `/importa/condividi?url=${encodeURIComponent("https://www.instagram.com/reel/AAA111aaa/")}`, "instagram: 'Apri' porta a 'Salva dal reel' con il link giusto");
+    await salva.click();
+    await ip.waitForURL(/\/importa\/condividi/, { timeout: 8000 }).catch(() => {});
+    await ip.getByTestId("reel-chiedi").waitFor({ timeout: 8000 }).catch(() => {});
+    ok(await ip.getByRole("heading", { name: "Salva dal reel" }).isVisible() && await ip.getByTestId("reel-chiedi").isVisible() && await ip.getByTestId("reel-guarda").isVisible(),
+      "instagram: si apre 'Salva dal reel' che chiede il nome, con 'Guarda il reel'");
+    ok(icalls.length === n0, `instagram: nessuna ricerca finché non si conferma nel flusso del reel (${icalls.slice(n0).join(", ")})`);
+    await ip.goBack({ waitUntil: "networkidle" });
+    await ip.getByTestId("ig-elenco").waitFor({ timeout: 5000 }).catch(() => {});
+    const aperto = ip.locator('[data-testid=ig-salva][data-aperto="1"]');
+    ok(ip.url().endsWith("/importa#da-instagram") && await ip.getByTestId("ig-elenco").isVisible() && (await aperto.count()) === 1 && (await aperto.textContent()).includes("Aperto"),
+      `instagram: tornando indietro la scheda è aperta e la riga è segnata 'Aperto' (${ip.url()})`);
+    await ip.reload({ waitUntil: "networkidle" });
+    await ip.getByTestId("ig-elenco").waitFor({ timeout: 5000 }).catch(() => {});
+    ok((await ip.getByTestId("ig-riga").count()) === 4 && (await ip.locator('[data-testid=ig-salva][data-aperto="1"]').count()) === 1 && (await ip.getByTestId("ig-sotto").textContent()).includes("1 aperto"),
+      "instagram: l'elenco resta nel telefono, con le righe aperte, anche ricaricando");
+    const saved = await ip.evaluate(() => localStorage.getItem("mapetite.instagram.salvati") ?? "");
+    ok(saved.includes("AAA111aaa") && !saved.includes("igsh"), "instagram: nel telefono solo i link puliti");
+    await ip.getByTestId("ig-elenco").scrollIntoViewIfNeeded();
+    await ip.screenshot({ path: `${OUT}/instagram-4-aperto.png`, caret: "initial" });
+    // HTML e JSON italiano insieme, da "Cambia file": l'elenco si sostituisce, gli "Aperto" restano.
+    await ip.getByTestId("ig-input").setInputFiles([
+      { name: "saved_posts.html", mimeType: "text/html", buffer: Buffer.from(IG_HTML) },
+      { name: "post_salvati.json", mimeType: "application/json", buffer: Buffer.from(IG_IT) },
+    ]);
+    await ip.waitForTimeout(500);
+    ok((await ip.getByTestId("ig-riepilogo").textContent()).replace(/\s+/g, " ") === "3 post salvati" && (await ip.getByTestId("ig-raccolta").count()) === 0, "instagram: HTML + JSON italiano caricati dall'interfaccia, senza raccolte niente pillole");
+    await ip.getByTestId("ig-input").setInputFiles({ name: "foto.json", mimeType: "application/json", buffer: Buffer.from('{"ciao":1}') });
+    await ip.waitForTimeout(300);
+    ok((await ip.getByTestId("ig-errore").textContent().catch(() => "")).includes("non trovo post salvati") && (await ip.getByTestId("ig-riga").count()) === 3, "instagram: file sbagliato spiegato, l'elenco di prima resta");
+    ok(iev.some((e) => e.props?.nome === "import_instagram" && e.props.contesto === "letti" && e.props.risultati === 4) && iev.some((e) => e.props?.nome === "import_instagram" && e.props.contesto === "apri") && droppedKeys(iev.filter((e) => e.props?.nome === "import_instagram")).length === 0,
+      "instagram: tracciato 'import_instagram' (letti, apri) con chiavi accettate dal server");
+    await ictx.close();
+  }
 }
 
 // 99. Salva da iPhone (piano 3.3) e Scopritori (piano 5.6). Tutto simulato: niente Google, niente Supabase.

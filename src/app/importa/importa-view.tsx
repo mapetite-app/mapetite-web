@@ -8,6 +8,7 @@ import SalvaDaTelefono from "./salva-da-telefono";
 import ManualAddCard from "./manual-add-card";
 import MultiLinkCard from "./multi-link-card";
 import TakeoutCard from "./takeout-card";
+import InstagramCard from "./instagram-card";
 import SalvatiBrevi from "@/components/salvati-brevi";
 import { displayAddress } from "@/lib/city";
 import { trackFeature } from "@/lib/track";
@@ -369,6 +370,10 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
         <TakeoutCard userId={userId} titolo={false} />
       </div>
 
+      <div id={PANEL_ID.ig} hidden={panel !== "ig"} className="mt-4 scroll-mt-4">
+        <InstagramCard userId={userId} />
+      </div>
+
       {/* Margine sotto i risultati quando li si porta in vista: restano sopra la barra in basso. */}
       <div hidden={panel !== "mano"} className="mt-4 [&_[data-testid=mano-nessuno]]:scroll-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza)+1rem)] [&_[data-testid=mano-risultati]]:scroll-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza)+1rem)]">
         <ManualAddCard key={manualReq?.n ?? 0} userId={userId} initialQuery={manualReq?.q} autoSearch={Boolean(manualReq)} />
@@ -569,13 +574,14 @@ export default function ImportaView({ userId, benvenuto = false }: { userId: str
 // Titolo nel serif da rivista di home e salvati (giro 1/11, D7).
 const TITLE = "font-[family-name:var(--font-newsreader)] text-[38px] font-medium leading-none tracking-tight text-text";
 
-type Panel = "file" | "shot" | "mano";
-const PANEL_ID: Record<Panel, string> = { file: "da-file", shot: "da-screenshot", mano: "a-mano" };
+type Panel = "file" | "ig" | "shot" | "mano";
+const PANEL_ID: Record<Panel, string> = { file: "da-file", ig: "da-instagram", shot: "da-screenshot", mano: "a-mano" };
 // "Da Google Maps" non è più una tessera: faceva la stessa cosa di "Incolla un link" (giro 1/11, D50).
 const TILES: { id: Panel; icon: string; title: string; text: string }[] = [
   { id: "shot", icon: "📸", title: "Da uno screenshot", text: "Post e storie: leggo io il nome" },
   { id: "mano", icon: "✍️", title: "Scrivi il nome", text: "Nome e città, lo trovo io" },
   { id: "file", icon: "🗂️", title: "Tutti i salvati di Google Maps", text: "Dal file che scarichi da Google" },
+  { id: "ig", icon: "🔖", title: "Salvati di Instagram", text: "Dal file che scarichi da Instagram" },
 ];
 
 function Row({
