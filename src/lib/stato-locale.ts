@@ -23,7 +23,9 @@ export async function ricordaStato(places: { id: string; businessStatus?: string
     const ora = new Date().toISOString();
     for (const row of data ?? []) {
       const nuovo = conStato.find((p) => p.id === row.google_place_id)?.stato;
-      if (!nuovo || nuovo === row.business_status) continue;
+      // "Chiuso per ora" confermato da Google: si aggiorna anche la data, che per i simili (proposta 78) vale
+      // come "letto l'ultima volta" (revisore 22/11). Gli altri stati uguali non si riscrivono.
+      if (!nuovo || (nuovo === row.business_status && nuovo !== "CLOSED_TEMPORARILY")) continue;
       const { error: e } = await admin.from("places").update({ business_status: nuovo, business_status_at: ora }).eq("id", row.id);
       if (e) throw e;
       console.log(`[stato-locale] ${row.google_place_id}: ${row.business_status ?? "—"} → ${nuovo}`);

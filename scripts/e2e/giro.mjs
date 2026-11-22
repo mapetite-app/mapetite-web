@@ -11051,10 +11051,10 @@ if (fakeUser) {
     // Minori della 30 (22/11 notte): parole brevi da creator solo come pezzo intero o attaccate a una parola-locale;
     // "da/dal/dalla" staccati solo davanti a un nome noto.
     const veri = ["trattorialabella", "gelateriagirolamo", "osteriadeifanti", "pizzeriatoppi"];
-    const finti = ["bestpizzeria", "pizzeria_top", "toptrattoria", "trattoriatour", "romeeats", "pizzerialab"];
+    const finti = ["bestpizzeria", "pizzeria_top", "toptrattoria", "trattoriatour", "romeeats", "pizzerialab", "eatspizzeria", "fanspizzeria", "pizzeriatoproma", "thebestgelateria", "gelateriatop10", "trattoriaromaeats", "sushiweekly", "tripinpizzeria"];
     ok(veri.every(il.sembraLocale) && !finti.some(il.sembraLocale), `instagram locali: parole brevi (sì ${veri.filter((h) => !il.sembraLocale(h)).join(",") || "tutti"}, no ${finti.filter(il.sembraLocale).join(",") || "nessuno"})`);
-    const da = ["macelleriadamini", "trattoriadavide", "osteriadalmasso", "ristorantedalpescatore", "trattoriadallazia"].map(il.nomeDaAccount).join(" | ");
-    ok(da === "Macelleria Damini | Trattoria Davide | Osteria Dalmasso | Ristorante dal Pescatore | Trattoria dalla Zia", `instagram locali: "da" solo davanti a un nome noto (${da})`); }
+    const da = ["macelleriadamini", "trattoriadavide", "osteriadalmasso", "ristorantedalpescatore", "trattoriadallazia", "trattoriadapippo", "osteriadallaivana"].map(il.nomeDaAccount).join(" | ");
+    ok(da === "Macelleria Damini | Trattoria Davide | Osteria Dalmasso | Ristorante dal Pescatore | Trattoria dalla Zia | Trattoria da Pippo | Osteria dalla Ivana", `instagram locali: "da" staccato tranne nei nomi e cognomi noti (${da})`); }
 
   if (fakeUser) {
     const ictx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });

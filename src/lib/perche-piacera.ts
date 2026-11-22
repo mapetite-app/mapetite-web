@@ -252,7 +252,7 @@ export function similiA(
 }
 
 // Minore della 78: stato del locale salvato nel catalogo (places.business_status, letto da Google quando il posto
-// passa da una ricerca). "Chiuso per sempre" vale sempre; "chiuso per ora" solo se letto negli ultimi 30 giorni,
+// passa da una ricerca). "Chiuso per sempre" vale sempre; "chiuso per ora" solo se confermato da Google negli ultimi 30 giorni (stato-locale.ts riscrive la data a ogni conferma),
 // perché un locale chiuso per ferie ad agosto a novembre è riaperto. Senza data: non si sa, come un posto aperto.
 export function statoCatalogo(stato: string | null | undefined, letto: string | null | undefined, ora = Date.now()): string | null {
   if (stato === "CLOSED_PERMANENTLY") return stato;
