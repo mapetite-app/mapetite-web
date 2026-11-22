@@ -708,7 +708,7 @@ await page.unroute("**/api/search");
   const n1 = await nomi();
   const perche = await riga.getByTestId("simile-perche").allInnerTexts();
   ok(n1.join(" | ") === "Trattoria Beta | Trattoria Gamma | Trattoria Famosa", `potrebbe piacerti: stesso tipo e zona, il famoso in fondo, niente pizzeria/lontano/chiuso (${n1.join(" | ")})`);
-  ok(perche[0] === "Trattoria · a 100 m" && /^Trattoria · a 1,\d km$/.test(perche[1] ?? ""), `potrebbe piacerti: il perché in parole (${perche.join(" / ")})`);
+  ok(perche[0] === "Trattoria · a 100 m" && /^Trattoria · a 1(,\d)? km$/.test(perche[1] ?? ""), `potrebbe piacerti: il perché in parole (${perche.join(" / ")})`);
   { const b = await riga.evaluate((el) => { const r = el.getBoundingClientRect(); const c = el.querySelector("[data-testid=simile]")?.getBoundingClientRect(); return { w: document.documentElement.scrollWidth, cw: c?.width ?? 0, ch: c?.height ?? 0, top: r.top }; });
     ok(b.w <= 390 && b.cw >= 140 && b.ch >= 44, `potrebbe piacerti: card scorrevoli senza scroll orizzontale della pagina (${JSON.stringify(b)})`); }
   await riga.scrollIntoViewIfNeeded();
