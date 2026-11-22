@@ -1,5 +1,6 @@
 import { parseMapsUrl } from "@/lib/maps-link";
 import { cityFromAddress } from "@/lib/city";
+import { zipTextFiles } from "@/lib/zip-leggi";
 
 // Import in blocco da Google Takeout (piano 3.2): il file si legge NEL TELEFONO, non va mai al server.
 // Formati: "Saved Places.json" / "Labeled places.json" (GeoJSON, con coordinate), i .csv delle liste
@@ -188,37 +189,9 @@ function fromKml(text: string, fallbackList: string): Raw[] {
   return out;
 }
 
-// KMZ = zip con dentro doc.kml: si estrae il primo .kml con DecompressionStream (niente librerie).
+// KMZ = zip con dentro doc.kml: si estrae il primo .kml (lettore zip comune, src/lib/zip-leggi.ts).
 export async function kmzToKml(buf: ArrayBuffer): Promise<string | null> {
-  const v = new DataView(buf);
-  const bytes = new Uint8Array(buf);
-  let i = 0;
-  while (i + 30 <= bytes.length && v.getUint32(i, true) === 0x04034b50) {
-    const method = v.getUint16(i + 8, true);
-    const flags = v.getUint16(i + 6, true);
-    let size = v.getUint32(i + 18, true);
-    const nameLen = v.getUint16(i + 26, true);
-    const extraLen = v.getUint16(i + 28, true);
-    const name = new TextDecoder().decode(bytes.subarray(i + 30, i + 30 + nameLen));
-    const start = i + 30 + nameLen + extraLen;
-    if ((flags & 8) && size === 0) {
-      // Dimensione scritta dopo i dati: si cerca la firma del record successivo.
-      let j = start;
-      while (j + 4 <= bytes.length && v.getUint32(j, true) !== 0x08074b50 && v.getUint32(j, true) !== 0x04034b50 && v.getUint32(j, true) !== 0x02014b50) j++;
-      size = j - start;
-    }
-    if (/\.kml$/i.test(name)) {
-      const data = bytes.slice(start, start + size);
-      if (method === 0) return new TextDecoder().decode(data);
-      if (method === 8 && typeof DecompressionStream !== "undefined") {
-        const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-        return await new Response(stream).text();
-      }
-      return null;
-    }
-    i = start + size + ((flags & 8) ? 16 : 0);
-  }
-  return null;
+  return (await zipTextFiles(buf, /\.kml$/i, 1))[0]?.text ?? null;
 }
 
 // `seen` passa da un file all'altro: lo stesso posto resta una riga sola, con l'elenco di tutte le sue liste.
