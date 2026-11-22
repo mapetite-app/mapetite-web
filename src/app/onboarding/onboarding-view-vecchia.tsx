@@ -275,7 +275,7 @@ function Benvenuto({ next, initial, ripreso }: { next: string | null; initial: D
       router.push(result.login);
       return;
     }
-    if (result?.error) {
+    if (result && "error" in result) {
       saveDraft(draftNow);
       setError(result.error);
       setSubmitting(null);

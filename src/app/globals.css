@@ -159,3 +159,35 @@ a,
     transition: transform 80ms ease-out;
   }
 }
+
+/* "Salva il primo posto" (proposta 52): i tre passi del gesto si accendono uno dopo l'altro. */
+@keyframes gesto-passo {
+  0%, 30% { border-color: var(--color-accent); background-color: #fff; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(255, 107, 74, 0.18); }
+  36%, 100% { border-color: #e3e7e7; background-color: #fff; transform: none; box-shadow: none; }
+}
+.gesto-passo { animation: gesto-passo 4.5s ease-in-out infinite; }
+.gesto-passo:nth-child(2) { animation-delay: 1.5s; }
+.gesto-passo:nth-child(3) { animation-delay: 3s; }
+/* Il disegno: il foglio Condividi sale dopo il tocco sull'icona, poi si accende il tasto giusto. */
+@keyframes gesto-foglio {
+  0%, 26% { transform: translateY(105%); }
+  34%, 92% { transform: translateY(0); }
+  100% { transform: translateY(105%); }
+}
+@keyframes gesto-icona {
+  0%, 14% { transform: scale(1); background-color: rgba(255, 255, 255, 0.25); }
+  20%, 28% { transform: scale(1.2); background-color: rgba(255, 255, 255, 0.6); }
+  34%, 100% { transform: scale(1); background-color: rgba(255, 255, 255, 0.25); }
+}
+@keyframes gesto-giusto {
+  0%, 40% { transform: scale(1); box-shadow: none; }
+  48%, 62% { transform: scale(1.12); box-shadow: 0 0 0 3px rgba(255, 107, 74, 0.55); }
+  70%, 100% { transform: scale(1); box-shadow: none; }
+}
+.gesto-foglio { animation: gesto-foglio 4.5s ease-in-out infinite; }
+.gesto-icona { animation: gesto-icona 4.5s ease-in-out infinite; }
+.gesto-giusto { animation: gesto-giusto 4.5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .gesto-passo, .gesto-icona, .gesto-giusto { animation: none; }
+  .gesto-foglio { animation: none; transform: none; }
+}

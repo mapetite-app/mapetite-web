@@ -16,6 +16,23 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 22/11/2026 (domenica, sessione 03:05, CEO che chiude — tema: dal reel al tavolo)
+
+### 76. "Arrivati dai reel" nel pannello del ristoratore
+- **Problema:** `PROBLEMI.md` 32: Instagram porta il 14% delle prenotazioni (Incrementoo, 212.000 prenotazioni in 300 ristoranti, gen–ago 2025, [BeverFood](https://www.beverfood.com/ristorazione-2025-prenotazioni-digitali-e-fidelizzazione/)), ma il ristoratore non sa quali video lo fanno salvare.
+- **Cosa fa:** nel pannello del locale verificato una riga "Salvato da un reel: 12 volte questo mese · 8 da Instagram, 4 da TikTok", solo con almeno 3 salvataggi (mai il singolo). Nessun nome, nessun link del reel di chi ha salvato.
+- **Da dove nasce:** le app "salva dal reel" (Pintra, NextBite, ReelsMap) tengono il dato per sé; nessuna lo restituisce al locale.
+- **Valore per l'utente:** nessuno diretto. **Per il ristoratore:** sa se i creator che lo citano portano clienti; è il primo numero che pagherebbe (domanda qualificata, VISIONE).
+- **Sforzo:** S (la fonte del salvataggio è già salvata). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA (con controllo di sicurezza del revisore: soglia 3 e solo conteggi).
+
+### 77. "Mandalo a Mapetite" in un messaggio Instagram
+- **Problema:** su iPhone le app web non compaiono nel menu Condividi: serve "Copia link" e poi incollare (2 gesti in più). Un founder racconta che salvare mandando il reel in un messaggio diretto è stato il "momento magico" del suo primo accesso ([Indie Hackers](https://www.indiehackers.com/post/i-kept-dming-myself-instagram-reels-i-never-visited-so-i-built-an-app-that-turns-them-into-a-map-d4e737ac1d)).
+- **Cosa fa:** un account Instagram di Mapetite: mandi il reel in DM e il posto compare tra i tuoi salvati, con la risposta "Salvato: Felice a Testaccio".
+- **Sforzo:** L (API Messenger di Meta per Instagram, account business, revisione dell'app da parte di Meta, collegare l'account Instagram alla persona).
+- **Costo:** API Meta gratuita; 1 ricerca Google per reel come oggi.
+- **Stato proposto:** **DA DECIDERE LORENZO** — Apriamo un account Instagram business di Mapetite per ricevere i reel in DM (serve la revisione di Meta)?
+
 ## 20/11/2026 (venerdì, CEO che chiude — tema: il piatto e l'ultimo minuto)
 
 ### 74. "Recensioni come vuole la legge": entro 30 giorni dalla visita, scadono dopo 2 anni
@@ -240,7 +257,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Albo ha una schermata che insegna a salvare dal "Condividi" dentro il primo accesso, ma il suo primo accesso è lungo e finisce con la prova a pagamento ([ScreensDesign](https://screensdesign.com/showcase/albo-save-organise)). Noi: una schermata sola, gratis, con il salvataggio vero.
 - **Valore per l'utente:** il primo posto salvato nel primo minuto. **Per il ristoratore:** nessuno diretto.
 - **Sforzo:** S (riusa `reel-save.tsx` e la pagina Importa). **Costo Google/Haiku:** zero, salvo la ricerca del link incollato (come oggi).
-- **Stato proposto:** PRONTA dal 9/11 (con un revisore di design: deve stare in una schermata a 390×844).
+- **Stato proposto:** PRONTA dal 9/11 (con un revisore di design: deve stare in una schermata a 390×844). **FATTA il 22/11** (sessione delle 03:05: passo facoltativo "Salva il primo posto" dopo la frase; vedi BACKLOG).
 
 ## 6/11/2026 (notte, sessione 03:05, CEO che chiude — tema Grafica e Salvati). Fino all'8/11 restano ferme (piano di Lorenzo): si fanno dopo.
 

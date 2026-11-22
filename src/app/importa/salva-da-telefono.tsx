@@ -8,16 +8,16 @@ import { trackFeature } from "@/lib/track";
 // Su Android, con l'app installata, Mapetite compare direttamente in Condividi.
 // Feedback 16/10 ("il dono della sintesi"): è una riga discreta "Come copio il link?" che si
 // apre con un tocco; l'unico pulsante Incolla è quello grande in cima a Importa.
-type Phone = "iphone" | "android" | null;
+export type Phone = "iphone" | "android" | null;
 
-function readPhone(): Phone {
+export function readPhone(): Phone {
   const ua = navigator.userAgent;
   // iPad con iPadOS si presenta come Mac: lo riconosce il tocco.
   if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "iphone";
   return /Android/.test(ua) ? "android" : null;
 }
 
-function readInstalled(): boolean {
+export function readInstalled(): boolean {
   try {
     return window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
   } catch {

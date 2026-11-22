@@ -14,6 +14,7 @@ import { cityArea } from "@/lib/named-city";
 import { saveLastView } from "@/lib/last-view";
 import { clearStoredInvite, isFriendCode, readStoredInvite, testoInvitoNo } from "@/lib/invito";
 import Avatar from "@/components/avatar";
+import PrimoPosto from "./primo-posto";
 
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 
@@ -125,6 +126,9 @@ const PASSO_CAPITO = 7;
 // invito. Fuori da STEPS, ma conta nel contatore: chi arriva da un link vede "N di 8" e l'invito è "8 di 8"
 // (revisore 15/11: prima frase e invito dicevano tutti e due "7 di 7").
 const PASSO_INVITO = TOTAL;
+// "Salva il primo posto" (proposta 52): l'ultimo passo, dopo la frase (e l'invito, se c'è). Non per chi rifà
+// il profilo né per chi deve tornare a una pagina precisa (next): loro finiscono come prima.
+const PASSO_GESTO = TOTAL + 1;
 
 const CITIES = [
   { value: "Roma", emoji: "🏛️" },
@@ -204,10 +208,11 @@ export default function OnboardingView({ next = null, dalProfilo = null, nomeNot
         scoperta: dalProfilo.scoperta, diete: dalProfilo.diete, amati: amatiValidi(dalProfilo.amati),
       }
     : null;
-  return <Benvenuto key={draft ? "ripreso" : "nuovo"} next={next} initial={draft ?? base} ripreso={draft != null} nomeNoto={nomeNoto?.trim() || null} />;
+  return <Benvenuto key={draft ? "ripreso" : "nuovo"} next={next} initial={draft ?? base} ripreso={draft != null} nomeNoto={nomeNoto?.trim() || null} rifalla={!!dalProfilo} />;
 }
 
-function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; initial: Draft | null; ripreso: boolean; nomeNoto: string | null }) {
+function Benvenuto({ next, initial, ripreso, nomeNoto, rifalla }: { next: string | null; initial: Draft | null; ripreso: boolean; nomeNoto: string | null; rifalla: boolean }) {
+  const conGesto = !next && !rifalla;
   const router = useRouter();
   const [step, setStep] = useState(initial?.step ?? 0);
   const cuisines = initial?.cuisines ?? [];
@@ -237,7 +242,9 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
   // Il passo più avanti visto: le diete si mandano solo se la persona ha visto la loro domanda
   // (saltandola restano quelle di prima); "famosi o chicche" proposto dai 👍 e visto vale come scelta.
   const [maxVisto, setMaxVisto] = useState(initial?.step ?? 0);
-  const [submitting, setSubmitting] = useState<"importa" | "mappa" | null>(null);
+  // "Salva il primo posto": incollata una lista di Maps, si accende "Porta qui tutti i tuoi salvati".
+  const [listaIncollata, setListaIncollata] = useState(false);
+  const [submitting, setSubmitting] = useState<"importa" | "mappa" | "condividi" | null>(null);
   // Invito che collega da solo e "Fatti trovare dagli amici" (Lorenzo 14/11: "non riesco a trovare nessuno").
   // Invito di un amico: chi invita (codice + nome) e a che punto è la risposta.
   // "no": la persona ha detto "Non ora"; "scaduto": il database ha detto di no (motivo: link scaduto, già usato, troppi).
@@ -251,7 +258,8 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
 
   // Ogni risposta si conserva subito sul telefono (vedi DRAFT_KEY). La prima schermata ancora
   // vuota non lascia niente: chi apre e chiude l'onboarding non si ritrova una bozza vuota.
-  const draftNow: Draft = { step, cuisines, occasions, atmospheres, priceRange, city, otherCity, otherOpen, zone, su, giu, visti, scoperta, diete, amati };
+  // Dopo la frase (invito, primo posto) la bozza riparte dalla frase.
+  const draftNow: Draft = { step: Math.min(step, PASSO_CAPITO), cuisines, occasions, atmospheres, priceRange, city, otherCity, otherOpen, zone, su, giu, visti, scoperta, diete, amati };
   const draftJson = JSON.stringify(draftNow);
   // Le risposte prese dal profilo ("Rifalla") diventano bozza solo quando la persona cambia qualcosa.
   const [partenza] = useState(draftJson);
@@ -337,9 +345,10 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
   // Collaudo 7/11: il contatore passava da "2 di 8" a "3 di 7" appena si sceglievano i gusti (il passo dei 10 tipi
   // spariva). "Cosa ti piace?" e "Ci andresti?" sono la stessa domanda (i tuoi gusti): contano come un passo solo,
   // così il totale resta sempre 7 e il numero non salta mai.
-  const passoMostrato = step <= PASSO_AMATI ? step + 1 : step;
-  // Con un invito c'è un passo in più (l'ultimo).
+  // Con un invito c'è un passo in più (l'ultimo). "Salva il primo posto" non conta: è facoltativo, la barra è piena
+  // e al posto del numero c'è "Facoltativo" (il profilo è già finito con la frase).
   const totale = invito ? TOTAL : TOTAL - 1;
+  const passoMostrato = step === PASSO_GESTO ? totale : step <= PASSO_AMATI ? step + 1 : step;
   // Revisore 7/11 (8,3): da "Cosa ti piace?" a "Ci andresti?" il numero resta "2 di 7" e la barra sembrava ferma:
   // la barra avanza di mezzo passo, così il tocco si vede.
   const progress = ((step === PASSO_TIPI ? passoMostrato + 0.5 : passoMostrato) / totale) * 100;
@@ -393,10 +402,20 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
     setGiu((p) => p.filter((x) => x !== ultimo));
   };
 
-  const finish = async (dest: "importa" | null) => {
+  // "Salva il primo posto": entrando, i gusti si salvano subito sul server (senza uscire dal primo accesso),
+  // così chi va su Instagram a condividere un reel non li perde. Se non va (rete, accesso scaduto) restano
+  // nella bozza e li salva la fine, come prima.
+  const entraNelGesto = () => {
+    setListaIncollata(false);
+    setStep(PASSO_GESTO);
+    void completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest: "gesto", next, gusto, diete: maxVisto >= PASSO_DIETE ? diete : undefined }).catch(() => {});
+  };
+
+  const finish = async (dest: "importa" | "condividi" | null, link: string | null = null) => {
     setSubmitting(dest ?? "mappa");
     setError(null);
-    trackFeature(dest === "importa" ? "benvenuto_importa" : "benvenuto_fine", { contesto: `passo_${step + 1}`, tipi: visti.length, chicche: scopertaOra ?? "nessuna" });
+    // "condividi" si conta a parte (benvenuto_primo_posto): qui gonfiava le fini.
+    if (dest !== "condividi") trackFeature(dest === "importa" ? "benvenuto_importa" : "benvenuto_fine", { contesto: `passo_${step + 1}`, tipi: visti.length, chicche: scopertaOra ?? "nessuna" });
     // La bozza si toglie prima: se il salvataggio va a buon fine il server porta altrove e qui
     // non si torna. Se non va (accesso scaduto, rete), si rimette com'era.
     clearDraft();
@@ -406,7 +425,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
     if (area) saveLastView({ lat: area.lat, lng: area.lng, zoom: 12 });
     let result: Awaited<ReturnType<typeof completeOnboarding>>;
     try {
-      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, next, gusto, diete: maxVisto >= PASSO_DIETE ? diete : undefined });
+      result = await completeOnboarding({ cuisines, occasions, atmospheres, priceRange, city: chosenCity, dest, link, next, gusto, diete: maxVisto >= PASSO_DIETE ? diete : undefined });
     } catch (err) {
       // Il rimando di Next dopo il salvataggio passa di qui come errore: va lasciato andare.
       if (err && typeof err === "object" && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
@@ -421,7 +440,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
       router.push(result.login);
       return;
     }
-    if (result?.error) {
+    if (result && "error" in result) {
       saveDraft(draftNow);
       setError(result.error);
       setSubmitting(null);
@@ -475,7 +494,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <button
             type="button"
-            onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => (s === PASSO_SCOPERTA && saltaTipi ? PASSO_AMATI : s - 1)); }}
+            onClick={() => { fissaScoperta(); if (tornaFrase) tornaAllaFrase(); else setStep((s) => (s === PASSO_GESTO ? (setListaIncollata(false), invito ? PASSO_INVITO : PASSO_CAPITO) : s === PASSO_SCOPERTA && saltaTipi ? PASSO_AMATI : s - 1)); }}
             disabled={step === 0}
             aria-label={tornaFrase ? "Torna alla frase" : "Indietro"}
             className="-ml-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center text-[#141414] disabled:opacity-0"
@@ -494,7 +513,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
           </div>
           <span className="shrink-0 text-[13px] font-sans tabular-nums text-text-muted" data-testid="benvenuto-passo">
             {/* Revisore 5/11: non salta da 2 a 4; collaudo 7/11: nemmeno da "di 8" a "di 7". */}
-            {passoMostrato} di {totale}
+            {step === PASSO_GESTO ? "Facoltativo" : `${passoMostrato} di ${totale}`}
           </span>
           {/* Solo nella prima schermata e solo prima di aver risposto: "Salta" salta tutto (i gusti si danno
               dopo in "I tuoi gusti"). Tornando qui dalla frase o con la freccia cancellava tutte le risposte
@@ -512,7 +531,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
 
       {/* Contenuto */}
       {/* Revisore 7/11: nella frase, con le righe aperte, l'ultima nota finiva sotto i due tasti fissi. */}
-      <div className={`mx-auto w-full max-w-lg flex-1 px-6 pt-3 ${step >= PASSO_CAPITO ? "pb-[calc(11rem+env(safe-area-inset-bottom))]" : "pb-32"}`}>
+      <div className={`mx-auto w-full max-w-lg flex-1 px-6 pt-3 ${step === PASSO_GESTO ? "pb-[calc(9rem+env(safe-area-inset-bottom))]" : step >= PASSO_CAPITO ? "pb-[calc(11rem+env(safe-area-inset-bottom))]" : "pb-32"}`}>
         {/* Il passo dell'invito: in alto chi invita, come nella pagina d'invito (revisore 15/11: era mezzo vuoto). */}
         {step === PASSO_INVITO && invito && (
           <div data-testid="invito-avatar" className="mb-4">
@@ -525,9 +544,9 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
         )}
         {/* Un solo titolo per tutti i passi (mockup A): serif grande e una riga sotto. */}
         <h1 className={`${SERIF} mb-1.5 text-balance text-[34px] font-medium leading-[1.06] tracking-[-0.02em] text-[#141414] min-[380px]:text-[38px]`}>
-          {step === PASSO_INVITO ? `${invito?.nome ?? "Un amico"} ti ha invitato` : step === PASSO_CAPITO && frase.length === 0 ? "Partiamo da zero" : config.title}
+          {step === PASSO_GESTO ? "Salva il primo posto" : step === PASSO_INVITO ? `${invito?.nome ?? "Un amico"} ti ha invitato` : step === PASSO_CAPITO && frase.length === 0 ? "Partiamo da zero" : config.title}
         </h1>
-        {config.subtitle && step !== PASSO_INVITO && (
+        {config.subtitle && step !== PASSO_INVITO && step !== PASSO_GESTO && (
           <p className="mb-5 text-[15px] font-sans text-text-muted [@media(max-height:700px)]:mb-3">
             {step === PASSO_SCOPERTA && !scoperta && dedotta ? "L'ho scelto dai tuoi 👍: cambialo se non è così." : config.subtitle}
           </p>
@@ -878,6 +897,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
             )}
           </section>
         )}
+        {step === PASSO_GESTO && <PrimoPosto busy={!!submitting} salvo={submitting === "condividi"} onSalva={(link) => void finish("condividi", link)} onLista={setListaIncollata} />}
       </div>
 
       {/* Pulsanti in basso, fissi sul fondo dello schermo (primo accesso a schermo intero, senza la barra dell'app). */}
@@ -936,6 +956,27 @@ function Benvenuto({ next, initial, ripreso, nomeNoto }: { next: string | null; 
               </button>
               <button type="button" data-testid="invito-no" onClick={() => rispondiInvito(false)} disabled={invito.stato === "salvo"} className="mt-1 flex min-h-11 w-full items-center justify-center font-display text-[15px] font-semibold text-text-muted">
                 Non ora
+              </button>
+            </>
+          ) : conGesto && step !== PASSO_GESTO ? (
+            // Dopo la frase (o la risposta all'invito) viene "Salva il primo posto".
+            <button type="button" data-testid="capito-gesto" onClick={entraNelGesto} className={TASTO_PIENO}>
+              Continua <ArrowRight size={18} aria-hidden />
+            </button>
+          ) : step === PASSO_GESTO ? (
+            <>
+              {/* Facoltativo: finisce come prima, con la mappa sui posti per te (revisore 22/11: non "Più tardi", che sembrava una rinuncia). */}
+              <button type="button" data-testid="benvenuto-fine" onClick={() => finish(null)} disabled={!!submitting} className={TASTO_VUOTO}>
+                {submitting === "mappa" ? "Cerco i posti per te…" : <>Mostrami i posti per me <ArrowRight size={18} aria-hidden /></>}
+              </button>
+              <button
+                type="button"
+                data-testid="benvenuto-importa-si"
+                onClick={() => finish("importa")}
+                disabled={!!submitting}
+                className={`mt-1 flex min-h-11 w-full items-center justify-center rounded-2xl font-display text-[15px] font-semibold text-brand transition-colors disabled:opacity-60 ${listaIncollata ? "bg-brand/10 ring-2 ring-brand" : ""}`}
+              >
+                {submitting === "importa" ? "Un attimo…" : "Porta qui tutti i tuoi salvati, gratis"}
               </button>
             </>
           ) : (
