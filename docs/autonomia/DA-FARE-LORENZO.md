@@ -60,6 +60,8 @@ Chiesto da Lorenzo il 21/10: "ricordami quello che devo fare anche nelle prossim
 
 12. **"Scarica i tuoi salvati" (proposta 70) — APERTA dal 19/11, una decisione.** Pronta e approvata, ma non in produzione: nome e indirizzo dei locali vengono da Google e i termini Google vietano di esportarli fuori dal servizio. Scegli: (a) file solo con i tuoi dati (nota, raccolte, stato, data) più il link Google Maps del posto, senza nome e indirizzo; (b) aspettare il parere dell'avvocato (voce 11); (c) lasciar perdere.
 
+13. **Prova "Salvati di Instagram" con il tuo file vero — APERTA dal 22/11, 5 minuti (più l'attesa della mail di Instagram).** Su Instagram: Centro gestione account → Le tue informazioni e autorizzazioni → Scarica le tue informazioni → solo «Elementi salvati» (va bene HTML o JSON). Quando arriva la mail, scarica lo zip e caricalo in Mapetite: Importa → Altri modi → «Salvati di Instagram». Dimmi se l'elenco esce giusto (autori, date, raccolte): il lettore non è mai stato provato su un file vero di Meta.
+
 ## Fatte
 
 - **Scelta del design (PR #87) — FATTA il 21/10:** "tutto come consigliato", deciso da Claude su autorizzazione di Lorenzo.
