@@ -15,8 +15,8 @@ const LOCALE = [
   "cocktailbar", "speakeasy", "pastificio", "gastronomia", "cremeria", "pub", "bar", "caffe", "cafe", "forno",
 ];
 // Segni di creator, guide e pagine di consigli: se ci sono, non è un locale.
-const CREATOR = /food|eat|mangi|magn|blog|lover|guide|guida|travel|tips|critic|review|recens|gram|hunter|addict|diar|journal|explor|secret|best|top|tour|giro|chef|influenc|consigli|insider|life|vibes|daily|fan|magazine|news|mania|guru|week|quiz|band|trip|masterclass|academy|school|scuola|corso|award|festival|club|lab|media|tv|radio|channel/;
-// Città (anche in inglese: "drinkkong_rome") → come si scrive in italiano.
+const CREATOR = /food|eat|mangi|magn|blog|lover|guide|guida|travel|tips|critic|review|recens|gram|hunter|addict|diar|journal|explor|secret|best|top|tour|giro|chef|influenc|consigli|insider|life|vibes|daily|fan|magazine|news|mania|guru|week|quiz|band|trip|masterclass|academy|school|scuola|corso|award|festival|club|lab|media|tv|radio|channel|ital|italy|official|ufficiale|finder|ranking|classic|queen|king/;
+// Città (anche in inglese: "trattoria_mario_rome") → come si scrive in italiano.
 const CITTA: Record<string, string> = {
   roma: "Roma", rome: "Roma", milano: "Milano", milan: "Milano", napoli: "Napoli", naples: "Napoli", torino: "Torino", turin: "Torino",
   firenze: "Firenze", florence: "Firenze", bologna: "Bologna", venezia: "Venezia", venice: "Venezia", genova: "Genova", palermo: "Palermo",
@@ -50,17 +50,22 @@ function paroleLocale(pezzo: string): { w: string; i: number }[] {
   return out;
 }
 
+// Minuscolo, senza "@" e senza ".it"/".com" finali ("trattoriamaria.it").
+const pulito = (autore: string) => autore.toLowerCase().replace(/^@/, "").replace(/\.(it|com|eu)$/, "");
+
 export function sembraLocale(autore: string | null | undefined): boolean {
   if (!autore) return false;
-  const h = autore.toLowerCase().replace(/^@/, "");
+  const h = pulito(autore);
   if (h.length < 3 || CREATOR.test(h)) return false;
+  // Una parola-locale da sola ("pizzeria", "bar") è una pagina generica, non un posto da cercare.
+  if (LOCALE.includes(h.replace(/[._-]+/g, ""))) return false;
   return h.split(/[._-]+/).filter(Boolean).some((p) => paroleLocale(p).length > 0);
 }
 
 // "trattoriadamario" → "Trattoria da Mario"; "sushizen.roma" → "Sushi Zen Roma". Solo spazi e maiuscole:
 // l'AI della lettura lo ripulisce ancora, e Google decide se il locale esiste.
 export function nomeDaAccount(autore: string): string {
-  const h = autore.toLowerCase().replace(/^@/, "");
+  const h = pulito(autore);
   const parole: string[] = [];
   for (const pezzo of h.split(/[._-]+/).filter(Boolean)) {
     let resto = pezzo;

@@ -11003,7 +11003,8 @@ if (fakeUser) {
     // Revisore 22/11: nomi di persona e città con "bar", guide e testate, plurali.
     const no = ["creator.food", "pizza.roma", "romeeats", "giulia.mangia", "barbara.rossi", "pubblico", "gamberorosso", "trattoria.lover", "osteriaguide", "", null,
       "enrico_bartolini", "bartolomeo", "bartolo_mario", "barzini", "bargello", "bardolino", "barcolana", "barrique_wine", "barcelona_trip", "barmanitalia", "barletta.city",
-      "rome_restaurants", "restaurantguru", "trattoriamagazine", "osteria_news", "pizzeriamania", "restaurant.week", "pubquiz_roma", "pubrock_band"];
+      "rome_restaurants", "restaurantguru", "trattoriamagazine", "osteria_news", "pizzeriamania", "restaurant.week", "pubquiz_roma", "pubrock_band",
+      "trattoria_italia", "osteriaitaliana", "ristorante_finder", "pizzeria_ranking", "pizzeria_official", "pizzeria", "bar"];
     ok(si.every(il.sembraLocale) && !no.some(il.sembraLocale), `instagram locali: dal nome sì ${si.filter((h) => !il.sembraLocale(h)).join(",") || "tutti"}, no ${no.filter(il.sembraLocale).join(",") || "nessuno"}`);
     const nomi = [["trattoriadamario", ["Roma food"]], ["osteriadellalumaca", []], ["sushizen.roma", []], ["barmilano", ["Caffè Milano"]], ["caffemexico", ["Napoli 2024"]], ["taverna.degli.amici", ["Rome trip"]], ["baroccoristorante", []]].map(([h, r]) => il.indizioLocale(h, r)).join(" | ");
     ok(nomi === "Trattoria da Mario, Roma | Osteria della Lumaca | Sushi Zen Roma | Bar Milano | Caffè Mexico, Napoli | Taverna degli Amici, Roma | Barocco Ristorante", `instagram locali: nome leggibile e città dalla raccolta (${nomi})`); }

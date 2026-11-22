@@ -253,7 +253,7 @@ export default function InstagramCard({ userId }: { userId: string | null }) {
                     aria-label={`${fatto ? "Aperto, riapri" : localeDi(it) ? "Trova" : "Apri"}: ${it.autore ? `@${it.autore}` : "post di Instagram"}`}
                     className={`inline-flex min-h-10 shrink-0 items-center rounded-pill px-4 text-sm font-display font-semibold ${fatto ? "bg-surface text-text-muted" : "border border-brand bg-white text-brand"}`}
                   >
-                    {fatto ? "✓ Aperto" : localeDi(it) ? "Trova" : "Apri"}
+                    {fatto ? (localeDi(it) ? "✓ Cercato" : "✓ Aperto") : localeDi(it) ? "Trova" : "Apri"}
                   </Link>
                 </li>
               );
