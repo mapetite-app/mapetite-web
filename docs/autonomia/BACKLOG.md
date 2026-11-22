@@ -6,6 +6,11 @@ Obiettivo: entro fine ottobre 2026 un'app che un gruppo ristretto di persone pos
 Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) · IN PR · FATTA.
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
+## RICHIESTE DI LORENZO IN CHAT (domenica 22/11, sera) — prevalgono su "Prossima sessione"
+1. **Messaggio di domattina (sessione delle 03:05 di lunedì 23/11):** Lorenzo domani mattina si dedica a fare tutto quello che gli chiediamo. Il messaggio finale di quella sessione, e la sua notifica, riportano **per intero** le voci APERTA di `DA-FARE-LORENZO.md` (oggi 3, 8, 9, 10, 11, 12, 13, 14), ognuna con i passi concreti e il tempo stimato: prima le decisioni rapide, poi le cose lunghe. Non le solite righe brevi del "Ti ricordo": un elenco da eseguire, con il rimando a `ISTRUZIONI-LORENZO.md`.
+2. **Proposta 78 "Potrebbe piacerti anche" (PRONTA, prima voce):** sotto la scheda di ogni locale, 3–4 posti simili, senza chiamate Google nuove. Dettagli in `PROPOSTE.md`, 78.
+3. **App sull'App Store:** decisione e passi in `DA-FARE-LORENZO.md`, voce 14 (DA DECIDERE LORENZO: 99 € all'anno). Se Lorenzo dice sì, la sessione dopo prepara il pacchetto con Capacitor e il Condividi per iPhone.
+
 ## SESSIONE DI DOMENICA 22/11 (14:05) — CEO apre e chiude
 - **CEO apre:** nessun commento nuovo di Lorenzo. Esito della #187 (proposta 30 "Salvati di Instagram"): **VALIDATA** (in produzione, approvata 8,5). DA-FARE 13 (prova con il file vero) ancora aperta.
 - **Proposta 30, seconda parte (FATTA):** nei salvati di Instagram gli account che dal nome sembrano locali ("trattoriadamario", "osteria_bella", "bar_basso") stanno nella pillola «🍽️ Locali», scelta di partenza: una riga per account con il nome leggibile («Trattoria da Mario», @account, «· 3 post») e «Trova». Trova apre «Salva dal reel» con il nome e la città (dal nome o dalla raccolta, es. «Roma food»): 1 lettura AI e 1 ricerca Google, poi sempre «È questo?», con la riga «Dal nome dell'account @…» (non «Nel reel»). Riconoscimento solo con regole sul nome, nel telefono (`src/lib/instagram-locali.ts`): «bar/pub/cafe» solo da soli, a fine parola o con una città; esclusi plurali, guide, testate, pagine generiche. Zero chiamate finché non si tocca Trova.
