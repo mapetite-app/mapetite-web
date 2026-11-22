@@ -33,7 +33,8 @@ import { mioNome } from "@/lib/share-place";
 import { distanceLabel, distanceMeters } from "@/lib/distance";
 import { CATEGORY_TYPE_MAP } from "@/lib/category-types";
 import { categoryLabel, etichettaNota, tipoGoogleSconosciuto } from "@/lib/category-label";
-import { percheTiPiacera } from "@/lib/perche-piacera";
+import { percheTiPiacera, similiA, tipo as tipoSimile, MI_E_PIACIUTO, type CandidatoSimile } from "@/lib/perche-piacera";
+import PotrebbePiacerti from "@/components/potrebbe-piacerti";
 import { ricordoSalvato } from "@/lib/ricordo-salvato";
 import { momentSuggestion, fetchWeather, type Weather } from "@/lib/moment";
 import { momentoDi, type Momento } from "@/lib/home-proposte";
@@ -1091,6 +1092,9 @@ export default function MapView({
   // Verdetti dei salvati (place_synthesis, per UUID): restano anche quando una ricerca
   // sostituisce venueDetails.
   const savedSynthRef = useRef<Record<string, VenueDetails>>({});
+  // Proposta 78: verdetti già pagati dei locali del catalogo (place_synthesis), tenuti anche dopo una ricerca nuova
+  // (revisore 22/11: venivano cancellati e il simile si apriva senza verdetto).
+  const catalogoSynthRef = useRef<Record<string, VenueDetails>>({});
   const [viewState, setViewState] = useState({ longitude: 12.4964, latitude: 41.9028, zoom: 11 });
   // Misure della mappa a schermo, per tenere i nomi dei segnalini dentro il bordo (vedi latiEtichette).
   const [mapBox, setMapBox] = useState<{ w: number; h: number } | null>(null);
@@ -1596,6 +1600,77 @@ export default function MapView({
     const uuid = resolveUuid(id);
     return uuid != null && savedIds.has(uuid);
   };
+
+  // Proposta 78 "Potrebbe piacerti anche": 2–4 posti simili sotto la scheda, solo da dati già qui (zero Google, zero AI).
+  // Fonti: (1) gli altri risultati della ricerca, (2) i locali del catalogo Mapetite vicini che hanno già un verdetto
+  // (place_synthesis, letto da Supabase). Mai un salvato (quindi mai un 👎), mai un posto già aperto in questa visita.
+  const [apertiScheda, setApertiScheda] = useState<string[]>([]);
+  // Aggiornato durante il render (stato derivato, come raccomanda React), non in un effetto.
+  if (selected && !apertiScheda.includes(selected.id)) setApertiScheda([...apertiScheda, selected.id]);
+  // Catalogo: si legge una volta per locale vicino e simile; solo chi ha un verdetto entra tra i candidati.
+  const catalogoLetto = useRef(new Set<string>());
+  const [catalogoConVerdetto, setCatalogoConVerdetto] = useState<Set<string>>(() => new Set());
+  const tipiAmati = useMemo(() => new Set(savedPlaces
+    .filter((p) => p.tags?.includes(MI_E_PIACIUTO) && !p.tags?.includes(OPINION_DISLIKE) && p.fuoriGusti !== true)
+    .map((p) => tipoSimile(p, etichettaNota))
+    .filter((t): t is string => t != null)), [savedPlaces]);
+  useEffect(() => {
+    if (!selected || selected.businessStatus === "CLOSED_PERMANENTLY") return;
+    const t = tipoSimile(selected, etichettaNota);
+    const daLeggere = places.filter((p) => !catalogoLetto.current.has(p.id) && p.id !== selected.id
+      && Math.abs(p.lat - selected.lat) < 0.03 && Math.abs(p.lng - selected.lng) < 0.04
+      && (t ? tipoSimile(p, etichettaNota) === t : p.category != null && p.category === selected.category)).slice(0, 40);
+    if (daLeggere.length === 0) return;
+    for (const p of daLeggere) catalogoLetto.current.add(p.id);
+    void (async () => {
+      try {
+        const supabase = await browserClient();
+        const { data: righe } = await supabase.from("places").select("id, google_place_id").in("id", daLeggere.map((p) => p.id));
+        const perGoogle: Record<string, string> = {};
+        for (const r of righe ?? []) if (typeof r.google_place_id === "string" && r.google_place_id) perGoogle[r.google_place_id] = r.id as string;
+        const google = Object.keys(perGoogle);
+        if (google.length === 0) return;
+        const { data: synth } = await supabase.from("place_synthesis")
+          .select("place_id, synthesis, tags, verdict, go_for, dont_expect").in("place_id", google);
+        const det: Record<string, VenueDetails> = {};
+        for (const row of synth ?? []) {
+          const uuid = perGoogle[row.place_id as string];
+          if (!uuid || typeof row.verdict !== "string" || !row.verdict.trim()) continue;
+          det[uuid] = {
+            userRatingCount: null, openNow: null, websiteUri: null, phone: null, selectedReviews: null,
+            synthesis: (row.synthesis as string | null) ?? null, tags: (row.tags as string[] | null) ?? null,
+            verdict: row.verdict, goFor: (row.go_for as string[] | null) ?? null, dontExpect: (row.dont_expect as string[] | null) ?? null,
+            matchReason: null,
+          };
+        }
+        const uuids = Object.keys(det);
+        if (uuids.length === 0) return;
+        // Il verdetto già pagato resta: aprendo il simile la scheda lo mostra subito, senza chiedere a Google.
+        catalogoSynthRef.current = { ...catalogoSynthRef.current, ...det };
+        setVenueDetails((prev) => ({ ...Object.fromEntries(uuids.map((u) => [u, det[u]])), ...prev }));
+        setPlaceUuids((prev) => ({ ...Object.fromEntries(Object.entries(perGoogle).filter(([, u]) => det[u])), ...prev }));
+        setCatalogoConVerdetto((prev) => new Set([...prev, ...uuids]));
+      } catch {
+        // Senza rete: restano solo i risultati della ricerca.
+      }
+    })();
+  }, [selected?.id, places]); // eslint-disable-line react-hooks/exhaustive-deps -- una lettura per locale aperto
+  const simili = useMemo(() => {
+    if (!selected) return [];
+    const target: CandidatoSimile = { ...selected, userRatingCount: venueDetails[selected.id]?.userRatingCount ?? null };
+    const daRicerca: CandidatoSimile[] = aiSearch !== null ? displayedPlaces.map((p) => ({
+      ...p, userRatingCount: venueDetails[p.id]?.userRatingCount ?? null, photoRef: venueDetails[p.id]?.photoRef ?? null,
+    })) : [];
+    const giaInRicerca = new Set(daRicerca.map((p) => placeUuids[p.id]).filter(Boolean));
+    const daCatalogo: CandidatoSimile[] = places.filter((p) => catalogoConVerdetto.has(p.id) && venueDetails[p.id]?.verdict && !giaInRicerca.has(p.id));
+    const selUuid = resolveUuid(selected.id);
+    return similiA(target, [...daRicerca, ...daCatalogo], {
+      etichetta: etichettaNota,
+      escludi: (p) => isPlaceSaved(p.id) || apertiScheda.includes(p.id) || (selUuid != null && resolveUuid(p.id) === selUuid),
+      tipiAmati,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isPlaceSaved/resolveUuid dipendono da savedIds e placeUuids
+  }, [selected, aiSearch, displayedPlaces, venueDetails, places, catalogoConVerdetto, placeUuids, apertiScheda, tipiAmati, savedPlaces]);
 
   // Segnale "apri_scheda" (una volta per locale aperto): vedi src/lib/track.ts.
   const trackedVenue = useRef<string | null>(null);
@@ -2116,7 +2191,7 @@ export default function MapView({
         };
       }
       setAiSearch({ risultati: places, filtri: data.filtri_usati ?? null, id: ticket });
-      setVenueDetails({ ...savedSynthRef.current, ...details });
+      setVenueDetails({ ...catalogoSynthRef.current, ...savedSynthRef.current, ...details });
       // Come per la ricerca AI: la mappa si sposta sui risultati. Con il raggio si vede tutto il cerchio.
       if (withRadius && places.length > 0) {
         const dLat = ((f.radiusKm as number) * 1000) / 111_320;
@@ -2782,7 +2857,7 @@ export default function MapView({
         const id = ticket;
         setClusterPlaces(null); setFilterError(null);
         setAiSearch({ risultati: places, filtri: data.filtri_usati, id, query: q, simileA: opts.simile?.nome, daParte: senzaNome(data.da_parte ?? null, nomeFuori) });
-        setVenueDetails({ ...savedSynthRef.current, ...details }); setFilters(EMPTY_FILTERS);
+        setVenueDetails({ ...catalogoSynthRef.current, ...savedSynthRef.current, ...details }); setFilters(EMPTY_FILTERS);
         dispatch({ type: "OPEN_LIST" });
         setQuickFilters(new Set());
       setMovedSinceSearch(false);
@@ -4391,6 +4466,17 @@ export default function MapView({
                 // Anche "Ci sono stato" in un tocco (prova dal vivo 8/11).
                 void quickSave(selected, [st]);
               }}
+              similiSlot={simili.length >= 2 ? (
+                <PotrebbePiacerti
+                  posti={simili.map(({ posto, perche }) => ({ id: posto.id, name: posto.name, category: posto.category, types: posto.types ?? null, photoRef: posto.photoRef ?? null, perche }))}
+                  onOpen={(id) => {
+                    trackFeature("potrebbe_piacerti_apri");
+                    const p = displayedPlaces.find((x) => x.id === id) ?? places.find((x) => x.id === id);
+                    if (p) { setFocusedId(p.id); const map = (mapRef.current as { getMap?: () => { easeTo: (o: { center: [number, number] }) => void } } | null)?.getMap?.(); map?.easeTo({ center: [p.lng, p.lat] }); }
+                    dispatch({ type: "OPEN_VENUE", placeId: id });
+                  }}
+                />
+              ) : null}
               onEdit={() => setPendingEditPlace(selected)}
               onClose={() => dispatch({ type: "CLOSE" })}
               userPos={userPos}

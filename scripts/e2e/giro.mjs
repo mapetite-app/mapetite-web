@@ -683,6 +683,46 @@ await page.unroute("**/api/search");
   const dett = ((await page.getByTestId("frase-dettaglio").innerText().catch(() => "")) ?? "").replace(/\u00a0/g, " ");
   ok(/Tutti poco conosciuti/.test(dett) && (await page.locator("ul.snap-x").getByTestId("gemma").count()) === 0, `gemme: tutti poco conosciuti → detto una volta sopra le card, nessun 💎 sulle card ('${dett}')`); }
 await page.unroute("**/api/search");
+// Proposta 78 "Potrebbe piacerti anche" (Lorenzo, 22/11 sera): in fondo alla scheda 2–4 posti simili dagli altri risultati,
+// stesso tipo e zona, i famosi in fondo, mai chiusi né lontani né già aperti. Un tocco apre la scheda. Zero ricerche in più.
+{ const sim = [
+    mk("S1", "Trattoria Alfa", 41.9, 12.49, { category: "restaurant", types: ["restaurant"], userRatingCount: 400 }),
+    mk("S2", "Trattoria Beta", 41.9008, 12.4905, { category: "restaurant", types: ["restaurant"], userRatingCount: 300 }),
+    mk("S3", "Trattoria Gamma", 41.905, 12.5, { category: "restaurant", types: ["restaurant"], userRatingCount: 250, priceLevel: 3 }),
+    mk("S4", "Trattoria Famosa", 41.9003, 12.4902, { category: "restaurant", types: ["restaurant"], userRatingCount: 20000, rating: 4.2 }),
+    mk("S5", "Pizzeria Delta", 41.9002, 12.4901, { category: "pizza_restaurant", types: ["pizza_restaurant"] }),
+    mk("S6", "Trattoria Lontana", 41.95, 12.55, { category: "restaurant", types: ["restaurant"] }),
+    mk("S7", "Trattoria Chiusa", 41.9001, 12.4901, { category: "restaurant", types: ["restaurant"], businessStatus: "CLOSED_TEMPORARILY" }),
+  ];
+  let chiamate = 0;
+  await page.route("**/api/search", (r) => { chiamate++; return r.fulfill({ json: { ...SEARCH_FAST, risultati: sim, sintesi_pendente: null } }); });
+  await page.goto(`${BASE}/mappa?scheda=b`, { waitUntil: "networkidle" });
+  await (await esempio(page)).click();
+  await page.locator("ul.snap-x li[data-id=S1]").waitFor({ timeout: 5000 });
+  await page.locator("ul.snap-x li[data-id=S1]").click();
+  if (!(await page.locator("h2", { hasText: "Trattoria Alfa" }).waitFor({ timeout: 1500 }).then(() => true, () => false))) await page.locator("ul.snap-x li[data-id=S1]").click().catch(() => {});
+  await page.locator("h2", { hasText: "Trattoria Alfa" }).waitFor({ timeout: 4000 }).catch(() => shot("78-errore"));
+  const riga = page.getByTestId("potrebbe-piacerti");
+  await riga.waitFor({ timeout: 4000 }).catch(() => {});
+  const nomi = async () => (await riga.getByTestId("simile").allInnerTexts()).map((t) => t.split("\n")[0].trim());
+  const n1 = await nomi();
+  const perche = await riga.getByTestId("simile-perche").allInnerTexts();
+  ok(n1.join(" | ") === "Trattoria Beta | Trattoria Gamma | Trattoria Famosa", `potrebbe piacerti: stesso tipo e zona, il famoso in fondo, niente pizzeria/lontano/chiuso (${n1.join(" | ")})`);
+  ok(perche[0] === "Trattoria · a 100 m" && /^Trattoria · a 1(,\d)? km$/.test(perche[1] ?? ""), `potrebbe piacerti: il perché in parole (${perche.join(" / ")})`);
+  { const b = await riga.evaluate((el) => { const r = el.getBoundingClientRect(); const c = el.querySelector("[data-testid=simile]")?.getBoundingClientRect(); return { w: document.documentElement.scrollWidth, cw: c?.width ?? 0, ch: c?.height ?? 0, top: r.top }; });
+    ok(b.w <= 390 && b.cw >= 140 && b.ch >= 44, `potrebbe piacerti: card scorrevoli senza scroll orizzontale della pagina (${JSON.stringify(b)})`); }
+  await riga.scrollIntoViewIfNeeded();
+  await shot("78-potrebbe-piacerti");
+  await riga.getByTestId("simile").first().click();
+  await page.locator("h2", { hasText: "Trattoria Beta" }).waitFor({ timeout: 4000 });
+  await riga.waitFor({ timeout: 3000 }).catch(() => {});
+  const n2 = await nomi();
+  ok(n2.join(" | ") === "Trattoria Gamma | Trattoria Famosa", `potrebbe piacerti: un tocco apre il simile, che non ripropone il posto appena visto (${n2.join(" | ")})`);
+  ok(chiamate === 1, `potrebbe piacerti: nessuna ricerca in più (${chiamate})`);
+  await page.unroute("**/api/search");
+  // Il resto del giro principale controlla la vecchia scheda (?scheda=a): si torna lì.
+  await page.goto(`${BASE}/mappa?scheda=a`, { waitUntil: "networkidle" });
+}
 // Proposta 55 "Scegli tra 3" (sessione 14/11 sera): con 5 posti o più, primo tasto della riga sotto la pillola.
 // Restano tre posti diversi tra loro, ognuno col suo perché; "Tutti i N" torna alla lista intera. Nessuna chiamata in più.
 { const sei = [
@@ -11970,6 +12010,28 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
     }
     await c.close();
   }
+}
+// Proposta 78: similiA, regole pure (stesso tipo, zona 3 km, mai salvati/chiusi/👎/stessa insegna, famosi in fondo, almeno 2).
+{
+  const pp = await import(new URL("../../src/lib/perche-piacera.ts", import.meta.url).href);
+  const cl = await import(new URL("../../src/lib/category-label.ts", import.meta.url).href);
+  const P = (id, name, category, extra = {}) => ({ id, name, category, priceLevel: 2, lat: 41.889, lng: 12.469, tags: null, ...extra });
+  const T = P("T", "Trattoria da Lucia", "restaurant");
+  const sim = (c, o = {}) => pp.similiA(T, c, { etichetta: cl.etichettaNota, escludi: () => false, ...o }).map((s) => s.posto.id).join(",");
+  const base = [P("a", "Trattoria Uno", "restaurant", { lat: 41.8895 }), P("b", "Trattoria Due", "restaurant", { lat: 41.895 })];
+  ok(sim(base) === "a,b", `simili: due trattorie vicine (${sim(base)})`);
+  ok(sim([base[0]]) === "", "simili: uno solo → nessuna riga (niente riempitivi)");
+  ok(sim([...base, P("c", "Pizzeria Tre", "pizza_restaurant")]) === "a,b", "simili: un altro tipo non entra");
+  ok(sim([...base, P("d", "Trattoria Chiusa", "restaurant", { businessStatus: "CLOSED_PERMANENTLY" }), P("e", "Trattoria No", "restaurant", { tags: ["Non fa per me"] })]) === "a,b", "simili: mai chiusi né 👎");
+  ok(sim([...base, P("f", "Trattoria da Lucia - Trastevere", "restaurant")]) === "a,b", "simili: mai un'altra sede della stessa insegna");
+  ok(sim([...base, P("g", "Trattoria Milano", "restaurant", { lat: 45.46, lng: 9.19 })]) === "a,b", "simili: mai oltre 3 km");
+  ok(sim(base, { escludi: (p) => p.id === "a" }) === "", "simili: un salvato o già aperto non conta, e con uno solo la riga sparisce");
+  const massa = [P("m", "Trattoria Famosissima", "restaurant", { lat: 41.8891, userRatingCount: 30000 }), ...base.map((p) => ({ ...p, userRatingCount: 200 }))];
+  { const g = pp.similiA(T, base, { etichetta: cl.etichettaNota, escludi: () => false, tipiAmati: new Set(["trattoria"]) });
+    ok(g[0]?.perche === "Il tuo genere · a 100 m", `simili: un tipo che ti è piaciuto si dice nel perché (${g[0]?.perche})`); }
+  ok(sim(massa) === "a,b,m", `simili: il posto di massa va in fondo anche se più vicino (${sim(massa)})`);
+  const gen = pp.similiA(P("x", "Ristorante X", "italian_restaurant"), [P("y", "Ristorante Y", "italian_restaurant", { lat: 41.8892 }), P("z", "Ristorante Z", "italian_restaurant", { lat: 41.8894, priceLevel: 3 }), P("w", "Ristorante W", "italian_restaurant", { lat: 41.8896 })], { etichetta: cl.etichettaNota, escludi: () => false });
+  ok(gen.map((s) => s.posto.id).join(",") === "y,w" && gen[0].perche === "Stessa spesa · a 100 m", `simili: tipo generico solo con stessa categoria, stessa spesa e vicino (${gen.map((s) => s.posto.id + ":" + s.perche).join(", ")})`);
 }
 // Proposta 48 "Perché ti piacerà" (18/11): nella scheda "Per te · Come X, tra i posti che ti sono piaciuti: prezzi simili, stessa zona"
 // dai salvati con 👍. Solo stesso tipo noto (mai generico), mai i 👎, mai il posto stesso né un'altra sede; prezzo e zona solo se veri.

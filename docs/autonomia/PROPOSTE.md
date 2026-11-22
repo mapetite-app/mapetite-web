@@ -25,7 +25,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google Maps ("Le persone cercano anche"), TheFork e Places mostrano simili per popolarità; noi per gusto e somiglianza, con i posti non mainstream.
 - **Valore per l'utente:** dalla scheda al prossimo posto in un tocco, senza ricominciare. **Valore per il ristoratore:** visibilità davanti a chi sta già scegliendo un posto come il suo; dato per il pannello ("ti hanno visto da un locale simile").
 - **Sforzo:** M. **Costo:** zero Google e zero Haiku (dati già nel database e nella ricerca); foto, se usate, nella quota di 200 al giorno, altrimenti emoji.
-- **Stato proposto:** PRONTA, **prima voce** (Lorenzo, 22/11 sera: "quando uno sceglie un locale poi sotto ti compaia potrebbe piacerti anche").
+- **Stato proposto:** PRONTA, **prima voce** (Lorenzo, 22/11 sera: "quando uno sceglie un locale poi sotto ti compaia potrebbe piacerti anche"). **FATTA il 22/11** (sessione delle 18:05): fonti (1) e (2); i salvati degli amici restano per dopo (servono le loro posizioni in memoria).
 
 ## 22/11/2026 (domenica, sessione 03:05, CEO che chiude — tema: dal reel al tavolo)
 
