@@ -11023,7 +11023,7 @@ if (fakeUser) {
     const righe = ic.getByTestId("ig-riga");
     ok(ries.replace(/\s+/g, " ") === "4 post salvati" && (await righe.count()) === 4, `instagram: dallo zip l'elenco dei salvati ("${ries}", ${await righe.count()} righe)`);
     const prima = (await righe.first().textContent()).replace(/\s+/g, " ");
-    ok(prima.includes("@pizza.roma") && prima.includes("2024") && prima.includes("Salva"), `instagram: riga con @autore · data e 'Salva', dal più recente (${prima})`);
+    ok(prima.includes("@pizza.roma") && prima.includes("2024") && prima.includes("Apri"), `instagram: riga con @autore · data e 'Apri', dal più recente (${prima})`);
     ok((await righe.nth(2).textContent()).includes("Roma food"), "instagram: la raccolta compare nella riga");
     ok(icalls.length === n0, `instagram: leggere il file non chiama il server, né Google né il database (${icalls.length - n0})`);
     const pills = (await ic.getByTestId("ig-raccolta").allTextContents()).join("|");
@@ -11035,7 +11035,7 @@ if (fakeUser) {
     ok((await righe.count()) === 1 && (await righe.first().textContent()).includes("@trattoriadamario"), "instagram: una pillola filtra la raccolta");
     await ip.screenshot({ path: `${OUT}/instagram-3-raccolta.png`, caret: "initial" });
     const salva = righe.first().getByTestId("ig-salva");
-    ok((await salva.getAttribute("href")) === `/importa/condividi?url=${encodeURIComponent("https://www.instagram.com/reel/AAA111aaa/")}`, "instagram: 'Salva' porta a 'Salva dal reel' con il link giusto");
+    ok((await salva.getAttribute("href")) === `/importa/condividi?url=${encodeURIComponent("https://www.instagram.com/reel/AAA111aaa/")}`, "instagram: 'Apri' porta a 'Salva dal reel' con il link giusto");
     await salva.click();
     await ip.waitForURL(/\/importa\/condividi/, { timeout: 8000 }).catch(() => {});
     await ip.getByTestId("reel-chiedi").waitFor({ timeout: 8000 }).catch(() => {});
