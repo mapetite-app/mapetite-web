@@ -403,7 +403,8 @@ function Benvenuto({ next, initial, ripreso, nomeNoto, rifalla }: { next: string
   const finish = async (dest: "importa" | "condividi" | null, link: string | null = null) => {
     setSubmitting(dest ?? "mappa");
     setError(null);
-    trackFeature(dest === "importa" ? "benvenuto_importa" : "benvenuto_fine", { contesto: `passo_${step + 1}`, tipi: visti.length, chicche: scopertaOra ?? "nessuna" });
+    // "condividi" si conta a parte (benvenuto_primo_posto): qui gonfiava le fini.
+    if (dest !== "condividi") trackFeature(dest === "importa" ? "benvenuto_importa" : "benvenuto_fine", { contesto: `passo_${step + 1}`, tipi: visti.length, chicche: scopertaOra ?? "nessuna" });
     // La bozza si toglie prima: se il salvataggio va a buon fine il server porta altrove e qui
     // non si torna. Se non va (accesso scaduto, rete), si rimette com'era.
     clearDraft();
@@ -885,7 +886,7 @@ function Benvenuto({ next, initial, ripreso, nomeNoto, rifalla }: { next: string
             )}
           </section>
         )}
-        {step === PASSO_GESTO && <PrimoPosto busy={submitting === "condividi"} onSalva={(link) => void finish("condividi", link)} />}
+        {step === PASSO_GESTO && <PrimoPosto busy={!!submitting} onSalva={(link) => void finish("condividi", link)} onImporta={() => void finish("importa")} />}
       </div>
 
       {/* Pulsanti in basso, fissi sul fondo dello schermo (primo accesso a schermo intero, senza la barra dell'app). */}
@@ -953,9 +954,9 @@ function Benvenuto({ next, initial, ripreso, nomeNoto, rifalla }: { next: string
             </button>
           ) : step === PASSO_GESTO ? (
             <>
-              {/* Facoltativo: "Più tardi" finisce come prima (la mappa con i posti per te). */}
+              {/* Facoltativo: finisce come prima, con la mappa sui posti per te (revisore 22/11: non "Più tardi", che sembrava una rinuncia). */}
               <button type="button" data-testid="benvenuto-fine" onClick={() => finish(null)} disabled={!!submitting} className={TASTO_VUOTO}>
-                {submitting === "mappa" ? "Cerco i posti per te…" : <>Più tardi, apri la mappa <ArrowRight size={18} aria-hidden /></>}
+                {submitting === "mappa" ? "Cerco i posti per te…" : <>Mostrami i posti per me <ArrowRight size={18} aria-hidden /></>}
               </button>
               <button
                 type="button"

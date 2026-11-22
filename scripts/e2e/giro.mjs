@@ -9808,7 +9808,7 @@ else {
   { const t = (await ip.locator("h1").textContent()) ?? ""; const passi = await ip.getByTestId("primo-posto-passo").count();
     ok(t.includes("Salva il primo posto") && passi === 3 && (await ip.getByTestId("benvenuto-passo").textContent()) === "Facoltativo" && (await ip.getByRole("progressbar").getAttribute("aria-valuenow")) === "8" && await ip.getByTestId("primo-posto-incolla").isVisible(), `primo posto: titolo, 3 passi del gesto, 'Facoltativo' al posto del numero, barra piena, 'Incolla il link' (${t}, ${passi})`);
     const fine = ((await ip.getByTestId("benvenuto-fine").textContent()) ?? "").trim();
-    ok(fine.startsWith("Più tardi, apri la mappa") && await ip.getByTestId("benvenuto-importa-si").isVisible(), `primo posto: in basso 'Più tardi, apri la mappa' e 'Porta qui tutti i tuoi salvati' (${fine})`);
+    ok(fine.startsWith("Mostrami i posti per me") && await ip.getByTestId("benvenuto-importa-si").isVisible() && await ip.getByTestId("primo-posto-disegno").isVisible(), `primo posto: il gesto disegnato, in basso 'Mostrami i posti per me' e 'Porta qui tutti i tuoi salvati' (${fine})`);
     const bg = await ip.getByTestId("primo-posto-incolla").evaluate((e) => getComputedStyle(e).backgroundColor);
     ok(bg === "rgb(255, 107, 74)", `primo posto: 'Incolla il link' è l'unico tasto pieno, in corallo (${bg})`); }
   await ip.screenshot({ path: `${OUT}/benvenuto-6-primo-posto.png`, caret: "initial" });
@@ -9907,6 +9907,7 @@ else {
   await ip.getByTestId("primo-posto-campo").fill("https://www.google.com/maps/placelists/list/AbCdEfGh123");
   await ip.getByTestId("primo-posto-salva").click();
   ok(((await ip.getByTestId("primo-posto-errore").textContent().catch(() => "")) ?? "").includes("lista di Google Maps"), "primo posto: una lista di Maps spiega che si porta con il file di Google");
+  ok(await ip.getByTestId("primo-posto-liste").isVisible(), "primo posto: con una lista, un tocco porta all'import con il file di Google");
   await ip.getByTestId("primo-posto-campo").fill("Guarda questo video https://www.tiktok.com/@roma.mangia/video/7300000000000000001?is_from_webapp=1");
   await ip.getByTestId("primo-posto-salva").click();
   await ip.waitForURL(/\/importa\/condividi/, { timeout: 8000 }).catch(() => {});

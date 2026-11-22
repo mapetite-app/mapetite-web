@@ -13,7 +13,7 @@ import { trackFeature } from "@/lib/track";
 // link condiviso (la stessa del "Condividi"), che legge il reel o il posto come sempre.
 const noop = () => () => {};
 
-export default function PrimoPosto({ onSalva, busy }: { onSalva: (link: string) => void; busy: boolean }) {
+export default function PrimoPosto({ onSalva, onImporta, busy }: { onSalva: (link: string) => void; onImporta: () => void; busy: boolean }) {
   const phone = useSyncExternalStore(noop, readPhone, () => null);
   const installed = useSyncExternalStore(noop, readInstalled, () => false);
   // Su Android con l'app installata Mapetite è nel menu Condividi; altrimenti si copia il link e si incolla.
@@ -27,10 +27,11 @@ export default function PrimoPosto({ onSalva, busy }: { onSalva: (link: string) 
     : [
         { icon: "📤", testo: "Nel reel tocca Condividi" },
         { icon: "🔗", testo: "Poi Copia link" },
-        { icon: "📋", testo: "Incollalo qui" },
+        { icon: "↩️", testo: "Torna qui" },
       ];
   const [campo, setCampo] = useState<string | null>(null);
   const [errore, setErrore] = useState<string | null>(null);
+  const [lista, setLista] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const prova = (testo: string) => {
@@ -41,6 +42,7 @@ export default function PrimoPosto({ onSalva, busy }: { onSalva: (link: string) 
       onSalva(r.link);
       return true;
     }
+    setLista(r?.tipo === "lista");
     setErrore(r?.tipo === "lista" ? LISTA_MSG : testo.trim() ? "Non è il link di un reel o di un posto su Google Maps." : null);
     return false;
   };
@@ -61,17 +63,38 @@ export default function PrimoPosto({ onSalva, busy }: { onSalva: (link: string) 
   return (
     <section data-testid="primo-posto" data-diretto={diretto ? "si" : "no"} className="flex flex-col">
       <p className="text-[15px] font-sans leading-snug text-text-muted">Hai visto un posto in un reel o su Google Maps? Così non lo perdi più.</p>
-      <ol aria-label="Come si salva" className="mt-5 grid grid-cols-3 gap-2">
+      {/* Il gesto disegnato (revisore 22/11: tre emoji non bastavano, Albo mostra il foglio Condividi): un reel
+          finto, il foglio che sale e il tasto giusto che si accende, a tempo con i tre passi qui sotto. */}
+      <div aria-hidden data-testid="primo-posto-disegno" className="relative mx-auto mt-4 h-[236px] w-[196px] overflow-hidden rounded-[28px] border-[5px] border-[#141414] bg-[#141414] [@media(max-height:760px)]:h-[178px] [@media(max-height:760px)]:w-[164px]">
+        <div className="absolute inset-0 bg-[linear-gradient(160deg,#ffb199_0%,#ff6b4a_45%,#1a3c40_100%)]" />
+        <span className="absolute left-1/2 top-[28%] -translate-x-1/2 -translate-y-1/2 text-[52px] [@media(max-height:760px)]:text-[38px]">🍝</span>
+        <span className="absolute left-2.5 top-2.5 font-display text-[11px] font-semibold text-white/90">@roma.mangia</span>
+        <span className="gesto-icona absolute bottom-[38%] right-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/25 text-[15px] text-white">➦</span>
+        <div className="gesto-foglio absolute inset-x-0 bottom-0 rounded-t-[16px] bg-white px-2.5 pb-3 pt-2">
+          <div className="mx-auto mb-2 h-1 w-8 rounded-full bg-[#e3e7e7]" />
+          <div className="flex justify-between gap-1">
+            {(diretto ? ["💬", "🍽️", "✉️"] : ["💬", "🔗", "✉️"]).map((x, i) => (
+              <span key={x} className="flex flex-col items-center gap-1">
+                <span className={`flex h-9 w-9 items-center justify-center rounded-[11px] text-[17px] ${i === 1 ? "gesto-giusto bg-brand text-white" : "bg-[#f1f3f3]"}`}>{x}</span>
+                <span className={`text-[9px] font-sans leading-none ${i === 1 ? "font-semibold text-brand" : "text-text-muted"}`}>{i === 1 ? (diretto ? "Mapetite" : "Copia link") : i === 0 ? "Messaggi" : "Mail"}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <ol aria-label="Come si salva" className="mt-4 grid grid-cols-3 gap-2">
         {passi.map((p, i) => (
-          <li key={p.testo} data-testid="primo-posto-passo" className="gesto-passo flex flex-col items-center rounded-card border-2 border-[#e3e7e7] bg-white px-2 pb-3 pt-2.5 text-center">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{i + 1}</span>
-            <span aria-hidden className="mt-1.5 text-[26px] leading-none">{p.icon}</span>
-            <span className="mt-2 font-display text-[13px] font-semibold leading-tight text-[#141414]">{p.testo}</span>
+          <li key={p.testo} data-testid="primo-posto-passo" className="gesto-passo flex flex-col items-center rounded-card border-2 border-[#e3e7e7] bg-white px-1.5 pb-2 pt-2 text-center">
+            <span className="flex items-center gap-1">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[11px] font-semibold text-white">{i + 1}</span>
+              <span aria-hidden className="text-[18px] leading-none">{p.icon}</span>
+            </span>
+            <span className="mt-1.5 font-display text-[13px] font-semibold leading-tight text-[#141414]">{p.testo}</span>
           </li>
         ))}
       </ol>
       {diretto ? (
-        <p data-testid="primo-posto-diretto" className="mt-5 text-[15px] font-sans leading-snug text-text">Prova adesso: apri Instagram, scegli un reel e condividilo con Mapetite.</p>
+        <p data-testid="primo-posto-diretto" className="mt-4 text-[15px] font-sans leading-snug text-text">Prova adesso: apri Instagram, scegli un reel e condividilo con Mapetite.</p>
       ) : null}
       {/* Il link si incolla anche su Android con l'app installata: è la strada per chi ha già copiato un link. */}
       {campo === null ? (
@@ -80,13 +103,13 @@ export default function PrimoPosto({ onSalva, busy }: { onSalva: (link: string) 
           data-testid="primo-posto-incolla"
           onClick={() => void incolla()}
           disabled={busy}
-          className={`mt-5 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl px-6 font-display text-[17px] font-semibold transition-opacity active:scale-[0.98] disabled:opacity-60 ${diretto ? "border-2 border-accent bg-white text-accent" : "bg-accent text-white shadow-float"}`}
+          className={`mt-4 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl px-6 font-display text-[17px] font-semibold transition-opacity active:scale-[0.98] disabled:opacity-60 ${diretto ? "border-2 border-accent bg-white text-accent" : "bg-accent text-white shadow-float"}`}
         >
           <span aria-hidden>📋</span> {busy ? "Apro il posto…" : diretto ? "Hai già copiato un link? Incolla" : "Incolla il link"}
         </button>
       ) : (
         <form
-          className="mt-5 flex gap-2"
+          className="mt-4 flex gap-2"
           onSubmit={(e) => { e.preventDefault(); prova(campo); }}
         >
           <input
@@ -107,6 +130,11 @@ export default function PrimoPosto({ onSalva, busy }: { onSalva: (link: string) 
         </form>
       )}
       {errore && <p role="alert" data-testid="primo-posto-errore" className="mt-2 text-sm text-error">{errore}</p>}
+      {lista && (
+        <button type="button" data-testid="primo-posto-liste" onClick={onImporta} disabled={busy} className="-ml-1 mt-1 flex min-h-11 items-center gap-1 self-start px-1 font-display text-[15px] font-semibold text-brand">
+          Porta le liste con il file di Google <ArrowRight size={16} aria-hidden />
+        </button>
+      )}
     </section>
   );
 }
