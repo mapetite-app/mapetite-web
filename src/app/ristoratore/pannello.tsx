@@ -400,7 +400,7 @@ export default function Pannello({
   const parola = tavoli && tavoli.personeParola >= SOGLIA && tavoli.persone - tavoli.personeParola >= SOGLIA ? tavoli.diParola : null;
   // Arrivati dai reel (proposta 76): solo da SOGLIA persone, come gli altri numeri.
   const daReel = reel && reel.persone >= SOGLIA ? reel : null;
-  const primaTavoli = attesa.persone > 0 || risposte >= SOGLIA || p.disdette.n > 0 || !!daReel;
+  const primaTavoli = attesa.persone > 0 || risposte >= SOGLIA || p.disdette.n > 0;
   const panoramica = (
     <>
       <section data-testid="pannello-azioni" aria-label={`Le persone e il tuo locale negli ultimi ${p.giorni} giorni`} className="mt-3 grid grid-cols-2 gap-2">
@@ -434,7 +434,7 @@ export default function Pannello({
           {/* Dal 1/11: il periodo si scrive una volta sola, in testa ai numeri del periodo; ogni riga è
               numero + 2–3 parole, il dettaglio (se serve) su una seconda riga piccola. "Ti vogliono provare"
               resta sopra perché non dipende dal periodo (chi ha salvato e non è ancora venuto, oggi). */}
-          {(risposte >= SOGLIA || p.disdette.n > 0 || tavoli || daReel) && (
+          {(risposte >= SOGLIA || p.disdette.n > 0 || tavoli) && (
             <div data-testid="pannello-periodo" className={attesa.persone > 0 ? "mt-2.5 border-t border-white/15 pt-2" : ""}>
               <p className="text-[11px] font-display font-semibold uppercase tracking-wide text-white/60">Ultimi {p.giorni}{"\u00a0"}giorni</p>
               <ul className="mt-1.5 space-y-2">
@@ -442,10 +442,6 @@ export default function Pannello({
                     con 1 o 2 si riconoscerebbe chi ha risposto. */}
                 {risposte >= SOGLIA && (
                   <Riga testId="pannello-visite-vere" numero={`👍 ${p.visite.piaciuto.toLocaleString("it-IT")}`} testo="è piaciuto" sotto={`su ${risposte.toLocaleString("it-IT")} che sono venuti e hanno risposto`} />
-                )}
-                {/* Arrivati dai reel (proposta 76, PROBLEMI.md 32): se i video che parlano di te portano gente. */}
-                {daReel && (
-                  <Riga testId="pannello-reel" numero={`🎬 ${daReel.persone.toLocaleString("it-IT")}`} testo="salvataggi da un reel" sotto={sottoReel(daReel)} />
                 )}
                 {/* Tavoli liberati per tempo (PROBLEMI.md 1): "Non vado più" invece di non presentarsi. */}
                 {p.disdette.n > 0 && (
@@ -471,13 +467,20 @@ export default function Pannello({
         </section>
       )}
 
-      {frasi.length > 0 && (
+      {(frasi.length > 0 || daReel) && (
         <section data-testid="pannello-insight" className="mt-3 rounded-card border border-accent/30 bg-accent-light/60 p-4">
           <h2 className="flex items-center gap-1.5 text-[11px] font-display font-semibold uppercase tracking-wide text-accent">
             <Sparkles size={13} aria-hidden />Cosa ti dicono i numeri
           </h2>
           <ul className="mt-2 space-y-1.5">
             {frasi.map((f) => <li key={f} className="text-[15px] font-sans leading-snug text-text">{f}</li>)}
+            {/* Arrivati dai reel (proposta 76, PROBLEMI.md 32): se i video che parlano di te portano gente. Qui e non nel
+                riquadro scuro: la prima schermata resta 4 numeri e "Cosa ti dicono i numeri" (feedback 16/10). */}
+            {daReel && (
+              <li data-testid="pannello-reel" className="text-[15px] font-sans leading-snug text-text">
+                {daReel.persone.toLocaleString("it-IT")} persone ti hanno salvato da un reel negli ultimi {p.giorni}{"\u00a0"}giorni{sottoReel(daReel) ? ` (${sottoReel(daReel)})` : ""}.
+              </li>
+            )}
           </ul>
         </section>
       )}

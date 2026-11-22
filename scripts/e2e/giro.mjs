@@ -8080,7 +8080,7 @@ else {
   { const r = await rp.goto(`${BASE}/ristoratore/${LOC}`, { waitUntil: "networkidle" });
     ok(r?.status() === 200 && await rp.getByTestId("pannello-pochi-dati").isVisible() && (await rp.getByTestId("pannello-azioni").textContent())?.includes("meno di 3") && (await rp.getByTestId("pannello-demo-etichetta").count()) === 0 && await rp.getByTestId("pannello-andamento-nascosto").isVisible(), "pannello ristoratore: dati veri, pochi → 'dati ancora pochi', 'meno di 3' e niente curva giornaliera");
     ok((await rp.getByTestId("pannello-passaparola").count()) === 0, "pannello ristoratore: 'Da un amico' sotto 3 persone non si mostra (proposta 58)");
-    ok((await rp.getByTestId("pannello-reel").count()) === 0, "pannello ristoratore: 'salvataggi da un reel' sotto 3 persone non si mostra (proposta 76)");
+    ok((await rp.getByTestId("pannello-reel").count()) === 0, "pannello ristoratore: 'ti hanno salvato da un reel' sotto 3 persone non si mostra (proposta 76)");
     ok((await rp.getByTestId("pannello-richieste-locale").textContent())?.includes("non turistico") && await rp.getByTestId("pannello-verificato").isVisible(), "pannello ristoratore: 'come ti trovano' con le richieste della ricerca");
     await rp.goto(`${BASE}/ristoratore/${LOC}?beta=-tavoli`, { waitUntil: "networkidle" });
     ok((await rp.getByTestId("pannello-tavoli").count()) === 0, "pannello ristoratore: 'tavoli da Mapetite' si spegne con ?beta=-tavoli");
@@ -8167,10 +8167,10 @@ else {
     { const t = ((await rp.getByTestId("pannello-in-attesa").innerText()) ?? "").replace(/\s+/g, " ");
       ok(t.includes("🗣️ Da un amico · 6") && (await rp.getByTestId("pannello-passaparola").count()) === 1, `pannello demo: tra chi vuole provarti 'Da un amico · 6' (proposta 58) (${t.slice(0, 140)})`);
       { const r = ((await rp.getByTestId("pannello-reel").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
-        ok(r.includes("🎬 12 salvataggi da un reel") && r.includes("8 da Instagram · 4 da TikTok"), `pannello demo: 'salvataggi da un reel' con le fonti (proposta 76) (${r})`);
+        ok(r.includes("12 persone ti hanno salvato da un reel negli ultimi 30 giorni (8 da Instagram · 4 da TikTok)."), `pannello demo: 'ti hanno salvato da un reel' con le fonti (proposta 76) (${r})`);
         await rp.goto(`${BASE}/ristoratore/demo?giorni=7`, { waitUntil: "networkidle" });
         const r7 = ((await rp.getByTestId("pannello-reel").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
-        ok(r7.includes("🎬 3 salvataggi da un reel") && !/\d+ da (Instagram|TikTok)/.test(r7), `pannello demo a 7 giorni: 3 dai reel senza fonti sotto 3 (${r7})`);
+        ok(r7.includes("3 persone ti hanno salvato da un reel negli ultimi 7 giorni.") && !/\d+ da (Instagram|TikTok)/.test(r7), `pannello demo a 7 giorni: 3 dai reel senza fonti sotto 3 (${r7})`);
         await rp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" }); }
       ok(t.includes("31 ti vogliono provare") && t.includes("Con amici · 9") && t.includes("Romantico · 7") && t.includes("Cena di lavoro · 3"), `pannello demo: 'ti vogliono provare' con le occasioni (${t.slice(0, 120)})`);
       ok(((await rp.getByTestId("pannello-visite-vere").innerText()) ?? "").replace(/\s+/g, " ").match(/👍 10 è piaciuto su 11/) !== null, "pannello demo: visite vere con il 'Com'è andata?' (👍 10 è piaciuto, su 11)");
