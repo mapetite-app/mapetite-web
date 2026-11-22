@@ -31,11 +31,13 @@ export default function ShareImport({
   sharedText,
   userId,
   autoSave = false,
+  daAccount = null,
 }: {
   title: string;
   sharedText: string;
   userId: string | null;
   autoSave?: boolean;
+  daAccount?: string | null;
 }) {
   const [results, setResults] = useState<LinkOutcome[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +73,7 @@ export default function ShareImport({
       <h1 className="mb-6 font-title text-3xl font-semibold text-text">{social ? "Salva dal reel" : "Salva da Google Maps"}</h1>
 
       {/* Reel di Instagram/TikTok/YouTube: si legge e si salva da qui, senza passare da Importa. */}
-      {social && <ReelSave text={fullText} userId={userId} autoSave={autoSave} />}
+      {social && <ReelSave text={fullText} userId={userId} autoSave={autoSave} daAccount={daAccount} />}
 
       {!fullText && (
         <div className="space-y-3" data-testid="condividi-vuoto">

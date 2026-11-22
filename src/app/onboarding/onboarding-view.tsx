@@ -15,6 +15,7 @@ import { saveLastView } from "@/lib/last-view";
 import { clearStoredInvite, isFriendCode, readStoredInvite, testoInvitoNo } from "@/lib/invito";
 import Avatar from "@/components/avatar";
 import PrimoPosto from "./primo-posto";
+import { rememberPendingLink } from "@/lib/save-from-link";
 
 const SERIF = "font-[family-name:var(--font-newsreader)]";
 
@@ -437,6 +438,9 @@ function Benvenuto({ next, initial, ripreso, nomeNoto, rifalla }: { next: string
     }
     if (result && "login" in result) {
       saveDraft(draftNow);
+      // Accesso scaduto proprio mentre si incollava il primo posto: il link resta in attesa sul telefono e
+      // dopo l'accesso lo ritrova Importa ("Incolla un link" già compilato), invece di perdersi.
+      if (dest === "condividi" && link) rememberPendingLink(link);
       router.push(result.login);
       return;
     }

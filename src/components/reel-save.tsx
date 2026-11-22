@@ -84,6 +84,7 @@ export default function ReelSave({
   userId,
   initial = null,
   autoSave = true,
+  daAccount = null,
 }: {
   // Testo condiviso o incollato (con il link del reel), anche vuoto se arriva solo uno screenshot.
   text: string;
@@ -92,6 +93,8 @@ export default function ReelSave({
   initial?: Luogo[] | null;
   // false: si chiede sempre "È questo?" (lettura arrivata da un link che non sappiamo chi ha aperto).
   autoSave?: boolean;
+  // Nome preso dall'account Instagram ("Trova" dai salvati di Instagram): la scheda non dice "Nel reel".
+  daAccount?: string | null;
 }) {
   const reelUrl = findReelLink(text);
   const source: ReelSource | null = (reelUrl ? reelSourceOf(reelUrl) : null) ?? findSocialLink(text);
@@ -264,7 +267,7 @@ export default function ReelSave({
 
       {luoghi && (
         <>
-          <PlaceRow key={queryOf(luoghi[0])} luogo={luoghi[0]} userId={userId} reelUrl={reelUrl} source={source} auto autoSave={autoSave || daTocco} />
+          <PlaceRow key={queryOf(luoghi[0])} luogo={luoghi[0]} userId={userId} reelUrl={reelUrl} source={source} auto autoSave={autoSave || daTocco} daAccount={daTocco ? null : daAccount} />
           {luoghi.length > 1 && (
             <div className="space-y-2 pt-1" data-testid="reel-altri">
               <p className="text-sm font-semibold text-text">Nel reel ci sono anche</p>
@@ -296,6 +299,7 @@ function PlaceRow({
   source,
   auto = false,
   autoSave = true,
+  daAccount = null,
 }: {
   luogo: Luogo;
   userId: string;
@@ -303,6 +307,7 @@ function PlaceRow({
   source: ReelSource | null;
   auto?: boolean;
   autoSave?: boolean;
+  daAccount?: string | null;
 }) {
   const savedKey = `mapetite.reel-salvato:${reelUrl ?? ""}:${queryOf(luogo)}`;
   const [st, setSt] = useState<RowState>(auto ? { s: "searching" } : { s: "idle" });
@@ -502,7 +507,7 @@ function PlaceRow({
             <p className="mt-0.5 text-xs text-text-muted">{displayAddress(st.top.address)}</p>
           </div>
         </div>
-        <p className="mt-1 text-xs text-text-muted">Nel reel: «{labelOf(luogo)}»</p>
+        <p className="mt-1 text-xs text-text-muted" data-testid="reel-provenienza">{daAccount ? `Dal nome dell'account @${daAccount}` : `Nel reel: «${labelOf(luogo)}»`}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" onClick={() => save(st.top, st.rest, false)} disabled={st.s === "saving"} data-testid="reel-conferma" className={`${btn} bg-brand text-white`}>
             {st.s === "saving" ? "Salvo…" : "Sì, salva"}

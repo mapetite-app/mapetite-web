@@ -10998,6 +10998,16 @@ if (fakeUser) {
   const zf = await zl.zipTextFiles(zip.buffer.slice(zip.byteOffset, zip.byteOffset + zip.length), ig.IG_FILE_SALVATI);
   ok(zf.length === 2 && ig.parseInstagram(zf).items.length === 4, `instagram: zip del download letto nel telefono, solo i file dei salvati (${zf.map((f) => f.name).join(", ")})`);
   ok(ig.parseInstagram([{ name: "x.json", text: '{"ciao":1}' }]).items.length === 0 && ig.parseInstagram([{ name: "x.html", text: "<p>niente</p>" }]).items.length === 0, "instagram: file senza salvati, elenco vuoto");
+  { const il = await import(new URL("../../src/lib/instagram-locali.ts", import.meta.url).href);
+    const si = ["trattoriadamario", "osteria_bella", "barmilano", "sushizen.roma", "pizzeriabella", "caffemexico", "ristorante.da.enzo", "forno_campo_de_fiori", "bar_basso", "sushibar_roma", "taverna.degli.amici", "pubroma", "baroccoristorante"];
+    // Revisore 22/11: nomi di persona e città con "bar", guide e testate, plurali.
+    const no = ["creator.food", "pizza.roma", "romeeats", "giulia.mangia", "barbara.rossi", "pubblico", "gamberorosso", "trattoria.lover", "osteriaguide", "", null,
+      "enrico_bartolini", "bartolomeo", "bartolo_mario", "barzini", "bargello", "bardolino", "barcolana", "barrique_wine", "barcelona_trip", "barmanitalia", "barletta.city",
+      "rome_restaurants", "restaurantguru", "trattoriamagazine", "osteria_news", "pizzeriamania", "restaurant.week", "pubquiz_roma", "pubrock_band",
+      "trattoria_italia", "osteriaitaliana", "ristorante_finder", "pizzeria_ranking", "pizzeria_official", "pizzeria", "bar"];
+    ok(si.every(il.sembraLocale) && !no.some(il.sembraLocale), `instagram locali: dal nome sì ${si.filter((h) => !il.sembraLocale(h)).join(",") || "tutti"}, no ${no.filter(il.sembraLocale).join(",") || "nessuno"}`);
+    const nomi = [["trattoriadamario", ["Roma food"]], ["osteriadellalumaca", []], ["sushizen.roma", []], ["barmilano", ["Caffè Milano"]], ["caffemexico", ["Napoli 2024"]], ["taverna.degli.amici", ["Rome trip"]], ["baroccoristorante", []]].map(([h, r]) => il.indizioLocale(h, r)).join(" | ");
+    ok(nomi === "Trattoria da Mario, Roma | Osteria della Lumaca | Sushi Zen Roma | Bar Milano | Caffè Mexico, Napoli | Taverna degli Amici, Roma | Barocco Ristorante", `instagram locali: nome leggibile e città dalla raccolta (${nomi})`); }
 
   if (fakeUser) {
     const ictx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -11021,21 +11031,33 @@ if (fakeUser) {
     await ic.getByTestId("ig-elenco").waitFor({ timeout: 5000 }).catch(() => {});
     const ries = await ic.getByTestId("ig-riepilogo").textContent().catch(() => "");
     const righe = ic.getByTestId("ig-riga");
-    ok(ries.replace(/\s+/g, " ") === "4 post salvati" && (await righe.count()) === 4, `instagram: dallo zip l'elenco dei salvati ("${ries}", ${await righe.count()} righe)`);
+    ok(ries.replace(/\s+/g, " ") === "4 post salvati" && (await righe.count()) === 2, `instagram: dallo zip parte da "Locali", un account per riga ("${ries}", ${await righe.count()} righe)`);
+    const loc = (await righe.allTextContents()).map((t) => t.replace(/\s+/g, " ")).join(" | ");
+    ok(loc.includes("Bar Milano@barmilano") && loc.includes("Trattoria da Mario@trattoriadamario") && !loc.includes("pizza.roma") && !loc.includes("creator.food") && (await ic.getByTestId("ig-trova").count()) === 2,
+      `instagram: in "Locali" solo gli account-locale, con nome leggibile, @account e "Trova" (${loc})`);
+    ok((await ic.getByTestId("ig-sotto").textContent()).includes("tocca Trova"), "instagram: in 'Locali' una frase dice cosa fa Trova");
+    const trovaMario = righe.filter({ hasText: "@trattoriadamario" }).getByTestId("ig-trova");
+    ok((await trovaMario.getAttribute("href")) === `/importa/condividi?url=${encodeURIComponent("https://www.instagram.com/reel/AAA111aaa/")}&title=${encodeURIComponent("Trattoria da Mario, Roma")}&account=trattoriadamario`, `instagram: 'Trova' passa link e nome con la città della raccolta (${await trovaMario.getAttribute("href")})`);
+    ok(await ip.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "instagram 390px: 'Locali' senza scorrimento orizzontale");
+    await ic.scrollIntoViewIfNeeded();
+    await ip.screenshot({ path: `${OUT}/instagram-5-locali.png`, caret: "initial" });
+    await ic.getByRole("button", { name: "Tutti · 4" }).click();
+    ok((await righe.count()) === 4, "instagram: 'Tutti' mostra tutti i post");
     const prima = (await righe.first().textContent()).replace(/\s+/g, " ");
     ok(prima.includes("@pizza.roma") && prima.includes("2024") && prima.includes("Apri"), `instagram: riga con @autore · data e 'Apri', dal più recente (${prima})`);
     ok((await righe.nth(2).textContent()).includes("Roma food"), "instagram: la raccolta compare nella riga");
     ok(icalls.length === n0, `instagram: leggere il file non chiama il server, né Google né il database (${icalls.length - n0})`);
     const pills = (await ic.getByTestId("ig-raccolta").allTextContents()).join("|");
-    ok(pills === "Tutti · 4|Caffè Milano · 1|Roma food · 1", `instagram: pillole delle raccolte (${pills})`);
+    ok(pills === "🍽️ Locali · 2|Tutti · 4|Caffè Milano · 1|Roma food · 1", `instagram: pillole "Locali", poi le raccolte (${pills})`);
     ok(await ip.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "instagram 390px: niente scorrimento orizzontale");
     await ic.scrollIntoViewIfNeeded();
     await ip.screenshot({ path: `${OUT}/instagram-2-elenco.png`, caret: "initial" });
     await ic.getByRole("button", { name: "Roma food · 1" }).click();
-    ok((await righe.count()) === 1 && (await righe.first().textContent()).includes("@trattoriadamario"), "instagram: una pillola filtra la raccolta");
+    ok((await righe.count()) === 1 && (await righe.first().textContent()).includes("@trattoriadamario") && (await righe.first().getByTestId("ig-salva").textContent()) === "Trova", "instagram: una pillola filtra la raccolta; l'account-locale ha 'Trova' anche qui");
     await ip.screenshot({ path: `${OUT}/instagram-3-raccolta.png`, caret: "initial" });
-    const salva = righe.first().getByTestId("ig-salva");
-    ok((await salva.getAttribute("href")) === `/importa/condividi?url=${encodeURIComponent("https://www.instagram.com/reel/AAA111aaa/")}`, "instagram: 'Apri' porta a 'Salva dal reel' con il link giusto");
+    await ic.getByRole("button", { name: "Tutti · 4" }).click();
+    const salva = righe.filter({ hasText: "@pizza.roma" }).getByTestId("ig-salva");
+    ok((await salva.textContent()) === "Apri" && (await salva.getAttribute("href")) === `/importa/condividi?url=${encodeURIComponent("https://www.instagram.com/p/BBB222bbb/")}`, "instagram: 'Apri' (non è un locale) porta a 'Salva dal reel' con il solo link");
     await salva.click();
     await ip.waitForURL(/\/importa\/condividi/, { timeout: 8000 }).catch(() => {});
     await ip.getByTestId("reel-chiedi").waitFor({ timeout: 8000 }).catch(() => {});
@@ -11044,28 +11066,53 @@ if (fakeUser) {
     ok(icalls.length === n0, `instagram: nessuna ricerca finché non si conferma nel flusso del reel (${icalls.slice(n0).join(", ")})`);
     await ip.goBack({ waitUntil: "networkidle" });
     await ip.getByTestId("ig-elenco").waitFor({ timeout: 5000 }).catch(() => {});
+    await ip.getByRole("button", { name: "Tutti · 4" }).click().catch(() => {});
     const aperto = ip.locator('[data-testid=ig-salva][data-aperto="1"]');
     ok(ip.url().endsWith("/importa#da-instagram") && await ip.getByTestId("ig-elenco").isVisible() && (await aperto.count()) === 1 && (await aperto.textContent()).includes("Aperto"),
       `instagram: tornando indietro la scheda è aperta e la riga è segnata 'Aperto' (${ip.url()})`);
     await ip.reload({ waitUntil: "networkidle" });
     await ip.getByTestId("ig-elenco").waitFor({ timeout: 5000 }).catch(() => {});
+    await ip.getByRole("button", { name: "Tutti · 4" }).click().catch(() => {});
     ok((await ip.getByTestId("ig-riga").count()) === 4 && (await ip.locator('[data-testid=ig-salva][data-aperto="1"]').count()) === 1 && (await ip.getByTestId("ig-sotto").textContent()).includes("1 aperto"),
       "instagram: l'elenco resta nel telefono, con le righe aperte, anche ricaricando");
     const saved = await ip.evaluate(() => localStorage.getItem("mapetite.instagram.salvati") ?? "");
     ok(saved.includes("AAA111aaa") && !saved.includes("igsh"), "instagram: nel telefono solo i link puliti");
     await ip.getByTestId("ig-elenco").scrollIntoViewIfNeeded();
     await ip.screenshot({ path: `${OUT}/instagram-4-aperto.png`, caret: "initial" });
+    // "Trova" su un account-locale: 1 lettura AI del nome leggibile, 1 ricerca Google, poi "È questo?" (mai salvato da solo).
+    {
+      const capT = [];
+      const srcT = [];
+      await ictx.route("**/api/import-caption", (r) => { capT.push(r.request().postDataJSON()); return r.fulfill({ json: { luoghi: [{ nome: "Trattoria da Mario", citta: "Roma", categoria: "trattoria" }] } }); });
+      await ictx.route("**/api/places/search", (r) => { srcT.push(r.request().postDataJSON()); return r.fulfill({ json: { results: [{ id: "GTM1", name: "Trattoria da Mario", address: "Via della Scala, 1, 00153 Roma RM, Italy", lat: 41.89, lng: 12.47, category: "trattoria", rating: 4.5, priceLevel: 2 }] } }); });
+      const w0 = icalls.length;
+      await ip.getByRole("button", { name: /Locali/ }).click();
+      await ip.getByTestId("ig-riga").filter({ hasText: "@trattoriadamario" }).getByTestId("ig-trova").click();
+      await ip.waitForURL(/\/importa\/condividi/, { timeout: 8000 }).catch(() => {});
+      await ip.getByTestId("reel-trovato").waitFor({ timeout: 8000 }).catch(() => {});
+      ok(capT.length === 1 && capT[0]?.caption === "Trattoria da Mario, Roma" && srcT.length === 1 && /Trattoria da Mario/.test(srcT[0]?.query ?? ""), `instagram Trova: una lettura del nome e una ricerca (${JSON.stringify(capT)} ${JSON.stringify(srcT)})`);
+      ok(await ip.getByTestId("reel-trovato").isVisible() && !icalls.slice(w0).some((u) => u.includes("/rest/v1/")), "instagram Trova: chiede 'È questo?' e non salva da solo");
+      const prov = await ip.getByTestId("reel-provenienza").textContent().catch(() => "");
+      ok(prov === "Dal nome dell'account @trattoriadamario", `instagram Trova: la scheda dice da dove viene il nome, non 'Nel reel' (${prov})`);
+      await ip.screenshot({ path: `${OUT}/instagram-6-trova.png`, caret: "initial" });
+      await ictx.unroute("**/api/import-caption");
+      await ictx.unroute("**/api/places/search");
+      await ip.goBack({ waitUntil: "networkidle" });
+      await ip.getByTestId("ig-elenco").waitFor({ timeout: 5000 }).catch(() => {});
+      const cercato = ip.locator('[data-testid=ig-trova][data-aperto="1"]');
+      ok((await cercato.count()) === 1 && (await cercato.textContent()) === "✓ Cercato", "instagram Trova: tornando indietro l'account è segnato 'Cercato'");
+    }
     // HTML e JSON italiano insieme, da "Cambia file": l'elenco si sostituisce, gli "Aperto" restano.
     await ip.getByTestId("ig-input").setInputFiles([
       { name: "saved_posts.html", mimeType: "text/html", buffer: Buffer.from(IG_HTML) },
       { name: "post_salvati.json", mimeType: "application/json", buffer: Buffer.from(IG_IT) },
     ]);
     await ip.waitForTimeout(500);
-    ok((await ip.getByTestId("ig-riepilogo").textContent()).replace(/\s+/g, " ") === "3 post salvati" && (await ip.getByTestId("ig-raccolta").count()) === 0, "instagram: HTML + JSON italiano caricati dall'interfaccia, senza raccolte niente pillole");
+    ok((await ip.getByTestId("ig-riepilogo").textContent()).replace(/\s+/g, " ") === "3 post salvati" && (await ip.getByTestId("ig-raccolta").allTextContents()).join("|") === "🍽️ Locali · 2|Tutti · 3", "instagram: HTML + JSON italiano caricati dall'interfaccia, senza raccolte solo 'Locali' e 'Tutti'");
     await ip.getByTestId("ig-input").setInputFiles({ name: "foto.json", mimeType: "application/json", buffer: Buffer.from('{"ciao":1}') });
     await ip.waitForTimeout(300);
-    ok((await ip.getByTestId("ig-errore").textContent().catch(() => "")).includes("non trovo post salvati") && (await ip.getByTestId("ig-riga").count()) === 3, "instagram: file sbagliato spiegato, l'elenco di prima resta");
-    ok(iev.some((e) => e.props?.nome === "import_instagram" && e.props.contesto === "letti" && e.props.risultati === 4) && iev.some((e) => e.props?.nome === "import_instagram" && e.props.contesto === "apri") && droppedKeys(iev.filter((e) => e.props?.nome === "import_instagram")).length === 0,
+    ok((await ip.getByTestId("ig-errore").textContent().catch(() => "")).includes("non trovo post salvati") && (await ip.getByTestId("ig-riepilogo").textContent()).includes("3 post"), "instagram: file sbagliato spiegato, l'elenco di prima resta");
+    ok(iev.some((e) => e.props?.nome === "import_instagram" && e.props.contesto === "letti" && e.props.risultati === 4) && iev.some((e) => e.props?.nome === "import_instagram" && e.props.contesto === "apri") && iev.some((e) => e.props?.nome === "import_instagram" && e.props.contesto === "trova") && droppedKeys(iev.filter((e) => e.props?.nome === "import_instagram")).length === 0,
       "instagram: tracciato 'import_instagram' (letti, apri) con chiavi accettate dal server");
     await ictx.close();
   }

@@ -16,6 +16,9 @@ export default async function CondividiPage({
     return (Array.isArray(v) ? v[0] : v ?? "").trim();
   };
   const title = pick("title");
+  // "Trova" dai salvati di Instagram: il nome viene dall'account, non dal reel (si dice così nella scheda).
+  const account = pick("account").replace(/^@/, "");
+  const daAccount = /^[A-Za-z0-9._]{1,30}$/.test(account) ? account : null;
   const sharedText = [pick("text"), pick("url")].filter(Boolean).join("\n");
 
   const supabase = await createClient();
@@ -31,5 +34,5 @@ export default async function CondividiPage({
   const segno = (await cookies()).get(CONDIVISO_COOKIE)?.value;
   const autoSave = Boolean(fullText && segno && segno === impronta(fullText));
 
-  return <ShareImport title={title} sharedText={sharedText} autoSave={autoSave} userId={anonimo ? null : e2eUser ?? userData?.user?.id ?? null} />;
+  return <ShareImport title={title} sharedText={sharedText} autoSave={autoSave} daAccount={daAccount} userId={anonimo ? null : e2eUser ?? userData?.user?.id ?? null} />;
 }
