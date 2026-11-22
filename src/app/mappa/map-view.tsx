@@ -1676,7 +1676,7 @@ export default function MapView({
     const giaInRicerca = new Set(daRicerca.map((p) => placeUuids[p.id]).filter(Boolean));
     const daCatalogo: CandidatoSimile[] = places
       .filter((p) => catalogoConVerdetto.has(p.id) && venueDetails[p.id]?.verdict && !giaInRicerca.has(p.id))
-      .map((p) => ({ ...p, priceLevel: catalogoInfo[p.id]?.priceLevel ?? p.priceLevel ?? null, businessStatus: catalogoInfo[p.id]?.businessStatus ?? p.businessStatus ?? null }));
+      .map((p) => ({ ...p, priceLevel: catalogoInfo[p.id]?.priceLevel ?? p.priceLevel ?? null, businessStatus: p.id in catalogoInfo ? catalogoInfo[p.id].businessStatus : p.businessStatus ?? null }));
     const selUuid = resolveUuid(selected.id);
     return similiA(target, [...daRicerca, ...daCatalogo], {
       etichetta: etichettaNota,

@@ -15,11 +15,7 @@ const LOCALE = [
   "cocktailbar", "speakeasy", "pastificio", "gastronomia", "cremeria", "pub", "bar", "caffe", "cafe", "forno",
 ];
 // Segni di creator, guide e pagine di consigli: se ci sono, non è un locale.
-const CREATOR = /food|mangi|magn|blog|lover|guide|guida|travel|critic|review|recens|gram|hunter|addict|diar|journal|explor|secret|chef|influenc|consigli|insider|vibes|daily|magazine|mania|guru|quiz|masterclass|academy|school|scuola|corso|award|festival|media|radio|channel|ital|official|ufficiale|finder|ranking|classic|queen/;
-// Parole brevi da creator che stanno dentro tanti nomi veri ("labella", "girolamo", "fanti", "toppi", "tvardo"):
-// contano solo come frammento intero, una volta tolti dal pezzo parole-locale, città, cifre, "the" davanti e "in"
-// dietro ("trattoria_top", "bestpizzeria", "pizzeriatoproma", "thebestgelateria", "gelateriatop10", "tripinpizzeria").
-const CREATOR_BREVI = new Set(["eat", "eats", "tips", "best", "top", "tour", "giro", "life", "fan", "fans", "news", "week", "weekly", "band", "trip", "club", "lab", "tv", "king"]);
+const CREATOR = /food|eat|mangi|magn|blog|lover|guide|guida|travel|tips|critic|review|recens|gram|hunter|addict|diar|journal|explor|secret|best|top|tour|giro|chef|influenc|consigli|insider|life|vibes|daily|fan|magazine|news|mania|guru|week|quiz|band|trip|masterclass|academy|school|scuola|corso|award|festival|club|lab|media|tv|radio|channel|ital|italy|official|ufficiale|finder|ranking|classic|queen|king/;
 // Città (anche in inglese: "trattoria_mario_rome") → come si scrive in italiano.
 const CITTA: Record<string, string> = {
   roma: "Roma", rome: "Roma", milano: "Milano", milan: "Milano", napoli: "Napoli", naples: "Napoli", torino: "Torino", turin: "Torino",
@@ -28,14 +24,13 @@ const CITTA: Record<string, string> = {
   cagliari: "Cagliari", brescia: "Brescia", bergamo: "Bergamo", pisa: "Pisa",
 };
 const NOMI_CITTA = Object.keys(CITTA).sort((a, b) => b.length - a.length);
-const CITTA_RE = new RegExp(NOMI_CITTA.join("|"), "g");
 const UNIONI = ["dalla", "della", "delle", "degli", "alla", "alle", "agli", "dal", "del", "dei", "dai", "al", "ai", "da", "di", "il", "la", "lo", "le", "de"];
 
 // "da"/"dal"/"dalla" + nome è il caso comune ("trattoriadamario", "dagiggetto", "dallaivana"): si staccano sempre,
 // tranne quando la parola intera è un nome o un cognome che comincia così ("trattoriadavide", "macelleriadamini").
 const NOMI_DA = new Set([
   "davide", "damiano", "daniele", "daniela", "daniel", "dante", "dario", "daria", "dalia", "dalila", "dafne", "damiana",
-  "damini", "damiani", "dalmasso", "dalbosco", "dallara", "dalmonte", "dalpozzo", "dalpiaz", "dallari", "dallago",
+  "damini", "damiani", "dalmasso", "dallara", "dalpiaz", "dallari",
   "danieli", "darini", "davoli", "davanzo", "dalmazio", "dalmata", "dalai",
 ]);
 const DA = new Set(["da", "dal", "dalla"]);
@@ -64,22 +59,13 @@ function paroleLocale(pezzo: string): { w: string; i: number }[] {
   return out;
 }
 
-// Un pezzo del nome con una parola breve da creator come frammento intero (vedi CREATOR_BREVI).
-function creatorBreve(pezzo: string): boolean {
-  const frammenti = pezzo.replace(LOCALE_RE, " ").replace(CITTA_RE, " ").replace(/\d+/g, " ").split(" ").filter(Boolean);
-  return frammenti.some((f) => {
-    const g = f.replace(/^the(?=.{2,})/, "").replace(/(?<=.{2,})in$/, "");
-    return CREATOR_BREVI.has(f) || CREATOR_BREVI.has(g);
-  });
-}
-
 // Minuscolo, senza "@" e senza ".it"/".com" finali ("trattoriamaria.it").
 const pulito = (autore: string) => autore.toLowerCase().replace(/^@/, "").replace(/\.(it|com|eu)$/, "");
 
 export function sembraLocale(autore: string | null | undefined): boolean {
   if (!autore) return false;
   const h = pulito(autore);
-  if (h.length < 3 || CREATOR.test(h) || h.split(/[._-]+/).some(creatorBreve)) return false;
+  if (h.length < 3 || CREATOR.test(h)) return false;
   // Una parola-locale da sola ("pizzeria", "bar") è una pagina generica, non un posto da cercare.
   if (LOCALE.includes(h.replace(/[._-]+/g, ""))) return false;
   return h.split(/[._-]+/).filter(Boolean).some((p) => paroleLocale(p).length > 0);

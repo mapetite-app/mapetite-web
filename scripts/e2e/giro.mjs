@@ -11048,11 +11048,7 @@ if (fakeUser) {
     ok(si.every(il.sembraLocale) && !no.some(il.sembraLocale), `instagram locali: dal nome sì ${si.filter((h) => !il.sembraLocale(h)).join(",") || "tutti"}, no ${no.filter(il.sembraLocale).join(",") || "nessuno"}`);
     const nomi = [["trattoriadamario", ["Roma food"]], ["osteriadellalumaca", []], ["sushizen.roma", []], ["barmilano", ["Caffè Milano"]], ["caffemexico", ["Napoli 2024"]], ["taverna.degli.amici", ["Rome trip"]], ["baroccoristorante", []]].map(([h, r]) => il.indizioLocale(h, r)).join(" | ");
     ok(nomi === "Trattoria da Mario, Roma | Osteria della Lumaca | Sushi Zen Roma | Bar Milano | Caffè Mexico, Napoli | Taverna degli Amici, Roma | Barocco Ristorante", `instagram locali: nome leggibile e città dalla raccolta (${nomi})`);
-    // Minori della 30 (22/11 notte): parole brevi da creator solo come pezzo intero o attaccate a una parola-locale;
-    // "da/dal/dalla" staccati solo davanti a un nome noto.
-    const veri = ["trattorialabella", "gelateriagirolamo", "osteriadeifanti", "pizzeriatoppi"];
-    const finti = ["bestpizzeria", "pizzeria_top", "toptrattoria", "trattoriatour", "romeeats", "pizzerialab", "eatspizzeria", "fanspizzeria", "pizzeriatoproma", "thebestgelateria", "gelateriatop10", "trattoriaromaeats", "sushiweekly", "tripinpizzeria"];
-    ok(veri.every(il.sembraLocale) && !finti.some(il.sembraLocale), `instagram locali: parole brevi (sì ${veri.filter((h) => !il.sembraLocale(h)).join(",") || "tutti"}, no ${finti.filter(il.sembraLocale).join(",") || "nessuno"})`);
+    // Minore della 30 (22/11 notte): "da/dal/dalla" staccati tranne nei nomi e cognomi noti.
     const da = ["macelleriadamini", "trattoriadavide", "osteriadalmasso", "ristorantedalpescatore", "trattoriadallazia", "trattoriadapippo", "osteriadallaivana"].map(il.nomeDaAccount).join(" | ");
     ok(da === "Macelleria Damini | Trattoria Davide | Osteria Dalmasso | Ristorante dal Pescatore | Trattoria dalla Zia | Trattoria da Pippo | Osteria dalla Ivana", `instagram locali: "da" staccato tranne nei nomi e cognomi noti (${da})`); }
 
