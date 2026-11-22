@@ -7848,6 +7848,17 @@ else {
       const righePp = [sv("u1", ["Da provare"]), { ...sv("u6", ["Da provare"]), privato: true }, sv("u3", ["Già visitato"])];
       const pp = rs.passaparolaDa(righePp, ["u1", "u6", "u3", "u9"], L.id);
       ok(pp === 1 && pp <= rs.inAttesa(righePp, L.id).persone, `ristoratore: passaparola solo tra chi conta in 'Ti vogliono provare' (niente lucchetto, visitati o righe assenti): ${pp}`); }
+    // Proposta 76 "Arrivati dai reel": una persona una volta (primo video), solo video collegati entro un giorno dal
+    // salvataggio, nel periodo, senza lucchetto né salvato tolto, solo fonti note, solo questo locale.
+    { const sv = (u, d, extra = {}) => ({ place_id: L.id, user_id: u, created_at: at(d), tags: ["Da provare"], ...extra });
+      const c = (u, fonte, d, h = 10, place = L.id) => ({ user_id: u, place_id: place, fonte, created_at: at(d, h) });
+      const salv = [sv("u1", 10), sv("u2", 12), sv("u3", 14), sv("u4", 5), { ...sv("u5", 11), privato: true }, sv("u7", 3), sv("u8", 13)];
+      const reel = [c("u1", "Instagram", 10, 11), c("u1", "TikTok", 10, 12), c("u2", "TikTok", 12), c("u3", "Instagram", 14), c("u4", "Instagram", 12), c("u5", "Instagram", 11), c("u6", "Instagram", 12), c("u7", "Instagram", 3), c("u8", "Facebook", 13), c("u2", "Instagram", 12, 10, "altro")];
+      const r7 = rs.daiReel(reel, salv, L.id, 7, now);
+      ok(r7.persone === 3 && JSON.stringify(r7.perFonte.map((f) => [f.chiave, f.persone])) === JSON.stringify([["Instagram", 2], ["TikTok", 1]]), `ristoratore: 'dai reel' conta 3 persone (niente video aggiunto dopo, lucchetto, salvato tolto, fuori periodo, fonte ignota) (${JSON.stringify(r7)})`);
+      ok(rs.sottoReel(r7) === "2 da Instagram · 1 da TikTok" && rs.sottoReel({ persone: 4, perFonte: [{ chiave: "TikTok", volte: 4, persone: 4 }] }) === "tutti da TikTok", `ristoratore: riga sotto 'dai reel' (${rs.sottoReel(r7)})`);
+      const r30 = rs.daiReel(reel, salv, L.id, 30, now);
+      ok(r30.persone === 4, `ristoratore: 'dai reel' a 30 giorni include anche il salvato di 12 giorni fa (${JSON.stringify(r30)})`); }
     // Visite vere (POSIZIONAMENTO proposta 4, 18/10): chi ha segnato "Ci sono stato" nel periodo (data della visita), con il voto.
     { const v = (u, tags, visited, place = L.id) => ({ place_id: place, user_id: u, created_at: at(1), tags, visited_at: visited });
       const today = Math.floor(Date.UTC(2026, 9, 15) / 86_400_000);
@@ -8067,6 +8078,7 @@ else {
   { const r = await rp.goto(`${BASE}/ristoratore/${LOC}`, { waitUntil: "networkidle" });
     ok(r?.status() === 200 && await rp.getByTestId("pannello-pochi-dati").isVisible() && (await rp.getByTestId("pannello-azioni").textContent())?.includes("meno di 3") && (await rp.getByTestId("pannello-demo-etichetta").count()) === 0 && await rp.getByTestId("pannello-andamento-nascosto").isVisible(), "pannello ristoratore: dati veri, pochi → 'dati ancora pochi', 'meno di 3' e niente curva giornaliera");
     ok((await rp.getByTestId("pannello-passaparola").count()) === 0, "pannello ristoratore: 'Da un amico' sotto 3 persone non si mostra (proposta 58)");
+    ok((await rp.getByTestId("pannello-reel").count()) === 0, "pannello ristoratore: 'ti hanno salvato da un reel' sotto 3 persone non si mostra (proposta 76)");
     ok((await rp.getByTestId("pannello-richieste-locale").textContent())?.includes("non turistico") && await rp.getByTestId("pannello-verificato").isVisible(), "pannello ristoratore: 'come ti trovano' con le richieste della ricerca");
     await rp.goto(`${BASE}/ristoratore/${LOC}?beta=-tavoli`, { waitUntil: "networkidle" });
     ok((await rp.getByTestId("pannello-tavoli").count()) === 0, "pannello ristoratore: 'tavoli da Mapetite' si spegne con ?beta=-tavoli");
@@ -8152,6 +8164,8 @@ else {
     ok(r?.status() === 200 && (await lab.textContent())?.includes("Esempio dimostrativo") && !!box && box.y < 200, "pannello demo: etichetta 'Esempio dimostrativo' in cima");
     { const t = ((await rp.getByTestId("pannello-in-attesa").innerText()) ?? "").replace(/\s+/g, " ");
       ok(t.includes("🗣️ Da un amico · 6") && (await rp.getByTestId("pannello-passaparola").count()) === 1, `pannello demo: tra chi vuole provarti 'Da un amico · 6' (proposta 58) (${t.slice(0, 140)})`);
+      { const r = ((await rp.getByTestId("pannello-reel").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
+        ok(r.includes("🎬 12 ti hanno salvato da un reel") && r.includes("8 da Instagram · 4 da TikTok"), `pannello demo: 'ti hanno salvato da un reel' con le fonti (proposta 76) (${r})`); }
       ok(t.includes("31 ti vogliono provare") && t.includes("Con amici · 9") && t.includes("Romantico · 7") && t.includes("Cena di lavoro · 3"), `pannello demo: 'ti vogliono provare' con le occasioni (${t.slice(0, 120)})`);
       ok(((await rp.getByTestId("pannello-visite-vere").innerText()) ?? "").replace(/\s+/g, " ").match(/👍 10 è piaciuto su 11/) !== null, "pannello demo: visite vere con il 'Com'è andata?' (👍 10 è piaciuto, su 11)");
       { const d = ((await rp.getByTestId("pannello-disdette").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");

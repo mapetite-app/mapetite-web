@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BadgeCheck, Check, ChevronDown, ChevronRight, MapPin, Megaphone, Sparkles, X } from "lucide-react";
 import { categoryLabel } from "@/lib/category-label";
 import { displayAddress } from "@/lib/city";
-import { cosaDiconoINumeri, mostraPersone, SOGLIA, TREND_ESEMPIO, type Azione, type PannelloRistoratore, type RistLocale, type TrendFascia, type Voce } from "@/lib/ristoratore";
+import { cosaDiconoINumeri, mostraPersone, SOGLIA, sottoReel, TREND_ESEMPIO, type Azione, type PannelloRistoratore, type RistLocale, type TrendFascia, type Voce } from "@/lib/ristoratore";
 import { adattoAllaRicerca, RICERCHE_DEMO, SPONSOR_DEMO } from "@/lib/evidenza";
 import TracciaFunzione from "@/components/traccia-funzione";
 import Schede from "./schede";
@@ -367,6 +367,7 @@ export default function Pannello({
   serate = { giorni: [], at: null },
   prenotazioni = null,
   passaparola = 0,
+  reel = null,
 }: {
   p: PannelloRistoratore;
   locale: RistLocale;
@@ -380,6 +381,8 @@ export default function Pannello({
   prenotazioni?: { tavoli: number; diParola: number; persone: number; personeParola: number } | null;
   // Proposta 58: tra chi ti vuole provare, quanti l'hanno salvato su consiglio di un amico. Solo il numero, mai chi.
   passaparola?: number;
+  // Proposta 76: persone che nel periodo ti hanno salvato da un reel, per fonte. Solo conteggi, mai chi o quale video.
+  reel?: { persone: number; perFonte: Voce[] } | null;
 }) {
   const categoria = categoryLabel(locale.category);
   const az = (t: Azione["tipo"]) => p.azioni.find((a) => a.tipo === t)!;
@@ -395,7 +398,9 @@ export default function Pannello({
   // "Di parola" solo se sia chi lo è sia chi non lo è sono almeno SOGLIA persone: il locale conosce i
   // nomi di chi ha prenotato, con meno saprebbe chi ha mancato un tavolo (anche altrove).
   const parola = tavoli && tavoli.personeParola >= SOGLIA && tavoli.persone - tavoli.personeParola >= SOGLIA ? tavoli.diParola : null;
-  const primaTavoli = attesa.persone > 0 || risposte >= SOGLIA || p.disdette.n > 0;
+  // Arrivati dai reel (proposta 76): solo da SOGLIA persone, come gli altri numeri.
+  const daReel = reel && reel.persone >= SOGLIA ? reel : null;
+  const primaTavoli = attesa.persone > 0 || risposte >= SOGLIA || p.disdette.n > 0 || !!daReel;
   const panoramica = (
     <>
       <section data-testid="pannello-azioni" aria-label={`Le persone e il tuo locale negli ultimi ${p.giorni} giorni`} className="mt-3 grid grid-cols-2 gap-2">
@@ -429,7 +434,7 @@ export default function Pannello({
           {/* Dal 1/11: il periodo si scrive una volta sola, in testa ai numeri del periodo; ogni riga è
               numero + 2–3 parole, il dettaglio (se serve) su una seconda riga piccola. "Ti vogliono provare"
               resta sopra perché non dipende dal periodo (chi ha salvato e non è ancora venuto, oggi). */}
-          {(risposte >= SOGLIA || p.disdette.n > 0 || tavoli) && (
+          {(risposte >= SOGLIA || p.disdette.n > 0 || tavoli || daReel) && (
             <div data-testid="pannello-periodo" className={attesa.persone > 0 ? "mt-2.5 border-t border-white/15 pt-2" : ""}>
               <p className="text-[11px] font-display font-semibold uppercase tracking-wide text-white/60">Ultimi {p.giorni}{"\u00a0"}giorni</p>
               <ul className="mt-1.5 space-y-2">
@@ -437,6 +442,10 @@ export default function Pannello({
                     con 1 o 2 si riconoscerebbe chi ha risposto. */}
                 {risposte >= SOGLIA && (
                   <Riga testId="pannello-visite-vere" numero={`👍 ${p.visite.piaciuto.toLocaleString("it-IT")}`} testo="è piaciuto" sotto={`su ${risposte.toLocaleString("it-IT")} che sono venuti e hanno risposto`} />
+                )}
+                {/* Arrivati dai reel (proposta 76, PROBLEMI.md 32): se i video che parlano di te portano gente. */}
+                {daReel && (
+                  <Riga testId="pannello-reel" numero={`🎬 ${daReel.persone.toLocaleString("it-IT")}`} testo="ti hanno salvato da un reel" sotto={sottoReel(daReel)} />
                 )}
                 {/* Tavoli liberati per tempo (PROBLEMI.md 1): "Non vado più" invece di non presentarsi. */}
                 {p.disdette.n > 0 && (

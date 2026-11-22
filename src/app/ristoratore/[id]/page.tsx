@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { puoGestireLocale } from "@/lib/ristoratore-accesso";
 import { cityFromAddress } from "@/lib/city";
-import { computeRistoratore, passaparolaDa, STATO_VISITATO, type RistEvento, type RistLocale, type RistSalvataggio } from "@/lib/ristoratore";
+import { computeRistoratore, daiReel, passaparolaDa, STATO_VISITATO, type RistReel, type RistEvento, type RistLocale, type RistSalvataggio } from "@/lib/ristoratore";
 import { pulisciGiorni } from "@/lib/serate";
 import { pulisciApertoDal } from "@/lib/aperto-dal";
 import { pulisciPrezzo, type Prezzo } from "@/lib/prezzo-locale";
@@ -31,7 +31,7 @@ type Serate = { giorni: number[]; at: string | null; apertoDal: string | null; p
 type Prenotazioni = { tavoli: number; diParola: number; persone: number; personeParola: number };
 // Riga di saved_places letta col lucchetto del posto (solo_per_me, 20261115f): la pagina ne ricava "privato".
 type RigaLucchetto = RistSalvataggio & { solo_per_me?: boolean | null };
-type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null; serate: Serate; prenotazioni: Prenotazioni | null; passaparola?: number };
+type Dati = { locale: RistLocale; citta: string | null; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[]; verificato: boolean; avviso: string | null; serate: Serate; prenotazioni: Prenotazioni | null; passaparola?: number; reel?: RistReel[] };
 
 // Tavoli chiesti da Mapetite nel periodo (dalla data della richiesta, come gli altri numeri).
 const inizioPeriodo = (giorni: number) => Date.now() - giorni * 86_400_000;
@@ -55,7 +55,7 @@ async function e2eDati(id: string): Promise<Dati | null> {
     let finte: unknown = null;
     try { finte = JSON.parse(decodeURIComponent((await cookies()).get("e2e_prenotazioni")?.value ?? "null")); } catch { /* niente */ }
     const prenotazioni = Array.isArray(finte) ? contaPrenotazioni(finte, v.locale, giorni) : null;
-    return { prenotazioni, locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, passaparola: Number(v.passaparola) || 0, serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal), prezzo: pulisciPrezzo(v.serate?.prezzo?.min, v.serate?.prezzo?.max, v.serate?.prezzo?.bevande), omaggio: pulisciOmaggio(v.serate?.omaggio?.testo, v.serate?.omaggio?.soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: Number(v.serate?.omaggiMostrati) || 0 } };
+    return { prenotazioni, locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, passaparola: Number(v.passaparola) || 0, reel: Array.isArray(v.reel) ? v.reel : [], serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal), prezzo: pulisciPrezzo(v.serate?.prezzo?.min, v.serate?.prezzo?.max, v.serate?.prezzo?.bevande), omaggio: pulisciOmaggio(v.serate?.omaggio?.testo, v.serate?.omaggio?.soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: Number(v.serate?.omaggiMostrati) || 0 } };
   } catch {
     return null;
   }
@@ -191,7 +191,11 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
   const { data: consigliati, error: ppErr } = await db.from("saved_places").select("user_id").eq("place_id", id).not("consigliato_da", "is", null).not("tags", "cs", `{"${STATO_VISITATO}"}`).limit(5000);
   if (ppErr && ppErr.code !== "42703") console.error("[ristoratore] conteggio passaparola:", ppErr.message);
   const passaparola = ppErr ? 0 : passaparolaDa(attesa, (consigliati ?? []).map((r) => r.user_id as string), id);
-  return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso, serate, prenotazioni, passaparola };
+  // Proposta 76 "Arrivati dai reel": i video collegati al locale nel periodo (solo persona, fonte e data; il link
+  // non si legge). Il conteggio lo fa daiReel, che tiene solo i video collegati entro un giorno dal salvataggio.
+  const { data: reel, error: rErr } = await db.from("contenuti_locali").select("user_id, place_id, fonte, created_at").eq("place_id", id).gte("created_at", new Date(inizioPeriodo(giorni)).toISOString()).limit(5000);
+  if (rErr && rErr.code !== "42P01" && rErr.code !== "PGRST205") console.error("[ristoratore] lettura reel:", rErr.message);
+  return { locale, citta, simili, eventi, salvati, attesa, verificato, avviso, serate, prenotazioni, passaparola, reel: (reel ?? []) as RistReel[] };
 }
 
 // "Tavoli da Mapetite" (PROPOSTE.md 3, passo 3): bocciata due volte il 31/10 notte, rifatta e approvata
@@ -209,5 +213,6 @@ export default async function RistoratorePage({ params, searchParams }: { params
     if (!dati) notFound();
   }
   const p = computeRistoratore(dati, giorni);
-  return <Pannello p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} serate={dati.serate} prenotazioni={sp.beta === "-tavoli" ? null : dati.prenotazioni} passaparola={dati.passaparola ?? 0} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
+  const reel = daiReel(dati.reel ?? [], dati.attesa, dati.locale.id, giorni);
+  return <Pannello reel={reel} p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} serate={dati.serate} prenotazioni={sp.beta === "-tavoli" ? null : dati.prenotazioni} passaparola={dati.passaparola ?? 0} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
 }
