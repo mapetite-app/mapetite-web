@@ -6,6 +6,12 @@ Obiettivo: entro fine ottobre 2026 un'app che un gruppo ristretto di persone pos
 Stati: PRONTA (si fa in autonomia) · DA DECIDERE (serve risposta di Lorenzo) · IN PR · FATTA.
 L'ordine è la priorità. Lorenzo può riordinare o commentare qui o nelle PR.
 
+## SESSIONE DI DOMENICA 22/11 (10:05) — CEO apre e chiude
+- **CEO apre:** nessun commento nuovo di Lorenzo. Esito della #185 (proposta 52 "Salva il primo posto"): **VALIDATA** (in produzione, approvata 8,6).
+- **Numeri di produzione (10:30):** 7 utenti, 0 accessi negli ultimi 7 giorni, 36 salvati, 0 reel collegati, 0 prove senza account, 0 locali verificati. Ancora nessun tester (DA-FARE 3 e 9).
+- **Proposta 76 "Arrivati dai reel" (FATTA):** nel riquadro scuro del pannello del ristoratore, sotto "Ultimi N giorni", la riga "🎬 12 salvataggi da un reel" con sotto "8 da Instagram · 4 da TikTok". Conta le persone che nel periodo hanno salvato il locale con un reel/video collegato entro un giorno dal salvataggio (`contenuti_locali`; chi aggiunge un video dopo dalla scheda non conta), una volta ciascuna, senza lucchetto né salvato tolto. Solo da 3 persone; nessuna fonte sotto 3 (le piccole in "altri video" se insieme fanno almeno 3, altrimenti niente seconda riga). Il link del reel non si legge. Zero chiamate Google/Haiku. In produzione si vede solo nel pannello dei locali verificati (oggi 0) e nell'esempio `/ristoratore/demo`.
+- **Revisore separato:** prima verifica 8,5, **bocciata** (a 7 giorni la demo scriveva "2 da Instagram · 1 da TikTok": una fonte sotto 3); corretto. Seconda verifica: **8,7, APPROVATA**. Minori scritti in PR: chi aveva già salvato il posto e lo risalva da un reel non conta; chi toglie e risalva dopo giorni perde il reel; lettura limitata a 5.000 righe.
+
 ## SESSIONE DI DOMENICA 22/11 (03:05) — CEO apre e chiude
 - **CEO apre:** nessun commento nuovo di Lorenzo. Esito della #184 (proposta 72 "Avvisami quando c'è posto"): **VALIDATA** (in produzione, spenta finché mancano le chiavi degli avvisi; approvata 8,5).
 - **Numeri di produzione (03:30):** 7 utenti, 0 accessi negli ultimi 7 giorni, 0 iscritti negli ultimi 2 giorni, 0 prove senza account, 0 avvisi. Ancora nessun tester: la notifica lo ripete (DA-FARE 3 e 9).

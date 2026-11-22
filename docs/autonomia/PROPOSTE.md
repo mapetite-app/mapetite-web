@@ -24,7 +24,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** le app "salva dal reel" (Pintra, NextBite, ReelsMap) tengono il dato per sé; nessuna lo restituisce al locale.
 - **Valore per l'utente:** nessuno diretto. **Per il ristoratore:** sa se i creator che lo citano portano clienti; è il primo numero che pagherebbe (domanda qualificata, VISIONE).
 - **Sforzo:** S (la fonte del salvataggio è già salvata). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA (con controllo di sicurezza del revisore: soglia 3 e solo conteggi).
+- **Stato proposto:** PRONTA (con controllo di sicurezza del revisore: soglia 3 e solo conteggi). **FATTA il 22/11** (sessione delle 10:05, revisore 8,7; anche nessuna fonte sotto 3).
 
 ### 77. "Mandalo a Mapetite" in un messaggio Instagram
 - **Problema:** su iPhone le app web non compaiono nel menu Condividi: serve "Copia link" e poi incollare (2 gesti in più). Un founder racconta che salvare mandando il reel in un messaggio diretto è stato il "momento magico" del suo primo accesso ([Indie Hackers](https://www.indiehackers.com/post/i-kept-dming-myself-instagram-reels-i-never-visited-so-i-built-an-app-that-turns-them-into-a-map-d4e737ac1d)).
