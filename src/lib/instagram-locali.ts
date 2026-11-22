@@ -26,6 +26,15 @@ const CITTA: Record<string, string> = {
 const NOMI_CITTA = Object.keys(CITTA).sort((a, b) => b.length - a.length);
 const UNIONI = ["dalla", "della", "delle", "degli", "alla", "alle", "agli", "dal", "del", "dei", "dai", "al", "ai", "da", "di", "il", "la", "lo", "le", "de"];
 
+// "da"/"dal"/"dalla" + nome è il caso comune ("trattoriadamario", "dagiggetto", "dallaivana"): si staccano sempre,
+// tranne quando la parola intera è un nome o un cognome che comincia così ("trattoriadavide", "macelleriadamini").
+const NOMI_DA = new Set([
+  "davide", "damiano", "daniele", "daniela", "daniel", "dante", "dario", "daria", "dalia", "dalila", "dafne", "damiana",
+  "damini", "damiani", "dalmasso", "dallara", "dalpiaz", "dallari",
+  "danieli", "darini", "davoli", "davanzo", "dalmazio", "dalmata", "dalai",
+]);
+const DA = new Set(["da", "dal", "dalla"]);
+
 const LOCALE_RE = new RegExp(LOCALE.sort((a, b) => b.length - a.length).join("|"), "g");
 // "bar", "pub", "cafe" stanno dentro troppi nomi ("enrico_bartolini", "bargello", "pubblico"): valgono solo da
 // soli ("bar_basso"), a fine pezzo ("sushibar") o seguiti da una città ("barmilano").
@@ -73,7 +82,8 @@ export function nomeDaAccount(autore: string): string {
     for (const c of NOMI_CITTA) resto = resto.replace(new RegExp(`(\\S{3,})${c}$`), `$1 ${c}`);
     for (const w of resto.split(/\s+/).filter(Boolean)) {
       const u = UNIONI.includes(w) ? undefined : UNIONI.find((x) => w.startsWith(x) && w.length - x.length >= 3);
-      if (u && parole.length > 0 && LOCALE.includes(parole[parole.length - 1])) parole.push(u, w.slice(u.length));
+      const resto = u ? w.slice(u.length) : "";
+      if (u && parole.length > 0 && LOCALE.includes(parole[parole.length - 1]) && (!DA.has(u) || !NOMI_DA.has(w))) parole.push(u, resto);
       else parole.push(w);
     }
   }

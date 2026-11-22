@@ -11047,7 +11047,10 @@ if (fakeUser) {
       "trattoria_italia", "osteriaitaliana", "ristorante_finder", "pizzeria_ranking", "pizzeria_official", "pizzeria", "bar"];
     ok(si.every(il.sembraLocale) && !no.some(il.sembraLocale), `instagram locali: dal nome sì ${si.filter((h) => !il.sembraLocale(h)).join(",") || "tutti"}, no ${no.filter(il.sembraLocale).join(",") || "nessuno"}`);
     const nomi = [["trattoriadamario", ["Roma food"]], ["osteriadellalumaca", []], ["sushizen.roma", []], ["barmilano", ["Caffè Milano"]], ["caffemexico", ["Napoli 2024"]], ["taverna.degli.amici", ["Rome trip"]], ["baroccoristorante", []]].map(([h, r]) => il.indizioLocale(h, r)).join(" | ");
-    ok(nomi === "Trattoria da Mario, Roma | Osteria della Lumaca | Sushi Zen Roma | Bar Milano | Caffè Mexico, Napoli | Taverna degli Amici, Roma | Barocco Ristorante", `instagram locali: nome leggibile e città dalla raccolta (${nomi})`); }
+    ok(nomi === "Trattoria da Mario, Roma | Osteria della Lumaca | Sushi Zen Roma | Bar Milano | Caffè Mexico, Napoli | Taverna degli Amici, Roma | Barocco Ristorante", `instagram locali: nome leggibile e città dalla raccolta (${nomi})`);
+    // Minore della 30 (22/11 notte): "da/dal/dalla" staccati tranne nei nomi e cognomi noti.
+    const da = ["macelleriadamini", "trattoriadavide", "osteriadalmasso", "ristorantedalpescatore", "trattoriadallazia", "trattoriadapippo", "osteriadallaivana"].map(il.nomeDaAccount).join(" | ");
+    ok(da === "Macelleria Damini | Trattoria Davide | Osteria Dalmasso | Ristorante dal Pescatore | Trattoria dalla Zia | Trattoria da Pippo | Osteria dalla Ivana", `instagram locali: "da" staccato tranne nei nomi e cognomi noti (${da})`); }
 
   if (fakeUser) {
     const ictx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -12032,6 +12035,16 @@ ok(errors.length === 0, `nessun errore JavaScript in console${errors.length ? ":
   ok(sim(massa) === "a,b,m", `simili: il posto di massa va in fondo anche se più vicino (${sim(massa)})`);
   const gen = pp.similiA(P("x", "Ristorante X", "italian_restaurant"), [P("y", "Ristorante Y", "italian_restaurant", { lat: 41.8892 }), P("z", "Ristorante Z", "italian_restaurant", { lat: 41.8894, priceLevel: 3 }), P("w", "Ristorante W", "italian_restaurant", { lat: 41.8896 })], { etichetta: cl.etichettaNota, escludi: () => false });
   ok(gen.map((s) => s.posto.id).join(",") === "y,w" && gen[0].perche === "Stessa spesa · a 100 m", `simili: tipo generico solo con stessa categoria, stessa spesa e vicino (${gen.map((s) => s.posto.id + ":" + s.perche).join(", ")})`);
+  // Minore della 78 (22/11 notte): stato dei posti del catalogo. Chiuso per sempre sempre; chiuso per ora solo se letto da poco.
+  const ora = Date.parse("2026-11-22T21:00:00Z");
+  ok(pp.statoCatalogo("CLOSED_PERMANENTLY", null, ora) === "CLOSED_PERMANENTLY", "simili catalogo: chiuso per sempre vale anche senza data");
+  ok(pp.statoCatalogo("CLOSED_TEMPORARILY", "2026-11-10T10:00:00Z", ora) === "CLOSED_TEMPORARILY", "simili catalogo: chiuso per ora letto 12 giorni fa vale");
+  ok(pp.statoCatalogo("CLOSED_TEMPORARILY", "2026-08-10T10:00:00Z", ora) === null, "simili catalogo: chiuso per ferie ad agosto non conta più");
+  ok(pp.statoCatalogo(null, null, ora) === null && pp.statoCatalogo("OPERATIONAL", null, ora) === "OPERATIONAL", "simili catalogo: senza stato come aperto");
+  // Con il prezzo del catalogo il perché "stessa spesa" scatta (prima il prezzo dei posti del catalogo mancava).
+  { const lontani = [P("a", "Trattoria Uno", "restaurant", { lat: 41.897 }), P("b", "Trattoria Due", "restaurant", { lat: 41.898, priceLevel: null })];
+    const g = pp.similiA(T, lontani, { etichetta: cl.etichettaNota, escludi: () => false });
+    ok(g[0]?.posto.id === "a" && g[0]?.perche.endsWith("stessa spesa") && /km$/.test(g[1]?.perche ?? ""), `simili catalogo: con il prezzo "stessa spesa", senza la distanza (${g.map((x) => x.posto.id + ":" + x.perche).join(", ")})`); }
 }
 // Proposta 48 "Perché ti piacerà" (18/11): nella scheda "Per te · Come X, tra i posti che ti sono piaciuti: prezzi simili, stessa zona"
 // dai salvati con 👍. Solo stesso tipo noto (mai generico), mai i 👎, mai il posto stesso né un'altra sede; prezzo e zona solo se veri.
