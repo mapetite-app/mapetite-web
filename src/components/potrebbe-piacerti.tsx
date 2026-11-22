@@ -37,7 +37,7 @@ export default function PotrebbePiacerti({ posti, onOpen }: { posti: PostoPiacer
                     ? <PlacePhoto photoRef={p.photoRef} alt="" className="h-full w-full object-cover" fallback={<span aria-hidden>{emoji}</span>} />
                     : <span aria-hidden>{emoji}</span>}
                 </span>
-                <span className="mt-1.5 line-clamp-2 min-h-[2.6em] font-display text-[14px] font-semibold leading-snug text-text">{nomeLeggibile(p.name)}</span>
+                <span className="mt-1.5 line-clamp-2 min-h-[2.75em] font-display text-[14px] font-semibold leading-snug text-text">{nomeLeggibile(p.name)}</span>
                 <span data-testid="simile-perche" className="mt-0.5 block truncate text-xs font-sans text-text-muted">{p.perche}</span>
               </button>
             </li>
