@@ -97,7 +97,7 @@ async function nascostiPer(viewer: string, placeId: string): Promise<{ recension
   const admin = createAdminClient();
   const [seg, nas] = await Promise.all([
     admin.from("contenuti_segnalati").select("tipo, contenuto_id").eq("user_id", viewer).limit(1000),
-    admin.from("utenti_nascosti").select("nascosto_id").eq("user_id", viewer).limit(1000),
+    admin.from("utenti_nascosti").select("nascosto_id").eq("user_id", viewer).order("created_at", { ascending: false }).limit(200),
   ]);
   if (seg.error || nas.error) return null;
   const recensioni = new Set<string>();

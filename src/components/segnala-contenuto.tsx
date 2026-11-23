@@ -112,7 +112,8 @@ export default function SegnalaContenuto({ tipo, id, nome, onFatto, className = 
             >
               {busy === "segnala" ? "Invio…" : "Segnala"}
             </button>
-            <p className="mt-2 text-xs font-sans text-text-muted">La controlliamo noi. Intanto non la vedi più.</p>
+            {errore ? <p role="alert" data-testid="segnala-errore" className="mt-2 text-sm font-sans text-error">{errore}</p>
+              : <p className="mt-2 text-xs font-sans text-text-muted">La controlliamo noi. Intanto non la vedi più.</p>}
             <button
               type="button"
               data-testid="segnala-nascondi"
@@ -122,7 +123,6 @@ export default function SegnalaContenuto({ tipo, id, nome, onFatto, className = 
             >
               {busy === "nascondi" ? "Un attimo…" : `Non mostrarmi più ${nome ? `i contenuti di ${nome}` : "i contenuti di questa persona"}`}
             </button>
-            {errore && <p role="alert" data-testid="segnala-errore" className="mt-2 text-sm font-sans text-error">{errore}</p>}
           </div>
         </div>,
         document.body,
