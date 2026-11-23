@@ -53,6 +53,31 @@ jobs:
             CODE_SIGNING_ALLOWED=NO > build.log 2>&1 \
             || { grep -E "error:|BUILD FAILED" build.log | head -60; tail -n 30 build.log; exit 1; }
           grep -E "BUILD SUCCEEDED" build.log
+      - name: Avvia nel simulatore e fotografa
+        working-directory: ios/App
+        run: |
+          set -x
+          DEV=$(xcrun simctl list devices available | grep -E "iPhone [0-9]+ Pro \(" | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+          test -n "$DEV"
+          xcrun simctl boot "$DEV"
+          xcrun simctl bootstatus "$DEV" -b
+          xcrun simctl install "$DEV" build/Build/Products/Debug-iphonesimulator/App.app
+          mkdir -p "$RUNNER_TEMP/foto"
+          xcrun simctl launch "$DEV" app.mapetite
+          sleep 25
+          xcrun simctl io "$DEV" screenshot "$RUNNER_TEMP/foto/1-avvio.png"
+          # Come arriva dal Condividi di Instagram.
+          xcrun simctl openurl "$DEV" "mapetite://condividi?url=https%3A%2F%2Fwww.instagram.com%2Freel%2FDA1b2C3d4E5%2F"
+          sleep 15
+          xcrun simctl io "$DEV" screenshot "$RUNNER_TEMP/foto/2-condividi.png"
+          # L'estensione è dentro l'app?
+          ls build/Build/Products/Debug-iphonesimulator/App.app/PlugIns/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: foto-simulatore
+          path: ${{ runner.temp }}/foto
+          retention-days: 14
 
   carica:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.carica }}
