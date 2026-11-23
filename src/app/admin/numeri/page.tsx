@@ -5,6 +5,9 @@ import { notFound } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminEmail } from "@/lib/admin";
+import { decidiSegnalazione } from "./moderazione-azioni";
+import { MOTIVI } from "@/lib/moderazione";
+import { fotoUrl } from "@/lib/foto-utenti";
 import { computeNumeri, googleOggi, statoAi, QUOTA_GOOGLE, etichettaFunzione, etichettaMotivo, etichettaUtile, type Conteggio, type EventRow, type Numeri } from "@/lib/numeri";
 
 // Pannello di Lorenzo (PIANO-25-OTTOBRE.md 7.5): i tester usano Mapetite? Tornano? Cosa usano?
@@ -109,6 +112,76 @@ function Segnalazioni({ items }: { items: Segnalazione[] }) {
               <p className="mt-1 text-xs text-text-muted">
                 {quando(s.created_at)} · {s.pagina ?? "pagina ?"}{s.larghezza ? ` · ${s.larghezza}px` : ""} · tester {s.user_id.slice(0, 4)}
               </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
+  );
+}
+
+// Proposta 82 "Segnala e nascondi" (regola 1.2 dell'App Store): recensioni e foto segnalate dagli utenti
+// e non ancora decise, con il testo o la foto. "Togli" la cancella per tutti, "Lascia" chiude la segnalazione.
+// Senza la tabella (migrazione 20261123_moderazione non applicata) la sezione non compare.
+type ContenutoSegnalato = { id: string; tipo: string; contenuto_id: string; motivo: string; created_at: string; testo: string | null; stelle: number | null; volte: number };
+async function loadContenutiSegnalati(): Promise<ContenutoSegnalato[] | null> {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("contenuti_segnalati")
+      .select("id,tipo,contenuto_id,motivo,created_at")
+      .is("esito", null)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) {
+      if (error.code !== "42P01" && error.code !== "PGRST205") console.warn(`[numeri] contenuti segnalati non letti ${error.code ?? ""}`);
+      return null;
+    }
+    // Una riga per contenuto, con quante persone l'hanno segnalato.
+    const per = new Map<string, ContenutoSegnalato>();
+    for (const r of (data ?? []) as Omit<ContenutoSegnalato, "testo" | "stelle" | "volte">[]) {
+      const k = `${r.tipo}:${r.contenuto_id}`;
+      const g = per.get(k);
+      if (g) g.volte += 1; else per.set(k, { ...r, testo: null, stelle: null, volte: 1 });
+    }
+    const righe = [...per.values()].slice(0, 30);
+    const idRec = righe.filter((r) => r.tipo === "recensione").map((r) => r.contenuto_id);
+    if (idRec.length > 0) {
+      const { data: rec } = await admin.from("reviews").select("id,rating,comment").in("id", idRec);
+      const m = new Map(((rec ?? []) as { id: string; rating: number; comment: string | null }[]).map((x) => [x.id, x]));
+      for (const r of righe) if (r.tipo === "recensione") { r.testo = m.get(r.contenuto_id)?.comment ?? null; r.stelle = m.get(r.contenuto_id)?.rating ?? null; }
+    }
+    return righe;
+  } catch {
+    return null;
+  }
+}
+
+function ContenutiSegnalati({ items }: { items: ContenutoSegnalato[] | null }) {
+  if (items == null) return null;
+  const motivo = (id: string) => MOTIVI.find((m) => m.id === id)?.label ?? id;
+  return (
+    <Section title="Contenuti segnalati" note="Recensioni e foto segnalate dagli utenti. Apple chiede di decidere entro 24 ore.">
+      {items.length === 0 ? (
+        <p data-testid="numeri-contenuti-segnalati" className="text-sm font-sans text-text-muted">Nessuna segnalazione da decidere</p>
+      ) : (
+        <ul data-testid="numeri-contenuti-segnalati" className="space-y-2">
+          {items.map((s) => (
+            <li key={s.id} className="rounded-card border border-border bg-white p-3 text-sm font-sans">
+              {s.tipo === "foto" ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={fotoUrl(s.contenuto_id)} alt="Foto segnalata" className="h-28 w-28 rounded-card object-cover" />
+              ) : (
+                <p className="whitespace-pre-wrap break-words text-text">{s.stelle != null ? `${"★".repeat(s.stelle)} ` : ""}{s.testo ?? "(solo stelle)"}</p>
+              )}
+              <p className="mt-1 text-xs text-text-muted">
+                {s.tipo === "foto" ? "Foto" : "Recensione"} · {motivo(s.motivo)} · {quando(s.created_at)}{s.volte > 1 ? ` · ${s.volte} persone` : ""}
+              </p>
+              <form action={decidiSegnalazione} className="mt-2 flex gap-2">
+                <input type="hidden" name="id" value={s.id} />
+                <button type="submit" name="esito" value="tolto" className="min-h-10 rounded-pill bg-error px-4 text-xs font-display font-semibold text-white">Togli per tutti</button>
+                <button type="submit" name="esito" value="lasciato" className="min-h-10 rounded-pill border border-border px-4 text-xs font-display font-semibold text-brand">Lascia</button>
+              </form>
             </li>
           ))}
         </ul>
@@ -435,9 +508,9 @@ export default async function NumeriPage({ searchParams }: { searchParams: Promi
 
   const sp = await searchParams;
   const giorni = PERIODI.find((p) => String(p) === sp.giorni) ?? 7;
-  const [{ rows, troncato, errore }, emails, ultimoVerdetto, segnalazioni] = fake
-    ? [{ rows: fake, troncato: false, errore: null }, new Map<string, string>(), null, await e2eSegnalazioni()]
-    : await Promise.all([loadRows(), loadEmails(), loadUltimoVerdetto(), loadSegnalazioni()]);
+  const [{ rows, troncato, errore }, emails, ultimoVerdetto, segnalazioni, contenutiSegnalati] = fake
+    ? [{ rows: fake, troncato: false, errore: null }, new Map<string, string>(), null, await e2eSegnalazioni(), null]
+    : await Promise.all([loadRows(), loadEmails(), loadUltimoVerdetto(), loadSegnalazioni(), loadContenutiSegnalati()]);
   const n = computeNumeri(rows, giorni, undefined, emails);
   const google = googleOggi(rows);
   const ai = statoAi(ultimoVerdetto, rows);
@@ -486,6 +559,7 @@ export default async function NumeriPage({ searchParams }: { searchParams: Promi
       ) : (
         <Pannello n={n} troncato={troncato} />
       )}
+      <ContenutiSegnalati items={contenutiSegnalati} />
       <Segnalazioni items={segnalazioni} />
     </main>
   );

@@ -6,6 +6,8 @@ import { Camera, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { FOTO_MAX, fotoLabel, type FotoCommunity, type FotoUtente } from "@/lib/foto-utenti";
 import { caricaFoto, eliminaFoto } from "@/lib/foto-utenti-write";
 import { trackFeature } from "@/lib/track";
+import { personName } from "@/lib/handle";
+import SegnalaContenuto from "@/components/segnala-contenuto";
 
 // Foto degli utenti (piani 4.4 e 5.6c): l'editor delle proprie (1–3 per locale, scattate o dalla
 // galleria), la fila delle foto della community e la vista a schermo intero. Sempre a parte
@@ -197,7 +199,7 @@ export function FotoMieEditor({
 }
 
 /** Le foto pubbliche degli altri sul locale, ciascuna con "Foto di <nome>". */
-export function FotoCommunityStrip({ foto }: { foto: FotoCommunity[] }) {
+export function FotoCommunityStrip({ foto, onFatto }: { foto: FotoCommunity[]; onFatto?: (id: string) => (azione: "segnala" | "nascondi") => void }) {
   const [open, setOpen] = useState<number | null>(null);
   if (foto.length === 0) return null;
   const slides = foto.map((f) => ({ url: f.url, label: fotoLabel(f.autore) }));
@@ -212,7 +214,11 @@ export function FotoCommunityStrip({ foto }: { foto: FotoCommunity[] }) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={f.url} alt="" loading="lazy" className="h-full w-full object-cover" />
             </button>
-            <p data-testid="foto-community-autore" className="mt-1 truncate text-[11px] font-sans text-text-muted">{slides[i].label}</p>
+            <div className="mt-0.5 flex items-center">
+              <p data-testid="foto-community-autore" className="min-w-0 flex-1 truncate text-[11px] font-sans text-text-muted">{slides[i].label}</p>
+              {/* Proposta 82: segnala o nascondi (solo per chi ha l'accesso). */}
+              {onFatto && <SegnalaContenuto tipo="foto" id={f.id} nome={f.autore ? personName(f.autore) : null} onFatto={onFatto(f.id)} className="-mr-3 -my-2" />}
+            </div>
           </li>
         ))}
       </ul>

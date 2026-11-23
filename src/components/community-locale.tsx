@@ -14,6 +14,7 @@ import type { Voto } from "@/lib/diario";
 import type { FotoUtente } from "@/lib/foto-utenti";
 import { FotoCommunityStrip, FotoMieEditor } from "@/components/foto-utenti";
 import { SchedaVisitaContext } from "@/components/scheda-visita";
+import SegnalaContenuto from "@/components/segnala-contenuto";
 
 // "Dalla community Mapetite" (piani 5.6c e 5.6d) nella scheda della mappa e nella pagina pubblica
 // del locale: la tua recensione (stelle + due righe), quelle degli altri (prima chi segui) e i reel
@@ -69,7 +70,7 @@ const meseVisita = (iso: string) => {
   return d.toLocaleDateString("it-IT", d.getFullYear() === new Date().getFullYear() ? { month: "long" } : { month: "long", year: "numeric" });
 };
 
-function ReviewRow({ r }: { r: CommunityReview }) {
+function ReviewRow({ r, onFatto }: { r: CommunityReview; onFatto?: (azione: "segnala" | "nascondi") => void }) {
   return (
     <li data-testid="recensione-community" className="flex gap-3 py-2.5">
       {r.autore ? <Avatar person={r.autore} size={32} /> : <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand/10 text-sm">🍽️</span>}
@@ -95,6 +96,8 @@ function ReviewRow({ r }: { r: CommunityReview }) {
         </p>
         {r.comment && <p className="mt-1 break-words font-sans text-sm leading-relaxed text-text">{r.comment}</p>}
       </div>
+      {/* Proposta 82: segnala o nascondi (solo per chi ha l'accesso). */}
+      {onFatto && <SegnalaContenuto tipo="recensione" id={r.id} nome={r.autore ? personName(r.autore) : null} onFatto={onFatto} className="-mr-2 -mt-2" />}
     </li>
   );
 }
@@ -174,6 +177,10 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
   const [comment, setComment] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "done" | "error">("idle");
   const [showAll, setShowAll] = useState(false);
+  // Proposta 82: dopo "Segnala" il contenuto sparisce subito; dopo "Non mostrarmi più" si rilegge la sezione
+  // (il server toglie tutto ciò che è di quella persona, senza dire al telefono chi è).
+  const [ricarica, setRicarica] = useState(0);
+  const [avviso, setAvviso] = useState<string | null>(null);
   const [reelOpen, setReelOpen] = useState(false);
   const [reelLink, setReelLink] = useState("");
   const [reelMsg, setReelMsg] = useState<string | null>(null);
@@ -197,7 +204,13 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
       })
       .catch(() => { /* rete assente o scheda chiusa: la sezione resta vuota */ });
     return () => ctrl.abort();
-  }, [id, contesto]);
+  }, [id, contesto, ricarica]);
+
+  const tolto = (tipo: "recensione" | "foto", contenutoId: string) => (azione: "segnala" | "nascondi") => {
+    setAvviso(azione === "segnala" ? "Segnalazione inviata: non la vedi più." : "Fatto: non vedrai più i suoi contenuti.");
+    if (azione === "nascondi") { setRicarica((n) => n + 1); return; }
+    setData((d) => d && d.id === id ? { id, c: tipo === "recensione" ? { ...d.c, recensioni: d.c.recensioni.filter((r) => r.id !== contenutoId) } : { ...d.c, foto: d.c.foto.filter((f) => f.id !== contenutoId) } } : d);
+  };
 
   const c = data?.id === id ? data.c : null;
   if (!c) return <div data-testid="community-caricamento" className="h-10" aria-hidden />;
@@ -453,7 +466,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
       {c.recensioni.length > 0 ? (
         <>
           <ul className="mt-2 divide-y divide-border">
-            {others.map((r) => <ReviewRow key={r.id} r={r} />)}
+            {others.map((r) => <ReviewRow key={r.id} r={r} onFatto={c.viewer ? tolto("recensione", r.id) : undefined} />)}
           </ul>
           {c.recensioni.length > 3 && !showAll && (
             <button type="button" onClick={() => setShowAll(true)} className="min-h-10 text-sm font-display font-semibold text-brand">
@@ -467,7 +480,8 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
       ) : null}
 
       {/* Foto scattate dagli altri membri, ciascuna con "Foto di <nome>". */}
-      <FotoCommunityStrip foto={c.foto} />
+      <FotoCommunityStrip foto={c.foto} onFatto={c.viewer ? (fid) => tolto("foto", fid) : undefined} />
+      {avviso && <p role="status" data-testid="segnala-fatto" className="mt-2 text-sm font-display font-semibold text-success">{avviso}</p>}
 
       {/* Reel e video collegati al locale */}
       {(c.reel.length > 0 || (canWrite && c.reelPronti)) && (
