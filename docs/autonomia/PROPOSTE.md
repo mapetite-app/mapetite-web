@@ -23,7 +23,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Cosa fa:** tasto "Accedi con Apple" sopra Google in /login e nel primo accesso, sul sito e nell'app (stesso giro nativo di Google: il plugin dell'app lo riconosce già perché passa da Supabase).
 - **Valore:** un tocco con Face ID per chi ha l'iPhone; via libera alla revisione Apple.
 - **Sforzo:** S per il codice (provider "apple" di Supabase, tasto che compare solo quando è acceso). **Costo:** zero (incluso nei 99 € di Apple).
-- **Stato proposto:** PRONTA per il codice; la chiave "Sign in with Apple" la crea Lorenzo dopo l'iscrizione (`APP-IPHONE.md`, punto 6).
+- **Stato proposto:** PRONTA per il codice; la chiave "Sign in with Apple" la crea Lorenzo dopo l'iscrizione (`APP-IPHONE.md`, punto 6). **Codice FATTO il 23/11** (sessione delle 03:05): tasto nero "Continua con Apple" sopra Google in /login e /signup, visibile solo con Apple acceso su Supabase; nell'app iPhone passa dallo stesso giro nativo di Google.
 
 ### 80. Avvisi push nativi nell'app iPhone
 - **Problema:** gli avvisi di oggi (proposte 6 e 72) funzionano solo con il sito installato; dentro l'app iPhone non arrivano. Sono anche la seconda funzione "da app vera" che Apple guarda (regola 4.2).

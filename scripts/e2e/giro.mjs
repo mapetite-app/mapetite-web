@@ -12489,6 +12489,39 @@ else {
   await rc.close();
 }
 // FINE-VOTO-GRUPPO
+// ACCESSO-APPLE (proposta 79) e ritorno dell'app iPhone (DA-FARE 14)
+{
+  console.log("\n— Accesso con Apple e ritorno dell'app —");
+  const ac = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await ac.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  const ap = await ac.newPage();
+  await ac.addCookies([{ name: "e2e_anonimo", value: "1", url: BASE }, { name: "e2e_provider", value: "apple,google", url: BASE }]);
+  await ap.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+  const mela = ap.getByTestId("auth-apple"), gg = ap.getByTestId("auth-google");
+  const ym = (await mela.boundingBox())?.y ?? -1, yg = (await gg.boundingBox())?.y ?? -1;
+  ok(await mela.isVisible() && await gg.isVisible() && ym >= 0 && ym < yg, "accesso: con Apple acceso, 'Continua con Apple' sta sopra Google");
+  ok(((await mela.boundingBox())?.height ?? 0) >= 44 && (await mela.innerText()).includes("Continua con Apple"), "accesso: tasto Apple alto almeno 44px, testo giusto");
+  { const w = await ap.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `accesso: con due tasti niente scorrimento orizzontale (${w})`); }
+  await ap.screenshot({ path: `${OUT}/99a-accesso-apple.png` });
+  await ac.addCookies([{ name: "e2e_provider", value: "google", url: BASE }]);
+  await ap.goto(`${BASE}/signup`, { waitUntil: "networkidle" });
+  ok(await ap.getByTestId("auth-apple").count() === 0 && await ap.getByTestId("auth-google").isVisible(), "registrazione: con Apple spento nessun tasto Apple");
+  await ac.addCookies([{ name: "e2e_provider", value: "", url: BASE }]);
+  await ap.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+  ok(await ap.getByTestId("auth-apple").count() === 0 && await ap.getByTestId("auth-google").count() === 0 && !(await ap.content()).includes("oppure con l&#x27;email") , "accesso: senza provider niente tasti né 'oppure con l'email'");
+  // /auth/app-ritorno: torna all'app solo verso la nostra pagina di conferma.
+  const r1 = await fetch(`${BASE}/auth/app-ritorno?dopo=${encodeURIComponent(`${BASE}/auth/conferma?next=/salvati`)}&code=abc&x=1`, { redirect: "manual" });
+  const l1 = r1.headers.get("location") ?? "";
+  ok(r1.status === 302 && l1.startsWith("mapetite://accesso?") && new URL(l1).searchParams.get("code") === "abc" && !new URL(l1).searchParams.has("x") && new URL(l1).searchParams.get("dopo") === `${BASE}/auth/conferma?next=/salvati`, `app-ritorno: rimanda all'app con dopo e code (${l1.slice(0, 60)})`);
+  for (const dopo of ["https://evil.example/auth/conferma", `${BASE}/login`, "javascript:alert(1)", ""]) {
+    const r = await fetch(`${BASE}/auth/app-ritorno?dopo=${encodeURIComponent(dopo)}&code=abc`, { redirect: "manual" });
+    ok(r.status === 302 && (r.headers.get("location") ?? "").endsWith("/login"), `app-ritorno: '${dopo || "(vuoto)"}' rifiutato, va a /login`);
+  }
+  const r2 = await fetch(`${BASE}/auth/app-ritorno?dopo=${encodeURIComponent(`${BASE}/auth/conferma`)}&error=access_denied&error_description=no`, { redirect: "manual" });
+  ok((r2.headers.get("location") ?? "").includes("error=access_denied"), "app-ritorno: un errore del provider arriva all'app");
+  await ac.close();
+}
+// FINE-ACCESSO-APPLE
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);

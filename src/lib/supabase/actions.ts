@@ -97,22 +97,33 @@ export async function signup(formData: FormData) {
   );
 }
 
-// Accesso con Google (sprint 25/10): Supabase apre la pagina di Google e torna su /auth/conferma
-// con `?code=`, che apre la sessione e porta all'onboarding chi è nuovo (o a `next`).
-// Il pulsante compare solo se il provider è acceso su Supabase (googleAttivo, sotto).
-export async function loginGoogle(formData: FormData) {
+// Accesso con Google (sprint 25/10) e con Apple (proposta 79, chiesto da Apple quando
+// c'è Google): Supabase apre la pagina del provider e torna su /auth/conferma con
+// `?code=`, che apre la sessione e porta all'onboarding chi è nuovo (o a `next`).
+// I tasti compaiono solo se il provider è acceso su Supabase (providerAttivi).
+// Nell'app iPhone il redirect verso Supabase lo intercetta AccessoNativoPlugin.
+async function loginConProvider(provider: "google" | "apple", formData: FormData) {
   const next = safeNext(formData.get("next"));
   const supabase = await createClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (await headers()).get("origin");
   const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
+    provider,
     options: { redirectTo: `${siteUrl ?? ""}${withNext("/auth/conferma", next)}` },
   });
   if (error || !data?.url) {
-    console.error("[auth] google:", error?.code, error?.message);
-    redirect(withNext(`/login?error=${encodeURIComponent("Accesso con Google non riuscito. Riprova o usa email e password.")}`, next));
+    console.error(`[auth] ${provider}:`, error?.code, error?.message);
+    const nome = provider === "google" ? "Google" : "Apple";
+    redirect(withNext(`/login?error=${encodeURIComponent(`Accesso con ${nome} non riuscito. Riprova o usa email e password.`)}`, next));
   }
   redirect(data.url);
+}
+
+export async function loginGoogle(formData: FormData) {
+  await loginConProvider("google", formData);
+}
+
+export async function loginApple(formData: FormData) {
+  await loginConProvider("apple", formData);
 }
 
 export async function logout() {
