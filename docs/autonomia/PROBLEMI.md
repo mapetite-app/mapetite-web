@@ -303,3 +303,11 @@ Ultimo aggiornamento: 22/11/2026.
 - **OGGI nell'app:** "Salva il primo posto" nel primo accesso (proposta 52, fatta il 22/11): il gesto del reel insegnato nel primo minuto. Proposta 76 (S): "Arrivati dai reel" nel pannello del ristoratore, solo conteggi da 3 in su.
 - **DAVVERO, in futuro:** salvataggio dal DM di Instagram (proposta 77, API Meta); prenotazione dentro l'app con un partner (proposta 63, Quandoo/TheFork) così il reel diventa tavolo senza uscire.
 - **Primo passo:** team (76); Lorenzo (77 e 63).
+
+## 33. "Vedo il reel su iPhone, voglio salvarlo, ma l'app che lo salva non è nel Condividi" — 23/11 (CEO che chiude)
+- **Chi lo ha:** clienti (su iPhone).
+- **Quanto pesa:** almeno 10 app concorrenti su App Store offrono il salvataggio dal Condividi di Instagram e TikTok (vedi `COMPETITOR.md`, 23/11); su iPhone un sito installato non può comparire nel Condividi. Quanti utenti iPhone ha il nostro pubblico: dato non trovato per l'Italia in questa sessione.
+- **OGGI nell'app:** "Copia link → Incolla" e lo screenshot; pacchetto iPhone con Condividi nativo pronto (`ios/`, 23/11), manca l'iscrizione Apple di Lorenzo (DA-FARE 14).
+- **DAVVERO, in futuro:** app su App Store con Condividi, avvisi push nativi e "Accedi con Apple"; poi la stessa cosa su Android (Play Store, 25 $ una volta).
+- **Primo passo:** Lorenzo (iscrizione Apple, `APP-IPHONE.md`); poi il team (push nativi, Accedi con Apple).
+

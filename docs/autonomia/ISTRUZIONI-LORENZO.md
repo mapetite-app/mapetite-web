@@ -4,6 +4,11 @@ In ordine di importanza. Accanto a ognuna: quanto ci vuole e come capisci che è
 
 ---
 
+## 0. App iPhone sull'App Store (23/11) — passi in `APP-IPHONE.md`
+Iscrizione Apple da persona fisica, due App ID, l'app in App Store Connect, una chiave API, 4 segreti su GitHub, poi un tasto "Run workflow" e la build arriva su TestFlight. Niente Mac.
+
+---
+
 ## 1. Accesso con Google in un tocco (15 minuti, dal computer)
 Il pulsante "Continua con Google" è già nell'app: compare da solo appena accendi Google su Supabase. Oggi (22/10 mattina) è ancora spento.
 

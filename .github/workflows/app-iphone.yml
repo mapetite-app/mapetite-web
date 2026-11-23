@@ -1,0 +1,151 @@
+# App iPhone di Mapetite (DA-FARE 14).
+# - "prova": a ogni modifica della cartella ios/ compila l'app per il simulatore,
+#   senza firma (nessun account Apple serve). Dice se il codice nativo compila.
+# - "carica": solo a mano (Actions → App iPhone → Run workflow → carica = sì).
+#   Firma con la chiave API di App Store Connect e manda la build a TestFlight.
+#   Servono 4 segreti del repository (passi in docs/autonomia/APP-IPHONE.md):
+#   APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8.
+# Costo: zero euro. Sui repository privati i minuti macOS valgono 10 volte quelli
+# Linux: ogni giro ~10 minuti = ~100 dei 2.000 minuti gratuiti al mese.
+name: App iPhone
+
+on:
+  push:
+    paths:
+      - "ios/**"
+      - "capacitor.config.ts"
+      - "app-ios-www/**"
+      - ".github/workflows/app-iphone.yml"
+  workflow_dispatch:
+    inputs:
+      carica:
+        description: "Carica su TestFlight (servono i segreti Apple)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: app-iphone-${{ github.event_name }}-${{ github.ref }}
+  # Un push nuovo ferma solo la prova vecchia, mai un caricamento a mano.
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+jobs:
+  prova:
+    if: ${{ github.event_name == 'push' || !inputs.carica }}
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx cap sync ios
+      - name: Xcode usato
+        run: xcodebuild -version
+      - name: Compila per il simulatore (senza firma)
+        working-directory: ios/App
+        run: |
+          xcodebuild build \
+            -project App.xcodeproj -scheme App -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO > build.log 2>&1 \
+            || { grep -E "error:|BUILD FAILED" build.log | head -60; tail -n 30 build.log; exit 1; }
+          grep -E "BUILD SUCCEEDED" build.log
+      - name: Avvia nel simulatore e fotografa
+        working-directory: ios/App
+        run: |
+          set -x
+          DEV=$(xcrun simctl list devices available | grep -E "iPhone [0-9]+ Pro \(" | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+          test -n "$DEV"
+          xcrun simctl boot "$DEV"
+          xcrun simctl bootstatus "$DEV" -b
+          xcrun simctl install "$DEV" build/Build/Products/Debug-iphonesimulator/App.app
+          mkdir -p "$RUNNER_TEMP/foto"
+          xcrun simctl launch --console-pty "$DEV" app.mapetite > "$RUNNER_TEMP/foto/app.log" 2>&1 &
+          sleep 40
+          xcrun simctl io "$DEV" screenshot "$RUNNER_TEMP/foto/1-avvio.png"
+          # Come arriva dal Condividi di Instagram.
+          xcrun simctl openurl "$DEV" "mapetite://condividi?url=https%3A%2F%2Fwww.instagram.com%2Freel%2FDA1b2C3d4E5%2F"
+          sleep 20
+          xcrun simctl io "$DEV" screenshot "$RUNNER_TEMP/foto/2-condividi.png"
+          echo "--- righe dell'app ---"
+          grep -aE "Loading app|WebView|Error|error|⚡️" "$RUNNER_TEMP/foto/app.log" | head -40 || true
+          # L'estensione è dentro l'app?
+          ls build/Build/Products/Debug-iphonesimulator/App.app/PlugIns/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: foto-simulatore
+          path: ${{ runner.temp }}/foto
+          retention-days: 14
+
+  carica:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.carica }}
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - name: Controlla i segreti
+        run: |
+          for v in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
+            if [ -z "${!v}" ]; then echo "::error::Manca il segreto $v (vedi docs/autonomia/APP-IPHONE.md)"; exit 1; fi
+          done
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx cap sync ios
+      - name: Chiave API di App Store Connect
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc/AuthKey.p8"
+      - name: Archivio firmato
+        working-directory: ios/App
+        run: |
+          xcodebuild archive \
+            -project App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Mapetite.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" > archive.log 2>&1 \
+            || { grep -E "error:|ARCHIVE FAILED" archive.log | head -60; tail -n 40 archive.log; exit 1; }
+          tail -n 5 archive.log
+      - name: Invio a TestFlight
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Mapetite.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" > export.log 2>&1 \
+            || { grep -E "error|Error" export.log | head -60; tail -n 40 export.log; exit 1; }
+          tail -n 10 export.log
+      - name: Pulizia
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc"
