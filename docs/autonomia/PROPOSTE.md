@@ -16,6 +16,27 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 23/11/2026 (lunedì, sessione 03:05, CEO che chiude — tema: l'app iPhone)
+
+### 79. "Accedi con Apple" (serve per l'App Store)
+- **Problema:** Apple chiede un accesso che protegga l'email quando l'app offre "Continua con Google" (regola 4.8); senza, la revisione può rifiutare.
+- **Cosa fa:** tasto "Accedi con Apple" sopra Google in /login e nel primo accesso, sul sito e nell'app (stesso giro nativo di Google: il plugin dell'app lo riconosce già perché passa da Supabase).
+- **Valore:** un tocco con Face ID per chi ha l'iPhone; via libera alla revisione Apple.
+- **Sforzo:** S per il codice (provider "apple" di Supabase, tasto che compare solo quando è acceso). **Costo:** zero (incluso nei 99 € di Apple).
+- **Stato proposto:** PRONTA per il codice; la chiave "Sign in with Apple" la crea Lorenzo dopo l'iscrizione (`APP-IPHONE.md`, punto 6).
+
+### 80. Avvisi push nativi nell'app iPhone
+- **Problema:** gli avvisi di oggi (proposte 6 e 72) funzionano solo con il sito installato; dentro l'app iPhone non arrivano. Sono anche la seconda funzione "da app vera" che Apple guarda (regola 4.2).
+- **Cosa fa:** l'app registra il telefono con Apple (APNs) e il server manda lo stesso avviso per due strade: web push o APNs. Stesse regole di oggi (orari, uno ogni 6 giorni per locale).
+- **Sforzo:** M (plugin push di Capacitor, colonna per il token, invio APNs dal server con la chiave .p8). **Costo:** zero.
+- **Stato proposto:** PRONTA dopo l'iscrizione Apple (serve la chiave APNs di Lorenzo); prima vanno accese le chiavi degli avvisi (DA-FARE 8).
+
+### 81. "Salva senza aprire l'app": il Condividi che salva da solo
+- **Problema:** oggi il Condividi apre Mapetite su "Salva dal reel"; Korka e altri salvano restando dentro Instagram.
+- **Cosa fa:** il foglio del Condividi mostra direttamente "È questo?" con nome e foto del posto e salva con un tocco, senza uscire da Instagram.
+- **Sforzo:** M-L (l'estensione deve parlare con il server con l'accesso dell'utente: serve un gruppo di app condiviso e un token). **Costo:** come oggi (1 lettura AI e 1 ricerca Google per reel).
+- **Stato proposto:** DA DECIDERE LORENZO dopo il primo giro su TestFlight. Domanda: "Il Condividi che apre l'app ti basta, o vuoi che salvi restando dentro Instagram?"
+
 ## 22/11/2026 (domenica sera, richieste di Lorenzo in chat)
 
 ### 78. "Potrebbe piacerti anche" sotto la scheda di ogni locale
