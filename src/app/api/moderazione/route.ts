@@ -34,7 +34,9 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
   const tabella = tipo === "recensione" ? "reviews" : "foto_locali";
-  const { data: riga, error: errRiga } = await admin.from(tabella).select("user_id").eq("id", id).maybeSingle<{ user_id: string }>();
+  // Foto: solo quelle pubbliche (quelle private del diario non le vede nessun altro).
+  const q = admin.from(tabella).select("user_id").eq("id", id);
+  const { data: riga, error: errRiga } = await (tipo === "foto" ? q.eq("pubblica", true) : q).maybeSingle<{ user_id: string }>();
   if (errRiga) {
     console.warn(`[moderazione] lettura ${tabella} ${errRiga.code ?? ""}`);
     return NextResponse.json({ error: ERRORE }, { status: 500 });
@@ -68,6 +70,9 @@ export async function POST(request: Request) {
     { user_id: user.id, tipo, contenuto_id: id, autore_id: riga.user_id, motivo: body?.motivo },
     { onConflict: "user_id,tipo,contenuto_id", ignoreDuplicates: true },
   );
+  if (error?.code === "P0001") {
+    return NextResponse.json({ error: "Hai già fatto molte segnalazioni oggi. Riprova domani." }, { status: 429 });
+  }
   if (error) {
     console.warn(`[moderazione] segnala ${error.code ?? ""}`);
     return NextResponse.json({ error: ERRORE }, { status: 500 });

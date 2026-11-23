@@ -17,9 +17,10 @@ type Props = {
   nome: string | null; // nome dell'autore se il profilo è pubblico; null = "questa persona"
   onFatto: (azione: "segnala" | "nascondi") => void;
   className?: string;
+  sopraFoto?: boolean; // "⋯" bianco nell'angolo della foto (non toglie spazio all'etichetta)
 };
 
-export default function SegnalaContenuto({ tipo, id, nome, onFatto, className = "" }: Props) {
+export default function SegnalaContenuto({ tipo, id, nome, onFatto, className = "", sopraFoto = false }: Props) {
   const [open, setOpen] = useState(false);
   const [motivo, setMotivo] = useState<Motivo | null>(null);
   const [busy, setBusy] = useState<"segnala" | "nascondi" | null>(null);
@@ -66,9 +67,15 @@ export default function SegnalaContenuto({ tipo, id, nome, onFatto, className = 
         data-testid="segnala-apri"
         aria-label={`Segnala o nascondi questa ${cosa}`}
         onClick={() => { setOpen(true); trackFeature("segnala_apri", { contesto: tipo }); }}
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-muted active:bg-surface ${className}`}
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${sopraFoto ? "" : "text-text-muted active:bg-surface"} ${className}`}
       >
-        <MoreHorizontal aria-hidden className="h-5 w-5" strokeWidth={1.75} />
+        {sopraFoto ? (
+          <span aria-hidden className="flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-white">
+            <MoreHorizontal className="h-4 w-4" strokeWidth={2} />
+          </span>
+        ) : (
+          <MoreHorizontal aria-hidden className="h-5 w-5" strokeWidth={1.75} />
+        )}
       </button>
       {open && createPortal(
         <div className="fixed inset-0 z-[70] flex items-end justify-center" data-testid="segnala-foglio">

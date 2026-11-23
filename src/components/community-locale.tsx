@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Play, Plus } from "lucide-react";
 import Avatar from "@/components/avatar";
@@ -181,6 +181,12 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
   // (il server toglie tutto ciò che è di quella persona, senza dire al telefono chi è).
   const [ricarica, setRicarica] = useState(0);
   const [avviso, setAvviso] = useState<string | null>(null);
+  const ricaricaFatta = useRef(0);
+  useEffect(() => {
+    if (!avviso) return;
+    const t = window.setTimeout(() => setAvviso(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [avviso]);
   const [reelOpen, setReelOpen] = useState(false);
   const [reelLink, setReelLink] = useState("");
   const [reelMsg, setReelMsg] = useState<string | null>(null);
@@ -192,6 +198,8 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
       .then((c: Community | null) => {
         if (!c) return;
         setData({ id, c });
+        // Rilettura dopo "Non mostrarmi più" (proposta 82): niente reset del modulo né evento ripetuto.
+        if (ricarica > 0 && ricaricaFatta.current !== ricarica) { ricaricaFatta.current = ricarica; return; }
         setEditing(false);
         setShowAll(false);
         setReelOpen(false);
@@ -462,6 +470,7 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
         </div>
       )}
 
+      {avviso && <p role="status" data-testid="segnala-fatto" className="mt-2 rounded-card bg-success/10 px-3 py-2 text-sm font-display font-semibold text-success">{avviso}</p>}
       {/* Recensioni degli altri */}
       {c.recensioni.length > 0 ? (
         <>
@@ -481,7 +490,6 @@ export default function CommunityLocale({ id, contesto, loginHref = "/login", vo
 
       {/* Foto scattate dagli altri membri, ciascuna con "Foto di <nome>". */}
       <FotoCommunityStrip foto={c.foto} onFatto={c.viewer ? (fid) => tolto("foto", fid) : undefined} />
-      {avviso && <p role="status" data-testid="segnala-fatto" className="mt-2 text-sm font-display font-semibold text-success">{avviso}</p>}
 
       {/* Reel e video collegati al locale */}
       {(c.reel.length > 0 || (canWrite && c.reelPronti)) && (

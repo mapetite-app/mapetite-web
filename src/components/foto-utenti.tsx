@@ -208,17 +208,15 @@ export function FotoCommunityStrip({ foto, onFatto }: { foto: FotoCommunity[]; o
       <p className="font-display text-sm font-semibold text-text">Foto dei membri</p>
       <ul className="-mx-5 mt-2 flex snap-x gap-2 overflow-x-auto px-5 pb-1">
         {foto.map((f, i) => (
-          <li key={f.id} className="w-28 shrink-0 snap-start">
+          <li key={f.id} className="relative w-28 shrink-0 snap-start">
+            {/* Proposta 82: segnala o nascondi, nell'angolo della foto (solo per chi ha l'accesso). */}
+            {onFatto && <SegnalaContenuto tipo="foto" id={f.id} nome={f.autore ? personName(f.autore) : null} onFatto={onFatto(f.id)} sopraFoto className="absolute right-0 top-0 z-[1]" />}
             <button type="button" data-testid="foto-community-foto" onClick={() => setOpen(i)} aria-label={`Guarda: ${slides[i].label}`} className="block h-28 w-28 overflow-hidden rounded-card bg-surface active:scale-[0.98]">
               {/* Foto scattata da un utente (mai Google), dal nostro server. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={f.url} alt="" loading="lazy" className="h-full w-full object-cover" />
             </button>
-            <div className="mt-0.5 flex items-center">
-              <p data-testid="foto-community-autore" className="min-w-0 flex-1 truncate text-[11px] font-sans text-text-muted">{slides[i].label}</p>
-              {/* Proposta 82: segnala o nascondi (solo per chi ha l'accesso). */}
-              {onFatto && <SegnalaContenuto tipo="foto" id={f.id} nome={f.autore ? personName(f.autore) : null} onFatto={onFatto(f.id)} className="-mr-3 -my-2" />}
-            </div>
+            <p data-testid="foto-community-autore" className="mt-1 truncate text-[11px] font-sans text-text-muted">{slides[i].label}</p>
           </li>
         ))}
       </ul>

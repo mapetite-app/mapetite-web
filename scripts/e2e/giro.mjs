@@ -2150,7 +2150,7 @@ for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
 }
 // Pagina di assistenza (23/11): URL di assistenza per App Store Connect; aperta senza account.
 { const resp = await page.goto(`${BASE}/aiuto`, { waitUntil: "networkidle" });
-  const t = (await page.getByTestId("aiuto").innerText().catch(() => "")) ?? "";
+  const t = (await page.getByTestId("aiuto").textContent().catch(() => "")) ?? "";
   ok(resp?.status() === 200 && new URL(page.url()).pathname === "/aiuto", "aiuto: /aiuto si apre senza account");
   ok(t.includes("Condividi → Mapetite") && t.includes("Elimina il mio account") && t.includes("founder.mapetite@gmail.com"), "aiuto: reel, eliminazione account e contatto");
   await page.getByText("Come cancello il mio account?").click();

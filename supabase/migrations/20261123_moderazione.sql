@@ -16,6 +16,23 @@ create table if not exists public.contenuti_segnalati (
   unique (user_id, tipo, contenuto_id)
 );
 create index if not exists contenuti_segnalati_created_idx on public.contenuti_segnalati (created_at desc);
+create index if not exists contenuti_segnalati_user_created_idx on public.contenuti_segnalati (user_id, created_at desc);
+
+-- Limite di 20 segnalazioni in 24 ore per persona, nel database (revisore 23/11): contare nella route e poi
+-- inserire si aggirava con tante richieste in parallelo. Il lucchetto per utente mette in fila gli inserimenti.
+create or replace function public.contenuti_segnalati_limite() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  perform pg_advisory_xact_lock(hashtextextended('contenuti_segnalati:' || new.user_id::text, 0));
+  if (select count(*) from public.contenuti_segnalati
+      where user_id = new.user_id and created_at > now() - interval '24 hours') >= 20 then
+    raise exception 'limite segnalazioni' using errcode = 'P0001', hint = 'limite_giorno';
+  end if;
+  return new;
+end $$;
+drop trigger if exists contenuti_segnalati_limite on public.contenuti_segnalati;
+create trigger contenuti_segnalati_limite before insert on public.contenuti_segnalati
+  for each row execute function public.contenuti_segnalati_limite();
 alter table public.contenuti_segnalati enable row level security;
 
 create table if not exists public.utenti_nascosti (

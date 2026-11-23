@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminEmail } from "@/lib/admin";
-import { FOTO_BUCKET } from "@/lib/foto-utenti";
+import { FOTO_BUCKET, UUID_RE } from "@/lib/foto-utenti";
 
 // Proposta 82: Lorenzo decide su una segnalazione dal pannello dei numeri. "Togli" cancella la
 // recensione o la foto (e il file della foto) per tutti; "Lascia" la chiude senza toccare niente.
@@ -23,10 +23,14 @@ export async function decidiSegnalazione(form: FormData): Promise<void> {
       const { error } = await admin.from("reviews").delete().eq("id", seg.contenuto_id);
       if (error) { console.warn(`[moderazione] recensione non tolta ${error.code ?? ""}`); return; }
     } else {
-      const { data: foto } = await admin.from("foto_locali").select("path").eq("id", seg.contenuto_id).maybeSingle<{ path: string | null }>();
+      // Il percorso si ricostruisce da id verificati (revisore 23/11): la colonna `path` la scrive il telefono
+      // e con "../" porterebbe la chiave di servizio fuori dalla cartella dell'autore.
+      const { data: foto } = await admin.from("foto_locali").select("user_id, place_id").eq("id", seg.contenuto_id).maybeSingle<{ user_id: string; place_id: string }>();
       const { error } = await admin.from("foto_locali").delete().eq("id", seg.contenuto_id);
       if (error) { console.warn(`[moderazione] foto non tolta ${error.code ?? ""}`); return; }
-      if (foto?.path) await admin.storage.from(FOTO_BUCKET).remove([foto.path]).catch(() => {});
+      if (foto && [foto.user_id, foto.place_id, seg.contenuto_id].every((v) => UUID_RE.test(v))) {
+        await admin.storage.from(FOTO_BUCKET).remove([`${foto.user_id}/${foto.place_id}/${seg.contenuto_id}.jpg`]).catch(() => {});
+      }
     }
   }
   // Tutte le segnalazioni dello stesso contenuto si chiudono insieme.

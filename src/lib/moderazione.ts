@@ -12,7 +12,3 @@ export const MOTIVI: { id: Motivo; label: string }[] = [
 
 export const isTipo = (v: unknown): v is TipoContenuto => v === "recensione" || v === "foto";
 export const isMotivo = (v: unknown): v is Motivo => MOTIVI.some((m) => m.id === v);
-
-/** Evento del telefono: un contenuto o una persona da togliere subito dalla scheda aperta. */
-export const EVENTO_NASCOSTO = "mapetite:nascosto";
-export type DettaglioNascosto = { tipo: TipoContenuto; id: string; autore: boolean };

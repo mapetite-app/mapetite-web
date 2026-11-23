@@ -56,7 +56,7 @@ Le chiavi restano solo su GitHub: il team non le vede e non le scrive da nessuna
   3. **Keys** → **"+"** → nome `Mapetite Apple login`, spunta Sign In with Apple (Configure → `app.mapetite`) → Register → scarica il file `.p8` e annota il Key ID.
   4. Supabase → https://supabase.com/dashboard/project/ypcghfffzcffyhfvungc/auth/providers → **Apple** → accendi; Client IDs: `app.mapetite.web,app.mapetite`; per la "Secret Key" Supabase chiede un codice generato da Team ID, Key ID, Services ID e file `.p8` (c'è il generatore nella stessa pagina) → Save. Il codice scade ogni 6 mesi: va rigenerato.
 - **Avvisi push nell'app** (oggi sono solo per il sito installato): chiave APNs, stessa pagina delle Keys.
-- **Scheda dell'App Store**: descrizione, parole chiave, screenshot da 6,9" (li facciamo noi), indirizzo della privacy (https://mapetite-web.vercel.app/privacy), **età minima** (DA-FARE 11) e "Privacy nutrizionale" (dati raccolti: email, salvati, posizione approssimata; nessun tracciamento pubblicitario).
+- **Scheda dell'App Store: testi pronti da incollare in `APP-STORE-SCHEDA.md` (23/11)**, con URL di assistenza `https://mapetite-web.vercel.app/aiuto`. Prima: descrizione, parole chiave, screenshot da 6,9" (li facciamo noi), indirizzo della privacy (https://mapetite-web.vercel.app/privacy), **età minima** (DA-FARE 11) e "Privacy nutrizionale" (dati raccolti: email, salvati, posizione approssimata; nessun tracciamento pubblicitario).
 - **Invio alla revisione Apple**: 1–3 giorni. Il rischio principale è la regola 4.2 (app che è solo un sito): per questo ci sono Condividi e l'accesso nativo, e dopo arriveranno gli avvisi push.
 
 ## Note tecniche (per le sessioni)
