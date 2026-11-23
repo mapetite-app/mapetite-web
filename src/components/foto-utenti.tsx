@@ -6,6 +6,8 @@ import { Camera, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { FOTO_MAX, fotoLabel, type FotoCommunity, type FotoUtente } from "@/lib/foto-utenti";
 import { caricaFoto, eliminaFoto } from "@/lib/foto-utenti-write";
 import { trackFeature } from "@/lib/track";
+import { personName } from "@/lib/handle";
+import SegnalaContenuto from "@/components/segnala-contenuto";
 
 // Foto degli utenti (piani 4.4 e 5.6c): l'editor delle proprie (1–3 per locale, scattate o dalla
 // galleria), la fila delle foto della community e la vista a schermo intero. Sempre a parte
@@ -197,7 +199,7 @@ export function FotoMieEditor({
 }
 
 /** Le foto pubbliche degli altri sul locale, ciascuna con "Foto di <nome>". */
-export function FotoCommunityStrip({ foto }: { foto: FotoCommunity[] }) {
+export function FotoCommunityStrip({ foto, onFatto }: { foto: FotoCommunity[]; onFatto?: (id: string) => (azione: "segnala" | "nascondi") => void }) {
   const [open, setOpen] = useState<number | null>(null);
   if (foto.length === 0) return null;
   const slides = foto.map((f) => ({ url: f.url, label: fotoLabel(f.autore) }));
@@ -206,7 +208,9 @@ export function FotoCommunityStrip({ foto }: { foto: FotoCommunity[] }) {
       <p className="font-display text-sm font-semibold text-text">Foto dei membri</p>
       <ul className="-mx-5 mt-2 flex snap-x gap-2 overflow-x-auto px-5 pb-1">
         {foto.map((f, i) => (
-          <li key={f.id} className="w-28 shrink-0 snap-start">
+          <li key={f.id} className="relative w-28 shrink-0 snap-start">
+            {/* Proposta 82: segnala o nascondi, nell'angolo della foto (solo per chi ha l'accesso). */}
+            {onFatto && <SegnalaContenuto tipo="foto" id={f.id} nome={f.autore ? personName(f.autore) : null} onFatto={onFatto(f.id)} sopraFoto className="absolute right-0 top-0 z-[1]" />}
             <button type="button" data-testid="foto-community-foto" onClick={() => setOpen(i)} aria-label={`Guarda: ${slides[i].label}`} className="block h-28 w-28 overflow-hidden rounded-card bg-surface active:scale-[0.98]">
               {/* Foto scattata da un utente (mai Google), dal nostro server. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}

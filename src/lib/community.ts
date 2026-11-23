@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { visitaOltre30 } from "@/lib/visita-30";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { followedIds, viewerId } from "@/lib/social";
 import { reelSourceOf, type ReelSource } from "@/lib/reel";
 import { fotoMie, fotoPubbliche } from "@/lib/foto-utenti-server";
@@ -85,6 +86,35 @@ type ReelRow = { id: string; url: string; fonte: string; user_id: string; handle
 const autoreOf = (r: { user_id: string | null; handle?: string | null; display_name?: string | null }): Autore | null =>
   r.user_id && r.handle ? { user_id: r.user_id, handle: r.handle, display_name: r.display_name ?? null } : null;
 
+/**
+ * Proposta 82 "Segnala e nascondi": id delle recensioni e delle foto di questo locale che `viewer` non
+ * deve più vedere (segnalate da lui o di persone che ha nascosto). Con la chiave di servizio, perché le
+ * viste pubbliche non dicono l'autore dei profili privati; al telefono arrivano solo gli id da togliere.
+ * Senza la migrazione 20261123_moderazione (tabelle mancanti) non toglie niente.
+ */
+async function nascostiPer(viewer: string, placeId: string): Promise<{ recensioni: Set<string>; foto: Set<string> } | null> {
+  if (!process.env.SUPABASE_SECRET_KEY) return null;
+  const admin = createAdminClient();
+  const [seg, nas] = await Promise.all([
+    admin.from("contenuti_segnalati").select("tipo, contenuto_id").eq("user_id", viewer).limit(1000),
+    admin.from("utenti_nascosti").select("nascosto_id").eq("user_id", viewer).order("created_at", { ascending: false }).limit(200),
+  ]);
+  if (seg.error || nas.error) return null;
+  const recensioni = new Set<string>();
+  const foto = new Set<string>();
+  for (const r of (seg.data ?? []) as { tipo: string; contenuto_id: string }[]) (r.tipo === "foto" ? foto : recensioni).add(r.contenuto_id);
+  const autori = ((nas.data ?? []) as { nascosto_id: string }[]).map((r) => r.nascosto_id);
+  if (autori.length > 0) {
+    const [rv, ft] = await Promise.all([
+      admin.from("reviews").select("id").eq("place_id", placeId).in("user_id", autori).limit(200),
+      admin.from("foto_locali").select("id").eq("place_id", placeId).in("user_id", autori).limit(200),
+    ]);
+    for (const r of (rv.data ?? []) as { id: string }[]) recensioni.add(r.id);
+    for (const r of (ft.data ?? []) as { id: string }[]) foto.add(r.id);
+  }
+  return { recensioni, foto };
+}
+
 /** Recensioni e reel del locale. `id`: UUID Supabase o Place ID Google (risultato di ricerca). */
 export async function loadCommunity(id: string): Promise<Community> {
   const f = await fake(id);
@@ -103,6 +133,8 @@ export async function loadCommunity(id: string): Promise<Community> {
 
   const PUB = "id, rating, comment, created_at, user_id, handle, display_name";
   const leggiPubbliche = (cols: string) => supabase.from("recensioni_pubbliche").select(cols).eq("place_id", placeId).order("created_at", { ascending: false }).limit(50);
+  // Proposta 82: recensioni e foto che chi guarda ha segnalato o di persone che ha nascosto (in parallelo).
+  const fuoriP = viewer ? nascostiPer(viewer, placeId).catch(() => null) : Promise.resolve(null);
   const [pub0, mine, ids, myReels, pubReels, altrui, mie, visita] = await Promise.all([
     leggiPubbliche(`${PUB}, c_e_stato, visita_mese`),
     viewer
@@ -120,6 +152,7 @@ export async function loadCommunity(id: string): Promise<Community> {
       ? supabase.from("saved_places").select("tags, visited_at").eq("user_id", viewer).eq("place_id", placeId).maybeSingle<{ tags: string[] | null; visited_at?: string | null }>()
       : Promise.resolve({ data: null, error: null }),
   ]);
+  const fuori = await fuoriP;
   // Senza la migrazione 20261116b (colonne mancanti) si rilegge come prima.
   const pub = pub0.error ? await leggiPubbliche(PUB) : pub0;
 
@@ -136,7 +169,7 @@ export async function loadCommunity(id: string): Promise<Community> {
   const myId = mine.data?.id ?? null;
   const friends = new Set(Array.isArray(ids) ? ids : []);
   const recensioni: CommunityReview[] = rows
-    .filter((r) => r.id !== myId && (r.user_id == null || r.user_id !== viewer))
+    .filter((r) => r.id !== myId && (r.user_id == null || r.user_id !== viewer) && !fuori?.recensioni.has(r.id))
     .map((r) => {
       const autore = autoreOf(r);
       return {
@@ -169,7 +202,7 @@ export async function loadCommunity(id: string): Promise<Community> {
     reel: reel.slice(0, 12),
     reelPronti,
     viewer: viewer != null,
-    foto: altrui,
+    foto: fuori ? altrui.filter((f) => !fuori.foto.has(f.id)) : altrui,
     mieFoto: mie?.foto.get(placeId) ?? [],
     fotoPronte: mie?.pronte ?? false,
     possoRecensire: (visita.data?.tags ?? []).includes("Già visitato"),

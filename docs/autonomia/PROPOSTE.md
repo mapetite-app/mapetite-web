@@ -16,6 +16,20 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 23/11/2026 (lunedì, sessione 22:05 — tema: pronti per la revisione Apple)
+
+### 82. "Segnala e nascondi" sui contenuti degli altri membri
+- **Problema:** recensioni e foto dei membri sono pubbliche, ma non c'era modo di segnalarle né di smettere di vedere chi le pubblica. Apple rifiuta le app con contenuti degli utenti senza segnalazione, blocco e un impegno a decidere entro 24 ore (regola 1.2, https://developer.apple.com/app-store/review/guidelines/#user-generated-content). È anche un problema vero per i ristoratori: una recensione falsa o offensiva oggi resta lì.
+- **Cosa fa:** "⋯" accanto a ogni recensione e sotto ogni foto degli altri (solo da collegati): un foglio con il motivo (Offensiva, Falsa o pubblicità, Non c'entra, Altro) e "Segnala"; sotto, "Non mostrarmi più i contenuti di Giulia" (o "di questa persona" se il profilo è privato, senza mai rivelarne il nome). Segnalato, il contenuto sparisce subito per chi l'ha segnalato; nascosta la persona, spariscono le sue recensioni e foto. Lorenzo decide in `/admin/numeri` → "Contenuti segnalati": "Togli per tutti" o "Lascia".
+- **Valore per l'utente:** fiducia nelle recensioni dei membri. **Per il ristoratore:** un canale per le recensioni false, argomento del pannello verificato.
+- **Sforzo:** S/M (2 tabelle senza accesso diretto, una route, un foglio, una sezione del pannello). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA. **Costruita il 23/11 sera** (vedi BACKLOG).
+
+### 83. Pagina "Aiuto" e scheda App Store pronta
+- **Problema:** App Store Connect chiede un URL di assistenza pubblico; i testi della scheda (sottotitolo, descrizione, parole chiave, privacy) andavano scritti da zero da Lorenzo.
+- **Cosa fa:** `/aiuto` (6 domande e il contatto, aperta senza account) e `APP-STORE-SCHEDA.md` con tutto da incollare, limiti di Apple già rispettati.
+- **Stato proposto:** PRONTA. **FATTA il 23/11 sera.**
+
 ## 23/11/2026 (lunedì, sessione 03:05, CEO che chiude — tema: l'app iPhone)
 
 ### 79. "Accedi con Apple" (serve per l'App Store)

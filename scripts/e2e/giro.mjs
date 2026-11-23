@@ -2148,6 +2148,16 @@ for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
   const resp = await page.goto(`${BASE}/${r}`, { waitUntil: "networkidle" });
   ok(resp?.status() === 200, `/${r} risponde 200`);
 }
+// Pagina di assistenza (23/11): URL di assistenza per App Store Connect; aperta senza account.
+{ const resp = await page.goto(`${BASE}/aiuto`, { waitUntil: "networkidle" });
+  const t = (await page.getByTestId("aiuto").textContent().catch(() => "")) ?? "";
+  ok(resp?.status() === 200 && new URL(page.url()).pathname === "/aiuto", "aiuto: /aiuto si apre senza account");
+  ok(t.includes("Condividi → Mapetite") && t.includes("Elimina il mio account") && t.includes("founder.mapetite@gmail.com"), "aiuto: reel, eliminazione account e contatto");
+  await page.getByText("Come cancello il mio account?").click();
+  ok(await page.getByText("Profilo → Impostazioni → \"Elimina il mio account\"", { exact: false }).isVisible().catch(() => false), "aiuto: la risposta si apre al tocco");
+  const sw = await page.evaluate(() => document.documentElement.scrollWidth);
+  ok(sw <= 390, `aiuto: niente scorrimento di lato (${sw}px)`);
+  await page.screenshot({ path: `${OUT}/aiuto.png` }).catch(() => {}); }
 // Norme sulla privacy (29/10): le chiede Google per pubblicare l'accesso con Google; aperte anche senza account.
 { const resp = await page.goto(`${BASE}/privacy`, { waitUntil: "networkidle" });
   const t = (await page.getByTestId("privacy").innerText().catch(() => "")) ?? "";
@@ -4761,7 +4771,7 @@ if (!fakeUser) {
   await mp.screenshot({ path: `${DOCS_SHOTS}/importa.png`, caret: "initial" });
   const mano = mp.getByTestId("importa-mano");
   const field = mano.getByLabel("Nome del locale e città");
-  ok(await field.isVisible() && (await field.getAttribute("placeholder")) === "es. Da Michele Roma", "a mano: un solo campo 'Nome del locale e città' (es. Da Michele Roma)");
+  ok(await field.isVisible() && (await field.getAttribute("placeholder")) === "Da Gino, Roma", "a mano: un solo campo 'Nome del locale e città' (Da Gino, Roma)");
   ok(mSearch.length === 0, "a mano: nessuna ricerca Google prima di toccare Cerca");
   await field.fill("Pizzeria da Michele Roma");
   await mano.getByRole("button", { name: "Cerca" }).click();
@@ -6091,7 +6101,7 @@ else {
   { const hs = await qp.evaluate(() => [...document.querySelectorAll("a[href='/mappa'], a[href='/login'], button")].filter((e) => /^(accedi|Come funziona)$/.test(e.textContent.trim())).map((e) => e.getBoundingClientRect().height)); ok(hs.length === 1 && hs.every((h) => h >= 40), `360px home: 'Come funziona' alto almeno 40px e niente 'accedi' doppione di 'Entra' (${hs.map(Math.round).join(", ")})`); }
   await qp.goto(`${BASE}/importa#a-mano`, { waitUntil: "networkidle" });
   await qp.locator("#mano-campo").waitFor({ timeout: 3000 }).catch(() => {});
-  if (await qp.locator("#mano-campo").isVisible()) ok(await placeholderFits("#mano-campo"), "360px importa: 'es. Da Michele Roma' si legge per intero");
+  if (await qp.locator("#mano-campo").isVisible()) ok(await placeholderFits("#mano-campo"), "360px importa: 'Da Gino, Roma' si legge per intero");
   await qp.goto(`${BASE}/importa/condividi`, { waitUntil: "networkidle" });
   ok(await qp.getByTestId("condividi-vuoto").getByRole("link", { name: "Incolla il link in Importa" }).isVisible(), "condividi senza link: c'è un'azione per andare avanti");
   await qp.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
@@ -10767,6 +10777,38 @@ else {
     });
   }
 
+  // 5d. Proposta 82 "Segnala e nascondi" (regola 1.2 dell'App Store): "⋯" su ogni recensione degli altri.
+  { const modPost = [];
+    let commLetture = 0;
+    await cctx.route("**/api/moderazione", (r) => { modPost.push(r.request().postDataJSON()); return r.fulfill({ json: { ok: true } }); });
+    cp.on("request", (q) => { if (q.url().includes("/api/places/community")) commLetture++; });
+    await cp.setViewportSize({ width: 390, height: 844 });
+    await cp.reload({ waitUntil: "networkidle" });
+    await cp.getByTestId("community-locale").waitFor({ timeout: 5000 }).catch(() => {});
+    const rr = cp.getByTestId("recensione-community");
+    ok((await rr.nth(0).getByTestId("segnala-apri").count()) === 1 && (await rr.nth(1).getByTestId("segnala-apri").count()) === 1, "segnala (proposta 82): '⋯' su ogni recensione degli altri");
+    const box = await rr.nth(0).getByTestId("segnala-apri").boundingBox();
+    ok(box && box.width >= 44 && box.height >= 44, `segnala: '⋯' tocca bene (${box?.width}×${box?.height})`);
+    await rr.nth(0).getByTestId("segnala-apri").click();
+    const fg = cp.getByTestId("segnala-foglio");
+    await fg.waitFor({ timeout: 3000 }).catch(() => {});
+    ok(await fg.isVisible() && (await txt(fg)).includes("Cosa non va in questa recensione?") && (await txt(fg)).includes("Non mostrarmi più i contenuti di Giulia"), "segnala: il foglio chiede il motivo e offre di nascondere Giulia");
+    ok(await fg.getByTestId("segnala-invia").isDisabled(), "segnala: senza motivo 'Segnala' non parte");
+    await cp.screenshot({ path: `${OUT}/98d-segnala-foglio.png`, caret: "initial" });
+    await fg.getByTestId("segnala-motivo-offensiva").click();
+    await fg.getByTestId("segnala-invia").click();
+    await cp.getByTestId("segnala-fatto").waitFor({ timeout: 3000 }).catch(() => {});
+    ok(modPost[0]?.azione === "segnala" && modPost[0]?.tipo === "recensione" && modPost[0]?.id === "r1" && modPost[0]?.motivo === "offensiva", `segnala: inviata con tipo, id e motivo (${JSON.stringify(modPost[0] ?? null)})`);
+    ok((await rr.count()) === 1 && !(await txt(rr.nth(0))).includes("Giulia") && (await txt(cp.getByTestId("segnala-fatto"))).includes("non la vedi più") && (await fg.count()) === 0, "segnala: la recensione sparisce subito, con la conferma");
+    const prima = commLetture;
+    await rr.nth(0).getByTestId("segnala-apri").click();
+    ok((await txt(fg)).includes("Non mostrarmi più i contenuti di questa persona"), "segnala: profilo privato → 'questa persona', nessun nome");
+    await fg.getByTestId("segnala-nascondi").click();
+    await cp.waitForTimeout(500);
+    ok(modPost[1]?.azione === "nascondi" && modPost[1]?.id === "r2" && modPost[1]?.motivo === undefined && commLetture > prima, `segnala: 'Non mostrarmi più' inviato e la sezione si rilegge (${JSON.stringify(modPost[1] ?? null)})`);
+    ok(cEv.some((e) => e.props?.nome === "contenuto_segnalato" && e.props?.contesto === "recensione") && cEv.some((e) => e.props?.nome === "contenuto_nascosto"), "segnala: segnalazione e 'nascondi' registrati come eventi");
+    await cctx.unroute("**/api/moderazione"); }
+
   // 6. Senza accesso: si leggono le recensioni, per scrivere serve "Accedi" (che riporta al locale).
   await setC("e2e_anonimo", 1);
   await cp.setViewportSize({ width: 390, height: 844 });
@@ -10775,6 +10817,7 @@ else {
   const acc = section.getByRole("link", { name: "Accedi" });
   ok((await cp.getByTestId("recensione-form").count()) === 0 && (await cp.getByTestId("reel-aggiungi").count()) === 0 && decodeURIComponent((await acc.getAttribute("href").catch(() => "")) ?? "") === `/login?next=/locali/${CID}`, "community senza accesso: niente modulo, 'Accedi' riporta al locale");
   ok((await cp.getByTestId("recensione-community").count()) === 2, "community senza accesso: le recensioni si leggono comunque");
+  ok((await cp.getByTestId("segnala-apri").count()) === 0, "segnala senza accesso: niente '⋯' (serve l'account)");
   await cctx.close();
 }
 
@@ -11591,6 +11634,20 @@ else {
   ok((await ftxt(fp.getByTestId("foto-lightbox-autore"))).includes("Foto di Giulia"), "foto community: a schermo intero resta 'Foto di Giulia'");
   await fp.keyboard.press("Escape");
   await fp.getByTestId("foto-lightbox").waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
+  // Proposta 82: "⋯" sotto ogni foto degli altri; segnalata, sparisce subito (si riapre ricaricando: dati finti).
+  { const mp = [];
+    await fp.route("**/api/moderazione", (r) => { mp.push(r.request().postDataJSON()); return r.fulfill({ json: { ok: true } }); });
+    ok((await strip.getByTestId("segnala-apri").count()) === 2, "segnala foto (proposta 82): '⋯' sotto ogni foto degli altri");
+    await strip.getByTestId("segnala-apri").nth(1).click();
+    const fg = fp.getByTestId("segnala-foglio");
+    ok((await ftxt(fg)).includes("Cosa non va in questa foto?"), "segnala foto: il foglio parla della foto");
+    await fg.getByTestId("segnala-motivo-fuori_tema").click();
+    await fg.getByTestId("segnala-invia").click();
+    await fp.getByTestId("segnala-fatto").waitFor({ timeout: 3000 }).catch(() => {});
+    ok(mp[0]?.tipo === "foto" && mp[0]?.id === "c0000002" && mp[0]?.motivo === "fuori_tema" && (await strip.getByTestId("foto-community-foto").count()) === 1, `segnala foto: inviata e la foto sparisce (${JSON.stringify(mp[0] ?? null)})`);
+    await fp.unroute("**/api/moderazione");
+    await fp.reload({ waitUntil: "networkidle" });
+    await fp.getByTestId("community-locale").waitFor({ timeout: 8000 }).catch(() => {}); }
   const nUp = uploads.length;
   await mie.locator("input[type=file]").setInputFiles(fotoFile("IMG_3.jpg"));
   await mie.getByTestId("foto-mia").first().waitFor({ timeout: 15000 }).catch(() => {});
