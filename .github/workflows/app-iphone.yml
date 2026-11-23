@@ -74,12 +74,6 @@ jobs:
           grep -aE "Loading app|WebView|Error|error|⚡️" "$RUNNER_TEMP/foto/app.log" | head -40 || true
           # L'estensione è dentro l'app?
           ls build/Build/Products/Debug-iphonesimulator/App.app/PlugIns/
-          # Foto piccole nel log, per chi non può scaricare gli artefatti.
-          set +x
-          for f in "$RUNNER_TEMP"/foto/*.png; do
-            sips -s format jpeg -s formatOptions 60 -Z 400 "$f" --out "${f%.png}.jpg" >/dev/null
-            echo "FOTO-INIZIO $(basename "$f")"; base64 -i "${f%.png}.jpg" | fold -w 4000; echo "FOTO-FINE"
-          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
