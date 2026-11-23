@@ -56,7 +56,7 @@ Le chiavi restano solo su GitHub: il team non le vede e non le scrive da nessuna
 - **Invio alla revisione Apple**: 1–3 giorni. Il rischio principale è la regola 4.2 (app che è solo un sito): per questo ci sono Condividi e l'accesso nativo, e dopo arriveranno gli avvisi push.
 
 ## Note tecniche (per le sessioni)
-- `capacitor.config.ts`: `server.url` = produzione; `app-ios-www/` è solo la pagina "serve internet".
+- `capacitor.config.ts`: `server.url` = produzione; `app-ios-www/` serve solo perché Capacitor vuole una cartella locale. **Da fare:** pagina "serve internet" quando manca la rete (oggi schermo teal vuoto). `server.errorPath` di Capacitor NON va usato: si accende anche sulle navigazioni annullate (-999), cioè all'avvio dal Condividi e quando l'accesso con Google ferma il redirect; serve un controllo di rete nostro (NWPathMonitor) in `MapetiteViewController`.
 - `ios/App/App/AccessoNativoPlugin.swift` + `src/app/auth/app-ritorno/route.ts`: giro dell'accesso con provider (vedi commento in testa al plugin). Supabase accetta già `https://mapetite-web.vercel.app/**` tra i redirect.
 - `ios/App/Condividi/`: estensione di condivisione, nessuna rete, nessun App Group.
 - `.github/workflows/app-iphone.yml`: "prova" compila senza firma a ogni modifica di `ios/`; "carica" firma con la chiave API (firma automatica, `-allowProvisioningUpdates`) e carica. Il numero di build è il numero del giro di GitHub.

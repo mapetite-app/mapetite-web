@@ -13,14 +13,10 @@ const config: CapacitorConfig = {
     // Solo il nostro sito resta dentro l'app; gli altri link (Google Maps,
     // siti dei locali, Instagram) si aprono fuori, in Safari o nell'app loro.
     allowNavigation: ["mapetite-web.vercel.app"],
-    // Senza rete: la nostra pagina "Serve la connessione", mai l'errore del browser
-    // (Apple lo guarda per la regola 4.2).
-    errorPath: "index.html",
   },
   ios: {
     contentInset: "never",
     backgroundColor: "#1a3c40",
-    scheme: "Mapetite",
   },
 };
 

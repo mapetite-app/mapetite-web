@@ -61,16 +61,25 @@ class ShareViewController: UIViewController {
         dest.host = "condividi"
         dest.queryItems = [URLQueryItem(name: "url", value: link.absoluteString)]
         guard let url = dest.url else { return }
-        if apriApp(url) {
-            finito = true
-            // Il tempo di passare all'app, poi si chiude il foglio.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-                self?.extensionContext?.completeRequest(returningItems: nil)
-            }
-        } else {
+        let copiaLink = { [weak self] in
             UIPasteboard.general.url = link
-            mostra("Link copiato. Apri Mapetite e tocca Incolla.")
+            self?.mostra("Link copiato. Apri Mapetite e tocca Incolla.")
         }
+        let trovata = apriApp(url) { [weak self] riuscito in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if riuscito {
+                    self.finito = true
+                    // Il tempo di passare all'app, poi si chiude il foglio.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        self.extensionContext?.completeRequest(returningItems: nil)
+                    }
+                } else {
+                    copiaLink()
+                }
+            }
+        }
+        if !trovata { copiaLink() }
     }
 
     private func mostra(_ testo: String) {
@@ -95,34 +104,28 @@ class ShareViewController: UIViewController {
         let url = UTType.url.identifier
         let testo = UTType.plainText.identifier
         let gruppo = DispatchGroup()
-        var daURL: [URL] = []
-        var daTesto: [String] = [testoElementi]
-        let blocco = NSLock()
+        let raccolta = Raccolta(testo: testoElementi)
 
         for a in allegati {
             if a.hasItemConformingToTypeIdentifier(url) {
                 gruppo.enter()
                 a.loadItem(forTypeIdentifier: url, options: nil) { valore, _ in
-                    blocco.lock()
-                    if let u = valore as? URL { daURL.append(u) }
-                    else if let s = valore as? String, let u = URL(string: s) { daURL.append(u) }
-                    blocco.unlock()
+                    if let u = valore as? URL { raccolta.aggiungi(url: u) }
+                    else if let s = valore as? String, let u = URL(string: s) { raccolta.aggiungi(url: u) }
                     gruppo.leave()
                 }
             } else if a.hasItemConformingToTypeIdentifier(testo) {
                 gruppo.enter()
                 a.loadItem(forTypeIdentifier: testo, options: nil) { valore, _ in
-                    blocco.lock()
-                    if let s = valore as? String { daTesto.append(s) }
-                    blocco.unlock()
+                    if let s = valore as? String { raccolta.aggiungi(testo: s) }
                     gruppo.leave()
                 }
             }
         }
 
         gruppo.notify(queue: .main) {
-            if let u = daURL.first(where: { Self.eWeb($0) }) { return fatto(u) }
-            fatto(Self.primoLink(in: daTesto.joined(separator: " ")))
+            if let u = raccolta.url.first(where: { Self.eWeb($0) }) { return fatto(u) }
+            fatto(Self.primoLink(in: raccolta.testo.joined(separator: " ")))
         }
     }
 
@@ -144,7 +147,7 @@ class ShareViewController: UIViewController {
     /// Un'estensione non può chiamare UIApplication.open direttamente: si
     /// risale la catena dei responder fino all'oggetto applicazione e si
     /// chiama il metodo per selettore (funziona da iOS 15 a iOS 26).
-    private func apriApp(_ url: URL) -> Bool {
+    private func apriApp(_ url: URL, esito: @escaping (Bool) -> Void) -> Bool {
         let sel = NSSelectorFromString("openURL:options:completionHandler:")
         var r: UIResponder? = self
         while let attuale = r {
@@ -152,11 +155,26 @@ class ShareViewController: UIViewController {
                attuale.responds(to: sel), let imp = attuale.method(for: sel) {
                 typealias Apri = @convention(c) (AnyObject, Selector, NSURL, NSDictionary, AnyObject?) -> Void
                 let apri = unsafeBitCast(imp, to: Apri.self)
-                apri(attuale, sel, url as NSURL, NSDictionary(), nil)
+                let blocco: @convention(block) (Bool) -> Void = { esito($0) }
+                apri(attuale, sel, url as NSURL, NSDictionary(), blocco as AnyObject)
                 return true
             }
             r = attuale.next
         }
         return false
     }
+}
+
+/// Raccoglie i risultati delle letture degli allegati, che arrivano da code diverse.
+private final class Raccolta: @unchecked Sendable {
+    private let blocco = NSLock()
+    private var _url: [URL] = []
+    private var _testo: [String]
+
+    init(testo: String) { _testo = [testo] }
+
+    func aggiungi(url: URL) { blocco.lock(); _url.append(url); blocco.unlock() }
+    func aggiungi(testo: String) { blocco.lock(); _testo.append(testo); blocco.unlock() }
+    var url: [URL] { blocco.lock(); defer { blocco.unlock() }; return _url }
+    var testo: [String] { blocco.lock(); defer { blocco.unlock() }; return _testo }
 }

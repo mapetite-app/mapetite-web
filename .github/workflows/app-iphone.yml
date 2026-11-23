@@ -24,8 +24,9 @@ on:
         default: false
 
 concurrency:
-  group: app-iphone-${{ github.ref }}
-  cancel-in-progress: true
+  group: app-iphone-${{ github.event_name }}-${{ github.ref }}
+  # Un push nuovo ferma solo la prova vecchia, mai un caricamento a mano.
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   prova:
@@ -91,6 +92,7 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" > archive.log 2>&1 \
             || { grep -E "error:|ARCHIVE FAILED" archive.log | head -60; tail -n 40 archive.log; exit 1; }
           tail -n 5 archive.log

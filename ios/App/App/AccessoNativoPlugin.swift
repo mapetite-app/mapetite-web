@@ -70,10 +70,15 @@ public class AccessoNativoPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticati
         let s = ASWebAuthenticationSession(url: url, callbackURLScheme: Sito.schema) { [weak self] callback, errore in
             DispatchQueue.main.async {
                 self?.sessione = nil
-                // Annullato dall'utente: si resta sulla pagina di accesso.
+                let principale = self?.bridge?.viewController as? MapetiteViewController
                 guard errore == nil, let callback = callback,
-                      let pagina = Self.paginaConferma(da: callback) else { return }
-                (self?.bridge?.viewController as? MapetiteViewController)?.apri(pagina)
+                      let pagina = Self.paginaConferma(da: callback) else {
+                    // Annullato o fallito: la server action del sito resta in attesa
+                    // del redirect che abbiamo fermato, quindi si ricarica /login.
+                    principale?.apri(Sito.base.appendingPathComponent("login"))
+                    return
+                }
+                principale?.apri(pagina)
             }
         }
         s.presentationContextProvider = self
