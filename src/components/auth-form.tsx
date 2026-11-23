@@ -73,7 +73,7 @@ export default function AuthForm({
         {apple && (
           <form action={loginApple} className="mt-6">
             {next && <input type="hidden" name="next" value={next} />}
-            <SubmitButton data-testid="auth-apple" className="flex h-12 w-full items-center justify-center gap-2 rounded-pill bg-black px-4 text-base font-display font-semibold text-white shadow-card active:scale-[0.98] disabled:opacity-60">
+            <SubmitButton data-testid="auth-apple" className="flex h-12 w-full items-center justify-center gap-2 rounded-pill bg-black px-4 text-base font-display font-semibold text-white active:scale-[0.98] disabled:opacity-60">
               <svg aria-hidden width="17" height="20" viewBox="0 0 17 20" fill="currentColor"><path d="M14.2 10.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.5 1.3 0 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4zM11.7 3c.7-.9 1.2-2 1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3.1-1.5z"/></svg>
               Continua con Apple
             </SubmitButton>
