@@ -154,7 +154,7 @@ export default function ManualAddCard({
               enterKeyHint="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="es. Da Michele Roma"
+              placeholder="Da Gino, Roma"
               maxLength={120}
               className="min-h-12 min-w-0 flex-1 rounded-btn border border-border bg-white px-3 text-base focus:border-brand focus:outline-none"
             />

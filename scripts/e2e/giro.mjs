@@ -4771,7 +4771,7 @@ if (!fakeUser) {
   await mp.screenshot({ path: `${DOCS_SHOTS}/importa.png`, caret: "initial" });
   const mano = mp.getByTestId("importa-mano");
   const field = mano.getByLabel("Nome del locale e città");
-  ok(await field.isVisible() && (await field.getAttribute("placeholder")) === "es. Da Michele Roma", "a mano: un solo campo 'Nome del locale e città' (es. Da Michele Roma)");
+  ok(await field.isVisible() && (await field.getAttribute("placeholder")) === "Da Gino, Roma", "a mano: un solo campo 'Nome del locale e città' (Da Gino, Roma)");
   ok(mSearch.length === 0, "a mano: nessuna ricerca Google prima di toccare Cerca");
   await field.fill("Pizzeria da Michele Roma");
   await mano.getByRole("button", { name: "Cerca" }).click();
@@ -6101,7 +6101,7 @@ else {
   { const hs = await qp.evaluate(() => [...document.querySelectorAll("a[href='/mappa'], a[href='/login'], button")].filter((e) => /^(accedi|Come funziona)$/.test(e.textContent.trim())).map((e) => e.getBoundingClientRect().height)); ok(hs.length === 1 && hs.every((h) => h >= 40), `360px home: 'Come funziona' alto almeno 40px e niente 'accedi' doppione di 'Entra' (${hs.map(Math.round).join(", ")})`); }
   await qp.goto(`${BASE}/importa#a-mano`, { waitUntil: "networkidle" });
   await qp.locator("#mano-campo").waitFor({ timeout: 3000 }).catch(() => {});
-  if (await qp.locator("#mano-campo").isVisible()) ok(await placeholderFits("#mano-campo"), "360px importa: 'es. Da Michele Roma' si legge per intero");
+  if (await qp.locator("#mano-campo").isVisible()) ok(await placeholderFits("#mano-campo"), "360px importa: 'Da Gino, Roma' si legge per intero");
   await qp.goto(`${BASE}/importa/condividi`, { waitUntil: "networkidle" });
   ok(await qp.getByTestId("condividi-vuoto").getByRole("link", { name: "Incolla il link in Importa" }).isVisible(), "condividi senza link: c'è un'azione per andare avanti");
   await qp.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
