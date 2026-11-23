@@ -94,6 +94,9 @@ export default function PrivacyPage() {
       <Link href="/" className="mt-8 inline-flex min-h-11 items-center font-display text-[15px] font-semibold text-brand underline underline-offset-2">
         Torna a Mapetite
       </Link>
+      <Link href="/aiuto" className="ml-5 mt-8 inline-flex min-h-11 items-center font-display text-[15px] text-text-muted underline underline-offset-2">
+        Aiuto
+      </Link>
     </main>
   );
 }
