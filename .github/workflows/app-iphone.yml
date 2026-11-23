@@ -63,19 +63,21 @@ jobs:
           xcrun simctl bootstatus "$DEV" -b
           xcrun simctl install "$DEV" build/Build/Products/Debug-iphonesimulator/App.app
           mkdir -p "$RUNNER_TEMP/foto"
-          xcrun simctl launch "$DEV" app.mapetite
-          sleep 25
+          xcrun simctl launch --console-pty "$DEV" app.mapetite > "$RUNNER_TEMP/foto/app.log" 2>&1 &
+          sleep 40
           xcrun simctl io "$DEV" screenshot "$RUNNER_TEMP/foto/1-avvio.png"
           # Come arriva dal Condividi di Instagram.
           xcrun simctl openurl "$DEV" "mapetite://condividi?url=https%3A%2F%2Fwww.instagram.com%2Freel%2FDA1b2C3d4E5%2F"
-          sleep 15
+          sleep 20
           xcrun simctl io "$DEV" screenshot "$RUNNER_TEMP/foto/2-condividi.png"
+          echo "--- righe dell'app ---"
+          grep -aE "Loading app|WebView|Error|error|⚡️" "$RUNNER_TEMP/foto/app.log" | head -40 || true
           # L'estensione è dentro l'app?
           ls build/Build/Products/Debug-iphonesimulator/App.app/PlugIns/
           # Foto piccole nel log, per chi non può scaricare gli artefatti.
           set +x
           for f in "$RUNNER_TEMP"/foto/*.png; do
-            sips -s format jpeg -s formatOptions 40 -Z 520 "$f" --out "${f%.png}.jpg" >/dev/null
+            sips -s format jpeg -s formatOptions 60 -Z 400 "$f" --out "${f%.png}.jpg" >/dev/null
             echo "FOTO-INIZIO $(basename "$f")"; base64 -i "${f%.png}.jpg" | fold -w 4000; echo "FOTO-FINE"
           done
       - uses: actions/upload-artifact@v4
