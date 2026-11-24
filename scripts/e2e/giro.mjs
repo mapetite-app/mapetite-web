@@ -4030,6 +4030,7 @@ else {
       await op.getByTestId("stasera-proponi").click();
       await op.getByTestId("stasera-tutti-chiusi").waitFor({ timeout: 4000 }).catch(() => {});
       ok(await op.getByTestId("stasera-tutti-chiusi").isVisible().catch(() => false) && (await op.getByTestId("stasera-proposta").count()) === 0 && await op.getByRole("heading", { name: "Tutti chiusi adesso" }).isVisible().catch(() => false) && chieste.flat().length <= 10 && (await op.getByTestId("stasera-riepilogo").count()) === 0 && (await op.getByTestId("stasera-altra-ora").filter({ hasText: "Qualsiasi ora" }).count()) === 1, `stasera, a che ora: tutti chiusi → 'Tutti chiusi adesso', le altre ore a un tocco, al massimo 10 letture (${chieste.flat().length})`);
+      await op.screenshot({ path: `${OUT}/84-stasera-chiusi.png`, caret: "initial" });
       // "Altri 3" che ricomincia il giro: mai più di 10 letture per tocco (revisore 24/11: erano fino a 30).
       { const molti = Array.from({ length: 24 }, (_, i) => sp(String(30 + i), `Posto ${i}`, "restaurant", "Via Roma 1, 00100 Roma RM, Italy", 41.9, 12.49, ["Da provare"]));
         stData = [...stRows, ...molti];
@@ -4044,10 +4045,13 @@ else {
         await op.getByTestId("stasera-altri").click().catch(() => {});
         await op.waitForTimeout(800);
         ok(primo <= 10 && chieste.flat().length <= 10, `stasera, a che ora: al massimo 10 letture per tocco anche con 'Altri 3' (${primo} e ${chieste.flat().length})`);
+        // Terzo revisore (24/11): finite le letture non si propone un posto mai controllato né si dice "Li hai visti tutti".
+        const nomiDopo = await op.getByTestId("stasera-proposta").locator("h2").allTextContents();
+        ok((await op.getByTestId("stasera-ricomincio").count()) === 0 && nomiDopo.every((n) => n === "Terrazza Uno" || n === "Enoteca Tre") && (nomiDopo.length > 0 || await op.getByRole("heading", { name: "Chiusi quelli che ho controllato" }).isVisible().catch(() => false)),
+          `stasera, a che ora: letture finite → niente 'ricomincio il giro', solo posti controllati aperti (${nomiDopo.join(" | ") || "nessuno: 'Chiusi quelli che ho controllato'"})`);
         stData = stRows; }
       // Il riepilogo non contraddice il titolo (era "Chiusi adesso · … aperti adesso").
       risposta = (ids) => ({ orari: Object.fromEntries(ids.map((g) => [g, g === "G1" ? sempre : g === "GS03" ? domani : null])) });
-      await op.screenshot({ path: `${OUT}/84-stasera-chiusi.png`, caret: "initial" });
       // Orari non disponibili (errore o tetto del giorno): si propone come prima, con l'avviso.
       await op.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
       await op.getByTestId("stasera-proponi").waitFor({ timeout: 6000 }).catch(() => {});

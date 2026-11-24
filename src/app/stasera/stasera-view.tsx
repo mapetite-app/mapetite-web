@@ -223,6 +223,8 @@ export default function StaseraView({ userId }: { userId: string }) {
   const [oraId, setOraId] = useState<string | null>(null);
   const [controllo, setControllo] = useState(false);
   const [orariKo, setOrariKo] = useState(false);
+  // true = zero proposte perché le letture del tocco sono finite, non perché sono tutti chiusi.
+  const [controllati, setControllati] = useState(false);
   const [orari, setOrari] = useState<Record<string, OpeningPeriods | null>>({});
 
   const load = useCallback(() => {
@@ -288,9 +290,9 @@ export default function StaseraView({ userId }: { userId: string }) {
   // tiene i primi 3 non chiusi (orari non noti = il posto resta). `budget` vale per tutto il tocco: al massimo
   // LETTURE_PER_TOCCO letture, anche quando "Altri 3" ricomincia il giro (revisore 24/11: si arrivava a 30).
   // Se gli orari non arrivano, si propone come prima. `cache` è una copia degli orari già noti.
-  const scegli = async (skip: Set<string>, cache: Record<string, OpeningPeriods | null>, o: OraStasera | null, budget: { n: number }): Promise<{ picks: SavedSpot[]; ko: boolean }> => {
-    if (!spots) return { picks: [], ko: false };
-    if (!o) return { picks: pickThree(spots, choices, skip), ko: false };
+  const scegli = async (skip: Set<string>, cache: Record<string, OpeningPeriods | null>, o: OraStasera | null, budget: { n: number }): Promise<{ picks: SavedSpot[]; ko: boolean; esaurito: boolean }> => {
+    if (!spots) return { picks: [], ko: false, esaurito: false };
+    if (!o) return { picks: pickThree(spots, choices, skip), ko: false, esaurito: false };
     let ko = false;
     for (let giro = 0; giro < 2; giro++) {
       const salta = new Set([...skip, ...spots.filter((s) => apertoAlle(s, o, cache) === false).map((s) => s.id)]);
@@ -311,10 +313,14 @@ export default function StaseraView({ userId }: { userId: string }) {
           ko = true;
         }
       }
-      const picks = cand.filter((s) => apertoAlle(s, o, cache) !== false).slice(0, 3);
-      if (picks.length > 0 || cand.length === 0 || ko || budget.n <= 0) return { picks, ko };
+      // Un posto mai controllato (letture del tocco finite) non si propone come se fosse aperto (revisore 24/11):
+      // resta solo se gli orari non sono arrivati per un errore (ko) o se non ha un Place ID.
+      const visto = (s: SavedSpot) => apertoAlle(s, o, cache) !== undefined || !s.googlePlaceId || ko;
+      const picks = cand.filter((s) => visto(s) && apertoAlle(s, o, cache) !== false).slice(0, 3);
+      const esaurito = picks.length === 0 && cand.some((s) => !visto(s));
+      if (picks.length > 0 || cand.length === 0 || ko || budget.n <= 0) return { picks, ko, esaurito };
     }
-    return { picks: [], ko };
+    return { picks: [], ko, esaurito: false };
   };
 
   // L'ora scelta, ricalcolata adesso; se nel frattempo è passata (es. "Alle 20" alle 20:10) vale "Adesso".
@@ -330,8 +336,9 @@ export default function StaseraView({ userId }: { userId: string }) {
     setControllo(true);
     const o = oraDelTocco(id);
     const cache = { ...orari };
-    const { picks, ko } = await scegli(new Set(), cache, o, { n: LETTURE_PER_TOCCO });
+    const { picks, ko, esaurito } = await scegli(new Set(), cache, o, { n: LETTURE_PER_TOCCO });
     setOrari(cache);
+    setControllati(esaurito);
     setOraUsata(o);
     setControllo(false);
     occupato.current = false;
@@ -349,10 +356,12 @@ export default function StaseraView({ userId }: { userId: string }) {
     const o = oraUsata;
     const cache = { ...orari };
     const budget = { n: LETTURE_PER_TOCCO };
-    let { picks, ko } = await scegli(shown, cache, o, budget);
+    const primo = await scegli(shown, cache, o, budget);
+    let { picks, ko } = primo;
     let nextShown = new Set([...shown, ...picks.map((p) => p.id)]);
     let again = false;
-    if (picks.length === 0) {
+    // Letture finite con salvati ancora da controllare: non si ricomincia il giro ("Altri 3" continua).
+    if (picks.length === 0 && !primo.esaurito) {
       // Visti tutti: si ricomincia il giro, evitando di riproporre subito gli stessi.
       ({ picks, ko } = await scegli(new Set(proposals.map((p) => p.id)), cache, o, budget));
       if (picks.length === 0) ({ picks, ko } = await scegli(new Set(), cache, o, budget));
@@ -360,6 +369,7 @@ export default function StaseraView({ userId }: { userId: string }) {
       again = true;
     }
     setOrari(cache);
+    setControllati(primo.esaurito);
     setControllo(false);
     occupato.current = false;
     setProposals(picks);
@@ -415,13 +425,13 @@ export default function StaseraView({ userId }: { userId: string }) {
         ) : proposals ? (
           <section aria-label="Proposte per stasera">
             <h1 className="font-title text-[32px] font-medium leading-tight tracking-tight">
-              {proposals.length === 0 ? `Tutti chiusi ${ora?.id === "adesso" ? "adesso" : ora?.label.toLowerCase() ?? ""}` : proposals.length === 1 ? `Ecco un'idea ${quando}` : `Ecco ${proposals.length} idee ${quando}`}
+              {proposals.length === 0 && controllati ? "Chiusi quelli che ho controllato" : proposals.length === 0 ? `Tutti chiusi ${ora?.id === "adesso" ? "adesso" : ora?.label.toLowerCase() ?? ""}` : proposals.length === 1 ? `Ecco un'idea ${quando}` : `Ecco ${proposals.length} idee ${quando}`}
             </h1>
             {proposals.length > 0 && <p data-testid="stasera-riepilogo" className="mt-1 text-sm text-text-muted">{summary}</p>}
             {restarted && <p data-testid="stasera-ricomincio" className="mt-2 text-sm text-text-muted">Li hai visti tutti: ricomincio il giro.</p>}
             {proposals.length === 0 && (
               <div data-testid="stasera-tutti-chiusi" className="mt-3">
-                <p className="text-[15px] text-text-muted">I salvati che ho controllato sono chiusi a quell&apos;ora. Prova un&apos;altra ora:</p>
+                <p className="text-[15px] text-text-muted">{controllati ? "Ne ho controllati 10, chiusi a quell'ora: tocca «Altri 3» per i prossimi, o prova un'altra ora:" : "I salvati che ho controllato sono chiusi a quell'ora. Prova un'altra ora:"}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {ore.filter((o) => o.id !== ora?.id).map((o) => (
                     <Pill key={o.id} testId="stasera-altra-ora" active={false} onClick={() => { setOraId(o.id); void propose(o.id); }}>{o.label}</Pill>

@@ -74,9 +74,11 @@ export async function POST(request: Request) {
   }
   const daLeggere = mine.slice(0, restano);
   const orari: Record<string, OpeningPeriods | null> = {};
+  // Si conta prima di chiamare Google (revisore 24/11): se la scrittura dell'evento non riesce, meglio una
+  // lettura contata in più che una non contata.
+  await Promise.all(daLeggere.map((g) => recordEvent({ type: "funzione", userId, googlePlaceId: g, props: { nome: "orari_google" } })));
   await Promise.all(daLeggere.map(async (g) => {
     orari[g] = await fetchOpeningPeriods(g).catch((err) => { console.error("[orari] Google:", err); return null; });
-    await recordEvent({ type: "funzione", userId, googlePlaceId: g, props: { nome: "orari_google" } });
   }));
   console.log(`[orari] ${daLeggere.length} letture (${Object.values(orari).filter(Boolean).length} con orari)`);
   // I locali oltre il tetto non compaiono nella risposta: per il telefono "orari non noti", restano.
