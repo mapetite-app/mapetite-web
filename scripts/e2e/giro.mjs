@@ -3560,6 +3560,8 @@ else {
         // Profilo minimo: quello completo più le persone nascoste supera i 4 KB di un cookie (il browser lo scarta).
         const conN = { email: profilo.email, saved: [], reviews: [], nascosti: [{ chiave: "2026-11-23T21:10:00.123456+00:00", nome: "Giulia", quando: "2026-11-23T21:10:00.123456+00:00" }, { chiave: "2026-11-20T09:00:00+00:00", nome: null, quando: "2026-11-20T09:00:00+00:00" }] };
         await sctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(conN)), url: BASE }]);
+        // Prima su un'altra pagina: da /profilo a /profilo#nascosti cambierebbe solo l'ancora, senza ricaricare.
+        await p.goto(`${BASE}/aiuto`, { waitUntil: "domcontentloaded" });
         await p.goto(`${BASE}/profilo#nascosti`, { waitUntil: "networkidle" });
         const sez = p.getByTestId("profilo-nascosti");
         const txt = (await sez.innerText().catch(() => "")) ?? "";
