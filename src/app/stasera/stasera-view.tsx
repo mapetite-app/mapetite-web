@@ -317,8 +317,9 @@ export default function StaseraView({ userId }: { userId: string }) {
       // resta solo se gli orari non sono arrivati per un errore (ko) o se non ha un Place ID.
       const visto = (s: SavedSpot) => apertoAlle(s, o, cache) !== undefined || !s.googlePlaceId || ko;
       const picks = cand.filter((s) => visto(s) && apertoAlle(s, o, cache) !== false).slice(0, 3);
-      const esaurito = picks.length === 0 && cand.some((s) => !visto(s));
-      if (picks.length > 0 || cand.length === 0 || ko || budget.n <= 0) return { picks, ko, esaurito };
+      // Zero proposte con salvati ancora da controllare (oltre a questi candidati): non è "tutti chiusi".
+      const esaurito = picks.length === 0 && spots.some((s) => matches(s, choices) && !skip.has(s.id) && !visto(s));
+      if (picks.length > 0 || cand.length === 0 || ko || budget.n <= 0 || giro === 1) return { picks, ko, esaurito };
     }
     return { picks: [], ko, esaurito: false };
   };
