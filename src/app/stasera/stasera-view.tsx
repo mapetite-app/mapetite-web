@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ChevronRight, Clock } from "lucide-react";
 import { isOpenAt } from "@/lib/filter-options";
+import { oreStasera, type OraStasera } from "@/lib/ore-stasera";
 import type { OpeningPeriods } from "@/lib/google-places";
 import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -23,8 +24,6 @@ import {
   pickThree,
   inProgramma,
   oggiRoma,
-  oreStasera,
-  type OraStasera,
   type Choices,
   type SavedSpot,
 } from "@/lib/stasera";

@@ -3979,7 +3979,7 @@ else {
 
     // Proposta 84 "Fra 2 ore": "A che ora?" filtra i salvati con gli orari Google, chiesti solo al tocco.
     {
-      const stm = await import(new URL("../../src/lib/stasera.ts", import.meta.url).href);
+      const stm = await import(new URL("../../src/lib/ore-stasera.ts", import.meta.url).href);
       // Martedì 24/11/2026: alle 18:00 di Roma (17:00 UTC) → Adesso, Alle 20, Alle 21:30; alle 12:00 → Adesso, Alle 13, Alle 20; alle 21:15 → solo Adesso.
       const lab = (iso) => stm.oreStasera(new Date(iso)).map((o) => o.label).join("|");
       const o18 = stm.oreStasera(new Date("2026-11-24T17:00:00Z"));
