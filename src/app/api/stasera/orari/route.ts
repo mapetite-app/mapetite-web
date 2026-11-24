@@ -13,11 +13,12 @@ import { recordEvent } from "@/lib/events";
 const MAX_PER_TOCCO = 5;
 export const ORARI_AL_GIORNO = 20;
 const GID = /^[A-Za-z0-9_-]{10,300}$/;
-const romeDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" });
 
 async function orariDiOggi(): Promise<number> {
   try {
-    const since = new Date(`${romeDay.format(new Date())}T00:00:00+02:00`).toISOString();
+    // Ultime 24 ore (revisore 24/11): la quota Google si azzera alle 9 di Roma, non a mezzanotte; così le
+    // letture restano al massimo ORARI_AL_GIORNO in qualsiasi giorno di quota.
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { count, error } = await createAdminClient()
       .from("events")
       .select("id", { count: "exact", head: true })

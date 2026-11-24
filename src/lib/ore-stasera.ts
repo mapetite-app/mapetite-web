@@ -18,9 +18,13 @@ export function oreStasera(now = new Date()): OraStasera[] {
   const minute = Number(parts.minute);
   const adesso = hour * 60 + minute;
   const dopo = PASTI.filter((p) => p.hour * 60 + p.minute >= adesso + 30).slice(0, 2);
-  return [
+  const lista: OraStasera[] = [
     { id: "adesso", label: "Adesso", riepilogo: "aperti adesso", t: { day, hour, minute } },
     ...dopo.map((p) => ({ id: p.id, label: p.label, riepilogo: p.riepilogo, t: { day, hour: p.hour, minute: p.minute } })),
   ];
+  // Dopo le 21: "Fra un'ora" (revisore 24/11: la sola "Adesso" era spoglia), finché resta nello stesso giorno.
+  const fra = adesso + 60;
+  if (dopo.length === 0 && fra < 24 * 60) lista.push({ id: "1h", label: "Fra un'ora", riepilogo: "aperti fra un'ora", t: { day, hour: Math.floor(fra / 60), minute: fra % 60 } });
+  return lista;
 }
 

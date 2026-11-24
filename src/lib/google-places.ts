@@ -376,6 +376,7 @@ export async function fetchOpeningPeriods(placeId: string): Promise<OpeningPerio
     return null;
   }
   const p = (await res.json()) as Pick<GooglePlace, "currentOpeningHours" | "regularOpeningHours">;
-  const periods = p.currentOpeningHours?.periods ?? p.regularOpeningHours?.periods ?? null;
-  return periods && periods.length > 0 ? periods : null;
+  // Un elenco vuoto non vale: si passa alla settimana tipo.
+  const periods = [p.currentOpeningHours?.periods, p.regularOpeningHours?.periods].find((x) => x && x.length > 0);
+  return periods ?? null;
 }
