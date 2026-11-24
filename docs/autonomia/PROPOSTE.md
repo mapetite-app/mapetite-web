@@ -23,7 +23,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Cosa fa:** in "Stasera dove andiamo?" tre pillole d'ora ("Adesso", "Alle 20", "Alle 21:30"); i salvati si filtrano con gli orari di Google per quell'ora, ordine come oggi (gusto, mai recensioni). Un posto senza orari noti resta, con "orari non noti".
 - **Valore per l'utente:** la scelta del sabato sera in 10 secondi, dai propri salvati. **Per il ristoratore:** domanda dell'ultimo minuto, quella che riempie i tavoli vuoti.
 - **Sforzo:** S/M. **Costo Google:** gli orari dei salvati NON sono nel nostro database (verificato il 24/11; i termini Google limitano la copia), quindi servono letture Place Details solo al tocco di un'ora, al massimo 5 salvati, campo `regularOpeningHours` soltanto (fascia più economica): fino a 5 chiamate per uso, dentro la quota di 50 al giorno solo se l'uso resta basso. Da misurare prima di accenderla per tutti.
-- **Stato proposto:** PRONTA, con il conteggio delle chiamate in PR.
+- **Stato proposto:** PRONTA, con il conteggio delle chiamate in PR. **Costruita il 24/11 sera** (vedi BACKLOG): al massimo 10 letture per tocco, 20 nelle ultime 24 ore per tutta l'app, 0 € stimati.
 
 ### 85. "Aiuto" nell'app che risponde dalle domande vere
 - **Problema:** Apple rifiuta le app che sembrano solo un sito impacchettato (regola 4.2) e l'affollamento di app "salva dal reel" è alto (`COMPETITOR.md`, 24/11): serve far vedere subito cosa facciamo di diverso. Oggi `/aiuto` ha 7 risposte fisse.
