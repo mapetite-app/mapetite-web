@@ -33,7 +33,7 @@ export default function PersoneNascoste({ iniziali }: { iniziali: PersonaNascost
   }
 
   if (righe.length === 0) {
-    return <p data-testid="nascosti-vuoto" className="text-sm font-sans text-text-muted">Fatto: vedi di nuovo le loro recensioni e foto.</p>;
+    return <p data-testid="nascosti-vuoto" className="text-sm font-sans text-text-muted">{iniziali.length > 0 ? "Fatto: vedi di nuovo le loro recensioni e foto." : "Nessuna persona nascosta."}</p>;
   }
   return (
     <div data-testid="persone-nascoste">

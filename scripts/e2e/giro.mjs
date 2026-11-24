@@ -11686,6 +11686,13 @@ else {
     await fg.getByTestId("segnala-motivo-offensiva").click();
     ok(await fg.isVisible() && await lbx.isVisible() && (await fg.getByTestId("segnala-motivo-offensiva").getAttribute("aria-checked")) === "true", "segnala foto a schermo intero: il foglio sta sopra la foto e scegliere il motivo non la chiude");
     await fp.screenshot({ path: `${OUT}/foto-schermo-intero-segnala.png`, caret: "initial" });
+    { const cb = await lbx.getByRole("button", { name: "Chiudi la foto" }).boundingBox(); const sb = await lbx.getByTestId("segnala-apri").boundingBox();
+      ok(!!cb && !!sb && cb.x - (sb.x + sb.width) < 16 && sb.x > 250, `segnala foto a schermo intero: il '⋯' sta accanto a Chiudi (⋯ x ${Math.round(sb?.x ?? 0)}, Chiudi x ${Math.round(cb?.x ?? 0)})`); }
+    await fp.keyboard.press("Escape");
+    await fg.waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
+    ok((await fp.getByTestId("segnala-foglio").count()) === 0 && await lbx.isVisible(), "segnala foto a schermo intero: Escape chiude il foglio e lascia la foto");
+    await lbx.getByTestId("segnala-apri").click();
+    await fg.getByTestId("segnala-motivo-offensiva").click();
     await fg.getByTestId("segnala-invia").click();
     await lbx.waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
     ok(mp[0]?.tipo === "foto" && mp[0]?.id === "c0000001" && mp[0]?.motivo === "offensiva" && (await fp.getByTestId("foto-lightbox").count()) === 0 && (await strip.getByTestId("foto-community-foto").count()) === 1, `segnala foto a schermo intero: inviata, la foto si chiude e sparisce dalla fila (${JSON.stringify(mp[0] ?? null)})`);

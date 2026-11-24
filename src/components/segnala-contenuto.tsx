@@ -32,9 +32,11 @@ export default function SegnalaContenuto({ tipo, id, nome, onFatto, className = 
 
   useEffect(() => {
     if (!open || busy) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setOpen(false); setErrore(null); setMotivo(null); } };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // In cattura (revisore 24/11): dalla foto a schermo intero il keydown si ferma prima di arrivare a window.
+    // Escape chiude solo il foglio, non anche la foto sotto.
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); setErrore(null); setMotivo(null); } };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [open, busy]);
 
   async function invia(azione: "segnala" | "nascondi") {

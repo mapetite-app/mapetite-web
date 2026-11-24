@@ -42,7 +42,7 @@ export function FotoLightbox({ slides, start, onClose, azioni }: { slides: Slide
       }}
     >
       <div className="flex items-center justify-between gap-2 px-3 pt-[calc(0.5rem+env(safe-area-inset-top))]">
-        <p data-testid="foto-lightbox-autore" className="min-w-0 truncate font-display text-sm font-semibold text-white">
+        <p data-testid="foto-lightbox-autore" className="min-w-0 flex-1 truncate font-display text-sm font-semibold text-white">
           {cur.label}{slides.length > 1 && <span className="font-sans font-normal text-white/60"> · {i + 1} di {slides.length}</span>}
         </p>
         {/* Proposta 82, minore (24/11): "⋯" anche a schermo intero. Tocchi e tasti del foglio (in un portale)

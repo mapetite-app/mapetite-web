@@ -311,3 +311,10 @@ Ultimo aggiornamento: 22/11/2026.
 - **DAVVERO, in futuro:** app su App Store con Condividi, avvisi push nativi e "Accedi con Apple"; poi la stessa cosa su Android (Play Store, 25 $ una volta).
 - **Primo passo:** Lorenzo (iscrizione Apple, `APP-IPHONE.md`); poi il team (push nativi, Accedi con Apple).
 
+
+## 34. "Decido all'ultimo e non so chi è aperto a quell'ora; il locale ha tavoli vuoti che nessuno vede" — 24/11 (CEO che chiude)
+- **Chi lo ha:** clienti e ristoratori.
+- **Quanto pesa:** il 41% delle prenotazioni in Italia arriva nelle 4 ore prima del pasto (Quandoo con FIPE, [Teleborsa, 19/02/2026](https://www.teleborsa.it/AMP/News/2026/02/19/fipe-e-quandoo-uniscono-le-forze-per-le-prenotazioni-online-111.html)). Dati sui no-show trovati in rete (Dissapore, Panorama) senza attribuzione chiara: non li citiamo finché non sono verificati.
+- **OGGI nell'app:** "Stasera dove andiamo?" con i salvati aperti adesso; "Prenota su TheFork/Quandoo" apre il modulo del locale.
+- **DAVVERO, in futuro:** proposta 84 (aperti all'ora in cui ci vai, S); disponibilità vera dell'ultimo minuto con le API partner di Quandoo o TheFork (proposta 25, DA-FARE 10).
+- **Primo passo:** team (84); Lorenzo (richiesta a Quandoo, bozza in `PARTNER.md`).
