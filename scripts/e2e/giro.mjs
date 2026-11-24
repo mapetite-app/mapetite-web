@@ -3557,7 +3557,8 @@ else {
       // Persone nascoste (proposta 82, minore del 24/11): la riga c'è solo con almeno una persona nascosta;
       // il nome solo per i profili pubblici; "Mostra di nuovo" toglie la riga.
       { ok((await p.getByTestId("profilo-nascosti").count()) === 0, "persone nascoste: senza nessuna, la riga in Impostazioni non c'è");
-        const conN = { ...profilo, nascosti: [{ chiave: "2026-11-23T21:10:00.123456+00:00", nome: "Giulia", quando: "2026-11-23T21:10:00.123456+00:00" }, { chiave: "2026-11-20T09:00:00+00:00", nome: null, quando: "2026-11-20T09:00:00+00:00" }] };
+        // Profilo minimo: quello completo più le persone nascoste supera i 4 KB di un cookie (il browser lo scarta).
+        const conN = { email: profilo.email, saved: [], reviews: [], nascosti: [{ chiave: "2026-11-23T21:10:00.123456+00:00", nome: "Giulia", quando: "2026-11-23T21:10:00.123456+00:00" }, { chiave: "2026-11-20T09:00:00+00:00", nome: null, quando: "2026-11-20T09:00:00+00:00" }] };
         await sctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(conN)), url: BASE }]);
         await p.goto(`${BASE}/profilo#nascosti`, { waitUntil: "networkidle" });
         const sez = p.getByTestId("profilo-nascosti");
