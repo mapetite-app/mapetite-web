@@ -3977,6 +3977,71 @@ else {
     }, () => ok(false, "stasera: posizione negata → spiegazione e si cerca ovunque"));
     await stc.close();
 
+    // Proposta 84 "Fra 2 ore": "A che ora?" filtra i salvati con gli orari Google, chiesti solo al tocco.
+    {
+      const stm = await import(new URL("../../src/lib/stasera.ts", import.meta.url).href);
+      // Martedì 24/11/2026: alle 18:00 di Roma (17:00 UTC) → Adesso, Alle 20, Alle 21:30; alle 12:00 → Adesso, Alle 13, Alle 20; alle 21:15 → solo Adesso.
+      const lab = (iso) => stm.oreStasera(new Date(iso)).map((o) => o.label).join("|");
+      const o18 = stm.oreStasera(new Date("2026-11-24T17:00:00Z"));
+      ok(lab("2026-11-24T17:00:00Z") === "Adesso|Alle 20|Alle 21:30" && lab("2026-11-24T11:00:00Z") === "Adesso|Alle 13|Alle 20" && lab("2026-11-24T20:15:00Z") === "Adesso" && o18[0].t.day === 2 && o18[0].t.hour === 18 && o18[2].t.hour === 21 && o18[2].t.minute === 30,
+        `stasera, a che ora (proposta 84): ore giuste per le 18, le 12 e le 21:15 di Roma (${lab("2026-11-24T17:00:00Z")} / ${lab("2026-11-24T11:00:00Z")} / ${lab("2026-11-24T20:15:00Z")})`);
+      ok((await fetch(`${BASE}/api/stasera/orari`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).status === 400 && (await fetch(`${BASE}/api/stasera/orari`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: ["ChIJaaaaaaaaaa1", "ChIJaaaaaaaaaa2", "ChIJaaaaaaaaaa3", "ChIJaaaaaaaaaa4", "ChIJaaaaaaaaaa5", "ChIJaaaaaaaaaa6"] }) })).status === 400, "stasera, a che ora: /api/stasera/orari 400 senza locali o con più di 5");
+      const romaDow = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Rome", weekday: "short" }).format(new Date())];
+      const sempre = [{ open: { day: 0, hour: 0, minute: 0 } }]; // aperto h24
+      const domani = [{ open: { day: (romaDow + 1) % 7, hour: 0, minute: 0 }, close: { day: (romaDow + 1) % 7, hour: 23, minute: 59 } }]; // oggi chiuso
+      const oc = await stCtx();
+      let chieste = [];
+      let risposta = (ids) => ({ orari: Object.fromEntries(ids.map((g) => [g, g === "G1" ? sempre : g === "GS03" ? domani : null])) });
+      let stato = 200;
+      await oc.route("**/api/stasera/orari", (r) => { const ids = r.request().postDataJSON().ids; chieste.push(ids); return stato === 200 ? r.fulfill({ json: risposta(ids) }) : r.fulfill({ status: stato, json: { error: "x" } }); });
+      const op = await oc.newPage();
+      op.on("pageerror", (e) => errors.push(e.message));
+      await op.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+      await op.getByTestId("stasera-proponi").waitFor({ timeout: 6000 }).catch(() => {});
+      const ore = await op.getByTestId("stasera-ora").getByRole("button").allTextContents();
+      ok(ore[0] === "Adesso" && ore.length >= 1 && ore.length <= 3 && (await op.getByTestId("stasera-ora").getByRole("button").evaluateAll((b) => b.every((x) => x.getAttribute("aria-pressed") === "false"))), `stasera, a che ora: 'Adesso' più al massimo due ore, nessuna accesa di partenza (${ore.join(" | ")})`);
+      // Senza ora scelta: nessuna chiamata agli orari.
+      await op.getByTestId("stasera-proponi").click();
+      await op.getByTestId("stasera-proposta").first().waitFor({ timeout: 3000 }).catch(() => {});
+      ok(chieste.length === 0 && (await op.getByTestId("stasera-orario").count()) === 0, `stasera, a che ora: senza ora scelta nessuna lettura degli orari (${chieste.length})`);
+      await op.getByRole("button", { name: "Cambia scelte" }).click();
+      await op.getByTestId("stasera-ora").getByRole("button", { name: "Adesso" }).click();
+      ok((await op.getByTestId("stasera-ora").getByRole("button", { name: "Adesso" }).getAttribute("aria-pressed")) === "true", "stasera, a che ora: 'Adesso' si accende");
+      await op.getByTestId("stasera-proponi").click();
+      await op.getByTestId("stasera-proposta").first().waitFor({ timeout: 4000 }).catch(() => {});
+      const nomi = await op.getByTestId("stasera-proposta").locator("h2").allTextContents();
+      const terr = op.getByTestId("stasera-proposta").filter({ hasText: "Terrazza Uno" });
+      const altro = op.getByTestId("stasera-proposta").filter({ hasNotText: "Terrazza Uno" }).first();
+      ok(chieste.length === 1 && chieste[0].length <= 5 && chieste[0].length >= 3 && nomi.length === 3 && !nomi.includes("Enoteca Tre"),
+        `stasera, a che ora: una lettura per al massimo 5 salvati, 3 proposte, mai quello chiuso (${JSON.stringify(chieste)} → ${nomi.join(" | ")})`);
+      if (await terr.count()) ok(((await terr.getByTestId("stasera-orario").textContent()) ?? "").trim() === "Aperto adesso", "stasera, a che ora: 'Aperto adesso' sul posto aperto");
+      ok(((await altro.getByTestId("stasera-orario").textContent().catch(() => "")) ?? "").trim() === "Orari non noti", "stasera, a che ora: 'Orari non noti' quando Google non li dà (il posto resta)");
+      ok(((await op.getByTestId("stasera-riepilogo").textContent()) ?? "").endsWith("aperti adesso"), "stasera, a che ora: il riepilogo dice 'aperti adesso'");
+      await op.screenshot({ path: `${OUT}/84-stasera-ora.png`, caret: "initial" });
+      const giaChiesti = new Set(chieste.flat());
+      await op.getByTestId("stasera-altri").click().catch(() => {});
+      await op.waitForTimeout(400);
+      ok(chieste.flat().filter((g) => giaChiesti.has(g)).length === giaChiesti.size, `stasera, a che ora: 'Altri 3' non richiede gli orari già letti (${JSON.stringify(chieste)})`);
+      // Tutti chiusi: messaggio chiaro, niente card.
+      await op.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+      await op.getByTestId("stasera-proponi").waitFor({ timeout: 6000 }).catch(() => {});
+      chieste = []; risposta = (ids) => ({ orari: Object.fromEntries(ids.map((g) => [g, domani])) });
+      await op.getByTestId("stasera-ora").getByRole("button", { name: "Adesso" }).click();
+      await op.getByTestId("stasera-proponi").click();
+      await op.getByTestId("stasera-tutti-chiusi").waitFor({ timeout: 4000 }).catch(() => {});
+      ok(await op.getByTestId("stasera-tutti-chiusi").isVisible().catch(() => false) && (await op.getByTestId("stasera-proposta").count()) === 0 && await op.getByRole("heading", { name: "Chiusi adesso" }).isVisible().catch(() => false) && chieste.flat().length <= 10, `stasera, a che ora: tutti chiusi → 'Chiusi adesso' e invito a cambiare ora, al massimo 10 letture (${chieste.flat().length})`);
+      await op.screenshot({ path: `${OUT}/84-stasera-chiusi.png`, caret: "initial" });
+      // Orari non disponibili (errore o tetto del giorno): si propone come prima, con l'avviso.
+      await op.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+      await op.getByTestId("stasera-proponi").waitFor({ timeout: 6000 }).catch(() => {});
+      stato = 429;
+      await op.getByTestId("stasera-ora").getByRole("button", { name: "Adesso" }).click();
+      await op.getByTestId("stasera-proponi").click();
+      await op.getByTestId("stasera-proposta").first().waitFor({ timeout: 4000 }).catch(() => {});
+      ok((await op.getByTestId("stasera-proposta").count()) === 3 && await op.getByTestId("stasera-orari-ko").isVisible().catch(() => false), "stasera, a che ora: orari non disponibili → 3 proposte come prima e 'controlla prima di andare'");
+      await oc.close();
+    }
+
     // Posizione già permessa (Roma): "Vicino a me" si accende da solo, niente salvati di Milano, distanza sulla card
     const stg = await stCtx({ permissions: ["geolocation"], geolocation: { latitude: 41.9, longitude: 12.49 } });
     const sg = await stg.newPage();

@@ -357,3 +357,25 @@ export async function fetchPlaceDetails(placeId: string): Promise<PlaceResult | 
   }
   return mapGooglePlace((await res.json()) as GooglePlace);
 }
+
+// Proposta 84 ("Fra 2 ore" in /stasera): solo gli orari di un salvato. Place Details con i soli campi
+// degli orari = fascia "Place Details Enterprise" (più bassa di quella delle recensioni), con la sua
+// soglia gratuita mensile. Gli orari si mostrano e basta: mai salvati (termini Google, 3.2.3(b)).
+export type OpeningPeriods = OpeningPeriod[];
+export async function fetchOpeningPeriods(placeId: string): Promise<OpeningPeriods | null> {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey || !/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return null;
+  // Collaudi senza quota (GOOGLE_FIXTURES_ONLY=1): mai Google vero, orari non noti.
+  if (process.env.NODE_ENV === "development" && process.env.GOOGLE_FIXTURES_ONLY === "1") return null;
+  const res = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
+    headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": "currentOpeningHours.periods,regularOpeningHours.periods" },
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!res.ok) {
+    console.error(`[orari] Google error ${res.status} per ${placeId}`);
+    return null;
+  }
+  const p = (await res.json()) as Pick<GooglePlace, "currentOpeningHours" | "regularOpeningHours">;
+  const periods = p.currentOpeningHours?.periods ?? p.regularOpeningHours?.periods ?? null;
+  return periods && periods.length > 0 ? periods : null;
+}

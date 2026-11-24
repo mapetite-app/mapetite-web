@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight, Clock } from "lucide-react";
+import { isOpenAt } from "@/lib/filter-options";
+import type { OpeningPeriods } from "@/lib/google-places";
 import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
@@ -21,6 +23,8 @@ import {
   pickThree,
   inProgramma,
   oggiRoma,
+  oreStasera,
+  type OraStasera,
   type Choices,
   type SavedSpot,
 } from "@/lib/stasera";
@@ -111,7 +115,10 @@ function Pill({ active, onClick, children, testId }: { active: boolean; onClick:
   );
 }
 
-function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | null; pos: Pos | null }) {
+// Proposta 84: con un'ora scelta, la card dice se a quell'ora è aperto (orari Google) o se non si sa.
+type Orario = { ora: OraStasera; aperto: boolean | null } | null;
+
+function SpotCard({ spot, verdict, pos, orario }: { spot: SavedSpot; verdict: string | null; pos: Pos | null; orario: Orario }) {
   const emoji = getCategoryEmoji(spot.category, spot.name);
   const city = cityFromAddress(spot.address);
   const dist = pos && spot.lat != null && spot.lng != null ? distanceLabel(pos, { lat: spot.lat, lng: spot.lng }) : null;
@@ -133,6 +140,12 @@ function SpotCard({ spot, verdict, pos }: { spot: SavedSpot; verdict: string | n
         <div className="min-w-0 flex-1">
           <h2 className="font-title text-lg font-semibold leading-snug text-brand">{spot.name}</h2>
           {where && <p className="mt-0.5 text-sm text-text-muted">{where}</p>}
+          {orario && (
+            <p data-testid="stasera-orario" className={`mt-1 flex items-center gap-1 text-[13px] ${orario.aperto ? "font-semibold text-brand" : "text-text-muted"}`}>
+              <Clock aria-hidden size={14} className="shrink-0" />
+              {orario.aperto ? (orario.ora.id === "adesso" ? "Aperto adesso" : `Aperto ${orario.ora.label.toLowerCase()}`) : "Orari non noti"}
+            </p>
+          )}
           {(planned || want || done) && (
             <span
               data-testid="stasera-stato"
@@ -203,6 +216,12 @@ export default function StaseraView({ userId }: { userId: string }) {
   const [restarted, setRestarted] = useState(false);
   // Proposta 69: "🌙 Dove c'è posto" (solo se almeno un salvato lo ha detto oggi).
   const [soloPosto, setSoloPosto] = useState(false);
+  // Proposta 84 "Fra 2 ore": ora scelta (null = qualsiasi). Gli orari Google si chiedono solo qui, al tocco
+  // di "Proponimi"/"Altri 3", per al massimo 5 salvati, e restano in memoria finché la pagina è aperta.
+  const [oraId, setOraId] = useState<string | null>(null);
+  const [controllo, setControllo] = useState(false);
+  const [orariKo, setOrariKo] = useState(false);
+  const [orari, setOrari] = useState<Record<string, OpeningPeriods | null>>({});
 
   const load = useCallback(() => {
     let alive = true;
@@ -244,36 +263,88 @@ export default function StaseraView({ userId }: { userId: string }) {
   const collections = useMemo(() => collectionsOf(spots ?? []), [spots]);
   const cities = useMemo(() => citiesOf(spots ?? []), [spots]);
   const matching = useMemo(() => (spots ?? []).filter((s) => matches(s, choices)), [spots, choices]);
+  // Le ore si calcolano quando arrivano i salvati (la scelta compare solo dopo): "Adesso" e le prossime due.
+  const ore = useMemo(() => (spots ? oreStasera() : []), [spots]);
+  const ora = ore.find((o) => o.id === oraId) ?? null;
+  // undefined = non ancora chiesto; null = orari non noti; true/false da Google.
+  const apertoAlle = (s: SavedSpot, o: OraStasera, cache = orari): boolean | null | undefined => {
+    if (!s.googlePlaceId || !(s.googlePlaceId in cache)) return undefined;
+    return isOpenAt(cache[s.googlePlaceId], o.t);
+  };
+  const chiuso = (s: SavedSpot) => !!ora && apertoAlle(s, ora) === false;
   const matchCount = matching.length;
+  const apribili = ora ? matching.filter((s) => !chiuso(s)).length : matchCount;
 
-  const propose = () => {
-    if (!spots) return;
-    const picks = pickThree(spots, choices);
+  // Sceglie fino a 3 posti; con un'ora scelta chiede a Google gli orari dei 5 candidati migliori non ancora
+  // noti e tiene i primi 3 non chiusi (orari non noti = il posto resta). Se i 5 sono tutti chiusi, un altro
+  // giro da 5 e basta: al massimo 10 letture per tocco. Se gli orari non arrivano, si propone come prima.
+  // `cache` è una copia degli orari già noti: la si aggiorna qui e la si salva alla fine del tocco.
+  const scegli = async (skip: Set<string>, cache: Record<string, OpeningPeriods | null>): Promise<{ picks: SavedSpot[]; ko: boolean }> => {
+    if (!spots) return { picks: [], ko: false };
+    if (!ora) return { picks: pickThree(spots, choices, skip), ko: false };
+    let ko = false;
+    for (let giro = 0; giro < 2; giro++) {
+      const salta = new Set([...skip, ...spots.filter((s) => apertoAlle(s, ora, cache) === false).map((s) => s.id)]);
+      const cand = pickThree(spots, choices, salta, 5);
+      const daChiedere = cand.map((s) => s.googlePlaceId).filter((g): g is string => !!g && !(g in cache));
+      if (daChiedere.length > 0) {
+        try {
+          const r = await fetch("/api/stasera/orari", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: daChiedere }) });
+          if (!r.ok) throw new Error(`orari ${r.status}`);
+          const j = (await r.json()) as { orari?: Record<string, OpeningPeriods | null> };
+          for (const g of daChiedere) {
+            if (j.orari && g in j.orari) cache[g] = j.orari[g];
+            else ko = true; // oltre il tetto del giorno: orari non noti, il posto resta
+          }
+        } catch (e) {
+          console.error("[stasera] orari non disponibili:", e);
+          ko = true;
+        }
+      }
+      const picks = cand.filter((s) => apertoAlle(s, ora, cache) !== false).slice(0, 3);
+      if (picks.length > 0 || cand.length === 0 || ko) return { picks, ko };
+    }
+    return { picks: [], ko };
+  };
+
+  const propose = async () => {
+    if (!spots || controllo) return;
+    setControllo(true);
+    const cache = { ...orari };
+    const { picks, ko } = await scegli(new Set(), cache);
+    setOrari(cache);
+    setControllo(false);
     setProposals(picks);
     setShown(new Set(picks.map((p) => p.id)));
     setRestarted(false);
+    setOrariKo(ko);
     window.scrollTo({ top: 0 });
   };
 
-  const more = () => {
-    if (!spots || !proposals) return;
-    let picks = pickThree(spots, choices, shown);
+  const more = async () => {
+    if (!spots || !proposals || controllo) return;
+    setControllo(true);
+    const cache = { ...orari };
+    let { picks, ko } = await scegli(shown, cache);
     let nextShown = new Set([...shown, ...picks.map((p) => p.id)]);
     let again = false;
     if (picks.length === 0) {
       // Visti tutti: si ricomincia il giro, evitando di riproporre subito gli stessi.
-      picks = pickThree(spots, choices, new Set(proposals.map((p) => p.id)));
-      if (picks.length === 0) picks = pickThree(spots, choices);
+      ({ picks, ko } = await scegli(new Set(proposals.map((p) => p.id)), cache));
+      if (picks.length === 0) ({ picks, ko } = await scegli(new Set(), cache));
       nextShown = new Set(picks.map((p) => p.id));
       again = true;
     }
+    setOrari(cache);
+    setControllo(false);
     setProposals(picks);
     setShown(nextShown);
     setRestarted(again);
+    setOrariKo(ko);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const summary = [occasion ? tagDisplay(occasion) : "Qualsiasi occasione", city ? `a ${city}` : choices.near ? "vicino a te" : "ovunque", onlyNew ? "da provare" : "anche dove sono stato", soloPosto ? "dove c'è posto" : null].filter(Boolean).join(" · ");
+  const summary = [occasion ? tagDisplay(occasion) : "Qualsiasi occasione", city ? `a ${city}` : choices.near ? "vicino a te" : "ovunque", onlyNew ? "da provare" : "anche dove sono stato", soloPosto ? "dove c'è posto" : null, ora?.riepilogo ?? null].filter(Boolean).join(" · ");
 
   return (
     <main data-testid="stasera" className="-mb-[calc(var(--nav-height-mobile)+var(--nav-sporgenza))] min-h-dvh bg-[#f6f7f7] pb-[var(--nav-height-mobile)] text-text md:mb-0 md:min-h-[calc(100dvh-3.5rem)] md:pb-0">
@@ -316,13 +387,19 @@ export default function StaseraView({ userId }: { userId: string }) {
         ) : proposals ? (
           <section aria-label="Proposte per stasera">
             <h1 className="font-title text-[32px] font-medium leading-tight tracking-tight">
-              {proposals.length === 1 ? "Ecco un'idea per stasera" : `Ecco ${proposals.length} idee per stasera`}
+              {proposals.length === 0 ? `Chiusi ${ora?.id === "adesso" ? "adesso" : ora?.label.toLowerCase() ?? ""}` : proposals.length === 1 ? "Ecco un'idea per stasera" : `Ecco ${proposals.length} idee per stasera`}
             </h1>
             <p data-testid="stasera-riepilogo" className="mt-1 text-sm text-text-muted">{summary}</p>
             {restarted && <p data-testid="stasera-ricomincio" className="mt-2 text-sm text-text-muted">Li hai visti tutti: ricomincio il giro.</p>}
+            {proposals.length === 0 && (
+              <p data-testid="stasera-tutti-chiusi" className="mt-3 text-[15px] text-text-muted">I salvati che ho controllato sono chiusi a quell&apos;ora. Prova un&apos;altra ora o altri posti.</p>
+            )}
+            {orariKo && proposals.length > 0 && (
+              <p data-testid="stasera-orari-ko" role="status" className="mt-2 text-sm text-text-muted">Non riesco a leggere tutti gli orari adesso: controlla prima di andare.</p>
+            )}
             <ul className="mt-5 space-y-3">
               {proposals.map((s) => (
-                <SpotCard key={s.id} spot={s} verdict={s.googlePlaceId ? verdicts[s.googlePlaceId] ?? null : null} pos={pos} />
+                <SpotCard key={s.id} spot={s} verdict={s.googlePlaceId ? verdicts[s.googlePlaceId] ?? null : null} pos={pos} orario={ora ? { ora, aperto: apertoAlle(s, ora) ?? null } : null} />
               ))}
             </ul>
             <div className="sticky bottom-[var(--nav-height-mobile)] -mx-4 mt-5 flex gap-2 bg-gradient-to-t from-[#f6f7f7] from-60% to-transparent px-4 pb-[calc(0.75rem+var(--nav-sporgenza))] pt-6">
@@ -333,14 +410,16 @@ export default function StaseraView({ userId }: { userId: string }) {
               >
                 Cambia scelte
               </button>
-              {matchCount > proposals.length && (
+              {apribili > proposals.length && (
                 <button
                   type="button"
                   onClick={more}
+                  disabled={controllo}
+                  aria-busy={controllo}
                   data-testid="stasera-altri"
-                  className="min-h-12 flex-1 rounded-pill bg-accent font-display font-semibold text-white shadow-float active:scale-[0.98]"
+                  className="min-h-12 flex-1 rounded-pill bg-accent font-display font-semibold text-white shadow-float active:scale-[0.98] disabled:opacity-80"
                 >
-                  Altri 3
+                  {controllo ? "Controllo…" : "Altri 3"}
                 </button>
               )}
             </div>
@@ -377,6 +456,15 @@ export default function StaseraView({ userId }: { userId: string }) {
             {geo === "assente" && (
               <p role="status" className="mt-2 text-xs text-text-muted">Posizione non disponibile adesso: intanto cerco ovunque.</p>
             )}
+
+            <h2 className="mb-2.5 mt-6 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">A che ora?</h2>
+            <div data-testid="stasera-ora" className="flex flex-wrap gap-2">
+              {ore.map((o) => (
+                <Pill key={o.id} active={oraId === o.id} onClick={() => { const nuova = oraId === o.id ? null : o.id; setOraId(nuova); if (nuova) track("funzione", null, { nome: "stasera_ora", ora: nuova }); }}>
+                  {o.label}
+                </Pill>
+              ))}
+            </div>
 
             <h2 className="mb-2.5 mt-6 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Che voglia?</h2>
             <div data-testid="stasera-novita" className="flex flex-wrap gap-2">
@@ -423,10 +511,12 @@ export default function StaseraView({ userId }: { userId: string }) {
                 <button
                   type="button"
                   onClick={propose}
+                  disabled={controllo}
+                  aria-busy={controllo}
                   data-testid="stasera-proponi"
-                  className="min-h-14 w-full rounded-pill bg-accent font-display text-[17px] font-semibold text-white shadow-float active:scale-[0.98]"
+                  className="min-h-14 w-full rounded-pill bg-accent font-display text-[17px] font-semibold text-white shadow-float active:scale-[0.98] disabled:opacity-80"
                 >
-                  {matchCount >= 3 ? "Proponimi 3 posti" : matchCount === 1 ? "Proponimi l'unico posto" : `Proponimi i ${matchCount} posti`}
+                  {controllo ? "Controllo gli orari…" : matchCount >= 3 ? "Proponimi 3 posti" : matchCount === 1 ? "Proponimi l'unico posto" : `Proponimi i ${matchCount} posti`}
                 </button>
                 <p data-testid="stasera-conteggio" className="mt-2 text-center text-xs text-text-muted">
                   {matchCount === 1 ? "1 salvato" : `${matchCount} salvati`} con queste scelte
