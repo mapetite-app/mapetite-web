@@ -34,7 +34,7 @@ const DOMANDE: { d: string; r: string; id: string }[] = [
   },
   {
     id: "segnala",
-    d: "Una recensione o una foto non va bene",
+    d: "Cosa faccio se una recensione o una foto non va bene?",
     r: "Tocca \"⋯\" accanto alla recensione o nell'angolo della foto: puoi segnalarla (la guardiamo entro 24 ore) o non vedere più i contenuti di quella persona. Per tornare a vederli: Profilo → Impostazioni → \"Persone nascoste\" → \"Mostra di nuovo\".",
   },
   {

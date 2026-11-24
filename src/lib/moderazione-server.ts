@@ -19,13 +19,14 @@ export async function personeNascoste(userId: string): Promise<PersonaNascosta[]
     .limit(MAX_NASCOSTI_LISTA);
   if (error) {
     // Senza la migrazione 20261123_moderazione la tabella non c'è: nessuna riga.
-    if (error.code !== "42P01") console.warn(`[moderazione] persone nascoste ${error.code ?? ""}`);
+    if (error.code !== "42P01" && error.code !== "PGRST205") console.warn(`[moderazione] persone nascoste ${error.code ?? ""}`);
     return [];
   }
   const righe = (data ?? []) as { nascosto_id: string; created_at: string }[];
   if (righe.length === 0) return [];
   // Solo i profili pubblici hanno un nome (vista profili_pubblici: is_public e handle).
-  const { data: prof } = await admin.from("profili_pubblici").select("id, handle, display_name").in("id", righe.map((r) => r.nascosto_id));
+  const { data: prof, error: errProf } = await admin.from("profili_pubblici").select("id, handle, display_name").in("id", righe.map((r) => r.nascosto_id));
+  if (errProf) console.warn(`[moderazione] nomi delle persone nascoste ${errProf.code ?? ""}`);
   const nomi = new Map(((prof ?? []) as { id: string; handle: string | null; display_name: string | null }[]).map((p) => [p.id, p.display_name?.trim() || (p.handle ? `@${p.handle}` : null)]));
   return righe.map((r) => ({ chiave: r.created_at, nome: nomi.get(r.nascosto_id) ?? null, quando: r.created_at }));
 }

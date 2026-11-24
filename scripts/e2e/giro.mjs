@@ -11675,6 +11675,23 @@ else {
     await fp.unroute("**/api/moderazione");
     await fp.reload({ waitUntil: "networkidle" });
     await fp.getByTestId("community-locale").waitFor({ timeout: 8000 }).catch(() => {}); }
+  // Minore della 82 (24/11): "⋯" anche nella foto a schermo intero; i tocchi nel foglio non chiudono la foto.
+  { const mp = [];
+    await fp.route("**/api/moderazione", (r) => { mp.push(r.request().postDataJSON()); return r.fulfill({ json: { ok: true } }); });
+    await strip.getByTestId("foto-community-foto").first().click();
+    const lbx = fp.getByTestId("foto-lightbox");
+    ok(await lbx.isVisible() && (await lbx.getByTestId("segnala-apri").count()) === 1, "segnala foto a schermo intero: c'è il '⋯' accanto a Chiudi");
+    await lbx.getByTestId("segnala-apri").click();
+    const fg = fp.getByTestId("segnala-foglio");
+    await fg.getByTestId("segnala-motivo-offensiva").click();
+    ok(await fg.isVisible() && await lbx.isVisible() && (await fg.getByTestId("segnala-motivo-offensiva").getAttribute("aria-checked")) === "true", "segnala foto a schermo intero: il foglio sta sopra la foto e scegliere il motivo non la chiude");
+    await fp.screenshot({ path: `${OUT}/foto-schermo-intero-segnala.png`, caret: "initial" });
+    await fg.getByTestId("segnala-invia").click();
+    await lbx.waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
+    ok(mp[0]?.tipo === "foto" && mp[0]?.id === "c0000001" && mp[0]?.motivo === "offensiva" && (await fp.getByTestId("foto-lightbox").count()) === 0 && (await strip.getByTestId("foto-community-foto").count()) === 1, `segnala foto a schermo intero: inviata, la foto si chiude e sparisce dalla fila (${JSON.stringify(mp[0] ?? null)})`);
+    await fp.unroute("**/api/moderazione");
+    await fp.reload({ waitUntil: "networkidle" });
+    await fp.getByTestId("community-locale").waitFor({ timeout: 8000 }).catch(() => {}); }
   const nUp = uploads.length;
   await mie.locator("input[type=file]").setInputFiles(fotoFile("IMG_3.jpg"));
   await mie.getByTestId("foto-mia").first().waitFor({ timeout: 15000 }).catch(() => {});

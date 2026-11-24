@@ -94,10 +94,13 @@ async function mostra(chiave: unknown) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user && process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER) return NextResponse.json({ ok: true });
   if (!user) return NextResponse.json({ error: "Accedi per farlo." }, { status: 401 });
-  const { error } = await createAdminClient().from("utenti_nascosti").delete().eq("user_id", user.id).eq("created_at", chiave);
+  if (!process.env.SUPABASE_SECRET_KEY) return NextResponse.json({ error: ERRORE }, { status: 500 });
+  const { data, error } = await createAdminClient().from("utenti_nascosti").delete().eq("user_id", user.id).eq("created_at", chiave).select("created_at");
   if (error) {
     console.warn(`[moderazione] mostra ${error.code ?? ""}`);
     return NextResponse.json({ error: ERRORE }, { status: 500 });
   }
+  // Chiave vecchia (pagina aperta da tempo): niente da togliere, si chiede di ricaricare invece di dire "fatto".
+  if ((data ?? []).length === 0) return NextResponse.json({ error: "La lista è cambiata: ricarica la pagina." }, { status: 409 });
   return NextResponse.json({ ok: true });
 }
