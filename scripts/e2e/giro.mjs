@@ -4016,7 +4016,7 @@ else {
         `stasera, a che ora: una lettura per al massimo 5 salvati, 3 proposte, mai quello chiuso (${JSON.stringify(chieste)} → ${nomi.join(" | ")})`);
       if (await terr.count()) ok(((await terr.getByTestId("stasera-orario").textContent()) ?? "").trim() === "Aperto adesso", "stasera, a che ora: 'Aperto adesso' sul posto aperto");
       ok((await altro.count()) === 1 && (await altro.getByTestId("stasera-orario").count()) === 0, "stasera, a che ora: senza orari Google il posto resta, senza righe in più (revisore 24/11)");
-      ok(((await op.getByTestId("stasera-riepilogo").textContent()) ?? "").endsWith("aperti adesso"), "stasera, a che ora: il riepilogo dice 'aperti adesso'");
+      ok(((await op.getByTestId("stasera-riepilogo").textContent()) ?? "").endsWith(" · adesso") && !/aperti/.test((await op.getByTestId("stasera-riepilogo").textContent()) ?? ""), "stasera, a che ora: il riepilogo dice '· adesso', mai 'aperti' (i posti senza orari restano)");
       await op.screenshot({ path: `${OUT}/84-stasera-ora.png`, caret: "initial" });
       const giaChiesti = new Set(chieste.flat());
       await op.getByTestId("stasera-altri").click().catch(() => {});

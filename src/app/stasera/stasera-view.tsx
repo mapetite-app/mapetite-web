@@ -143,7 +143,7 @@ function SpotCard({ spot, verdict, pos, orario }: { spot: SavedSpot; verdict: st
           <h2 className="font-title text-lg font-semibold leading-snug text-brand">{spot.name}</h2>
           {where && <p className="mt-0.5 text-sm text-text-muted">{where}</p>}
           {orario?.aperto && (
-            <p data-testid="stasera-orario" className={`mt-1 flex items-center gap-1 text-[13px] ${orario.aperto ? "font-semibold text-brand" : "text-text-muted"}`}>
+            <p data-testid="stasera-orario" className="mt-1 flex items-center gap-1 text-[13px] font-semibold text-brand">
               <Clock aria-hidden size={14} className="shrink-0" />
               {orario.ora.id === "adesso" ? "Aperto adesso" : `Aperto ${orario.ora.label.toLowerCase()}`}
             </p>
@@ -269,6 +269,8 @@ export default function StaseraView({ userId }: { userId: string }) {
   // usata per le proposte si fissa al tocco (revisore 24/11: con la pagina aperta per ore "Adesso" restava vecchio).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const ore = useMemo(() => (spots ? oreStasera() : []), [spots, proposals]);
+  // Un'ora scelta che nel frattempo è passata (es. "Alle 13" alle 12:35) non vale più: niente ora nascosta.
+  const oraValida = ore.some((o) => o.id === oraId) ? oraId : null;
   const [oraUsata, setOraUsata] = useState<OraStasera | null>(null);
   const ora = proposals ? oraUsata : null;
   // undefined = non ancora chiesto; null = orari non noti; true/false da Google.
@@ -322,7 +324,7 @@ export default function StaseraView({ userId }: { userId: string }) {
     return fresche.find((o) => o.id === id) ?? fresche[0];
   };
 
-  const propose = async (id: string | null = oraId) => {
+  const propose = async (id: string | null = oraValida) => {
     if (!spots || occupato.current) return;
     occupato.current = true;
     setControllo(true);
@@ -368,7 +370,8 @@ export default function StaseraView({ userId }: { userId: string }) {
   };
 
   // "Alle 13" è il pranzo: il titolo non dice "per stasera".
-  const quando = ora?.id === "13" ? "per pranzo" : "per stasera";
+  // "Adesso" di giorno: "per adesso" (revisore 24/11).
+  const quando = ora?.id === "13" ? "per pranzo" : ora?.id === "adesso" && ora.t.hour < 17 ? "per adesso" : "per stasera";
   const summary = [occasion ? tagDisplay(occasion) : "Qualsiasi occasione", city ? `a ${city}` : choices.near ? "vicino a te" : "ovunque", onlyNew ? "da provare" : "anche dove sono stato", soloPosto ? "dove c'è posto" : null, ora?.riepilogo ?? null].filter(Boolean).join(" · ");
 
   return (
@@ -493,7 +496,7 @@ export default function StaseraView({ userId }: { userId: string }) {
             <h2 className="mb-2.5 mt-6 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">A che ora?</h2>
             <div data-testid="stasera-ora" className="flex flex-wrap gap-2">
               {ore.map((o) => (
-                <Pill key={o.id} active={oraId === o.id} onClick={() => { const nuova = oraId === o.id ? null : o.id; setOraId(nuova); if (nuova) track("funzione", null, { nome: "stasera_ora", ora: nuova }); }}>
+                <Pill key={o.id} active={oraValida === o.id} onClick={() => { const nuova = oraValida === o.id ? null : o.id; setOraId(nuova); if (nuova) track("funzione", null, { nome: "stasera_ora", ora: nuova }); }}>
                   {o.label}
                 </Pill>
               ))}
