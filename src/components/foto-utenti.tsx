@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { Camera, ChevronLeft, ChevronRight, X } from "lucide-react";
@@ -17,7 +18,7 @@ const subscribeNothing = () => () => {};
 
 type Slide = { url: string; label: string };
 
-export function FotoLightbox({ slides, start, onClose }: { slides: Slide[]; start: number; onClose: () => void }) {
+export function FotoLightbox({ slides, start, onClose, azioni }: { slides: Slide[]; start: number; onClose: () => void; azioni?: (i: number) => ReactNode }) {
   const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
   const [i, setI] = useState(start);
   if (!mounted || slides.length === 0) return null;
@@ -41,9 +42,12 @@ export function FotoLightbox({ slides, start, onClose }: { slides: Slide[]; star
       }}
     >
       <div className="flex items-center justify-between gap-2 px-3 pt-[calc(0.5rem+env(safe-area-inset-top))]">
-        <p data-testid="foto-lightbox-autore" className="min-w-0 truncate font-display text-sm font-semibold text-white">
+        <p data-testid="foto-lightbox-autore" className="min-w-0 flex-1 truncate font-display text-sm font-semibold text-white">
           {cur.label}{slides.length > 1 && <span className="font-sans font-normal text-white/60"> · {i + 1} di {slides.length}</span>}
         </p>
+        {/* Proposta 82, minore (24/11): "⋯" anche a schermo intero. Tocchi e tasti del foglio (in un portale)
+            non devono risalire alla vista e chiuderla. */}
+        {azioni && <span className="contents" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>{azioni(Math.min(i, slides.length - 1))}</span>}
         <button type="button" autoFocus onClick={onClose} aria-label="Chiudi la foto" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-white">
           <X size={20} />
         </button>
@@ -220,7 +224,14 @@ export function FotoCommunityStrip({ foto, onFatto }: { foto: FotoCommunity[]; o
           </li>
         ))}
       </ul>
-      {open != null && <FotoLightbox slides={slides} start={open} onClose={() => setOpen(null)} />}
+      {open != null && (
+        <FotoLightbox
+          slides={slides}
+          start={open}
+          onClose={() => setOpen(null)}
+          azioni={onFatto ? (i) => <SegnalaContenuto key={foto[i].id} tipo="foto" id={foto[i].id} nome={foto[i].autore ? personName(foto[i].autore) : null} onFatto={(azione) => { setOpen(null); onFatto(foto[i].id)(azione); }} sopraFoto /> : undefined}
+        />
+      )}
     </div>
   );
 }

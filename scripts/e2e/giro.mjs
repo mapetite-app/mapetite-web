@@ -2153,6 +2153,7 @@ for (const r of ["login", "signup", "profilo", "importa", "onboarding"]) {
   const t = (await page.getByTestId("aiuto").textContent().catch(() => "")) ?? "";
   ok(resp?.status() === 200 && new URL(page.url()).pathname === "/aiuto", "aiuto: /aiuto si apre senza account");
   ok(t.includes("Condividi → Mapetite") && t.includes("Elimina il mio account") && t.includes("founder.mapetite@gmail.com"), "aiuto: reel, eliminazione account e contatto");
+  ok(t.includes("Persone nascoste") && t.includes("Mostra di nuovo") && t.includes("24 ore"), "aiuto: come segnalare e come rivedere le persone nascoste (proposta 82)");
   await page.getByText("Come cancello il mio account?").click();
   ok(await page.getByText("Profilo → Impostazioni → \"Elimina il mio account\"", { exact: false }).isVisible().catch(() => false), "aiuto: la risposta si apre al tocco");
   const sw = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -3553,6 +3554,35 @@ else {
       await p.getByTestId("profilo-ristoratori").waitFor({ timeout: 3000 }).catch(() => {});
       ok(await p.getByTestId("profilo-ristoratori").isVisible() && await p.getByTestId("profilo-account").isVisible() && await p.getByTestId("profilo-gusti-link").getAttribute("href") === "/me" && await p.getByTestId("profilo-gestisci-raccolte").isVisible(), "profilo: 'Impostazioni' apre gusti, gestione raccolte, ristoratori, feedback ed Esci");
       // Revisore 1/11: niente voci "in arrivo" che non fanno niente (Premium; Profilo pubblico senza la parte social).
+      // Persone nascoste (proposta 82, minore del 24/11): la riga c'è solo con almeno una persona nascosta;
+      // il nome solo per i profili pubblici; "Mostra di nuovo" toglie la riga.
+      { ok((await p.getByTestId("profilo-nascosti").count()) === 0, "persone nascoste: senza nessuna, la riga in Impostazioni non c'è");
+        // Profilo minimo: quello completo più le persone nascoste supera i 4 KB di un cookie (il browser lo scarta).
+        const conN = { email: profilo.email, saved: [], reviews: [], nascosti: [{ chiave: "2026-11-23T21:10:00.123456+00:00", nome: "Giulia", quando: "2026-11-23T21:10:00.123456+00:00" }, { chiave: "2026-11-20T09:00:00+00:00", nome: null, quando: "2026-11-20T09:00:00+00:00" }] };
+        await sctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(conN)), url: BASE }]);
+        // Prima su un'altra pagina: da /profilo a /profilo#nascosti cambierebbe solo l'ancora, senza ricaricare.
+        await p.goto(`${BASE}/aiuto`, { waitUntil: "domcontentloaded" });
+        await p.goto(`${BASE}/profilo#nascosti`, { waitUntil: "networkidle" });
+        const sez = p.getByTestId("profilo-nascosti");
+        const txt = (await sez.innerText().catch(() => "")) ?? "";
+        ok(await sez.isVisible() && txt.includes("2 persone") && (await p.getByTestId("persona-nascosta").count()) === 2 && txt.includes("Giulia") && txt.includes("Un membro di Mapetite") && txt.includes("Nascosta il 23 novembre"), "persone nascoste: 2 righe, nome solo per il profilo pubblico, data in italiano");
+        { const sw = await p.evaluate(() => document.documentElement.scrollWidth); ok(sw <= 390, `persone nascoste: niente scorrimento di lato (${sw}px)`); }
+        await sez.scrollIntoViewIfNeeded();
+        await p.screenshot({ path: `${OUT}/profilo-persone-nascoste.png`, caret: "initial" });
+        let corpo = null;
+        p.on("request", (r) => { if (r.url().includes("/api/moderazione") && r.method() === "POST") corpo = r.postDataJSON(); });
+        await p.getByRole("button", { name: "Mostra di nuovo Giulia" }).click();
+        await p.getByTestId("persona-nascosta").nth(1).waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+        ok((await p.getByTestId("persona-nascosta").count()) === 1 && corpo?.azione === "mostra" && corpo?.chiave === "2026-11-23T21:10:00.123456+00:00" && !("id" in (corpo ?? {})), "persone nascoste: 'Mostra di nuovo' toglie la riga e manda solo la chiave, mai l'id della persona");
+        await p.getByRole("button", { name: "Mostra di nuovo questo membro" }).click();
+        await p.getByTestId("nascosti-vuoto").waitFor({ timeout: 5000 }).catch(() => {});
+        ok(await p.getByTestId("nascosti-vuoto").isVisible(), "persone nascoste: tolta l'ultima, 'Nessuna persona nascosta'");
+        const r400 = await p.evaluate(async () => (await fetch("/api/moderazione", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ azione: "mostra", chiave: "x' or 1=1" }) })).status);
+        ok(r400 === 400, `persone nascoste: chiave non valida → 400 (${r400})`);
+        await sctx.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(profilo)), url: BASE }]);
+        await p.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+        await p.locator("#altro > summary").click();
+        await p.getByTestId("profilo-ristoratori").waitFor({ timeout: 3000 }).catch(() => {}); }
       ok((await p.getByTestId("profilo-premium").count()) === 0 && !/in arrivo/i.test((await p.getByTestId("profilo-altro").innerText()) ?? ""), "profilo: in Impostazioni nessuna voce 'in arrivo' (Premium e profilo pubblico non pronto non compaiono)");
       // Revisore 1/11: un solo stile di freccia (›) in Impostazioni.
       { const frecce = await p.getByTestId("profilo-altro").evaluate((el) => [...el.querySelectorAll("svg.lucide")].filter((s) => /chevron/.test(s.getAttribute("class") ?? "")).map((s) => [...s.classList].find((c) => c.startsWith("lucide-chevron")) ?? "?"));
@@ -11645,6 +11675,30 @@ else {
     await fg.getByTestId("segnala-invia").click();
     await fp.getByTestId("segnala-fatto").waitFor({ timeout: 3000 }).catch(() => {});
     ok(mp[0]?.tipo === "foto" && mp[0]?.id === "c0000002" && mp[0]?.motivo === "fuori_tema" && (await strip.getByTestId("foto-community-foto").count()) === 1, `segnala foto: inviata e la foto sparisce (${JSON.stringify(mp[0] ?? null)})`);
+    await fp.unroute("**/api/moderazione");
+    await fp.reload({ waitUntil: "networkidle" });
+    await fp.getByTestId("community-locale").waitFor({ timeout: 8000 }).catch(() => {}); }
+  // Minore della 82 (24/11): "⋯" anche nella foto a schermo intero; i tocchi nel foglio non chiudono la foto.
+  { const mp = [];
+    await fp.route("**/api/moderazione", (r) => { mp.push(r.request().postDataJSON()); return r.fulfill({ json: { ok: true } }); });
+    await strip.getByTestId("foto-community-foto").first().click();
+    const lbx = fp.getByTestId("foto-lightbox");
+    ok(await lbx.isVisible() && (await lbx.getByTestId("segnala-apri").count()) === 1, "segnala foto a schermo intero: c'è il '⋯' accanto a Chiudi");
+    await lbx.getByTestId("segnala-apri").click();
+    const fg = fp.getByTestId("segnala-foglio");
+    await fg.getByTestId("segnala-motivo-offensiva").click();
+    ok(await fg.isVisible() && await lbx.isVisible() && (await fg.getByTestId("segnala-motivo-offensiva").getAttribute("aria-checked")) === "true", "segnala foto a schermo intero: il foglio sta sopra la foto e scegliere il motivo non la chiude");
+    await fp.screenshot({ path: `${OUT}/foto-schermo-intero-segnala.png`, caret: "initial" });
+    { const cb = await lbx.getByRole("button", { name: "Chiudi la foto" }).boundingBox(); const sb = await lbx.getByTestId("segnala-apri").boundingBox();
+      ok(!!cb && !!sb && cb.x - (sb.x + sb.width) < 16 && sb.x > 250, `segnala foto a schermo intero: il '⋯' sta accanto a Chiudi (⋯ x ${Math.round(sb?.x ?? 0)}, Chiudi x ${Math.round(cb?.x ?? 0)})`); }
+    await fp.keyboard.press("Escape");
+    await fg.waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
+    ok((await fp.getByTestId("segnala-foglio").count()) === 0 && await lbx.isVisible(), "segnala foto a schermo intero: Escape chiude il foglio e lascia la foto");
+    await lbx.getByTestId("segnala-apri").click();
+    await fg.getByTestId("segnala-motivo-offensiva").click();
+    await fg.getByTestId("segnala-invia").click();
+    await lbx.waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
+    ok(mp[0]?.tipo === "foto" && mp[0]?.id === "c0000001" && mp[0]?.motivo === "offensiva" && (await fp.getByTestId("foto-lightbox").count()) === 0 && (await strip.getByTestId("foto-community-foto").count()) === 1, `segnala foto a schermo intero: inviata, la foto si chiude e sparisce dalla fila (${JSON.stringify(mp[0] ?? null)})`);
     await fp.unroute("**/api/moderazione");
     await fp.reload({ waitUntil: "networkidle" });
     await fp.getByTestId("community-locale").waitFor({ timeout: 8000 }).catch(() => {}); }

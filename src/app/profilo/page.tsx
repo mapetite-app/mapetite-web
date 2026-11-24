@@ -1,7 +1,7 @@
 import { createClient, getUser } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { BookOpen, CalendarCheck, ChevronDown, ChevronRight, Download, FolderHeart, Globe, History, IdCard, Lock, MessageSquareText, Repeat, Send, Settings, SlidersHorizontal, Sparkles, Store, Trophy } from "lucide-react";
+import { BookOpen, CalendarCheck, ChevronDown, EyeOff, ChevronRight, Download, FolderHeart, Globe, History, IdCard, Lock, MessageSquareText, Repeat, Send, Settings, SlidersHorizontal, Sparkles, Store, Trophy } from "lucide-react";
 import ProfiloSezione from "@/components/profilo-sezione";
 import { GRIGLIA_CLASS, TILE_CLASS, TileBody } from "@/components/profilo-tessera";
 import ProfiloRicerche from "@/components/profilo-ricerche";
@@ -32,6 +32,8 @@ import { categoryLabel } from "@/lib/category-label";
 import { topTypes } from "@/lib/social-view";
 import { tipoPlurale } from "@/lib/scaffali-salvati";
 import { profilePath } from "@/lib/handle";
+import PersoneNascoste from "@/components/persone-nascoste";
+import { personeNascoste, type PersonaNascosta } from "@/lib/moderazione-server";
 
 type SavedPlaceRow = {
   created_at: string;
@@ -76,13 +78,13 @@ function savedHref(filter?: { stato?: "voglio" | "fatto"; tag?: string }): strin
 // In produzione NODE_ENV è sempre "production" e questo ramo non si attiva.
 type GustoRow = { gusto?: unknown; cuisines?: string[] | null; occasions?: string[] | null; atmospheres?: string[] | null; price_range?: string | null };
 
-async function e2eProfile(): Promise<{ email: string; saved: SavedPlaceRow[]; reviews: ReviewRow[]; classifica: boolean; diario: boolean; senzaGusto: boolean; gusto: GustoRow | null } | null> {
+async function e2eProfile(): Promise<{ email: string; saved: SavedPlaceRow[]; reviews: ReviewRow[]; classifica: boolean; diario: boolean; senzaGusto: boolean; gusto: GustoRow | null; nascosti: PersonaNascosta[] } | null> {
   if (process.env.NODE_ENV !== "development" || !process.env.E2E_FAKE_USER) return null;
   const raw = (await cookies()).get("e2e_profilo")?.value;
   if (!raw) return null;
   try {
     const data = JSON.parse(decodeURIComponent(raw));
-    return { email: data.email ?? "tester@example.com", saved: data.saved ?? [], reviews: data.reviews ?? [], classifica: data.classifica !== false, diario: data.diario !== false, senzaGusto: data.senzaGusto === true, gusto: data.gusto && typeof data.gusto === "object" ? (data.gusto as GustoRow) : null };
+    return { email: data.email ?? "tester@example.com", saved: data.saved ?? [], reviews: data.reviews ?? [], classifica: data.classifica !== false, diario: data.diario !== false, senzaGusto: data.senzaGusto === true, gusto: data.gusto && typeof data.gusto === "object" ? (data.gusto as GustoRow) : null, nascosti: Array.isArray(data.nascosti) ? (data.nascosti as PersonaNascosta[]) : [] };
   } catch {
     return null;
   }
@@ -238,7 +240,9 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
         if (error && !/solo_per_me/.test(error.message ?? "")) console.error("[profilo] lettura 'Solo per me' fallita:", error.message);
         return new Set((data ?? []).map((r) => r.place_id as string));
       });
-  const [social, gems, codiceInvito, soloPerMe, raccoltePrivate] = await Promise.all([socialPromise, gemsPromise, mioInvito(), soloPromise, loadRaccoltePrivate(user.id)]);
+  // Proposta 82, minore (24/11): le persone nascoste, per "Mostra di nuovo" in Impostazioni.
+  const nascostiPromise: Promise<PersonaNascosta[]> = fake ? Promise.resolve(fake.nascosti) : personeNascoste(user.id).catch(() => []);
+  const [social, gems, codiceInvito, soloPerMe, raccoltePrivate, nascosti] = await Promise.all([socialPromise, gemsPromise, mioInvito(), soloPromise, loadRaccoltePrivate(user.id), nascostiPromise]);
   const reviews = (reviewsRaw ?? []) as unknown as ReviewRow[];
 
   const initial = (user.email ?? "?").charAt(0).toUpperCase();
@@ -547,6 +551,12 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
                 hint={social.is_public ? "Pubblico: gli amici ti trovano" : "Privato"}
               >
                 <ProfiloSocial userId={user.id} initial={social} />
+              </ProfiloSezione>
+            )}
+            {/* Persone nascoste (proposta 82, minore): solo se ce n'è almeno una. */}
+            {nascosti.length > 0 && (
+              <ProfiloSezione id="nascosti" testId="profilo-nascosti" icon={<EyeOff {...icon} />} title="Persone nascoste" hint={`${nascosti.length} ${nascosti.length === 1 ? "persona" : "persone"}`}>
+                <PersoneNascoste iniziali={nascosti} />
               </ProfiloSezione>
             )}
             {ranks && (

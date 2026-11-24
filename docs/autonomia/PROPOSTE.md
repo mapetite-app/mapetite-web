@@ -16,6 +16,21 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 24/11/2026 (martedì, sessione 03:05 — tema: chi sceglie all'ultimo minuto)
+
+### 84. "Fra 2 ore": in "Stasera dove andiamo?" i salvati aperti all'ora in cui ci vai
+- **Problema:** il 41% delle prenotazioni al ristorante in Italia arriva nelle 4 ore prima del pasto (Quandoo con FIPE, [Teleborsa, 19/02/2026](https://www.teleborsa.it/AMP/News/2026/02/19/fipe-e-quandoo-uniscono-le-forze-per-le-prenotazioni-online-111.html); `PROBLEMI.md`, 34). Chi decide alle 18 per le 21 vuole sapere cosa sarà aperto alle 21, non adesso.
+- **Cosa fa:** in "Stasera dove andiamo?" tre pillole d'ora ("Adesso", "Alle 20", "Alle 21:30"); i salvati si filtrano con gli orari di Google per quell'ora, ordine come oggi (gusto, mai recensioni). Un posto senza orari noti resta, con "orari non noti".
+- **Valore per l'utente:** la scelta del sabato sera in 10 secondi, dai propri salvati. **Per il ristoratore:** domanda dell'ultimo minuto, quella che riempie i tavoli vuoti.
+- **Sforzo:** S/M. **Costo Google:** gli orari dei salvati NON sono nel nostro database (verificato il 24/11; i termini Google limitano la copia), quindi servono letture Place Details solo al tocco di un'ora, al massimo 5 salvati, campo `regularOpeningHours` soltanto (fascia più economica): fino a 5 chiamate per uso, dentro la quota di 50 al giorno solo se l'uso resta basso. Da misurare prima di accenderla per tutti.
+- **Stato proposto:** PRONTA, con il conteggio delle chiamate in PR.
+
+### 85. "Aiuto" nell'app che risponde dalle domande vere
+- **Problema:** Apple rifiuta le app che sembrano solo un sito impacchettato (regola 4.2) e l'affollamento di app "salva dal reel" è alto (`COMPETITOR.md`, 24/11): serve far vedere subito cosa facciamo di diverso. Oggi `/aiuto` ha 7 risposte fisse.
+- **Cosa fa:** in fondo a `/aiuto`, "Non trovi la risposta?" apre "Dai un feedback" con la pagina già scritta (esiste già); nel pannello `/admin/numeri` le domande che arrivano più spesso, per aggiungerle a `/aiuto`. Nessuna AI.
+- **Sforzo:** S. **Costo:** zero.
+- **Stato proposto:** PRONTA (dopo i primi tester: senza domande vere non serve).
+
 ## 23/11/2026 (lunedì, sessione 22:05 — tema: pronti per la revisione Apple)
 
 ### 82. "Segnala e nascondi" sui contenuti degli altri membri

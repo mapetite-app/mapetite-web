@@ -9,7 +9,8 @@ import { MOTIVI, type Motivo, type TipoContenuto } from "@/lib/moderazione";
 // Proposta 82 "Segnala e nascondi" (23/11, regola 1.2 dell'App Store): il "⋯" accanto a una recensione o
 // a una foto di un altro membro apre un foglio con due gesti: segnalarla (con un motivo) o non vedere più
 // i contenuti di quella persona. Una sola azione principale per foglio: il motivo, poi "Segnala".
-// Il foglio va in un portale: la scheda del locale ha trasformazioni che rompono il "fixed".
+// Il foglio va in un portale: la scheda del locale ha trasformazioni che rompono il "fixed". Sta sopra
+// anche la foto a schermo intero (z 80), da dove si apre dal 24/11.
 
 type Props = {
   tipo: TipoContenuto;
@@ -31,9 +32,11 @@ export default function SegnalaContenuto({ tipo, id, nome, onFatto, className = 
 
   useEffect(() => {
     if (!open || busy) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setOpen(false); setErrore(null); setMotivo(null); } };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // In cattura (revisore 24/11): dalla foto a schermo intero il keydown si ferma prima di arrivare a window.
+    // Escape chiude solo il foglio, non anche la foto sotto.
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); setErrore(null); setMotivo(null); } };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [open, busy]);
 
   async function invia(azione: "segnala" | "nascondi") {
@@ -78,7 +81,7 @@ export default function SegnalaContenuto({ tipo, id, nome, onFatto, className = 
         )}
       </button>
       {open && createPortal(
-        <div className="fixed inset-0 z-[70] flex items-end justify-center" data-testid="segnala-foglio">
+        <div className="fixed inset-0 z-[90] flex items-end justify-center" data-testid="segnala-foglio">
           <button type="button" aria-label="Chiudi" onClick={close} className="absolute inset-0 bg-black/40" />
           <div
             role="dialog"
