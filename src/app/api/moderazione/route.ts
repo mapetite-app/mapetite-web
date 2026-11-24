@@ -10,13 +10,16 @@ import { isMotivo, isTipo } from "@/lib/moderazione";
 // azione "nascondi": chi guarda smette di vedere recensioni e foto di quella persona (utenti_nascosti).
 // L'autore si trova qui dal contenuto, con la chiave di servizio, e non torna mai al telefono: chi ha
 // il profilo privato resta anonimo anche per chi lo nasconde. Al massimo 20 segnalazioni al giorno.
+// azione "mostra" (24/11): "Mostra di nuovo" da Impostazioni → Persone nascoste. La riga si trova con la
+//   sua chiave (l'ora in cui è stata nascosta), mai con l'id della persona, che il telefono non conosce.
 
 const LIMITE_GIORNO = 20;
 const ERRORE = "Non ci sono riuscito. Riprova tra poco.";
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as { azione?: unknown; tipo?: unknown; id?: unknown; motivo?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { azione?: unknown; tipo?: unknown; id?: unknown; motivo?: unknown; chiave?: unknown } | null;
   const azione = body?.azione;
+  if (azione === "mostra") return mostra(body?.chiave);
   const tipo = body?.tipo;
   const id = typeof body?.id === "string" ? body.id : "";
   if ((azione !== "segnala" && azione !== "nascondi") || !isTipo(tipo) || !UUID_RE.test(id)) {
@@ -75,6 +78,25 @@ export async function POST(request: Request) {
   }
   if (error) {
     console.warn(`[moderazione] segnala ${error.code ?? ""}`);
+    return NextResponse.json({ error: ERRORE }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
+}
+
+// Chiave = created_at della riga in utenti_nascosti (timestamptz come lo restituisce Supabase).
+const CHIAVE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
+
+async function mostra(chiave: unknown) {
+  if (typeof chiave !== "string" || !CHIAVE_RE.test(chiave)) {
+    return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 });
+  }
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user && process.env.NODE_ENV === "development" && process.env.E2E_FAKE_USER) return NextResponse.json({ ok: true });
+  if (!user) return NextResponse.json({ error: "Accedi per farlo." }, { status: 401 });
+  const { error } = await createAdminClient().from("utenti_nascosti").delete().eq("user_id", user.id).eq("created_at", chiave);
+  if (error) {
+    console.warn(`[moderazione] mostra ${error.code ?? ""}`);
     return NextResponse.json({ error: ERRORE }, { status: 500 });
   }
   return NextResponse.json({ ok: true });

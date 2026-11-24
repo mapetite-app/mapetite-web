@@ -33,6 +33,11 @@ const DOMANDE: { d: string; r: string; id: string }[] = [
     r: "Nomi, indirizzi, orari e recensioni vengono da Google. Il verdetto lo scrive un'AI leggendo solo quelle recensioni: se le recensioni non dicono una cosa, il verdetto non la dice.",
   },
   {
+    id: "segnala",
+    d: "Una recensione o una foto non va bene",
+    r: "Tocca \"⋯\" accanto alla recensione o nell'angolo della foto: puoi segnalarla (la guardiamo entro 24 ore) o non vedere più i contenuti di quella persona. Per tornare a vederli: Profilo → Impostazioni → \"Persone nascoste\" → \"Mostra di nuovo\".",
+  },
+  {
     id: "elimina",
     d: "Come cancello il mio account?",
     r: "Profilo → Impostazioni → \"Elimina il mio account\", in fondo. Si cancellano l'account e tutti i tuoi posti, note e raccolte.",
