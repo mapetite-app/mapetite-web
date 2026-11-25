@@ -3977,6 +3977,92 @@ else {
     }, () => ok(false, "stasera: posizione negata → spiegazione e si cerca ovunque"));
     await stc.close();
 
+    // Proposta 84 "Fra 2 ore": "A che ora?" filtra i salvati con gli orari Google, chiesti solo al tocco.
+    {
+      const stm = await import(new URL("../../src/lib/ore-stasera.ts", import.meta.url).href);
+      // Martedì 24/11/2026: alle 18:00 di Roma (17:00 UTC) → Adesso, Alle 20, Alle 21:30; alle 12:00 → Adesso, Alle 13, Alle 20; alle 21:15 → Adesso, Tra un'ora; alle 23:45 → solo Adesso.
+      const lab = (iso) => stm.oreStasera(new Date(iso)).map((o) => o.label).join("|");
+      const o18 = stm.oreStasera(new Date("2026-11-24T17:00:00Z"));
+      ok(lab("2026-11-24T17:00:00Z") === "Adesso|Alle 20|Alle 21:30" && lab("2026-11-24T11:00:00Z") === "Adesso|Alle 13|Alle 20" && lab("2026-11-24T20:15:00Z") === "Adesso|Tra un'ora" && lab("2026-11-24T22:45:00Z") === "Adesso" && o18[0].t.day === 2 && o18[0].t.hour === 18 && o18[2].t.hour === 21 && o18[2].t.minute === 30,
+        `stasera, a che ora (proposta 84): ore giuste per le 18, le 12, le 21:15 e le 23:45 di Roma (${lab("2026-11-24T17:00:00Z")} / ${lab("2026-11-24T11:00:00Z")} / ${lab("2026-11-24T20:15:00Z")})`);
+      ok((await fetch(`${BASE}/api/stasera/orari`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).status === 400 && (await fetch(`${BASE}/api/stasera/orari`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: ["ChIJaaaaaaaaaa1", "ChIJaaaaaaaaaa2", "ChIJaaaaaaaaaa3", "ChIJaaaaaaaaaa4", "ChIJaaaaaaaaaa5", "ChIJaaaaaaaaaa6"] }) })).status === 400, "stasera, a che ora: /api/stasera/orari 400 senza locali o con più di 5");
+      const romaDow = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Rome", weekday: "short" }).format(new Date())];
+      const sempre = [{ open: { day: 0, hour: 0, minute: 0 } }]; // aperto h24
+      const domani = [{ open: { day: (romaDow + 1) % 7, hour: 0, minute: 0 }, close: { day: (romaDow + 1) % 7, hour: 23, minute: 59 } }]; // oggi chiuso
+      const oc = await stCtx();
+      let chieste = [];
+      let risposta = (ids) => ({ orari: Object.fromEntries(ids.map((g) => [g, g === "G1" ? sempre : g === "GS03" ? domani : null])) });
+      let stato = 200;
+      await oc.route("**/api/stasera/orari", (r) => { const ids = r.request().postDataJSON().ids; chieste.push(ids); return stato === 200 ? r.fulfill({ json: risposta(ids) }) : r.fulfill({ status: stato, json: { error: "x" } }); });
+      const op = await oc.newPage();
+      op.on("pageerror", (e) => errors.push(e.message));
+      await op.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+      await op.getByTestId("stasera-proponi").waitFor({ timeout: 6000 }).catch(() => {});
+      const ore = await op.getByTestId("stasera-ora").getByRole("button").allTextContents();
+      ok(ore[0] === "Adesso" && ore.length >= 1 && ore.length <= 3 && (await op.getByTestId("stasera-ora").getByRole("button").evaluateAll((b) => b.every((x) => x.getAttribute("aria-pressed") === "false"))), `stasera, a che ora: 'Adesso' più al massimo due ore, nessuna accesa di partenza (${ore.join(" | ")})`);
+      // Senza ora scelta: nessuna chiamata agli orari.
+      await op.getByTestId("stasera-proponi").click();
+      await op.getByTestId("stasera-proposta").first().waitFor({ timeout: 3000 }).catch(() => {});
+      ok(chieste.length === 0 && (await op.getByTestId("stasera-orario").count()) === 0, `stasera, a che ora: senza ora scelta nessuna lettura degli orari (${chieste.length})`);
+      await op.getByRole("button", { name: "Cambia scelte" }).click();
+      await op.getByTestId("stasera-ora").getByRole("button", { name: "Adesso" }).click();
+      ok((await op.getByTestId("stasera-ora").getByRole("button", { name: "Adesso" }).getAttribute("aria-pressed")) === "true", "stasera, a che ora: 'Adesso' si accende");
+      await op.getByTestId("stasera-proponi").click();
+      await op.getByTestId("stasera-proposta").first().waitFor({ timeout: 4000 }).catch(() => {});
+      const nomi = await op.getByTestId("stasera-proposta").locator("h2").allTextContents();
+      const terr = op.getByTestId("stasera-proposta").filter({ hasText: "Terrazza Uno" });
+      const altro = op.getByTestId("stasera-proposta").filter({ hasNotText: "Terrazza Uno" }).first();
+      ok(chieste.length === 1 && chieste[0].length <= 5 && chieste[0].length >= 3 && nomi.length === 3 && !nomi.includes("Enoteca Tre"),
+        `stasera, a che ora: una lettura per al massimo 5 salvati, 3 proposte, mai quello chiuso (${JSON.stringify(chieste)} → ${nomi.join(" | ")})`);
+      if (await terr.count()) ok(((await terr.getByTestId("stasera-orario").textContent()) ?? "").trim() === "Aperto adesso", "stasera, a che ora: 'Aperto adesso' sul posto aperto");
+      ok((await altro.count()) === 1 && (await altro.getByTestId("stasera-orario").count()) === 0, "stasera, a che ora: senza orari Google il posto resta, senza righe in più (revisore 24/11)");
+      ok(((await op.getByTestId("stasera-riepilogo").textContent()) ?? "").endsWith(" · adesso") && !/aperti/.test((await op.getByTestId("stasera-riepilogo").textContent()) ?? ""), "stasera, a che ora: il riepilogo dice '· adesso', mai 'aperti' (i posti senza orari restano)");
+      await op.screenshot({ path: `${OUT}/84-stasera-ora.png`, caret: "initial" });
+      const giaChiesti = new Set(chieste.flat());
+      await op.getByTestId("stasera-altri").click().catch(() => {});
+      await op.waitForTimeout(400);
+      ok(chieste.flat().filter((g) => giaChiesti.has(g)).length === giaChiesti.size, `stasera, a che ora: 'Altri 3' non richiede gli orari già letti (${JSON.stringify(chieste)})`);
+      // Tutti chiusi: messaggio chiaro, niente card.
+      await op.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+      await op.getByTestId("stasera-proponi").waitFor({ timeout: 6000 }).catch(() => {});
+      chieste = []; risposta = (ids) => ({ orari: Object.fromEntries(ids.map((g) => [g, domani])) });
+      await op.getByTestId("stasera-ora").getByRole("button", { name: "Adesso" }).click();
+      await op.getByTestId("stasera-proponi").click();
+      await op.getByTestId("stasera-tutti-chiusi").waitFor({ timeout: 4000 }).catch(() => {});
+      ok(await op.getByTestId("stasera-tutti-chiusi").isVisible().catch(() => false) && (await op.getByTestId("stasera-proposta").count()) === 0 && await op.getByRole("heading", { name: "Tutti chiusi adesso" }).isVisible().catch(() => false) && chieste.flat().length <= 10 && (await op.getByTestId("stasera-riepilogo").count()) === 0 && (await op.getByTestId("stasera-altra-ora").filter({ hasText: "Qualsiasi ora" }).count()) === 1, `stasera, a che ora: tutti chiusi → 'Tutti chiusi adesso', le altre ore a un tocco, al massimo 10 letture (${chieste.flat().length})`);
+      await op.screenshot({ path: `${OUT}/84-stasera-chiusi.png`, caret: "initial" });
+      // "Altri 3" che ricomincia il giro: mai più di 10 letture per tocco (revisore 24/11: erano fino a 30).
+      { const molti = Array.from({ length: 24 }, (_, i) => sp(String(30 + i), `Posto ${i}`, "restaurant", "Via Roma 1, 00100 Roma RM, Italy", 41.9, 12.49, ["Da provare"]));
+        stData = [...stRows, ...molti];
+        await op.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+        await op.getByTestId("stasera-proponi").waitFor({ timeout: 6000 }).catch(() => {});
+        risposta = (ids) => ({ orari: Object.fromEntries(ids.map((g) => [g, g === "G1" || g === "GS03" ? sempre : domani])) });
+        await op.getByTestId("stasera-ora").getByRole("button", { name: "Adesso" }).click();
+        chieste = [];
+        await op.getByTestId("stasera-proponi").click();
+        await op.getByTestId("stasera-proposta").first().waitFor({ timeout: 4000 }).catch(() => {});
+        const primo = chieste.flat().length; chieste = [];
+        await op.getByTestId("stasera-altri").click().catch(() => {});
+        await op.waitForTimeout(800);
+        ok(primo <= 10 && chieste.flat().length <= 10, `stasera, a che ora: al massimo 10 letture per tocco anche con 'Altri 3' (${primo} e ${chieste.flat().length})`);
+        // Terzo revisore (24/11): finite le letture non si propone un posto mai controllato né si dice "Li hai visti tutti".
+        const nomiDopo = await op.getByTestId("stasera-proposta").locator("h2").allTextContents();
+        ok((await op.getByTestId("stasera-ricomincio").count()) === 0 && nomiDopo.every((n) => n === "Terrazza Uno" || n === "Enoteca Tre") && (nomiDopo.length > 0 || await op.getByRole("heading", { name: "Chiusi quelli che ho controllato" }).isVisible().catch(() => false)),
+          `stasera, a che ora: letture finite → niente 'ricomincio il giro', solo posti controllati aperti (${nomiDopo.join(" | ") || "nessuno: 'Chiusi quelli che ho controllato'"})`);
+        stData = stRows; }
+      // Il riepilogo non contraddice il titolo (era "Chiusi adesso · … aperti adesso").
+      risposta = (ids) => ({ orari: Object.fromEntries(ids.map((g) => [g, g === "G1" ? sempre : g === "GS03" ? domani : null])) });
+      // Orari non disponibili (errore o tetto del giorno): si propone come prima, con l'avviso.
+      await op.goto(`${BASE}/stasera`, { waitUntil: "networkidle" });
+      await op.getByTestId("stasera-proponi").waitFor({ timeout: 6000 }).catch(() => {});
+      stato = 429;
+      await op.getByTestId("stasera-ora").getByRole("button", { name: "Adesso" }).click();
+      await op.getByTestId("stasera-proponi").click();
+      await op.getByTestId("stasera-proposta").first().waitFor({ timeout: 4000 }).catch(() => {});
+      ok((await op.getByTestId("stasera-proposta").count()) === 3 && await op.getByTestId("stasera-orari-ko").isVisible().catch(() => false), "stasera, a che ora: orari non disponibili → 3 proposte come prima e 'controlla prima di andare'");
+      await oc.close();
+    }
+
     // Posizione già permessa (Roma): "Vicino a me" si accende da solo, niente salvati di Milano, distanza sulla card
     const stg = await stCtx({ permissions: ["geolocation"], geolocation: { latitude: 41.9, longitude: 12.49 } });
     const sg = await stg.newPage();
@@ -11483,6 +11569,108 @@ else {
   await g.screenshot({ path: `${OUT}/99i-carta-gusto-vuota.png`, caret: "initial" });
   { const lost = droppedKeys(gEv); ok(lost.length === 0, `carta del gusto: chiavi degli eventi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
   await gc.close();
+}
+
+// "Il tuo anno a tavola" (proposta 49, /profilo/anno): riepilogo SOLO dai "Ci sono stato" dell'anno,
+// costellazione di punti senza mappa di Google, immagine PNG senza nomi di locali, ingressi da diario e profilo.
+if (!process.env.E2E_FAKE_USER) console.log("SKIP  anno a tavola: serve E2E_FAKE_USER");
+else {
+  const aEv = [];
+  const ac = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await ac.route("**/api/events", (r) => { aEv.push(r.request().postDataJSON()); return r.fulfill({ status: 204, body: "" }); });
+  await ac.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
+  await ac.route("**/rest/v1/**", (r) => r.fulfill({ json: [] }));
+  const romaOggi = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const [yy, mm, dd] = romaOggi.split("-").map(Number);
+  const ANNO = mm === 1 && dd <= 15 ? yy - 1 : yy;
+  const setA = (v) => ac.addCookies([{ name: "e2e_profilo", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  // Cookie sotto i 4 KB: indirizzi corti (bastano CAP e città) e niente campi vuoti.
+  const apl = (n, name, category, city, lat, lng, poco) => ({ id: `00000000-0000-4000-8000-0000000008${String(n).padStart(2, "0")}`, name, category, address: city === "M" ? "20144 Milano MI" : "00153 Roma RM", lat, lng, ...(poco ? { poco_conosciuto: true } : {}) });
+  const V = "Già visitato", L = "Mi è piaciuto";
+  const asaved = [
+    { created_at: `${ANNO}-03-01`, visited_at: `${ANNO}-03-02`, visite: 4, tags: [V, L], places: apl(1, "Trattoria Uno", "Trattoria", "R", 41.889, 12.47, true) },
+    { created_at: `${ANNO}-03-03`, visited_at: `${ANNO}-03-10`, visite: 1, tags: [V, L], places: apl(2, "Trattoria Due", "Trattoria", "R", 41.9, 12.49) },
+    { created_at: `${ANNO}-03-04`, visited_at: `${ANNO}-03-20`, visite: 2, tags: [V], places: apl(3, "Bar Tre", "cocktail_bar", "R", 41.88, 12.5) },
+    { created_at: `${ANNO}-05-01`, visited_at: `${ANNO}-05-08`, visite: 1, tags: [V, L], places: apl(4, "Pizzeria Quattro", "pizzeria", "M", 45.45, 9.16) },
+    { created_at: `${ANNO}-06-01`, tags: [V], places: apl(5, "Osteria Senza Data", "Trattoria", "R", 41.895, 12.48) },
+    { created_at: `${ANNO - 1}-06-01`, visited_at: `${ANNO - 1}-06-02`, visite: 1, tags: [V, L], places: apl(6, "Vecchio Anno", "Trattoria", "R", 41.9, 12.45) },
+    { created_at: `${ANNO}-06-01`, visited_at: `${ANNO + 1}-02-01`, tags: [V], places: apl(7, "Visita Futura", "Trattoria", "R", 41.9, 12.46) },
+    { created_at: `${ANNO}-07-01`, tags: ["Da provare"], places: apl(8, "Da Provare Uno", "Trattoria", "R", 41.9, 12.47) },
+    { created_at: `${ANNO}-07-02`, tags: ["Da provare"], places: apl(9, "Da Provare Due", "bar", "R", 41.9, 12.48) },
+  ];
+  await setA({ email: "giulia@example.com", saved: asaved, reviews: [] });
+  const a = await ac.newPage();
+  a.on("pageerror", (e) => errors.push(e.message));
+  // Ingresso dal diario (sempre, con almeno un posto provato nell'anno).
+  await a.goto(`${BASE}/profilo/diario`, { waitUntil: "networkidle" });
+  const dAnno = a.getByTestId("diario-anno");
+  ok(await dAnno.isVisible() && (await dAnno.textContent())?.includes(`Il tuo ${ANNO} a tavola`) && (await dAnno.getAttribute("href")) === "/profilo/anno", `anno a tavola: ingresso dal diario (${await dAnno.textContent().catch(() => "assente")})`);
+  await dAnno.click();
+  await a.waitForURL(/\/profilo\/anno$/, { timeout: 8000 }).catch(() => {});
+  const acard = a.getByTestId("anno-card");
+  await acard.waitFor({ timeout: 8000 }).catch(() => {});
+  ok(await acard.isVisible(), "anno a tavola: dal diario si apre la card");
+  const atit = (await a.getByTestId("anno-titolo").textContent()) ?? "";
+  ok(atit.replace(/\s+/g, "") === "5postiprovati", `anno a tavola: contati solo i posti dell'anno (con la data o, senza, salvati nell'anno; niente anno scorso né date future) (${atit})`);
+  const anum = (await a.getByTestId("anno-numeri").textContent()) ?? "";
+  ok(anum.includes("9volte a tavola") && anum.includes("2posti fissi") && anum.includes("1poco conosciuto"), `anno a tavola: volte con i ritorni, posti fissi, posti poco conosciuti (${anum})`);
+  const arighe = (await a.getByTestId("anno-righe").textContent()) ?? "";
+  ok(arighe.includes("Trattoria · 3 posti") && arighe.includes("Marzo · 3 posti"), `anno a tavola: genere e mese più goloso contati (${arighe})`);
+  ok((await a.getByTestId("anno-punto").count()) === 4 && (await a.getByTestId("anno-mappa").textContent())?.includes("Roma"), `anno a tavola: costellazione dei posti della città più girata, senza mappa di Google (${await a.getByTestId("anno-punto").count()} punti)`);
+  ok((await a.locator("img").count()) === 0 && (await a.locator("iframe").count()) === 0, "anno a tavola: nessuna immagine o mappa esterna nella pagina");
+  const pref = await a.getByTestId("anno-preferito").allTextContents();
+  ok(pref.length === 3 && pref[0].includes("Trattoria Uno") && pref[0].includes("ci sei tornato 3 volte") && !pref.some((t) => t.includes("Vecchio Anno")), `anno a tavola: preferiti 👍 dell'anno, prima dove sei tornato di più (${pref.join(" | ")})`);
+  ok((await a.getByTestId("anno-preferito").first().getAttribute("href")) === `/mappa?salvato=${asaved[0].places.id}`, "anno a tavola: un tocco sul preferito apre la sua scheda");
+  ok((await a.getByTestId("anno-da-provare").textContent())?.includes(`Nel ${ANNO + 1}: 2 posti da provare`), "anno a tavola: i 'Da provare' per l'anno dopo");
+  ok(!(await acard.textContent())?.includes("Trattoria Uno"), "anno a tavola: nella card da condividere niente nomi di locali");
+  ok(await a.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0, "anno a tavola 390px: niente scorrimento orizzontale");
+  { const cb = await acard.boundingBox(); const sb = await a.getByTestId("carta-condividi").boundingBox(); ok(!!cb && !!sb && sb.y + sb.height <= 844 + 260, `anno a tavola: Condividi subito sotto la card (${sb ? Math.round(sb.y) : "?"})`); }
+  await a.waitForTimeout(300);
+  ok(aEv.some((e) => e.type === "funzione" && e.props?.nome === "anno_tavola_vista" && e.props?.contesto === "piena"), "anno a tavola: la vista è registrata");
+  await a.screenshot({ path: `${OUT}/99j-anno-tavola.png`, caret: "initial", fullPage: true });
+  const aimg = await a.request.get(`${BASE}/profilo/anno/immagine`);
+  const abuf = aimg.ok() ? await aimg.body() : Buffer.alloc(0);
+  ok(aimg.status() === 200 && (aimg.headers()["content-type"] ?? "").includes("image/png") && abuf.length > 24 && abuf.readUInt32BE(16) === 1080 && abuf.readUInt32BE(20) === 1920, `anno a tavola: immagine PNG 1080×1920 (${aimg.status()})`);
+  if (abuf.length) { const { writeFileSync } = await import("fs"); writeFileSync(`${OUT}/99k-anno-tavola-immagine.png`, abuf); }
+  const adl = a.waitForEvent("download", { timeout: 15000 }).catch(() => null);
+  await a.getByTestId("carta-condividi").click();
+  const afile = await adl;
+  for (let i = 0; i < 20 && !aEv.some((e) => e.props?.nome === "anno_tavola_condividi"); i++) await a.waitForTimeout(250);
+  ok(afile?.suggestedFilename() === `il-mio-${ANNO}-a-tavola-mapetite.png` && aEv.some((e) => e.props?.nome === "anno_tavola_condividi"), `anno a tavola: Condividi scarica l'immagine dell'anno ed è registrato (${afile?.suggestedFilename()})`);
+  // Profilo: l'invito c'è solo a dicembre; il cookie e2e_anno lo accende per il test.
+  await a.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  const stagione = mm === 12;
+  ok((await a.getByTestId("profilo-anno").count()) === (stagione ? 1 : 0), `anno a tavola: nel profilo l'invito compare solo a dicembre (${stagione ? "in stagione" : "fuori stagione"})`);
+  await ac.addCookies([{ name: "e2e_anno", value: "1", url: BASE }]);
+  await a.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
+  const pAnno = a.getByTestId("profilo-anno");
+  { const pb = await pAnno.boundingBox(); const cb = await a.getByTestId("profilo-mie-cose").boundingBox(); ok(await pAnno.isVisible() && (await pAnno.getAttribute("href")) === "/profilo/anno" && !!pb && !!cb && pb.y < cb.y && (await a.getByTestId("profilo-mie-cose").getByTestId("profilo-anno").count()) === 0, "anno a tavola: in stagione l'invito sta sopra 'Le mie cose', non è una tessera in più"); }
+  await a.screenshot({ path: `${OUT}/99l-anno-tavola-profilo.png`, caret: "initial" });
+  await ac.clearCookies({ name: "e2e_anno" });
+  // A pari merito nessun "primo" inventato (revisore 25/11): città, genere e mese solo con un primo netto;
+  // con un posto solo niente caselle a zero.
+  const pari = [
+    { created_at: `${ANNO}-03-01`, visited_at: `${ANNO}-03-02`, tags: [V], places: { ...apl(1, "Uno", "Trattoria", "R", 41.9, 12.47), address: "00153 Roma RM" } },
+    { created_at: `${ANNO}-04-01`, visited_at: `${ANNO}-04-02`, tags: [V], places: { ...apl(2, "Due", "pizzeria", "M", 45.45, 9.16), address: "20144 Milano MI" } },
+    { created_at: `${ANNO}-05-01`, visited_at: `${ANNO}-05-02`, tags: [V], places: { ...apl(3, "Tre", "cocktail_bar", "R", 40.85, 14.26), address: "80134 Napoli NA" } },
+  ];
+  await setA({ email: "giulia@example.com", saved: pari, reviews: [] });
+  await a.goto(`${BASE}/profilo/anno`, { waitUntil: "networkidle" });
+  ok((await a.getByTestId("anno-righe").count()) === 0 && !/Roma/.test((await a.getByTestId("anno-mappa").textContent().catch(() => "")) ?? "") && (await a.getByTestId("anno-numeri").textContent())?.includes("3città"), `anno a tavola: a pari merito niente genere, mese o città "preferiti" inventati (${await a.getByTestId("anno-card").textContent()})`);
+  await setA({ email: "giulia@example.com", saved: pari.slice(0, 1), reviews: [] });
+  await a.goto(`${BASE}/profilo/anno`, { waitUntil: "networkidle" });
+  ok((await a.getByTestId("anno-titolo").textContent())?.replace(/\s+/g, "") === "1postoprovato" && !/(^|\D)0\s*[a-z]/i.test((await a.getByTestId("anno-card").innerText()) ?? ""), `anno a tavola: con un posto solo nessun numero a zero (${(await a.getByTestId("anno-card").innerText()).replace(/\n/g, " ")})`);
+  ok((await a.request.get(`${BASE}/profilo/anno/immagine`)).status() === 200, "anno a tavola: immagine anche con un posto solo");
+  // Nessun posto provato nell'anno: stato vuoto, niente immagine, niente ingresso dal diario.
+  await setA({ email: "giulia@example.com", saved: asaved.slice(5, 6).concat(asaved.slice(7)), reviews: [] });
+  await a.goto(`${BASE}/profilo/anno`, { waitUntil: "networkidle" });
+  ok(await a.getByTestId("anno-vuoto").isVisible() && (await a.getByTestId("anno-vuoto").textContent())?.includes("Ci sono stato"), "anno a tavola: senza posti provati nell'anno invito a segnare 'Ci sono stato'");
+  ok((await a.request.get(`${BASE}/profilo/anno/immagine`)).status() === 404, "anno a tavola: senza posti provati nessuna immagine");
+  await a.goto(`${BASE}/profilo/diario`, { waitUntil: "networkidle" });
+  ok((await a.getByTestId("diario-anno").count()) === 0, "anno a tavola: nel diario niente ingresso se quest'anno non c'è nessun posto");
+  await a.screenshot({ path: `${OUT}/99m-anno-tavola-vuoto.png`, caret: "initial" });
+  { const lost = droppedKeys(aEv); ok(lost.length === 0, `anno a tavola: chiavi degli eventi tutte conservate dal server (${lost.join(", ") || "nessuna scartata"})`); }
+  await ac.close();
 }
 
 // ─── Foto degli utenti: diario e community (PIANO-25-OTTOBRE.md 4.4 e 5.6c) ───

@@ -7,7 +7,7 @@ Continua `RICERCA-RISTORATORI.md` (base di Lorenzo del 17/10). Qui ogni problema
 - **DAVVERO, in futuro:** cosa serve (partner, integrazioni, pagamenti, accordi, norme).
 - **Primo passo** e **chi lo fa**: "team" (sessioni di sviluppo) oppure "Lorenzo/Roberto" (contatti, contratti, soldi).
 
-Ultimo aggiornamento: 22/11/2026.
+Ultimo aggiornamento: 25/11/2026.
 
 ---
 
@@ -318,3 +318,10 @@ Ultimo aggiornamento: 22/11/2026.
 - **OGGI nell'app:** "Stasera dove andiamo?" con i salvati aperti adesso; "Prenota su TheFork/Quandoo" apre il modulo del locale.
 - **DAVVERO, in futuro:** proposta 84 (aperti all'ora in cui ci vai, S); disponibilità vera dell'ultimo minuto con le API partner di Quandoo o TheFork (proposta 25, DA-FARE 10).
 - **Primo passo:** team (84); Lorenzo (richiesta a Quandoo, bozza in `PARTNER.md`).
+
+## 35. "Esco meno e ogni cena fuori deve valere la pena; il locale vede gli stessi clienti spendere meno" — 25/11 (CEO che chiude)
+- **Chi lo ha:** entrambi.
+- **Quanto pesa:** il 52% degli italiani dice di aver già ridotto la spesa per ristoranti e delivery negli ultimi tre mesi e il 53% prevede di farlo nell'ultimo trimestre 2026 (sondaggio Confesercenti-Ipsos su 800 persone tra 18 e 65 anni, 2/11/2026: [Teleborsa](https://www.teleborsa.it/DettaglioNews/159_2026-11-02_TLB/Caro-vita-il-sondaggio-Confesercenti-Ipsos-nove-italiani-su-dieci-tagliano-i-consumi.html), [QuiFinanza](https://quifinanza.it/lifestyle/food-economy/caro-vita-classifica-spese-italiani/1022584/)). Sono intenzioni dichiarate, non vendite. A settembre 2026 le visite nei locali sono salite dello 0,3% e la spesa dell'1,7%, ma i prezzi del 2,9%: la spesa reale è scesa; il pranzo cresce più della cena (visite +3,3% contro +2,0%) (Osservatorio FIPE-Confcommercio, 2/11/2026: [QdS](https://qds.it/fipe-a-settembre-ristorazione-tiene-03-ma-spesa-reale-scende/), [Vinetur](https://www.vinetur.com/it/20261103110257/italian-restaurant-spending-fell-in-real-terms-in-september.html)). Quante cene "sbagliate" (posto deludente, conto più alto del previsto) si potevano evitare: dato non trovato.
+- **OGGI nell'app:** verdetto onesto su ogni posto, "Quanto si spende davvero" da chi c'è stato (64) e "Il locale dice" (65); filtro "più economico" con un tocco (47).
+- **DAVVERO, in futuro:** proposta 86 ("A pranzo costa meno", dalle recensioni, zero costi). Lato locale: proposta 87 (riepilogo dell'anno per il ristoratore, per mostrargli chi lo vuole provare). Offerte e sconti legati alla visita restano DA DECIDERE LORENZO (pagamenti e accordi).
+- **Primo passo:** team (86 e 87).

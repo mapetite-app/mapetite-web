@@ -20,6 +20,8 @@ import { ScopritoreRiga } from "@/components/scopritore";
 import ProfiloClassifica, { type ClassificaRow } from "@/components/profilo-classifica";
 import { isMissingColumn } from "@/lib/classifica";
 import { isMissingVisitedAt, POSTO_FISSO, visiteDi } from "@/lib/diario";
+import { annoDa, buildAnno, stagioneAnno } from "@/lib/anno-tavola";
+import { loadAnnoRows } from "@/lib/anno-tavola-server";
 import ProfiloAccount from "@/components/profilo-account";
 import PostiFissi, { type PostoFisso } from "@/components/posti-fissi";
 import ProfiloGusti from "@/components/profilo-gusti";
@@ -254,6 +256,12 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
   // Revisore 2/11: un salvato senza stato è "Da provare" (come nei Salvati), senza scrivere nel database.
   const wantCount = saved.filter((r) => isWanted(r.tags)).length;
   const doneCount = saved.filter((r) => r.tags?.includes(STATE_DONE)).length;
+  // "Il tuo anno a tavola" (proposta 49): invito solo a dicembre, con almeno un posto provato (a gennaio chi non ha
+  // visite dell'anno prima finirebbe sullo stato vuoto: la pagina resta raggiungibile dal diario).
+  // Nel giro automatico il cookie "e2e_anno" lo accende anche fuori stagione (solo in sviluppo).
+  const e2eAnno = process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER && !!(await cookies()).get("e2e_anno");
+  // Solo con almeno un posto provato in QUESTO anno (revisore 25/11): una lettura in più, solo a dicembre.
+  const invitoAnno = doneCount > 0 && (stagioneAnno() || e2eAnno) && buildAnno((await loadAnnoRows()) ?? [], annoDa()).provati > 0;
   const counters = [
     // Lessico (revisore 8/11): "Provati" per i numeri e i titoli, "Ci sono stato" solo per l'azione sulla scheda.
     { label: saved.length === 1 ? "Salvato" : "Salvati", value: saved.length, href: savedHref(), id: "salvati" },
@@ -419,6 +427,17 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
             </a>
           )}
         </section>
+      )}
+
+      {invitoAnno && (
+        <Link href="/profilo/anno" data-testid="profilo-anno" className="mb-6 flex min-h-14 items-center gap-3 rounded-card bg-brand px-4 py-3 text-white shadow-card active:opacity-90">
+          <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full bg-accent" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-[15px] font-semibold">Il tuo {annoDa()} a tavola</span>
+            <span className="block truncate text-xs text-white/70">La mappa dei posti dove sei stato, da condividere</span>
+          </span>
+          <ChevronRight aria-hidden size={16} className="shrink-0 text-white/80" />
+        </Link>
       )}
 
       {/* Le mie cose: ogni funzione del profilo a un tocco, con il suo numero. */}

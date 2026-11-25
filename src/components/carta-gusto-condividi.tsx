@@ -6,40 +6,45 @@ import { trackFeature } from "@/lib/track";
 
 // "Condividi": l'immagine PNG della carta con la condivisione del telefono (Instagram, WhatsApp…).
 // Dove non si possono condividere file (computer, alcuni browser) l'immagine si scarica.
-export default function CartaGustoCondividi() {
+// Proposta 49: la stessa condivisione serve anche "Il tuo anno a tavola" (url, nome del file, testo ed evento).
+export default function CartaGustoCondividi({
+  url = "/profilo/gusto/immagine",
+  fileName = "carta-del-gusto-mapetite.png",
+  text = "La mia carta del gusto su Mapetite",
+  evento = "carta_gusto_condividi",
+}: { url?: string; fileName?: string; text?: string; evento?: string } = {}) {
   const [stato, setStato] = useState<"pronto" | "attendi" | "scaricata" | "errore">("pronto");
 
   async function condividi() {
     setStato("attendi");
     try {
-      const res = await fetch("/profilo/gusto/immagine", { cache: "no-store" });
+      const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
       const blob = await res.blob();
-      const file = new File([blob], "carta-del-gusto-mapetite.png", { type: "image/png" });
-      const text = "La mia carta del gusto su Mapetite";
+      const file = new File([blob], fileName, { type: "image/png" });
       if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({ files: [file], title: "Mapetite", text });
-          trackFeature("carta_gusto_condividi", { contesto: "condivisa" });
+          trackFeature(evento, { contesto: "condivisa" });
         } catch (e) {
           // L'utente ha chiuso il foglio di condivisione: nessun errore da mostrare.
-          trackFeature("carta_gusto_condividi", { contesto: (e as Error)?.name === "AbortError" ? "annullata" : "errore" });
+          trackFeature(evento, { contesto: (e as Error)?.name === "AbortError" ? "annullata" : "errore" });
         }
         setStato("pronto");
         return;
       }
-      const url = URL.createObjectURL(blob);
+      const href = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
+      a.href = href;
       a.download = file.name;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-      trackFeature("carta_gusto_condividi", { contesto: "scaricata" });
+      setTimeout(() => URL.revokeObjectURL(href), 5000);
+      trackFeature(evento, { contesto: "scaricata" });
       setStato("scaricata");
     } catch {
-      trackFeature("carta_gusto_condividi", { contesto: "errore" });
+      trackFeature(evento, { contesto: "errore" });
       setStato("errore");
     }
   }

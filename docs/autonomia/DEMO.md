@@ -13,6 +13,8 @@ Aggiornato con le funzioni dal 1/11 al 7/11. I testi tra virgolette sono quelli 
 
 **Passo in più se c'è tempo (22/11): "Potrebbe piacerti anche" (15 s).** Nella scheda di un risultato scorri in fondo: 2–4 posti simili (stesso tipo, stessa zona, i famosi in fondo). Tocca il primo: si apre la sua scheda, con il verdetto. Dì: "Non devo rifare la ricerca: da un posto che mi piace passo al prossimo, e mi propone quelli simili, non i più recensiti."
 
+**Passo in più a dicembre (25/11): "Il tuo anno a tavola" (15 s).** Profilo → "Il tuo 2026 a tavola" (o Diario → stesso tasto). Mostra la card: posti provati, la costellazione dei posti a Roma, il mese più goloso; tocca Condividi. Dì: "A fine anno Mapetite ti restituisce il tuo anno a tavola, fatto solo da dove sei stato davvero: è il motivo per cui chi lo riceve scarica l'app."
+
 **Passo in più se c'è tempo (21/11): decidere in gruppo (30 s).** Dopo la ricerca del passo 3, tocca **"Scegli tra 3"** e poi **"Manda al gruppo"** → "Crea il link" → **"Manda"** (WhatsApp). Apri il link su un secondo telefono: si vota con il nome, senza app, e si vede chi ha votato cosa. Dì: "Non devo convincere nessuno a scaricare l'app: votano dal link, e il voto lo vince il posto giusto, non il più famoso." Funziona anche da una raccolta (Profilo → raccolta → "Manda al gruppo", scegli 2 o 3 posti).
 
 **Se qualcosa va storto:** quota Google finita → cerca tra i salvati; AI ferma → i risultati Google restano, i posti già visti hanno il verdetto. Mai indirizzi con `?beta=` ("Ti porterei qui" è ancora in prova). Non ricaricare la pagina della mappa dopo una ricerca: la ricerca si perde e rifarla costa una ricerca Google.

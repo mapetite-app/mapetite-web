@@ -357,3 +357,29 @@ export async function fetchPlaceDetails(placeId: string): Promise<PlaceResult | 
   }
   return mapGooglePlace((await res.json()) as GooglePlace);
 }
+
+// Proposta 84 ("Fra 2 ore" in /stasera): solo gli orari di un salvato. Place Details con i soli campi
+// degli orari = fascia "Place Details Enterprise" (più bassa di quella delle recensioni), con la sua
+// soglia gratuita mensile. Gli orari si mostrano e basta: mai salvati (termini Google, 3.2.3(b)).
+export type OpeningPeriods = OpeningPeriod[];
+export async function fetchOpeningPeriods(placeId: string): Promise<OpeningPeriods | null> {
+  // null = Google ha risposto senza orari (orari non noti). Errore, quota finita o chiave mancante: eccezione,
+  // così chi chiama non lo scambia per "orari non noti" e il telefono mostra "controlla prima di andare".
+  // Collaudi senza quota (GOOGLE_FIXTURES_ONLY=1): mai Google vero, orari non noti (anche senza chiave).
+  if (process.env.NODE_ENV === "development" && process.env.GOOGLE_FIXTURES_ONLY === "1") return null;
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) throw new Error("chiave Google mancante");
+  if (!/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return null;
+  const res = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
+    headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": "currentOpeningHours.periods,regularOpeningHours.periods" },
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!res.ok) {
+    console.error(`[orari] Google error ${res.status} per ${placeId}`);
+    throw new Error(`Google ${res.status}`);
+  }
+  const p = (await res.json()) as Pick<GooglePlace, "currentOpeningHours" | "regularOpeningHours">;
+  // Un elenco vuoto non vale: si passa alla settimana tipo.
+  const periods = [p.currentOpeningHours?.periods, p.regularOpeningHours?.periods].find((x) => x && x.length > 0);
+  return periods ?? null;
+}
