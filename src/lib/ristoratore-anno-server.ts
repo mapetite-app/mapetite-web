@@ -62,10 +62,13 @@ export async function caricaAnnoLocale(id: string): Promise<DatiAnnoLocale | nul
     }
     for (const p of (pr ?? []) as { id: string; raccolte_private: string[] | null }[]) privateDi.set(p.id, p.raccolte_private ?? []);
   }
-  const salvati: RistSalvataggio[] = tutte.map(({ solo_per_me, consigliato_da: _c, ...r }) => ({
-    ...r,
-    privato: ignote || solo_per_me === true || (r.tags ?? []).some((t) => (privateDi.get(r.user_id) ?? []).includes(t)),
-  }));
+  const salvati: RistSalvataggio[] = tutte.map(({ solo_per_me, ...resto }) => {
+    const r = { place_id: resto.place_id, user_id: resto.user_id, created_at: resto.created_at, tags: resto.tags, visited_at: resto.visited_at, visite: resto.visite };
+    return {
+      ...r,
+      privato: ignote || solo_per_me === true || (r.tags ?? []).some((t) => (privateDi.get(r.user_id) ?? []).includes(t)),
+    };
+  });
   const consigliati = tutte.filter((r) => r.consigliato_da).map((r) => r.user_id);
 
   // Video collegati dall'inizio dell'anno (a Roma, con un giorno di margine) a fine anno.
