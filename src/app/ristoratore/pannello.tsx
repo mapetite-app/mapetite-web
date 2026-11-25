@@ -12,6 +12,8 @@ import PrezzoMedio from "./prezzo-medio";
 import OmaggioRitorno from "./omaggio";
 import type { Omaggio } from "@/lib/omaggio";
 import type { Prezzo } from "@/lib/prezzo-locale";
+import { annoDa } from "@/lib/anno-tavola";
+import { stagioneAnnoLocale } from "@/lib/ristoratore-anno";
 
 // Pannello del ristoratore (piano 8.2): stessa grafica per i dati veri (/ristoratore/[id]) e per
 // l'esempio dimostrativo (/ristoratore/demo). Solo numeri aggregati; le etichette dei piani
@@ -650,6 +652,18 @@ export default function Pannello({
         <p data-testid="pannello-pochi-dati" className="mt-3 rounded-card bg-surface p-3 text-sm font-sans text-text">
           <strong className="font-display">Dati ancora pochi:</strong> crescono con i tester. Per proteggere chi usa Mapetite, sotto le {SOGLIA} persone scriviamo “meno di {SOGLIA}”.
         </p>
+      )}
+
+      {/* "Il vostro anno su Mapetite" (proposta 87): l'invito si vede dal 1/12 al 15/1 (nell'esempio sempre). */}
+      {(demo || stagioneAnnoLocale()) && (
+        <Link href={`${base}/anno`} data-testid="pannello-anno" className="mt-3 flex min-h-14 items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-card active:opacity-90">
+          <span aria-hidden className="text-xl">🎉</span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-[15px] font-semibold">Il vostro {annoDa()} su Mapetite</span>
+            <span className="block text-xs text-white/70">Da condividere nelle storie di Instagram</span>
+          </span>
+          <ChevronRight aria-hidden size={18} className="shrink-0 text-accent" />
+        </Link>
       )}
 
       <Schede
