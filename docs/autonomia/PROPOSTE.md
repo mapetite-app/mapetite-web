@@ -16,6 +16,24 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 25/11/2026 (mercoledì, CEO che chiude — tema: cene che devono valere la pena, e il riepilogo dell'anno)
+
+### 86. "A pranzo costa meno": il menu del pranzo detto dalle recensioni, con la frase
+- **Problema:** `PROBLEMI.md` 35: il 53% degli italiani prevede di tagliare la spesa al ristorante in questo trimestre (Confesercenti-Ipsos, 2/11/2026) e il pranzo cresce più della cena (FIPE, settembre 2026). Chi ha un posto in "Da provare" che costa troppo per una cena non sa che a pranzo si può provare spendendo meno.
+- **Cosa fa:** sulla scheda, quando le recensioni Google già scaricate citano un menu del pranzo o del giorno con un prezzo ("menu pranzo a 15 €", "business lunch"), una riga "A pranzo: menu da 15 € · lo dice una recensione" che si apre sulla frase originale. In "Stasera dove andiamo?" con "Alle 13", quei salvati mostrano la stessa riga. Se le recensioni non lo dicono, la riga non c'è (mai stimato, mai inventato).
+- **Da dove nasce:** TheFork mostra sconti decisi dal locale; Mapstr, Corner, Beli e Places non dicono niente del pranzo. Noi lo prendiamo dalla prova (le recensioni), come i ✓ dei requisiti.
+- **Valore per l'utente:** prova il posto che sognava spendendo la metà, senza sorprese. **Per il ristoratore:** il pranzo, la fascia che cresce, mostrato a chi lo ha già salvato; dopo, dal pannello potrà confermarlo lui ("Il locale dice", come la 65).
+- **Sforzo:** S/M (regola sulle recensioni già in memoria: parole del pranzo + cifra in €; una riga nella scheda e in "Stasera"; controllo del revisore sui falsi positivi, es. "a pranzo abbiamo speso 60 €"). **Costo Google/Haiku:** zero (nessuna chiamata nuova, nessun token in più).
+- **Stato proposto:** PRONTA.
+
+### 87. "Il vostro anno su Mapetite": il riepilogo di dicembre per il ristoratore
+- **Problema:** `PROBLEMI.md` 35 e 7: il locale vede i clienti spendere meno e non sa chi lo vorrebbe provare. ClearCOGS dà ai ristoratori USA un "Restaurant Wrapped" sui numeri di cassa ([Newswire](https://www.newswire.com/news/clearcogs-launches-industrys-first-restaurant-wrapped-delivering-year-end)); Beli fa il recap dell'anno solo per chi mangia ([Spoon University](https://spoonuniversity.com/news/what-your-2025-beli-plated-says-about-you/)).
+- **Cosa fa:** a dicembre, nel pannello del locale verificato, una pagina "Il vostro 2026": quante persone lo hanno salvato, quante hanno segnato "Ci sono stato", da quali fonti (reel, Google Maps, ricerca: riprende la 76), il mese con più salvataggi, il piatto che le recensioni nominano di più (51). Solo conteggi da 3 in su, nessun nome. In fondo un'immagine verticale da condividere su Instagram ("Salvato da 140 persone su Mapetite nel 2026"), con il nostro logo.
+- **Da dove nasce:** nessuna app di salvataggio restituisce al locale il riepilogo di chi lo vuole provare; è la "domanda qualificata" di `VISIONE.md` resa visibile in un colpo, nel mese in cui i locali fanno i conti.
+- **Valore per l'utente:** nessuno diretto; indiretto: i locali che condividono l'immagine portano persone nuove nell'app. **Per il ristoratore:** il primo motivo concreto per verificare il locale e, dopo, per pagare il pannello.
+- **Sforzo:** S/M (dati già nel database: salvataggi, fonti, visite; una pagina nel pannello; l'immagine con lo stesso motore delle anteprime `opengraph-image`). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA (revisione di sicurezza: soglia 3 e solo conteggi, come la 76). L'immagine non mostra foto Google (termini 3.2.3(b)): solo testo, emoji e logo.
+
 ## 24/11/2026 (martedì, sessione 03:05 — tema: chi sceglie all'ultimo minuto)
 
 ### 84. "Fra 2 ore": in "Stasera dove andiamo?" i salvati aperti all'ora in cui ci vai
