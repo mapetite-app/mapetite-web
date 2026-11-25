@@ -71,6 +71,8 @@ export const FUNZIONI_NOTE = [
   "invito_arrivo", "invito_registrato", "invito_condividi", "benvenuto_importa",
   // Vicino a me e raggio sulla mappa (piano 2.1).
   "vicino_adesso", "raggio",
+  // Stasera "A che ora?" (84), anno a tavola (49) e anno del locale (87): misurati dal 25/11.
+  "orari_google", "anno_tavola_vista", "anno_tavola_condividi", "anno_locale_vista", "anno_locale_condividi",
 ] as const;
 const AZIONI_DIRETTE = ["apri_scheda", "salva", "rimuovi", "ci_sono_stato", "voglio_andarci", "percorso", "chiama", "sito", "condividi"];
 
@@ -115,6 +117,11 @@ const ETICHETTE: Record<string, string> = {
   invito_condividi: "Invito: link mandato",
   benvenuto_importa: "Primo accesso: importa",
   benvenuto_fine: "Primo accesso: finito",
+  orari_google: "Stasera: orari letti da Google",
+  anno_tavola_vista: "Anno a tavola: aperto",
+  anno_tavola_condividi: "Anno a tavola: condiviso",
+  anno_locale_vista: "Anno del locale: aperto",
+  anno_locale_condividi: "Anno del locale: condiviso",
 };
 // Dove si chiede "Ti è stato utile?" (anche quelli ancora senza voti compaiono, a 0).
 export const UTILE_CONTESTI = ["ricerca", "articolo", "assistente", "serata", "sorpresa", "prenota"] as const;
