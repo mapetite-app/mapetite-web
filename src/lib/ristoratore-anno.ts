@@ -55,7 +55,9 @@ export function annoLocale(
     const visitato = tags.includes(STATO_VISITATO);
     // "Vi aspettano": solo chi ha salvato nell'anno e non è ancora venuto (revisore 25/11: niente periodi mescolati).
     if (!visitato && am && am[0] === anno) attesa.add(r.user_id);
-    if (visitato && nellAnno(r.visited_at ?? r.created_at)) {
+    // Visite con una data futura: fuori, come in "Il tuo anno a tavola" (revisore 25/11).
+    const quando = r.visited_at ?? r.created_at;
+    if (visitato && nellAnno(quando) && Date.parse(quando.length === 10 ? `${quando}T00:00:00Z` : quando) <= Date.now()) {
       venuti.add(r.user_id);
       if (tags.includes(PIACIUTO)) piaciuto.add(r.user_id);
       if ((r.visite ?? 0) >= 2) tornati.add(r.user_id);

@@ -35,7 +35,7 @@ export async function immagineAnnoLocale(a: AnnoLocale, host: string, demo = fal
         <div style={{ display: "flex", marginTop: demo ? 40 : 80, fontSize: 40, color: "rgba(255,255,255,0.75)" }}>{`Il nostro ${a.anno} su Mapetite`}</div>
         <div style={{ display: "flex", flexDirection: "column", marginTop: 40, color: CORAL }}>
           <div style={{ display: "flex", fontSize: 260, fontWeight: 700, lineHeight: 1, letterSpacing: -8 }}>{titolo.numero.toLocaleString("it-IT")}</div>
-          <div style={{ display: "flex", marginTop: 16, fontSize: 64, fontWeight: 600 }}>{titolo.testo === "persone vi hanno salvato" ? "persone ci hanno salvato" : "persone sono venute da noi"}</div>
+          <div style={{ display: "flex", marginTop: 16, fontSize: 64, fontWeight: 600 }}>{titolo.testo === "persone vi hanno salvato" ? "persone ci hanno salvato" : "persone sono venute"}</div>
         </div>
         <div style={{ display: numeri.length ? "flex" : "none", gap: 24, marginTop: 70 }}>
           {numeri.map((x) => (
@@ -55,7 +55,7 @@ export async function immagineAnnoLocale(a: AnnoLocale, host: string, demo = fal
         </div>
         <div style={{ display: "flex", flex: 1 }} />
         {barre && (
-          <div style={{ display: "flex", flexDirection: "column", marginBottom: 60 }}>
+          <div style={{ display: "flex", flexDirection: "column", marginTop: 50, marginBottom: 60 }}>
             <div style={{ display: "flex", fontSize: 28, fontWeight: 600, letterSpacing: 4, textTransform: "uppercase", color: "rgba(255,255,255,0.6)", marginBottom: 26 }}>Salvati mese per mese</div>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 18, height: 160 }}>
               {a.mesi.map((n, i) => (

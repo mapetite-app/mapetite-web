@@ -30,9 +30,9 @@ export default function AnnoVista({ nome, a, base, demo = false }: { nome: strin
       {!titolo ? (
         <div data-testid="anno-locale-pochi" className="mt-2 rounded-[28px] bg-brand px-6 py-10 text-center text-white shadow-float">
           <p className="font-display text-sm text-white/70">Il vostro {a.anno} su Mapetite</p>
-          <p className="mt-2 font-title text-[28px] leading-tight">Ancora meno di {SOGLIA} persone</p>
+          <p className="mt-2 font-title text-[28px] leading-tight">Ancora pochi numeri</p>
           <p className="mx-auto mt-3 max-w-xs text-sm text-white/80">
-            Scriviamo i numeri solo da {SOGLIA} persone in su, così nessuno si riconosce. Tornate qui quando vi avranno salvato in più.
+            Scriviamo i numeri solo da {SOGLIA} persone in su, così nessuno si riconosce. Tornate qui quando vi avranno salvato più persone.
           </p>
         </div>
       ) : (
@@ -42,7 +42,7 @@ export default function AnnoVista({ nome, a, base, demo = false }: { nome: strin
               <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-accent" />
               <span className="font-display text-sm font-bold">Mapetite</span>
             </div>
-            <p className="mt-6 truncate font-display text-sm text-white/70">{nome} · il {a.anno}</p>
+            <p className="mt-6 truncate font-display text-sm text-white/70">{nome} · {a.anno}</p>
             <h1 data-testid="anno-locale-titolo" className="mt-1 font-title leading-none text-accent">
               <span className="block text-[64px] font-semibold tracking-tight">{titolo.numero.toLocaleString("it-IT")}</span>
               <span className="mt-1 block text-[24px] leading-tight">{titolo.testo}</span>
