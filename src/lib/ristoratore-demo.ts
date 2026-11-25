@@ -1,4 +1,4 @@
-import type { RistEvento, RistLocale, RistSalvataggio } from "./ristoratore";
+import type { RistEvento, RistLocale, RistReel, RistSalvataggio } from "./ristoratore";
 
 // Dati INVENTATI per /ristoratore/demo (presentazione agli investitori, piani Growth/Pro):
 // come apparirà il pannello quando Mapetite avrà molti utenti. La pagina li etichetta sempre
@@ -125,4 +125,32 @@ export function demoDati(now: number = Date.now()): { locale: RistLocale; citta:
   let u = 0;
   const attesa: RistSalvataggio[] = ATTESA.flatMap(([tags, k]) => Array.from({ length: k }, () => ({ place_id: DEMO_LOCALE.id, user_id: `demo-${++u}`, created_at: new Date(now - u * 86_400_000).toISOString(), tags, visited_at: tags.includes("Già visitato") ? new Date(now - (u % 25) * 86_400_000).toISOString() : null, visite: tags.includes("Già visitato") && u % 2 === 0 ? 2 + (u % 3) : 0 })));
   return { locale: DEMO_LOCALE, citta: "Roma", simili: [DEMO_LOCALE, ...simili], eventi, salvati: [], attesa };
+}
+
+// "Il vostro anno su Mapetite" (proposta 87) nell'esempio: salvataggi INVENTATI sparsi nei mesi dell'anno, con
+// la stessa crescita del pannello d'esempio; passano dallo stesso calcolo dei dati veri (annoLocale).
+export function demoAnnoDati(anno: number, now: number = Date.now()): { righe: RistSalvataggio[]; reel: RistReel[]; consigliati: string[] } {
+  const r = rng(20261125);
+  const righe: RistSalvataggio[] = [];
+  const reel: RistReel[] = [];
+  const consigliati: string[] = [];
+  const fine = Math.min(now, Date.UTC(anno, 11, 31, 20));
+  // Pesi dei mesi: si parte piano a gennaio e si cresce, con il picco in autunno (un reel girato bene a ottobre).
+  // Scala coerente col pannello d'esempio (circa 200 salvataggi negli ultimi 30 giorni).
+  const PESI = [25, 30, 40, 50, 60, 55, 45, 40, 90, 160, 210, 200];
+  let u = 0;
+  PESI.forEach((peso, m) => {
+    for (let k = 0; k < peso; k++) {
+      const t = Date.UTC(anno, m, 1 + Math.floor(r() * 27), 17 + Math.floor(r() * 4));
+      if (t > fine) continue;
+      const user = `demo-anno-${++u}`;
+      const venuto = r() < 0.38;
+      const tags = venuto ? ["Già visitato", ...(r() < 0.8 ? ["Mi è piaciuto"] : [])] : ["Da provare", ...(r() < 0.4 ? ["Con amici"] : [])];
+      const visitedAt = venuto ? new Date(Math.min(t + Math.floor(r() * 20) * 86_400_000, fine)).toISOString().slice(0, 10) : null;
+      righe.push({ place_id: DEMO_LOCALE.id, user_id: user, created_at: new Date(t).toISOString(), tags, visited_at: visitedAt, visite: venuto && r() < 0.35 ? 2 + Math.floor(r() * 3) : venuto ? 1 : 0 });
+      if (r() < (m === 9 ? 0.5 : 0.2)) reel.push({ user_id: user, place_id: DEMO_LOCALE.id, fonte: r() < 0.7 ? "Instagram" : "TikTok", created_at: new Date(t - 3_600_000).toISOString() });
+      if (r() < 0.18) consigliati.push(user);
+    }
+  });
+  return { righe, reel, consigliati };
 }

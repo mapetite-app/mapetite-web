@@ -12,6 +12,8 @@ import PrezzoMedio from "./prezzo-medio";
 import OmaggioRitorno from "./omaggio";
 import type { Omaggio } from "@/lib/omaggio";
 import type { Prezzo } from "@/lib/prezzo-locale";
+import { annoDa } from "@/lib/anno-tavola";
+import { stagioneAnnoLocale } from "@/lib/ristoratore-anno";
 
 // Pannello del ristoratore (piano 8.2): stessa grafica per i dati veri (/ristoratore/[id]) e per
 // l'esempio dimostrativo (/ristoratore/demo). Solo numeri aggregati; le etichette dei piani
@@ -633,7 +635,16 @@ export default function Pannello({
           <strong className="font-display">Esempio dimostrativo</strong> · locale e numeri inventati
         </p>
       )}
-      <p className="text-[11px] font-display font-semibold uppercase tracking-wider text-accent">Pannello del ristoratore</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-display font-semibold uppercase tracking-wider text-accent">Pannello del ristoratore</p>
+        {/* "Il vostro anno su Mapetite" (proposta 87): dal 1/12 al 15/1 (nell'esempio sempre). Nella riga della scritta in
+            alto, non un riquadro: la prima schermata resta quella dei 4 numeri e di "Cosa ti dicono i numeri". */}
+        {(demo || stagioneAnnoLocale()) && (
+          <Link href={`${base}/anno`} data-testid="pannello-anno" className="relative -my-1 inline-flex shrink-0 items-center gap-1 rounded-pill bg-brand px-2.5 py-1 text-xs font-display font-semibold text-white after:absolute after:-inset-x-1 after:-inset-y-2.5 after:content-['']">
+            🎉 Il vostro {annoDa()}<ChevronRight aria-hidden size={14} className="text-accent" />
+          </Link>
+        )}
+      </div>
       <h1 className="mt-0.5 font-title text-[26px] font-semibold leading-tight text-brand">{locale.name}</h1>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-sans text-text-muted">
         {verificato ? (

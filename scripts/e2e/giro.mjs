@@ -12788,6 +12788,72 @@ else {
   await rc.close();
 }
 // FINE-VOTO-GRUPPO
+// ANNO-LOCALE (proposta 87): "Il vostro anno su Mapetite" per il ristoratore. Solo conteggi da 3 persone,
+// lucchetto escluso, anno prima escluso; pagina e immagine vietate a chi non è admin o titolare.
+{
+  console.log("\n— Il vostro anno su Mapetite (ristoratore) —");
+  const yc = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await yc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  const yp = await yc.newPage();
+  const romaY = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const [Y, M, D] = romaY.split("-").map(Number);
+  const ANNO_L = M === 1 && D <= 15 ? Y - 1 : Y;
+  const stagione = M === 12 || (M === 1 && D <= 15);
+  await yp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" });
+  ok((await yp.getByTestId("pannello-anno").getAttribute("href")) === "/ristoratore/demo/anno" && (await yp.getByTestId("pannello-anno").textContent())?.includes(`Il vostro ${ANNO_L}`), "anno del locale: nell'esempio l'invito c'è sempre e porta alla pagina d'esempio");
+  { const r = await yp.goto(`${BASE}/ristoratore/demo/anno`, { waitUntil: "networkidle" });
+    const n = Number(((await yp.getByTestId("anno-locale-titolo").textContent()) ?? "").replace(/\D+/g, " ").trim().split(" ")[0]);
+    ok(r?.status() === 200 && await yp.getByTestId("anno-locale-esempio").isVisible() && n >= 3 && await yp.getByTestId("carta-condividi").isVisible(), `anno del locale: pagina d'esempio con etichetta, numero grande (${n}) e Condividi`);
+    const w = await yp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 390, `anno del locale: niente scorrimento orizzontale (${w}px)`);
+    await yp.screenshot({ path: `${OUT}/100-anno-locale-esempio.png`, fullPage: true });
+    const img = await yp.request.get(`${BASE}/ristoratore/demo/anno/immagine`);
+    ok(img.status() === 200 && img.headers()["content-type"]?.includes("image/png"), `anno del locale: immagine d'esempio PNG (${img.status()})`);
+    const ad = yp.waitForEvent("download", { timeout: 15000 }).catch(() => null);
+    await yp.getByTestId("carta-condividi").click();
+    const f = await ad; ok(f?.suggestedFilename() === `il-nostro-${ANNO_L}-su-mapetite.png`, `anno del locale: Condividi scarica l'immagine (${f?.suggestedFilename()})`); }
+  const LOCY = "44444444-0000-4000-8000-0000000000a7";
+  { const a = await yp.request.get(`${BASE}/ristoratore/${LOCY}/anno`); const b = await yp.request.get(`${BASE}/ristoratore/${LOCY}/anno/immagine`); const c = await yp.request.get(`${BASE}/ristoratore/non-un-id/anno`);
+    ok(a.status() === 404 && b.status() === 404 && c.status() === 404, `anno del locale: vietato a chi non è admin o titolare (${a.status()}/${b.status()}/${c.status()})`); }
+  const at = (m, d) => new Date(Date.UTC(ANNO_L, m, d, 18)).toISOString();
+  const V = "Già visitato", L = "Mi è piaciuto";
+  const righe = [
+    { place_id: LOCY, user_id: "A", created_at: at(9, 3), tags: [V, L], visited_at: `${ANNO_L}-10-10`, visite: 1 },
+    { place_id: LOCY, user_id: "B", created_at: at(9, 5), tags: [V, L], visited_at: `${ANNO_L}-10-12`, visite: 1 },
+    { place_id: LOCY, user_id: "C", created_at: at(9, 9), tags: ["Da provare"] },
+    { place_id: LOCY, user_id: "D", created_at: at(2, 9), tags: [V], visited_at: `${ANNO_L}-03-20`, visite: 1 },
+    { place_id: LOCY, user_id: "E", created_at: at(5, 9), tags: ["Da provare"] },
+    { place_id: LOCY, user_id: "F", created_at: at(9, 20), tags: [V, L], visited_at: `${ANNO_L}-10-22`, visite: 3, privato: true },
+    { place_id: LOCY, user_id: "G", created_at: new Date(Date.UTC(ANNO_L - 1, 5, 1)).toISOString(), tags: ["Da provare"] },
+  ];
+  const reel = ["A", "B", "C"].map((u, i) => ({ user_id: u, place_id: LOCY, fonte: "Instagram", created_at: righe[i].created_at }));
+  const setY = (v) => yc.addCookies([{ name: "e2e_rist_anno", value: encodeURIComponent(JSON.stringify(v)), url: BASE }]);
+  await setY({ id: LOCY, nome: "Osteria Prova", anno: ANNO_L, righe, reel, consigliati: ["A", "B"] });
+  { const r = await yp.goto(`${BASE}/ristoratore/${LOCY}/anno`, { waitUntil: "networkidle" });
+    const t = (await yp.getByTestId("anno-locale-titolo").textContent()) ?? "";
+    ok(r?.status() === 200 && t.startsWith("5") && t.includes("persone vi hanno salvato") && (await yp.getByTestId("anno-locale-esempio").count()) === 0, `anno del locale: 5 salvati nell'anno (lucchetto e anno prima fuori) (${t})`);
+    const nn = (await yp.getByTestId("anno-locale-numeri").textContent()) ?? "";
+    ok(nn.includes("3sono venute") && !nn.includes("aspettano") && !nn.includes("👍"), `anno del locale: venuti 3; 👍 e 'vi aspettano' sotto 3 non ci sono (chi ha salvato l'anno prima non conta) (${nn})`);
+    const rr = (await yp.getByTestId("anno-locale-righe").textContent()) ?? "";
+    ok(rr.includes("Ottobre · 3") && rr.includes("Da un reel o un video3 persone") && !rr.includes("amico"), `anno del locale: mese netto, 3 dai reel, 'amico' sotto 3 non c'è (${rr})`);
+    ok((await yp.getByTestId("anno-locale-mesi").count()) === 0, "anno del locale: con mesi da 1 persona niente barre (si leggerebbero dalle altezze)");
+    ok((await yp.request.get(`${BASE}/ristoratore/${LOCY}/anno/immagine`)).status() === 200, "anno del locale: immagine del locale vero");
+    await yp.screenshot({ path: `${OUT}/100b-anno-locale.png`, fullPage: true }); }
+  // Tre persone tutte a ottobre: barre sì (ogni mese 0 o almeno 3); 3 venuti tutti con 👍: niente 👍 (si saprebbe il voto di ognuno).
+  await setY({ id: LOCY, nome: "Osteria Prova", anno: ANNO_L, righe: [righe[0], righe[1], { ...righe[2], tags: [V, L], visited_at: `${ANNO_L}-10-15`, visite: 1 }], reel: [], consigliati: [] });
+  await yp.goto(`${BASE}/ristoratore/${LOCY}/anno`, { waitUntil: "networkidle" });
+  ok(await yp.getByTestId("anno-locale-mesi").isVisible() && !((await yp.getByTestId("anno-locale-numeri").textContent().catch(() => "")) ?? "").includes("👍"), "anno del locale: barre quando ogni mese è 0 o almeno 3; 3 su 3 con 👍 non si scrive");
+  await setY({ id: LOCY, nome: "Osteria Prova", anno: ANNO_L, righe: righe.slice(0, 2), reel: [], consigliati: [] });
+  await yp.goto(`${BASE}/ristoratore/${LOCY}/anno`, { waitUntil: "networkidle" });
+  ok(await yp.getByTestId("anno-locale-pochi").isVisible() && (await yp.getByTestId("anno-locale-card").count()) === 0 && (await yp.getByTestId("carta-condividi").count()) === 0, "anno del locale: con 2 persone niente numeri e niente Condividi");
+  ok((await yp.request.get(`${BASE}/ristoratore/${LOCY}/anno/immagine`)).status() === 404, "anno del locale: con 2 persone nessuna immagine");
+  // Pannello vero: l'invito solo dal 1/12 al 15/1.
+  const Ly = { id: LOCY, name: "Osteria Prova", address: "00176 Roma RM", category: "restaurant", lat: 41.888, lng: 12.53, google_place_id: "GPROVA" };
+  await yc.addCookies([{ name: "e2e_ristoratore", value: encodeURIComponent(JSON.stringify({ locale: Ly, simili: [Ly], verificato: true, salvati: [], eventi: [] })), url: BASE }]);
+  await yp.goto(`${BASE}/ristoratore/${LOCY}`, { waitUntil: "networkidle" });
+  ok((await yp.getByTestId("pannello-anno").count()) === (stagione ? 1 : 0), `anno del locale: nel pannello vero l'invito ${stagione ? "c'è (stagione)" : "non c'è fuori stagione"}`);
+  await yc.close();
+}
+// FINE-ANNO-LOCALE
 // ACCESSO-APPLE (proposta 79) e ritorno dell'app iPhone (DA-FARE 14)
 {
   console.log("\n— Accesso con Apple e ritorno dell'app —");
