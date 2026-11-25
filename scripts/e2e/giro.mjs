@@ -12800,7 +12800,7 @@ else {
   const ANNO_L = M === 1 && D <= 15 ? Y - 1 : Y;
   const stagione = M === 12 || (M === 1 && D <= 15);
   await yp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" });
-  ok((await yp.getByTestId("pannello-anno").getAttribute("href")) === "/ristoratore/demo/anno" && (await yp.getByTestId("pannello-anno").textContent())?.includes(`Il vostro ${ANNO_L} su Mapetite`), "anno del locale: nell'esempio l'invito c'è sempre e porta alla pagina d'esempio");
+  ok((await yp.getByTestId("pannello-anno").getAttribute("href")) === "/ristoratore/demo/anno" && (await yp.getByTestId("pannello-anno").textContent())?.includes(`Il vostro ${ANNO_L}`), "anno del locale: nell'esempio l'invito c'è sempre e porta alla pagina d'esempio");
   { const r = await yp.goto(`${BASE}/ristoratore/demo/anno`, { waitUntil: "networkidle" });
     const n = Number(((await yp.getByTestId("anno-locale-titolo").textContent()) ?? "").replace(/\D+/g, " ").trim().split(" ")[0]);
     ok(r?.status() === 200 && await yp.getByTestId("anno-locale-esempio").isVisible() && n >= 3 && await yp.getByTestId("carta-condividi").isVisible(), `anno del locale: pagina d'esempio con etichetta, numero grande (${n}) e Condividi`);

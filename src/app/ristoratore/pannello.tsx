@@ -635,7 +635,16 @@ export default function Pannello({
           <strong className="font-display">Esempio dimostrativo</strong> · locale e numeri inventati
         </p>
       )}
-      <p className="text-[11px] font-display font-semibold uppercase tracking-wider text-accent">Pannello del ristoratore</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-display font-semibold uppercase tracking-wider text-accent">Pannello del ristoratore</p>
+        {/* "Il vostro anno su Mapetite" (proposta 87): dal 1/12 al 15/1 (nell'esempio sempre). Nella riga della scritta in
+            alto, non un riquadro: la prima schermata resta quella dei 4 numeri e di "Cosa ti dicono i numeri". */}
+        {(demo || stagioneAnnoLocale()) && (
+          <Link href={`${base}/anno`} data-testid="pannello-anno" className="relative -my-1 inline-flex shrink-0 items-center gap-1 rounded-pill bg-brand px-2.5 py-1 text-xs font-display font-semibold text-white after:absolute after:-inset-x-1 after:-inset-y-2.5 after:content-['']">
+            🎉 Il vostro {annoDa()}<ChevronRight aria-hidden size={14} className="text-accent" />
+          </Link>
+        )}
+      </div>
       <h1 className="mt-0.5 font-title text-[26px] font-semibold leading-tight text-brand">{locale.name}</h1>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-sans text-text-muted">
         {verificato ? (
@@ -652,18 +661,6 @@ export default function Pannello({
         <p data-testid="pannello-pochi-dati" className="mt-3 rounded-card bg-surface p-3 text-sm font-sans text-text">
           <strong className="font-display">Dati ancora pochi:</strong> crescono con i tester. Per proteggere chi usa Mapetite, sotto le {SOGLIA} persone scriviamo “meno di {SOGLIA}”.
         </p>
-      )}
-
-      {/* "Il vostro anno su Mapetite" (proposta 87): l'invito si vede dal 1/12 al 15/1 (nell'esempio sempre). */}
-      {(demo || stagioneAnnoLocale()) && (
-        <Link href={`${base}/anno`} data-testid="pannello-anno" className="mt-3 flex min-h-14 items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white shadow-card active:opacity-90">
-          <span aria-hidden className="text-xl">🎉</span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-display text-[15px] font-semibold">Il vostro {annoDa()} su Mapetite</span>
-            <span className="block text-xs text-white/70">Da condividere nelle storie di Instagram</span>
-          </span>
-          <ChevronRight aria-hidden size={18} className="shrink-0 text-accent" />
-        </Link>
       )}
 
       <Schede
