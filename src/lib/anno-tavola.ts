@@ -86,8 +86,8 @@ function top(items: string[]): { key: string; count: number } | null {
 function mappaDi(rows: AnnoRow[], citta: string | null): Anno["mappa"] {
   const conPos = rows.filter((r) => typeof r.lat === "number" && typeof r.lng === "number" && Number.isFinite(r.lat) && Number.isFinite(r.lng));
   const stessa = citta ? conPos.filter((r) => cityFromAddress(r.address) === citta) : [];
-  const scelti = stessa.length >= 2 ? stessa : conPos;
-  if (scelti.length < 2) return null;
+  if (stessa.length < 2) return null;
+  const scelti = stessa;
   const lat0 = scelti.reduce((s, r) => s + r.lat!, 0) / scelti.length;
   const k = Math.cos((lat0 * Math.PI) / 180);
   const xs = scelti.map((r) => r.lng! * k);
@@ -97,7 +97,8 @@ function mappaDi(rows: AnnoRow[], citta: string | null): Anno["mappa"] {
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
   const punti = scelti.map((r, i) => ({ x: 0.5 + (xs[i] - cx) / span, y: 0.5 + (ys[i] - cy) / span, su: r.tags.includes(LIKE) }));
-  return { punti, citta: stessa.length >= 2 ? citta : null };
+  // Senza una città con almeno 2 posti i punti sarebbero sparsi su mezza Italia: niente costellazione.
+  return stessa.length >= 2 ? { punti, citta } : null;
 }
 
 export function buildAnno(rows: AnnoRow[], anno: number, now = new Date()): Anno {

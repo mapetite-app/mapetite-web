@@ -318,7 +318,9 @@ export default function StaseraView({ userId }: { userId: string }) {
       // Un posto mai controllato (letture del tocco finite) non si propone come se fosse aperto (revisore 24/11):
       // resta solo se gli orari non sono arrivati per un errore (ko) o se non ha un Place ID.
       const visto = (s: SavedSpot) => apertoAlle(s, o, cache) !== undefined || !s.googlePlaceId || ko;
-      const picks = cand.filter((s) => visto(s) && apertoAlle(s, o, cache) !== false).slice(0, 3);
+      // Prima gli aperti confermati, poi (solo con l'avviso) quelli senza orari; dentro ogni gruppo l'ordine del gusto.
+      const buoni = cand.filter((s) => visto(s) && apertoAlle(s, o, cache) !== false);
+      const picks = [...buoni.filter((s) => apertoAlle(s, o, cache) === true), ...buoni.filter((s) => apertoAlle(s, o, cache) !== true)].slice(0, 3);
       // Zero proposte con salvati ancora da controllare (oltre a questi candidati): non è "tutti chiusi".
       const esaurito = picks.length === 0 && spots.some((s) => matches(s, choices) && !skip.has(s.id) && !visto(s));
       // Meno di 3 aperti e letture ancora disponibili: secondo giro sui prossimi salvati (revisore 25/11).

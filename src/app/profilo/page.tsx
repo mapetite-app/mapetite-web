@@ -20,7 +20,8 @@ import { ScopritoreRiga } from "@/components/scopritore";
 import ProfiloClassifica, { type ClassificaRow } from "@/components/profilo-classifica";
 import { isMissingColumn } from "@/lib/classifica";
 import { isMissingVisitedAt, POSTO_FISSO, visiteDi } from "@/lib/diario";
-import { annoDa, stagioneAnno } from "@/lib/anno-tavola";
+import { annoDa, buildAnno, stagioneAnno } from "@/lib/anno-tavola";
+import { loadAnnoRows } from "@/lib/anno-tavola-server";
 import ProfiloAccount from "@/components/profilo-account";
 import PostiFissi, { type PostoFisso } from "@/components/posti-fissi";
 import ProfiloGusti from "@/components/profilo-gusti";
@@ -259,7 +260,8 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
   // visite dell'anno prima finirebbe sullo stato vuoto: la pagina resta raggiungibile dal diario).
   // Nel giro automatico il cookie "e2e_anno" lo accende anche fuori stagione (solo in sviluppo).
   const e2eAnno = process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER && !!(await cookies()).get("e2e_anno");
-  const invitoAnno = doneCount > 0 && (stagioneAnno() || e2eAnno);
+  // Solo con almeno un posto provato in QUESTO anno (revisore 25/11): una lettura in più, solo a dicembre.
+  const invitoAnno = doneCount > 0 && (stagioneAnno() || e2eAnno) && buildAnno((await loadAnnoRows()) ?? [], annoDa()).provati > 0;
   const counters = [
     // Lessico (revisore 8/11): "Provati" per i numeri e i titoli, "Ci sono stato" solo per l'azione sulla scheda.
     { label: saved.length === 1 ? "Salvato" : "Salvati", value: saved.length, href: savedHref(), id: "salvati" },
