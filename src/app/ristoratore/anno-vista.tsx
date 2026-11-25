@@ -12,9 +12,8 @@ export default function AnnoVista({ nome, a, base, demo = false }: { nome: strin
   const titolo = titoloAnno(a);
   const numeri = numeriAnnoLocale(a);
   const righe = righeAnnoLocale(a);
-  const totMesi = a.mesi.reduce((x, y) => x + y, 0);
   const maxMese = Math.max(1, ...a.mesi);
-  const barre = a.salvati >= SOGLIA && totMesi >= SOGLIA;
+  const barre = a.barre;
 
   return (
     <div className="mx-auto max-w-md px-4 pb-10 pt-4">
@@ -75,7 +74,7 @@ export default function AnnoVista({ nome, a, base, demo = false }: { nome: strin
               <figure data-testid="anno-locale-mesi" className="mt-5" aria-label="Salvataggi mese per mese">
                 <div className="flex h-14 items-end gap-1">
                   {a.mesi.map((n, i) => (
-                    <span key={i} className={`flex-1 rounded-[3px] ${n === maxMese ? "bg-accent" : n > 0 ? "bg-white/55" : "bg-white/10"}`} style={{ height: n > 0 ? `${Math.max(12, Math.round((n / maxMese) * 100))}%` : "6%" }} />
+                    <span key={i} className={`flex-1 rounded-[3px] ${a.mese && n === maxMese ? "bg-accent" : n > 0 ? "bg-white/55" : "bg-white/10"}`} style={{ height: n > 0 ? `${Math.max(12, Math.round((n / maxMese) * 100))}%` : "6%" }} />
                   ))}
                 </div>
                 <div className="mt-1 flex gap-1">

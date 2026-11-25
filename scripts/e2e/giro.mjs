@@ -12832,12 +12832,16 @@ else {
     const t = (await yp.getByTestId("anno-locale-titolo").textContent()) ?? "";
     ok(r?.status() === 200 && t.startsWith("5") && t.includes("persone vi hanno salvato") && (await yp.getByTestId("anno-locale-esempio").count()) === 0, `anno del locale: 5 salvati nell'anno (lucchetto e anno prima fuori) (${t})`);
     const nn = (await yp.getByTestId("anno-locale-numeri").textContent()) ?? "";
-    ok(nn.includes("3sono venute") && nn.includes("3vi aspettano") && !nn.includes("👍"), `anno del locale: venuti 3 e 3 vi aspettano, 👍 sotto 3 non c'è (${nn})`);
+    ok(nn.includes("3sono venute") && !nn.includes("aspettano") && !nn.includes("👍"), `anno del locale: venuti 3; 👍 e 'vi aspettano' sotto 3 non ci sono (chi ha salvato l'anno prima non conta) (${nn})`);
     const rr = (await yp.getByTestId("anno-locale-righe").textContent()) ?? "";
     ok(rr.includes("Ottobre · 3") && rr.includes("Da un reel o un video3 persone") && !rr.includes("amico"), `anno del locale: mese netto, 3 dai reel, 'amico' sotto 3 non c'è (${rr})`);
-    ok(await yp.getByTestId("anno-locale-mesi").isVisible(), "anno del locale: barre mese per mese");
+    ok((await yp.getByTestId("anno-locale-mesi").count()) === 0, "anno del locale: con mesi da 1 persona niente barre (si leggerebbero dalle altezze)");
     ok((await yp.request.get(`${BASE}/ristoratore/${LOCY}/anno/immagine`)).status() === 200, "anno del locale: immagine del locale vero");
     await yp.screenshot({ path: `${OUT}/100b-anno-locale.png`, fullPage: true }); }
+  // Tre persone tutte a ottobre: barre sì (ogni mese 0 o almeno 3); 3 venuti tutti con 👍: niente 👍 (si saprebbe il voto di ognuno).
+  await setY({ id: LOCY, nome: "Osteria Prova", anno: ANNO_L, righe: [righe[0], righe[1], { ...righe[2], tags: [V, L], visited_at: `${ANNO_L}-10-15`, visite: 1 }], reel: [], consigliati: [] });
+  await yp.goto(`${BASE}/ristoratore/${LOCY}/anno`, { waitUntil: "networkidle" });
+  ok(await yp.getByTestId("anno-locale-mesi").isVisible() && !((await yp.getByTestId("anno-locale-numeri").textContent().catch(() => "")) ?? "").includes("👍"), "anno del locale: barre quando ogni mese è 0 o almeno 3; 3 su 3 con 👍 non si scrive");
   await setY({ id: LOCY, nome: "Osteria Prova", anno: ANNO_L, righe: righe.slice(0, 2), reel: [], consigliati: [] });
   await yp.goto(`${BASE}/ristoratore/${LOCY}/anno`, { waitUntil: "networkidle" });
   ok(await yp.getByTestId("anno-locale-pochi").isVisible() && (await yp.getByTestId("anno-locale-card").count()) === 0 && (await yp.getByTestId("carta-condividi").count()) === 0, "anno del locale: con 2 persone niente numeri e niente Condividi");

@@ -24,7 +24,8 @@ export type AnnoLocale = {
   piaciuto: number; // tra i venuti, quelli con 👍
   tornati: number; // tra i venuti, quelli tornati 2 o più volte
   mese: { label: string; persone: number } | null; // il mese con più salvataggi, solo se primo netto e da SOGLIA
-  mesi: number[]; // 12 conteggi dei salvataggi, per le barre (l'immagine le mostra solo se il totale è da SOGLIA)
+  mesi: number[]; // 12 conteggi dei salvataggi, per le barre
+  barre: boolean; // barre mese per mese solo se OGNI mese è 0 o da SOGLIA (revisore 25/11: 1 e 2 si leggevano dalle altezze)
   daReel: number; // salvato da un reel o video collegato entro un giorno dal salvataggio (proposta 76)
   daAmico: number; // salvato su consiglio di un amico (proposta 58)
   inAttesa: number; // oggi: chi lo ha salvato (anche prima dell'anno) e non è ancora venuto
@@ -52,7 +53,8 @@ export function annoLocale(
     const am = annoMese(r.created_at);
     if (am && am[0] === anno) { salvatiChi.set(r.user_id, am[1]); salvatoIl.set(r.user_id, Date.parse(r.created_at)); }
     const visitato = tags.includes(STATO_VISITATO);
-    if (!visitato) attesa.add(r.user_id);
+    // "Vi aspettano": solo chi ha salvato nell'anno e non è ancora venuto (revisore 25/11: niente periodi mescolati).
+    if (!visitato && am && am[0] === anno) attesa.add(r.user_id);
     if (visitato && nellAnno(r.visited_at ?? r.created_at)) {
       venuti.add(r.user_id);
       if (tags.includes(PIACIUTO)) piaciuto.add(r.user_id);
@@ -81,11 +83,13 @@ export function annoLocale(
     anno,
     salvati: sopra(salvatiChi.size),
     venuti: sopra(venuti.size),
-    // 👍 solo se i venuti sono almeno SOGLIA (come il pannello: con 1 o 2 si capirebbe chi).
-    piaciuto: venuti.size >= SOGLIA ? sopra(piaciuto.size) : 0,
+    // 👍 solo se anche chi non l'ha messo è almeno SOGLIA (come "di parola" nel pannello): con 3 su 3, o 3 su 4,
+    // si saprebbe il voto di ognuno o di chi non l'ha dato.
+    piaciuto: piaciuto.size >= SOGLIA && venuti.size - piaciuto.size >= SOGLIA ? piaciuto.size : 0,
     tornati: sopra(tornati.size),
     mese: netto ? { label: MESI[primo], persone: max } : null,
     mesi,
+    barre: salvatiChi.size >= SOGLIA && mesi.every((n) => n === 0 || n >= SOGLIA),
     daReel: sopra(reel.size),
     daAmico: sopra(amici.size),
     inAttesa: sopra(attesa.size),
@@ -107,7 +111,7 @@ export function numeriAnnoLocale(a: AnnoLocale): { value: string; label: string 
   if (a.salvati && a.venuti) out.push({ value: it(a.venuti), label: "sono venute" });
   if (a.piaciuto) out.push({ value: `👍 ${it(a.piaciuto)}`, label: "a cui è piaciuto" });
   if (a.tornati) out.push({ value: it(a.tornati), label: "tornate più volte" });
-  if (out.length < 3 && a.inAttesa) out.push({ value: it(a.inAttesa), label: "vi aspettano" });
+  if (out.length < 3 && a.inAttesa && a.inAttesa !== a.salvati) out.push({ value: it(a.inAttesa), label: "vi aspettano" });
   return out.slice(0, 3);
 }
 

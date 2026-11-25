@@ -2,7 +2,6 @@ import { ImageResponse } from "next/og";
 import { MESI_CORTI } from "@/lib/anno-tavola";
 import { fonts } from "@/lib/og-fonts";
 import { numeriAnnoLocale, righeAnnoLocale, titoloAnno, type AnnoLocale } from "@/lib/ristoratore-anno";
-import { SOGLIA } from "@/lib/ristoratore";
 
 // Immagine verticale (storia 1080×1920) di "Il vostro anno su Mapetite" (proposta 87), che il locale pubblica su
 // Instagram. Solo i numeri della pagina (da 3 persone in su): nessun nome di cliente, nessuna foto o testo di
@@ -19,9 +18,8 @@ export async function immagineAnnoLocale(a: AnnoLocale, host: string, demo = fal
   const loaded = await fonts();
   const numeri = numeriAnnoLocale(a);
   const righe = righeAnnoLocale(a);
-  const totMesi = a.mesi.reduce((x, y) => x + y, 0);
   const maxMese = Math.max(1, ...a.mesi);
-  const barre = a.salvati >= SOGLIA && totMesi >= SOGLIA;
+  const barre = a.barre;
 
   return new ImageResponse(
     (
@@ -29,9 +27,12 @@ export async function immagineAnnoLocale(a: AnnoLocale, host: string, demo = fal
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <div style={{ display: "flex", width: 26, height: 26, borderRadius: 999, background: CORAL }} />
           <div style={{ display: "flex", fontSize: 40, fontWeight: 700 }}>Mapetite</div>
-          {demo && <div style={{ display: "flex", marginLeft: "auto", fontSize: 28, color: CORAL }}>Esempio</div>}
         </div>
-        <div style={{ display: "flex", marginTop: 80, fontSize: 40, color: "rgba(255,255,255,0.75)" }}>{`Il nostro ${a.anno} su Mapetite`}</div>
+        {/* Revisore 25/11: nell'esempio la scritta deve leggersi anche nella storia sul telefono, vicino al numero. */}
+        {demo && (
+          <div style={{ display: "flex", alignSelf: "flex-start", marginTop: 60, padding: "16px 30px", borderRadius: 999, background: CORAL, color: "white", fontSize: 36, fontWeight: 700 }}>Esempio dimostrativo · numeri inventati</div>
+        )}
+        <div style={{ display: "flex", marginTop: demo ? 40 : 80, fontSize: 40, color: "rgba(255,255,255,0.75)" }}>{`Il nostro ${a.anno} su Mapetite`}</div>
         <div style={{ display: "flex", flexDirection: "column", marginTop: 40, color: CORAL }}>
           <div style={{ display: "flex", fontSize: 260, fontWeight: 700, lineHeight: 1, letterSpacing: -8 }}>{titolo.numero.toLocaleString("it-IT")}</div>
           <div style={{ display: "flex", marginTop: 16, fontSize: 64, fontWeight: 600 }}>{titolo.testo === "persone vi hanno salvato" ? "persone ci hanno salvato" : "persone sono venute da noi"}</div>
@@ -58,7 +59,7 @@ export async function immagineAnnoLocale(a: AnnoLocale, host: string, demo = fal
             <div style={{ display: "flex", fontSize: 28, fontWeight: 600, letterSpacing: 4, textTransform: "uppercase", color: "rgba(255,255,255,0.6)", marginBottom: 26 }}>Salvati mese per mese</div>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 18, height: 160 }}>
               {a.mesi.map((n, i) => (
-                <div key={i} style={{ display: "flex", flex: 1, height: n > 0 ? Math.max(14, Math.round((n / maxMese) * 160)) : 6, borderRadius: 10, background: n === maxMese ? CORAL : n > 0 ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.12)" }} />
+                <div key={i} style={{ display: "flex", flex: 1, height: n > 0 ? Math.max(14, Math.round((n / maxMese) * 160)) : 6, borderRadius: 10, background: a.mese && n === maxMese ? CORAL : n > 0 ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.12)" }} />
               ))}
             </div>
             <div style={{ display: "flex", gap: 18, marginTop: 14 }}>
