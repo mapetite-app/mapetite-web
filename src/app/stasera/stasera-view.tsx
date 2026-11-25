@@ -294,9 +294,11 @@ export default function StaseraView({ userId }: { userId: string }) {
     if (!spots) return { picks: [], ko: false, esaurito: false };
     if (!o) return { picks: pickThree(spots, choices, skip), ko: false, esaurito: false };
     let ko = false;
+    // Aperti già confermati nel primo giro: nel secondo restano davanti, mai rimescolati via (revisore 25/11).
+    let trovati: SavedSpot[] = [];
     for (let giro = 0; giro < 2; giro++) {
-      const salta = new Set([...skip, ...spots.filter((s) => apertoAlle(s, o, cache) === false).map((s) => s.id)]);
-      const cand = pickThree(spots, choices, salta, 5);
+      const salta = new Set([...skip, ...trovati.map((s) => s.id), ...spots.filter((s) => apertoAlle(s, o, cache) === false).map((s) => s.id)]);
+      const cand = [...trovati, ...pickThree(spots, choices, salta, 5 - trovati.length)];
       const daChiedere = cand.map((s) => s.googlePlaceId).filter((g): g is string => !!g && !(g in cache)).slice(0, Math.max(0, budget.n));
       if (daChiedere.length > 0) {
         budget.n -= daChiedere.length;
@@ -320,7 +322,8 @@ export default function StaseraView({ userId }: { userId: string }) {
       // Zero proposte con salvati ancora da controllare (oltre a questi candidati): non è "tutti chiusi".
       const esaurito = picks.length === 0 && spots.some((s) => matches(s, choices) && !skip.has(s.id) && !visto(s));
       // Meno di 3 aperti e letture ancora disponibili: secondo giro sui prossimi salvati (revisore 25/11).
-      if (picks.length >= 3 || cand.length === 0 || ko || budget.n <= 0 || giro === 1) return { picks, ko, esaurito };
+      if (picks.length >= 3 || cand.length === trovati.length || ko || budget.n <= 0 || giro === 1) return { picks, ko, esaurito };
+      trovati = picks;
     }
     return { picks: [], ko, esaurito: false };
   };

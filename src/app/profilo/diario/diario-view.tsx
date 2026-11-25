@@ -75,7 +75,7 @@ export default function DiarioView({ userId, initial, withDate, fotoPronte = fal
             <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full bg-accent" />
             <span className="min-w-0 flex-1">
               <span className="block font-display text-[15px] font-semibold">Il tuo {anno} a tavola</span>
-              <span className="block truncate text-xs text-white/70">La mappa del tuo anno, da condividere</span>
+              <span className="block truncate text-xs text-white/70">I numeri del tuo anno, da condividere</span>
             </span>
             <ChevronRight aria-hidden size={16} className="shrink-0 text-white/80" />
           </Link>

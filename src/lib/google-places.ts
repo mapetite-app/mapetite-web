@@ -365,11 +365,11 @@ export type OpeningPeriods = OpeningPeriod[];
 export async function fetchOpeningPeriods(placeId: string): Promise<OpeningPeriods | null> {
   // null = Google ha risposto senza orari (orari non noti). Errore, quota finita o chiave mancante: eccezione,
   // così chi chiama non lo scambia per "orari non noti" e il telefono mostra "controlla prima di andare".
+  // Collaudi senza quota (GOOGLE_FIXTURES_ONLY=1): mai Google vero, orari non noti (anche senza chiave).
+  if (process.env.NODE_ENV === "development" && process.env.GOOGLE_FIXTURES_ONLY === "1") return null;
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) throw new Error("chiave Google mancante");
   if (!/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return null;
-  // Collaudi senza quota (GOOGLE_FIXTURES_ONLY=1): mai Google vero, orari non noti.
-  if (process.env.NODE_ENV === "development" && process.env.GOOGLE_FIXTURES_ONLY === "1") return null;
   const res = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
     headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": "currentOpeningHours.periods,regularOpeningHours.periods" },
     signal: AbortSignal.timeout(6000),

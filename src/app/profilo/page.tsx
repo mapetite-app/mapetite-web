@@ -255,7 +255,8 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Prom
   // Revisore 2/11: un salvato senza stato è "Da provare" (come nei Salvati), senza scrivere nel database.
   const wantCount = saved.filter((r) => isWanted(r.tags)).length;
   const doneCount = saved.filter((r) => r.tags?.includes(STATE_DONE)).length;
-  // "Il tuo anno a tavola" (proposta 49): invito solo dal 1° dicembre al 15 gennaio, con almeno un posto provato.
+  // "Il tuo anno a tavola" (proposta 49): invito solo a dicembre, con almeno un posto provato (a gennaio chi non ha
+  // visite dell'anno prima finirebbe sullo stato vuoto: la pagina resta raggiungibile dal diario).
   // Nel giro automatico il cookie "e2e_anno" lo accende anche fuori stagione (solo in sviluppo).
   const e2eAnno = process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER && !!(await cookies()).get("e2e_anno");
   const invitoAnno = doneCount > 0 && (stagioneAnno() || e2eAnno);

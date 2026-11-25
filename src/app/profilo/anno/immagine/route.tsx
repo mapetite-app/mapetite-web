@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { annoDa, buildAnno } from "@/lib/anno-tavola";
+import { annoDa, buildAnno, MESI_CORTI, numeriAnno } from "@/lib/anno-tavola";
 import { loadAnnoRows } from "@/lib/anno-tavola-server";
 import { fonts } from "@/lib/og-fonts";
 
@@ -27,13 +27,16 @@ export async function GET(request: Request) {
     </div>
   );
   const riga = (label: string, value: string) => (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "26px 0", borderBottom: "2px solid rgba(255,255,255,0.1)" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "22px 0", borderBottom: "2px solid rgba(255,255,255,0.1)" }}>
       <div style={{ display: "flex", fontSize: 32, color: "rgba(255,255,255,0.65)" }}>{label}</div>
       <div style={{ display: "flex", fontSize: 40, fontWeight: 600 }}>{value}</div>
     </div>
   );
   const posti = (n: number) => `${n} ${n === 1 ? "posto" : "posti"}`;
-  const terzo = a.chicche > 0 ? stat(String(a.chicche), a.chicche === 1 ? "poco conosciuto" : "poco conosciuti") : a.cittaCount >= 2 ? stat(String(a.cittaCount), "città") : stat(String(a.piaciuti), "mi sono piaciuti");
+  const numeri = numeriAnno(a);
+  // Barre mese per mese (revisore 25/11: il fondo era vuoto): solo visite con la data, almeno 2 in tutto.
+  const datate = a.mesi.reduce((x, y) => x + y, 0);
+  const maxMese = Math.max(1, ...a.mesi);
 
   return new ImageResponse(
     (
@@ -42,19 +45,17 @@ export async function GET(request: Request) {
           <div style={{ display: "flex", width: 26, height: 26, borderRadius: 999, background: CORAL }} />
           <div style={{ display: "flex", fontSize: 40, fontWeight: 700 }}>Mapetite</div>
         </div>
-        <div style={{ display: "flex", marginTop: 110, fontSize: 40, color: "rgba(255,255,255,0.75)" }}>{`Il mio ${anno} a tavola`}</div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 26, marginTop: 10, color: CORAL }}>
+        <div style={{ display: "flex", marginTop: 80, fontSize: 40, color: "rgba(255,255,255,0.75)" }}>{`Il mio ${anno} a tavola`}</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 26, marginTop: 40, color: CORAL }}>
           <div style={{ display: "flex", fontSize: 260, fontWeight: 700, lineHeight: 1, letterSpacing: -8 }}>{a.provati}</div>
           <div style={{ display: "flex", fontSize: 64, fontWeight: 600 }}>{a.provati === 1 ? "posto provato" : "posti provati"}</div>
         </div>
 
-        <div style={{ display: "flex", gap: 24, marginTop: 90 }}>
-          {stat(String(a.volte), a.volte === 1 ? "volta a tavola" : "volte a tavola")}
-          {stat(String(a.tornati), a.tornati === 1 ? "posto fisso" : "posti fissi")}
-          {terzo}
+        <div style={{ display: numeri.length ? "flex" : "none", gap: 24, marginTop: 70 }}>
+          {numeri.map((x) => stat(x.value, x.label))}
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", marginTop: 60 }}>
+        <div style={{ display: "flex", flexDirection: "column", marginTop: 40 }}>
           {a.tipo && riga("Il mio genere", `${a.tipo.label} · ${posti(a.tipo.count)}`)}
           {a.mese && riga("Il mese più goloso", `${a.mese.label.charAt(0).toUpperCase()}${a.mese.label.slice(1)} · ${posti(a.mese.count)}`)}
           {a.citta && riga("La mia città", a.citta.nome)}
@@ -62,6 +63,21 @@ export async function GET(request: Request) {
         </div>
 
         <div style={{ display: "flex", flex: 1 }} />
+        {datate >= 2 && (
+          <div style={{ display: "flex", flexDirection: "column", marginTop: 50, marginBottom: 60 }}>
+            <div style={{ display: "flex", fontSize: 28, fontWeight: 600, letterSpacing: 4, textTransform: "uppercase", color: "rgba(255,255,255,0.6)", marginBottom: 26 }}>Mese per mese</div>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 18, height: 160 }}>
+              {a.mesi.map((n, i) => (
+                <div key={i} style={{ display: "flex", flex: 1, height: n > 0 ? Math.max(14, Math.round((n / maxMese) * 160)) : 6, borderRadius: 10, background: n === maxMese ? CORAL : n > 0 ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.12)" }} />
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 18, marginTop: 14 }}>
+              {MESI_CORTI.map((m, i) => (
+                <div key={i} style={{ display: "flex", flex: 1, justifyContent: "center", fontSize: 26, color: "rgba(255,255,255,0.55)" }}>{m}</div>
+              ))}
+            </div>
+          </div>
+        )}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", fontSize: 30, color: "rgba(255,255,255,0.7)" }}>
           <div style={{ display: "flex" }}>I locali giusti per te, non quelli di tutti.</div>
           <div style={{ display: "flex", color: CORAL, fontWeight: 600 }}>{host}</div>

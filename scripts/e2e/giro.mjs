@@ -11635,17 +11635,32 @@ else {
   const adl = a.waitForEvent("download", { timeout: 15000 }).catch(() => null);
   await a.getByTestId("carta-condividi").click();
   const afile = await adl;
+  for (let i = 0; i < 20 && !aEv.some((e) => e.props?.nome === "anno_tavola_condividi"); i++) await a.waitForTimeout(250);
   ok(afile?.suggestedFilename() === `il-mio-${ANNO}-a-tavola-mapetite.png` && aEv.some((e) => e.props?.nome === "anno_tavola_condividi"), `anno a tavola: Condividi scarica l'immagine dell'anno ed è registrato (${afile?.suggestedFilename()})`);
-  // Profilo: l'invito c'è solo in stagione (1/12–15/1); il cookie e2e_anno lo accende per il test.
+  // Profilo: l'invito c'è solo a dicembre; il cookie e2e_anno lo accende per il test.
   await a.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
-  const stagione = mm === 12 || (mm === 1 && dd <= 15);
-  ok((await a.getByTestId("profilo-anno").count()) === (stagione ? 1 : 0), `anno a tavola: nel profilo l'invito compare solo dal 1° dicembre al 15 gennaio (${stagione ? "in stagione" : "fuori stagione"})`);
+  const stagione = mm === 12;
+  ok((await a.getByTestId("profilo-anno").count()) === (stagione ? 1 : 0), `anno a tavola: nel profilo l'invito compare solo a dicembre (${stagione ? "in stagione" : "fuori stagione"})`);
   await ac.addCookies([{ name: "e2e_anno", value: "1", url: BASE }]);
   await a.goto(`${BASE}/profilo`, { waitUntil: "networkidle" });
   const pAnno = a.getByTestId("profilo-anno");
   { const pb = await pAnno.boundingBox(); const cb = await a.getByTestId("profilo-mie-cose").boundingBox(); ok(await pAnno.isVisible() && (await pAnno.getAttribute("href")) === "/profilo/anno" && !!pb && !!cb && pb.y < cb.y && (await a.getByTestId("profilo-mie-cose").getByTestId("profilo-anno").count()) === 0, "anno a tavola: in stagione l'invito sta sopra 'Le mie cose', non è una tessera in più"); }
   await a.screenshot({ path: `${OUT}/99l-anno-tavola-profilo.png`, caret: "initial" });
   await ac.clearCookies({ name: "e2e_anno" });
+  // A pari merito nessun "primo" inventato (revisore 25/11): città, genere e mese solo con un primo netto;
+  // con un posto solo niente caselle a zero.
+  const pari = [
+    { created_at: `${ANNO}-03-01`, visited_at: `${ANNO}-03-02`, tags: [V], places: { ...apl(1, "Uno", "Trattoria", "R", 41.9, 12.47), address: "00153 Roma RM" } },
+    { created_at: `${ANNO}-04-01`, visited_at: `${ANNO}-04-02`, tags: [V], places: { ...apl(2, "Due", "pizzeria", "M", 45.45, 9.16), address: "20144 Milano MI" } },
+    { created_at: `${ANNO}-05-01`, visited_at: `${ANNO}-05-02`, tags: [V], places: { ...apl(3, "Tre", "cocktail_bar", "R", 40.85, 14.26), address: "80134 Napoli NA" } },
+  ];
+  await setA({ email: "giulia@example.com", saved: pari, reviews: [] });
+  await a.goto(`${BASE}/profilo/anno`, { waitUntil: "networkidle" });
+  ok((await a.getByTestId("anno-righe").count()) === 0 && !/Roma/.test((await a.getByTestId("anno-mappa").textContent().catch(() => "")) ?? "") && (await a.getByTestId("anno-numeri").textContent())?.includes("3città"), `anno a tavola: a pari merito niente genere, mese o città "preferiti" inventati (${await a.getByTestId("anno-card").textContent()})`);
+  await setA({ email: "giulia@example.com", saved: pari.slice(0, 1), reviews: [] });
+  await a.goto(`${BASE}/profilo/anno`, { waitUntil: "networkidle" });
+  ok((await a.getByTestId("anno-titolo").textContent())?.replace(/\s+/g, "") === "1postoprovato" && !/(^|\D)0\s*[a-z]/i.test((await a.getByTestId("anno-card").innerText()) ?? ""), `anno a tavola: con un posto solo nessun numero a zero (${(await a.getByTestId("anno-card").innerText()).replace(/\n/g, " ")})`);
+  ok((await a.request.get(`${BASE}/profilo/anno/immagine`)).status() === 200, "anno a tavola: immagine anche con un posto solo");
   // Nessun posto provato nell'anno: stato vuoto, niente immagine, niente ingresso dal diario.
   await setA({ email: "giulia@example.com", saved: asaved.slice(5, 6).concat(asaved.slice(7)), reviews: [] });
   await a.goto(`${BASE}/profilo/anno`, { waitUntil: "networkidle" });

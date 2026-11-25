@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { annoDa, buildAnno, type Anno } from "@/lib/anno-tavola";
+import { annoDa, buildAnno, numeriAnno, type Anno } from "@/lib/anno-tavola";
 import { loadAnnoRows } from "@/lib/anno-tavola-server";
 import { categoryLabel } from "@/lib/category-label";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -42,8 +42,8 @@ function Costellazione({ mappa }: { mappa: NonNullable<Anno["mappa"]> }) {
           <rect width="100" height="70" fill="url(#anno-griglia)" />
           {punti.map((p, i) => (
             <g key={i}>
-              {p.su && <circle cx={15 + p.x * 70} cy={8 + p.y * 54} r="4" fill="#ff6b4a" opacity="0.22" />}
-              <circle data-testid="anno-punto" cx={15 + p.x * 70} cy={8 + p.y * 54} r={p.su ? 2.2 : 1.6} fill={p.su ? "#ff6b4a" : "rgba(255,255,255,0.8)"} />
+              {p.su && <circle cx={23 + p.x * 54} cy={8 + p.y * 54} r="4" fill="#ff6b4a" opacity="0.22" />}
+              <circle data-testid="anno-punto" cx={23 + p.x * 54} cy={8 + p.y * 54} r={p.su ? 2.2 : 1.6} fill={p.su ? "#ff6b4a" : "rgba(255,255,255,0.8)"} />
             </g>
           ))}
         </svg>
@@ -93,19 +93,9 @@ export default async function AnnoPage() {
     );
   }
 
-  // Terzo numero: il differenziatore prima (posti poco conosciuti), poi le città, poi i 👍.
-  const terzo = a.chicche > 0
-    ? { value: String(a.chicche), label: a.chicche === 1 ? "poco conosciuto" : "poco conosciuti" }
-    : a.cittaCount >= 2
-      ? { value: String(a.cittaCount), label: "città" }
-      : { value: String(a.piaciuti), label: "👍 ti sono piaciuti" };
-  const stats = [
-    { value: String(a.volte), label: a.volte === 1 ? "volta a tavola" : "volte a tavola" },
-    { value: String(a.tornati), label: a.tornati === 1 ? "posto fisso" : "posti fissi" },
-    terzo,
-  ];
+  const stats = numeriAnno(a);
   const righe = [
-    a.tipo && { k: "tipo", label: "Il tuo genere", value: `${a.tipo.label} · ${plur(a.tipo.count, "posto", "posti")}` },
+    a.tipo && { k: "tipo", label: "Il mio genere", value: `${a.tipo.label} · ${plur(a.tipo.count, "posto", "posti")}` },
     a.mese && { k: "mese", label: "Il mese più goloso", value: `${a.mese.label.charAt(0).toUpperCase()}${a.mese.label.slice(1)} · ${plur(a.mese.count, "posto", "posti")}` },
   ].filter(Boolean) as { k: string; label: string; value: string }[];
 
@@ -126,7 +116,8 @@ export default async function AnnoPage() {
 
         {a.mappa && <Costellazione mappa={a.mappa} />}
 
-        <div data-testid="anno-numeri" className="mt-5 grid grid-cols-3 gap-2">
+        {stats.length > 0 && (
+        <div data-testid="anno-numeri" className={`mt-5 grid gap-2 ${stats.length === 3 ? "grid-cols-3" : stats.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
           {stats.map((s) => (
             <p key={s.label} className="rounded-2xl bg-white/[0.08] px-3 py-3">
               <span className="block font-display text-2xl font-bold leading-none">{s.value}</span>
@@ -134,6 +125,7 @@ export default async function AnnoPage() {
             </p>
           ))}
         </div>
+        )}
 
         {righe.length > 0 && (
           <dl data-testid="anno-righe" className="mt-5 space-y-2.5">
@@ -164,7 +156,7 @@ export default async function AnnoPage() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-display text-[15px] font-semibold text-text">{p.name}</span>
                     <span className="block truncate text-xs text-text-muted">
-                      {[categoryLabel(p.category), p.volte >= 2 ? `ci sei tornato ${p.volte - 1} ${p.volte === 2 ? "volta" : "volte"}` : null].filter(Boolean).join(" · ") || "Locale"}
+                      {[p.volte >= 2 ? `ci sei tornato ${p.volte - 1} ${p.volte === 2 ? "volta" : "volte"}` : null, categoryLabel(p.category)].filter(Boolean).join(" · ") || "Locale"}
                     </span>
                   </span>
                   <ChevronRight aria-hidden size={16} className="shrink-0 text-text-muted" />

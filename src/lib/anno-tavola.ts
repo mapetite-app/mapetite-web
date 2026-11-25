@@ -25,12 +25,14 @@ export type Punto = { x: number; y: number; su: boolean };
 export type Anno = {
   anno: number;
   provati: number;
-  volte: number; // visite contate, con i "Ci sono tornato"
+  volte: number; // visite contate, con i "Ci sono tornato" (saved_places.visite conta da sempre, non per anno:
+  // nel 2026 è lo stesso perché l'app è nuova; dal 2027 servirà il conteggio per anno)
   tornati: number; // posti dove sei tornato almeno una volta
   piaciuti: number; // posti con 👍
   preferiti: { id: string; name: string; category: string | null; volte: number }[]; // 👍, max 3
   tipo: { label: string; count: number } | null; // solo se almeno 2
-  mese: { label: string; count: number } | null; // solo se almeno 2 visite datate nello stesso mese
+  mese: { label: string; count: number } | null; // solo se almeno 2 visite datate nello stesso mese, primo netto
+  mesi: number[]; // 12 conteggi delle visite con la data, per le barre dell'immagine
   citta: { nome: string; count: number } | null;
   cittaCount: number;
   chicche: number; // posti poco conosciuti provati
@@ -52,10 +54,9 @@ export function annoDa(now = new Date()): number {
   return m === 1 && d <= 15 ? y - 1 : y;
 }
 
-/** Quando mostrare l'invito nel profilo: dal 1° dicembre al 15 gennaio. */
+/** Quando mostrare l'invito nel profilo: a dicembre. */
 export function stagioneAnno(now = new Date()): boolean {
-  const [, m, d] = oggiRoma(now).split("-").map(Number);
-  return m === 12 || (m === 1 && d <= 15);
+  return oggiRoma(now).slice(5, 7) === "12";
 }
 
 /** Anno della visita: la data scelta; senza data, l'anno (a Roma) in cui il posto è stato salvato. */
@@ -70,12 +71,14 @@ export function visitatiNellAnno(rows: AnnoRow[], anno: number, now = new Date()
   return rows.filter((r) => r.tags.includes(VISITED) && annoVisita(r, oggi) === anno);
 }
 
+// Il primo, solo se netto (revisore 25/11): a pari merito non si sceglie a caso ("La mia città: Roma" con
+// cinque città da un posto ciascuna era un dato inventato).
 function top(items: string[]): { key: string; count: number } | null {
   const m = new Map<string, number>();
   for (const it of items) m.set(it, (m.get(it) ?? 0) + 1);
-  let best: { key: string; count: number } | null = null;
-  for (const [key, count] of m) if (!best || count > best.count) best = { key, count };
-  return best;
+  const ord = [...m.entries()].sort((a, b) => b[1] - a[1]);
+  if (ord.length === 0 || (ord.length > 1 && ord[1][1] === ord[0][1])) return null;
+  return { key: ord[0][0], count: ord[0][1] };
 }
 
 // Punti della mappa senza sfondo (niente mappe di Google): proiezione semplice nel riquadro 0–1,
@@ -106,6 +109,8 @@ export function buildAnno(rows: AnnoRow[], anno: number, now = new Date()): Anno
     .slice(0, 3)
     .map((r) => ({ id: r.id, name: r.name, category: r.category, volte: volteDi(r) }));
   const tipoTop = top(visti.flatMap((r) => { const l = categoryLabel(r.category); return l ? [l] : []; }));
+  const mesi = Array.from({ length: 12 }, () => 0);
+  for (const r of visti) if (r.visitedAt && Number(r.visitedAt.slice(0, 4)) === anno) mesi[Number(r.visitedAt.slice(5, 7)) - 1]++;
   const meseTop = top(visti.flatMap((r) => (r.visitedAt && Number(r.visitedAt.slice(0, 4)) === anno ? [r.visitedAt.slice(5, 7)] : [])));
   const cittaNomi = visti.flatMap((r) => { const c = cityFromAddress(r.address); return c ? [c] : []; });
   const cittaTop = top(cittaNomi);
@@ -118,10 +123,28 @@ export function buildAnno(rows: AnnoRow[], anno: number, now = new Date()): Anno
     preferiti,
     tipo: tipoTop && tipoTop.count >= 2 ? { label: tipoTop.key, count: tipoTop.count } : null,
     mese: meseTop && meseTop.count >= 2 ? { label: MESI[Number(meseTop.key) - 1], count: meseTop.count } : null,
-    citta: cittaTop ? { nome: cittaTop.key, count: cittaTop.count } : null,
+    mesi,
+    citta: cittaTop && cittaTop.count >= 2 ? { nome: cittaTop.key, count: cittaTop.count } : null,
     cittaCount: new Set(cittaNomi).size,
     chicche: visti.filter((r) => r.pocoConosciuto === true).length,
     daProvare: rows.filter((r) => r.tags.includes(WANT) && !r.tags.includes(VISITED)).length,
     mappa: mappaDi(visti, cittaTop?.key ?? null),
   };
 }
+
+export type Numero = { value: string; label: string };
+/** Fino a 3 numeri, mai a zero (revisore 25/11: "0 posti fissi" sull'immagine era triste): prima le volte,
+ *  poi i posti fissi, i poco conosciuti (il differenziatore), le città, i 👍. */
+export function numeriAnno(a: Anno): Numero[] {
+  const n = (v: number, uno: string, tanti: string): Numero | null => (v > 0 ? { value: String(v), label: v === 1 ? uno : tanti } : null);
+  return [
+    a.volte > a.provati ? n(a.volte, "volta a tavola", "volte a tavola") : null,
+    n(a.tornati, "posto fisso", "posti fissi"),
+    n(a.chicche, "poco conosciuto", "poco conosciuti"),
+    a.cittaCount >= 2 ? n(a.cittaCount, "città", "città") : null,
+    n(a.piaciuti, "ti è piaciuto", "ti sono piaciuti"),
+  ].filter((x): x is Numero => x !== null).slice(0, 3);
+}
+
+/** Iniziali dei mesi per le barre dell'immagine. */
+export const MESI_CORTI = MESI.map((m) => m.slice(0, 1).toUpperCase());
