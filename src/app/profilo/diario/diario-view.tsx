@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { annoDa, oggiRoma } from "@/lib/anno-tavola";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
@@ -26,6 +27,14 @@ export default function DiarioView({ userId, initial, withDate, fotoPronte = fal
   const [saved, setSaved] = useState<string | null>(null);
   const groups = useMemo(() => groupByMonth(entries), [entries]);
   const liked = entries.filter((e) => votoOf(e.tags) === "su").length;
+  // "Il tuo anno a tavola" (proposta 49): l'ingresso compare con almeno un posto provato nell'anno
+  // (stessa regola della pagina: la data della visita, o senza data l'anno in cui l'hai salvato).
+  const anno = annoDa();
+  const nellAnno = entries.filter((e) => {
+    if (e.date) return e.date <= oggiRoma() && e.date.startsWith(String(anno));
+    const t = Date.parse(e.savedAt);
+    return Number.isFinite(t) && oggiRoma(new Date(t)).startsWith(String(anno));
+  }).length;
 
   const save = async (e: DiaryEntry, v: DiarioValori): Promise<boolean> => {
     const patch: VisitPatch = {};
@@ -60,6 +69,16 @@ export default function DiarioView({ userId, initial, withDate, fotoPronte = fal
             {entries.length} {entries.length === 1 ? "posto provato" : "posti provati"}
             {liked > 0 && ` · ${liked} ti ${liked === 1 ? "è piaciuto" : "sono piaciuti"}`}
           </p>
+        )}
+        {nellAnno > 0 && (
+          <Link href="/profilo/anno" data-testid="diario-anno" className="mt-3 flex min-h-12 items-center gap-3 rounded-card bg-brand px-4 py-2.5 text-white active:opacity-90">
+            <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full bg-accent" />
+            <span className="min-w-0 flex-1">
+              <span className="block font-display text-[15px] font-semibold">Il tuo {anno} a tavola</span>
+              <span className="block truncate text-xs text-white/70">La mappa del tuo anno, da condividere</span>
+            </span>
+            <ChevronRight aria-hidden size={16} className="shrink-0 text-white/80" />
+          </Link>
         )}
       </header>
 

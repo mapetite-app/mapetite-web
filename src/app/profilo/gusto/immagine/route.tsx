@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { buildCarta, CARTA_MIN } from "@/lib/carta-gusto";
 import { loadCartaRows } from "@/lib/carta-gusto-server";
+import { fonts } from "@/lib/og-fonts";
 
 // Immagine verticale (formato storia 1080×1920) della carta del gusto, da condividere.
 // Solo numeri e tipi di locale contati dai salvati: nessun nome di locale, nessun contenuto Google.
@@ -8,28 +9,6 @@ const W = 1080;
 const H = 1920;
 const TEAL = "#1a3c40";
 const CORAL = "#ff6b4a";
-
-type Font = { name: string; data: ArrayBuffer; weight: 400 | 600 | 700; style: "normal" };
-// Poppins dal servizio Google Fonts (licenza libera), una volta per processo; se la rete
-// non risponde si usa il carattere predefinito e l'immagine esce lo stesso.
-let fontsPromise: Promise<Font[]> | null = null;
-async function loadFont(weight: 400 | 600 | 700): Promise<Font> {
-  const css = await (await fetch(`https://fonts.googleapis.com/css2?family=Poppins:wght@${weight}`, { signal: AbortSignal.timeout(2500) })).text();
-  const url = css.match(/src: url\((.+?)\) format\('(?:opentype|truetype)'\)/)?.[1];
-  if (!url) throw new Error("font non trovato");
-  const data = await (await fetch(url, { signal: AbortSignal.timeout(2500) })).arrayBuffer();
-  return { name: "Poppins", data, weight, style: "normal" };
-}
-function fonts(): Promise<Font[]> {
-  if (!fontsPromise) {
-    fontsPromise = Promise.all([loadFont(400), loadFont(600), loadFont(700)]).catch((e) => {
-      console.error("[carta-gusto] Poppins non disponibile:", e instanceof Error ? e.message : e);
-      fontsPromise = null;
-      return [];
-    });
-  }
-  return fontsPromise;
-}
 
 export async function GET(request: Request) {
   const rows = await loadCartaRows();
