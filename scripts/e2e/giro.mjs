@@ -3980,10 +3980,10 @@ else {
     // Proposta 84 "Fra 2 ore": "A che ora?" filtra i salvati con gli orari Google, chiesti solo al tocco.
     {
       const stm = await import(new URL("../../src/lib/ore-stasera.ts", import.meta.url).href);
-      // Martedì 24/11/2026: alle 18:00 di Roma (17:00 UTC) → Adesso, Alle 20, Alle 21:30; alle 12:00 → Adesso, Alle 13, Alle 20; alle 21:15 → Adesso, Fra un'ora; alle 23:45 → solo Adesso.
+      // Martedì 24/11/2026: alle 18:00 di Roma (17:00 UTC) → Adesso, Alle 20, Alle 21:30; alle 12:00 → Adesso, Alle 13, Alle 20; alle 21:15 → Adesso, Tra un'ora; alle 23:45 → solo Adesso.
       const lab = (iso) => stm.oreStasera(new Date(iso)).map((o) => o.label).join("|");
       const o18 = stm.oreStasera(new Date("2026-11-24T17:00:00Z"));
-      ok(lab("2026-11-24T17:00:00Z") === "Adesso|Alle 20|Alle 21:30" && lab("2026-11-24T11:00:00Z") === "Adesso|Alle 13|Alle 20" && lab("2026-11-24T20:15:00Z") === "Adesso|Fra un'ora" && lab("2026-11-24T22:45:00Z") === "Adesso" && o18[0].t.day === 2 && o18[0].t.hour === 18 && o18[2].t.hour === 21 && o18[2].t.minute === 30,
+      ok(lab("2026-11-24T17:00:00Z") === "Adesso|Alle 20|Alle 21:30" && lab("2026-11-24T11:00:00Z") === "Adesso|Alle 13|Alle 20" && lab("2026-11-24T20:15:00Z") === "Adesso|Tra un'ora" && lab("2026-11-24T22:45:00Z") === "Adesso" && o18[0].t.day === 2 && o18[0].t.hour === 18 && o18[2].t.hour === 21 && o18[2].t.minute === 30,
         `stasera, a che ora (proposta 84): ore giuste per le 18, le 12, le 21:15 e le 23:45 di Roma (${lab("2026-11-24T17:00:00Z")} / ${lab("2026-11-24T11:00:00Z")} / ${lab("2026-11-24T20:15:00Z")})`);
       ok((await fetch(`${BASE}/api/stasera/orari`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).status === 400 && (await fetch(`${BASE}/api/stasera/orari`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: ["ChIJaaaaaaaaaa1", "ChIJaaaaaaaaaa2", "ChIJaaaaaaaaaa3", "ChIJaaaaaaaaaa4", "ChIJaaaaaaaaaa5", "ChIJaaaaaaaaaa6"] }) })).status === 400, "stasera, a che ora: /api/stasera/orari 400 senza locali o con più di 5");
       const romaDow = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Rome", weekday: "short" }).format(new Date())];

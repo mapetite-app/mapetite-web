@@ -23,9 +23,23 @@ export function oreStasera(now = new Date()): OraStasera[] {
     { id: "adesso", label: "Adesso", riepilogo: "adesso", t: { day, hour, minute } },
     ...dopo.map((p) => ({ id: p.id, label: p.label, riepilogo: p.riepilogo, t: { day, hour: p.hour, minute: p.minute } })),
   ];
-  // Dopo le 21: "Fra un'ora" (revisore 24/11: la sola "Adesso" era spoglia), finché resta nello stesso giorno.
+  // Dopo le 21: "Tra un'ora" ("fra" si leggeva "apre fra un'ora", revisore 25/11) (revisore 24/11: la sola "Adesso" era spoglia), finché resta nello stesso giorno.
   const fra = adesso + 60;
-  if (dopo.length === 0 && fra < 24 * 60) lista.push({ id: "1h", label: "Fra un'ora", riepilogo: "fra un'ora", t: { day, hour: Math.floor(fra / 60), minute: fra % 60 } });
+  if (dopo.length === 0 && fra < 24 * 60) lista.push({ id: "1h", label: "Tra un'ora", riepilogo: "tra un'ora", t: { day, hour: Math.floor(fra / 60), minute: fra % 60 } });
   return lista;
 }
 
+
+/** L'ora scelta al momento del tocco (revisore 25/11): un pasto scelto resta valido finché non è passato,
+ *  anche se nel frattempo è sotto i 30 minuti e non compare più tra le pillole; passato, vale "Adesso". */
+export function oraAlTocco(id: string, now = new Date()): OraStasera {
+  const fresche = oreStasera(now);
+  const trovata = fresche.find((o) => o.id === id);
+  if (trovata) return trovata;
+  const adesso = fresche[0];
+  const pasto = PASTI.find((p) => p.id === id);
+  if (pasto && pasto.hour * 60 + pasto.minute > adesso.t.hour * 60 + adesso.t.minute) {
+    return { id: pasto.id, label: pasto.label, riepilogo: pasto.riepilogo, t: { day: adesso.t.day, hour: pasto.hour, minute: pasto.minute } };
+  }
+  return adesso;
+}

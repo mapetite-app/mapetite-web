@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronRight, Clock } from "lucide-react";
 import { isOpenAt } from "@/lib/filter-options";
-import { oreStasera, type OraStasera } from "@/lib/ore-stasera";
+import { oraAlTocco, oreStasera, type OraStasera } from "@/lib/ore-stasera";
 import type { OpeningPeriods } from "@/lib/google-places";
 import { createClient } from "@/lib/supabase/client";
 import { getCategoryEmoji } from "@/lib/emoji";
@@ -319,17 +319,14 @@ export default function StaseraView({ userId }: { userId: string }) {
       const picks = cand.filter((s) => visto(s) && apertoAlle(s, o, cache) !== false).slice(0, 3);
       // Zero proposte con salvati ancora da controllare (oltre a questi candidati): non è "tutti chiusi".
       const esaurito = picks.length === 0 && spots.some((s) => matches(s, choices) && !skip.has(s.id) && !visto(s));
-      if (picks.length > 0 || cand.length === 0 || ko || budget.n <= 0 || giro === 1) return { picks, ko, esaurito };
+      // Meno di 3 aperti e letture ancora disponibili: secondo giro sui prossimi salvati (revisore 25/11).
+      if (picks.length >= 3 || cand.length === 0 || ko || budget.n <= 0 || giro === 1) return { picks, ko, esaurito };
     }
     return { picks: [], ko, esaurito: false };
   };
 
-  // L'ora scelta, ricalcolata adesso; se nel frattempo è passata (es. "Alle 20" alle 20:10) vale "Adesso".
-  const oraDelTocco = (id: string | null): OraStasera | null => {
-    if (!id) return null;
-    const fresche = oreStasera();
-    return fresche.find((o) => o.id === id) ?? fresche[0];
-  };
+  // L'ora scelta, ricalcolata adesso; resta valida finché non è passata (es. "Alle 20" alle 20:10 vale "Adesso").
+  const oraDelTocco = (id: string | null): OraStasera | null => (id ? oraAlTocco(id) : null);
 
   const propose = async (id: string | null = oraValida) => {
     if (!spots || occupato.current) return;
@@ -432,7 +429,7 @@ export default function StaseraView({ userId }: { userId: string }) {
             {restarted && <p data-testid="stasera-ricomincio" className="mt-2 text-sm text-text-muted">Li hai visti tutti: ricomincio il giro.</p>}
             {proposals.length === 0 && (
               <div data-testid="stasera-tutti-chiusi" className="mt-3">
-                <p className="text-[15px] text-text-muted">{controllati ? "Ne ho controllati 10, chiusi a quell'ora: tocca «Altri 3» per i prossimi, o prova un'altra ora:" : "I salvati che ho controllato sono chiusi a quell'ora. Prova un'altra ora:"}</p>
+                <p className="text-[15px] text-text-muted">{controllati ? "Chiusi quelli che ho controllato: tocca «Altri 3» per i prossimi, o prova un'altra ora:" : `I salvati che ho controllato sono chiusi ${ora?.riepilogo ?? ""}. Prova un'altra ora:`}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {ore.filter((o) => o.id !== ora?.id).map((o) => (
                     <Pill key={o.id} testId="stasera-altra-ora" active={false} onClick={() => { setOraId(o.id); void propose(o.id); }}>{o.label}</Pill>

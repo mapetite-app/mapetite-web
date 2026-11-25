@@ -78,9 +78,15 @@ export async function POST(request: Request) {
   // lettura contata in più che una non contata.
   await Promise.all(daLeggere.map((g) => recordEvent({ type: "funzione", userId, googlePlaceId: g, props: { nome: "orari_google" } })));
   await Promise.all(daLeggere.map(async (g) => {
-    orari[g] = await fetchOpeningPeriods(g).catch((err) => { console.error("[orari] Google:", err); return null; });
+    // Errore di Google (quota, rete, timeout): il locale resta FUORI dalla risposta, come quelli oltre il tetto,
+    // così il telefono lo tratta come "non controllato" e mostra "controlla prima di andare" (revisore 25/11).
+    try {
+      orari[g] = await fetchOpeningPeriods(g);
+    } catch (err) {
+      console.error("[orari] Google:", err instanceof Error ? err.message : err);
+    }
   }));
   console.log(`[orari] ${daLeggere.length} letture (${Object.values(orari).filter(Boolean).length} con orari)`);
-  // I locali oltre il tetto non compaiono nella risposta: per il telefono "orari non noti", restano.
+  // I locali oltre il tetto o con errore di Google non compaiono nella risposta: il telefono li tratta come non controllati.
   return NextResponse.json({ orari });
 }
