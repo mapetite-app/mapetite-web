@@ -354,7 +354,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Beli mostra la mappa di dove hai mangiato nel tempo; Spotify Wrapped ha reso il riepilogo un rito. Nessuna app di posti lo fa in italiano e con i "da provare" del 2027 accanto.
 - **Valore per l'utente:** un ricordo da condividere che porta amici nell'app. **Per il ristoratore:** compare nelle storie dei clienti.
 - **Sforzo:** M. **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA dal 9/11 (da fare entro metà dicembre).
+- **Stato proposto:** PRONTA dal 9/11 (da fare entro metà dicembre). **Costruita il 25/11** (sessione delle 03:05, `/profilo/anno`; vedi BACKLOG).
 
 ## 5/11/2026 (notte, sessione 03:05, CEO che chiude — tema Ricerca). Fino all'8/11 restano ferme (piano di Lorenzo): si fanno dopo.
 
