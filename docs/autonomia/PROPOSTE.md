@@ -32,7 +32,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** TheFork e Google mostrano i menu di Natale dei locali famosi; Mapstr e Corner non ricordano niente. Noi partiamo dai posti che la persona ha già scelto, nel momento giusto (VISIONE: "ritrovarlo nel momento giusto").
 - **Valore per l'utente:** la cena delle feste sistemata prima che sia tardi, da posti che già conosce o vuole provare. **Per il ristoratore:** tavolate prenotate presto da chi lo ama già.
 - **Sforzo:** S (salvati, visite, 👍 e nomi delle raccolte già nel database; una card, un controllo di date, un "chiudi" in memoria del telefono). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA, da costruire **prima del 1/12**. In demo: si mostra cambiando la data di prova. **Costruita il 26/11** (sessione delle 03:05): riga in cima a Salvati che si apre, "Manda al gruppo" e "Non quest'anno"; "Prenota" sta nella scheda del posto. Bocciata due volte (7,5 e 7), corretta, **spenta** dietro `?beta=feste` (demo: `&oggi=2026-12-05`); serve un revisore nuovo prima del 1/12.
+- **Stato proposto:** PRONTA, da costruire **prima del 1/12**. In demo: si mostra cambiando la data di prova. **Costruita il 26/11** (sessione delle 03:05): riga in cima a Salvati che si apre, "Manda al gruppo" e "Non quest'anno"; "Prenota" sta nella scheda del posto. Bocciata due volte (7,5 e 7), corretta, **spenta** dietro `?beta=feste` (demo: `&oggi=2026-12-05`); serve un revisore nuovo prima del 1/12. **26/11 sera: terzo revisore 8,6, APPROVATA, accesa per tutti** (con la città detta nella riga quando i salvati sono in più città, "Feste di compleanno" non conta, "Cena di fine anno" e "Cena aziendale" sì).
 
 ### 90. "Menu delle feste" detto dal locale nel pannello
 - **Problema:** `PROBLEMI.md` 36: il 72,4% dei locali punta su menu tutto compreso per Natale, 82 € a persona in media nel 2025 (analisi FIPE, [Gambero Rosso](https://www.gamberorosso.it/notizie/attualita/pranzo-natale-2025-ristorante-prezzi-analisi-fipe/)), ma chi ha salvato il posto non lo sa e deve chiamare.
@@ -40,7 +40,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** la 86 è stata fermata perché le recensioni non bastano; il prezzo detto dal locale era la strada indicata. TheFork mostra le offerte dei locali, ma non a chi li aveva già salvati.
 - **Valore per l'utente:** sa quanto spende prima di proporlo al gruppo. **Per il ristoratore:** il menu delle feste davanti a chi lo vuole già provare; il primo motivo concreto per verificare il locale a dicembre.
 - **Sforzo:** S/M (una tabella piccola o colonne nel profilo del locale verificato, un modulo nel pannello, una riga nella scheda). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA (serve almeno un locale verificato per vederla dal vivo; in demo con il locale di prova).
+- **Stato proposto:** PRONTA (serve almeno un locale verificato per vederla dal vivo; in demo con il locale di prova). **Costruita il 26/11 sera:** pannello (giorni, prezzo a persona, bevande; i gruppi tolti dopo il primo revisore per tenere corta la riga) e riga nel riquadro unico del titolare sulla scheda e sulla pagina pubblica, al posto del prezzo di tutti i giorni finché restano giorni delle feste. Migrazione `20261126_menu_feste`.
 
 ## 25/11/2026 (mercoledì, CEO che chiude — tema: cene che devono valere la pena, e il riepilogo dell'anno)
 

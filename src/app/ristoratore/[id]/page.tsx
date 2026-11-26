@@ -8,6 +8,7 @@ import { computeRistoratore, daiReel, passaparolaDa, STATO_VISITATO, type RistRe
 import { pulisciGiorni } from "@/lib/serate";
 import { pulisciApertoDal } from "@/lib/aperto-dal";
 import { pulisciPrezzo, type Prezzo } from "@/lib/prezzo-locale";
+import { pulisciMenuFeste, type MenuFeste } from "@/lib/menu-feste";
 import { giornoItalia, pulisciOmaggio, OMAGGIO_OGNI_GIORNI, type Omaggio } from "@/lib/omaggio";
 import { codiceDelGiorno } from "@/lib/omaggio-server";
 import { dateKey, prenotazioniAlLocale, type BookingRequest } from "@/lib/booking";
@@ -27,7 +28,7 @@ const TIPI = ["ricerca", "apri_scheda", "salva", "ci_sono_stato", "percorso", "c
 const PAGE = 1000;
 const MAX_ROWS = 50_000;
 
-type Serate = { giorni: number[]; at: string | null; apertoDal: string | null; prezzo?: Prezzo | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
+type Serate = { giorni: number[]; at: string | null; apertoDal: string | null; prezzo?: Prezzo | null; feste?: MenuFeste | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
 type Prenotazioni = { tavoli: number; diParola: number; persone: number; personeParola: number };
 // Riga di saved_places letta col lucchetto del posto (solo_per_me, 20261115f): la pagina ne ricava "privato".
 type RigaLucchetto = RistSalvataggio & { solo_per_me?: boolean | null };
@@ -55,7 +56,7 @@ async function e2eDati(id: string): Promise<Dati | null> {
     let finte: unknown = null;
     try { finte = JSON.parse(decodeURIComponent((await cookies()).get("e2e_prenotazioni")?.value ?? "null")); } catch { /* niente */ }
     const prenotazioni = Array.isArray(finte) ? contaPrenotazioni(finte, v.locale, giorni) : null;
-    return { prenotazioni, locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, passaparola: Number(v.passaparola) || 0, reel: Array.isArray(v.reel) ? v.reel : [], serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal), prezzo: pulisciPrezzo(v.serate?.prezzo?.min, v.serate?.prezzo?.max, v.serate?.prezzo?.bevande), omaggio: pulisciOmaggio(v.serate?.omaggio?.testo, v.serate?.omaggio?.soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: Number(v.serate?.omaggiMostrati) || 0 } };
+    return { prenotazioni, locale: v.locale, citta: cityFromAddress(v.locale.address), simili: v.simili ?? [], eventi: v.eventi ?? [], salvati: v.salvati ?? [], attesa: v.attesa ?? [], verificato: !!v.verificato, avviso: null, passaparola: Number(v.passaparola) || 0, reel: Array.isArray(v.reel) ? v.reel : [], serate: { giorni: pulisciGiorni(v.serate?.giorni), at: v.serate?.at ?? null, apertoDal: pulisciApertoDal(v.serate?.apertoDal), prezzo: pulisciPrezzo(v.serate?.prezzo?.min, v.serate?.prezzo?.max, v.serate?.prezzo?.bevande), feste: pulisciMenuFeste(v.serate?.feste?.prezzo, v.serate?.feste?.bevande, v.serate?.feste?.giorni, v.serate?.feste?.gruppi, v.serate?.feste?.at), omaggio: pulisciOmaggio(v.serate?.omaggio?.testo, v.serate?.omaggio?.soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: Number(v.serate?.omaggiMostrati) || 0 } };
   } catch {
     return null;
   }
@@ -158,8 +159,10 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
   // "Aperto da poco" (20261020_aperto_dal.sql): senza la colonna si rilegge senza.
   // "Omaggio a chi torna" (20261030b_omaggio.sql): senza colonne, si rilegge senza.
   // "Prezzo a testa" (20261117_prezzo_medio.sql): senza colonne, si rilegge senza.
-  type Sr = { giorni_tranquilli: number[] | null; giorni_tranquilli_at: string | null; aperto_dal?: string | null; omaggio_testo?: string | null; omaggio_soglia?: number | null; prezzo_min?: number | null; prezzo_max?: number | null; prezzo_bevande?: boolean | null };
-  let { data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at, aperto_dal, omaggio_testo, omaggio_soglia, prezzo_min, prezzo_max, prezzo_bevande").eq("id", id).maybeSingle<Sr>();
+  type Sr = { giorni_tranquilli: number[] | null; giorni_tranquilli_at: string | null; aperto_dal?: string | null; omaggio_testo?: string | null; omaggio_soglia?: number | null; prezzo_min?: number | null; prezzo_max?: number | null; prezzo_bevande?: boolean | null; feste_prezzo?: number | null; feste_bevande?: boolean | null; feste_giorni?: string[] | null; feste_gruppi?: number | null; feste_at?: string | null };
+  // "Menu delle feste" (20261126_menu_feste.sql): senza colonne, si rilegge senza.
+  let { data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at, aperto_dal, omaggio_testo, omaggio_soglia, prezzo_min, prezzo_max, prezzo_bevande, feste_prezzo, feste_bevande, feste_giorni, feste_gruppi, feste_at").eq("id", id).maybeSingle<Sr>();
+  if (srErr?.code === "42703") ({ data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at, aperto_dal, omaggio_testo, omaggio_soglia, prezzo_min, prezzo_max, prezzo_bevande").eq("id", id).maybeSingle<Sr>());
   if (srErr?.code === "42703") ({ data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at, aperto_dal, omaggio_testo, omaggio_soglia").eq("id", id).maybeSingle<Sr>());
   if (srErr?.code === "42703") ({ data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at, aperto_dal").eq("id", id).maybeSingle<Sr>());
   if (srErr?.code === "42703") ({ data: sr, error: srErr } = await db.from("places").select("giorni_tranquilli, giorni_tranquilli_at").eq("id", id).maybeSingle<Sr>());
@@ -167,7 +170,7 @@ async function carica(id: string, giorni: number): Promise<Dati | null> {
   // Omaggi mostrati negli ultimi 30 giorni: la fedeltà misurata (senza tabella: 0).
   const daOmaggi = new Date(Date.now() - OMAGGIO_OGNI_GIORNI * 86_400_000).toISOString().slice(0, 10);
   const { count: omaggiMostrati } = await db.from("omaggi_usati").select("user_id", { count: "exact", head: true }).eq("place_id", id).gte("giorno", daOmaggi);
-  const serate = { giorni: pulisciGiorni(sr?.giorni_tranquilli), at: sr?.giorni_tranquilli_at ?? null, apertoDal: pulisciApertoDal(sr?.aperto_dal), prezzo: pulisciPrezzo(sr?.prezzo_min, sr?.prezzo_max, sr?.prezzo_bevande), omaggio: pulisciOmaggio(sr?.omaggio_testo, sr?.omaggio_soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: omaggiMostrati ?? 0 };
+  const serate = { giorni: pulisciGiorni(sr?.giorni_tranquilli), at: sr?.giorni_tranquilli_at ?? null, apertoDal: pulisciApertoDal(sr?.aperto_dal), prezzo: pulisciPrezzo(sr?.prezzo_min, sr?.prezzo_max, sr?.prezzo_bevande), feste: pulisciMenuFeste(sr?.feste_prezzo, sr?.feste_bevande, sr?.feste_giorni, sr?.feste_gruppi, sr?.feste_at), omaggio: pulisciOmaggio(sr?.omaggio_testo, sr?.omaggio_soglia), codiceOggi: codiceDelGiorno(id, giornoItalia()), omaggiMostrati: omaggiMostrati ?? 0 };
   // "Cliente di parola", passo 3 (PROPOSTE.md 3): tavoli chiesti da Mapetite, solo dalle prenotazioni
   // che le persone tengono sull'account (con il loro consenso: senza, le righe non esistono). Poi tutte
   // le prenotazioni di quelle persone, per sapere se sono di parola. Al telefono arrivano solo numeri.
@@ -214,5 +217,5 @@ export default async function RistoratorePage({ params, searchParams }: { params
   }
   const p = computeRistoratore(dati, giorni);
   const reel = daiReel(dati.reel ?? [], dati.attesa, dati.locale.id, giorni);
-  return <Pannello reel={reel} p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} serate={dati.serate} prenotazioni={sp.beta === "-tavoli" ? null : dati.prenotazioni} passaparola={dati.passaparola ?? 0} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
+  return <Pannello reel={reel} p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} serate={dati.serate} prenotazioni={sp.beta === "-tavoli" ? null : dati.prenotazioni} passaparola={dati.passaparola ?? 0} vista={typeof sp.vista === "string" ? sp.vista : undefined} menuFeste={sp.beta === "menufeste"} />;
 }
