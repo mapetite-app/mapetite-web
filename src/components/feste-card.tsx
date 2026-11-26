@@ -15,7 +15,7 @@ import { trackFeature } from "@/lib/track";
 // Un tocco su un posto apre la sua scheda (lì c'è "Prenota" dove si può); "Manda al gruppo" fa votare la
 // tavolata (proposta 56); "Non quest'anno" la chiude fino alle feste dell'anno dopo (memoria del telefono).
 // Per la demo: `?oggi=2026-12-05` nell'indirizzo finge la data (solo questa card, nient'altro).
-// Dal 26/11 spenta: serve anche `?beta=feste`.
+// 26/11 sera: approvata dal terzo revisore (8,6), accesa per tutti.
 
 const subscribeNothing = () => () => {};
 
@@ -27,11 +27,6 @@ function oggiDiProva(): string {
     // niente indirizzo leggibile: la data vera
   }
   return oggiRoma();
-}
-
-// Spenta per tutti finché un revisore non la approva (bocciata due volte il 26/11): si vede solo con ?beta=feste.
-function beta(): boolean {
-  try { return new URLSearchParams(window.location.search).get("beta") === "feste"; } catch { return false; }
 }
 
 function letta(chiave: string): boolean {
@@ -49,9 +44,14 @@ export default function FesteCard({ posti, totale, verdicts, onOpen }: {
   const giaChiusa = useSyncExternalStore(subscribeNothing, () => (oggi ? letta(chiaveChiusa(oggi)) : false), () => true);
   const [chiusa, setChiusa] = useState(false);
   const scelti = useMemo(() => postiFeste(posti, (p) => cityFromAddress(p.address)), [posti]);
+  // Revisore 26/11 (3): con salvati in più città la riga dice quale ha scelto ("3 dei tuoi posti a Milano").
+  const cittaScelta = useMemo(() => {
+    const tutte = new Set(posti.map((p) => cityFromAddress(p.address)).filter(Boolean));
+    const c = scelti[0] ? cityFromAddress(scelti[0].posto.address) : null;
+    return tutte.size > 1 && c ? c : null;
+  }, [posti, scelti]);
   const [aperta, setAperta] = useState(false);
-  const acceso = useSyncExternalStore(subscribeNothing, beta, () => false);
-  const mostra = acceso && !!oggi && stagioneFeste(oggi) && totale >= MIN_SALVATI_FESTE && !giaChiusa && !chiusa && scelti.length > 0;
+  const mostra = !!oggi && stagioneFeste(oggi) && totale >= MIN_SALVATI_FESTE && !giaChiusa && !chiusa && scelti.length > 0;
   useEffect(() => { if (mostra) trackFeature("feste_vista", { risultati: scelti.length }); }, [mostra, scelti.length]);
 
   if (!mostra) return null;
@@ -59,6 +59,8 @@ export default function FesteCard({ posti, totale, verdicts, onOpen }: {
   const chiudi = () => {
     try { window.localStorage.setItem(chiaveChiusa(oggi), "1"); } catch { /* resta chiusa finché non si ricarica */ }
     setChiusa(true);
+    // Revisore 26/11 (3): il fuoco non resta sul niente, passa al primo posto della lista.
+    requestAnimationFrame(() => (document.querySelector('[data-testid="salvati-lista-posti"] button, [data-testid="salvati-lista-posti"] a') as HTMLElement | null)?.focus());
     trackFeature("feste_chiudi", {});
   };
 
@@ -70,13 +72,13 @@ export default function FesteCard({ posti, totale, verdicts, onOpen }: {
         type="button"
         data-testid="feste-apri"
         aria-expanded={aperta}
-        aria-controls="feste-posti"
+        aria-controls={aperta ? "feste-posti" : undefined}
         onClick={() => { if (!aperta) trackFeature("feste_apri", { contesto: "card" }); setAperta((a) => !a); }}
         className="flex min-h-[56px] w-full items-center gap-3 px-4 py-2 text-left active:bg-[#f6f7f7]"
       >
         <span className="min-w-0 flex-1">
           <span id="feste-titolo" className="block font-title text-[17px] font-semibold leading-tight text-brand">Cena delle feste?</span>
-          <span className="block truncate text-[13px] text-text-muted">{scelti.length} dei tuoi posti · prenota presto</span>
+          <span className="block truncate text-[13px] text-text-muted">{scelti.length} dei tuoi posti{cittaScelta ? ` a ${cittaScelta}` : ""} · prenota presto</span>
         </span>
         <ChevronDown size={18} aria-hidden className={`shrink-0 text-text-muted transition-transform motion-reduce:transition-none ${aperta ? "rotate-180" : ""}`} />
       </button>

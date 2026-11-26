@@ -18,8 +18,8 @@ const ULTIMO_GIORNO = 20;
 // l'intenzione esplicita della persona. Poi quelle da tavolata (amici, colleghi, compleanno…).
 // Parole intere all'inizio: "Natalia", "Festival" e "Team" non contano (revisore 26/11).
 // "Festa di laurea" o "della mamma" non sono le feste di fine anno (revisore 26/11): solo "feste" al plurale.
-const FESTE = /(^|[^\p{L}])(natal[ei](?!\p{L})|natalizi|capodann|cenon|vigilia|feste\b|festivit|san silvestro|xmas|christmas)/iu;
-const DA_TAVOLATA = /(^|[^\p{L}])(amic|collegh|compleann|grupp|famigli|tavolat|cen[ae] di lavoro|ufficio|parenti|addio al)/iu;
+const FESTE = /(^|[^\p{L}])(natal[ei](?!\p{L})|natalizi|capodann|cenon|vigilia|feste(?!\s+d[ie]\s*(?:compleann|laurea|matrimon))\b|festivit|san silvestro|santo stefano|fine anno|xmas|christmas)/iu;
+const DA_TAVOLATA = /(^|[^\p{L}])(amic|collegh|compleann|grupp|famigli|tavolat|cen[ae] di lavoro|ufficio|aziendal|rimpatriat|parenti|addio al)/iu;
 
 export type PostoFeste = {
   id: string;
