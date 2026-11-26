@@ -3254,8 +3254,18 @@ else {
     // Revisore 26/11 (secondo): un 👍 dato in un weekend a Milano non toglie la card a chi ha i posti a Roma.
     const w = fe.postiFeste([P("ra", ["Già visitato", "Mi è piaciuto"], { citta: "Roma" }), P("rb", ["Già visitato", "Mi è piaciuto"], { citta: "Roma" }), P("rc", ["Da provare", "Con amici"], { citta: "Roma" }), P("rd", ["Già visitato", "Mi è piaciuto"], { citta: "Roma" }), P("mu", ["Già visitato", "Mi è piaciuto"], { citta: "Milano" })], cittaDi);
     ok(w.map((x) => x.posto.id).join(",") === "rd,rb,rc", `feste: la città con più posti adatti, non quella dell'ultimo salvato (${w.map((x) => x.posto.id).join(",")})`);
-    ok(fe.postiFeste([P("t", ["Da provare", "Famiglia"], { businessStatus: "CLOSED_TEMPORARILY" }), P("a1", ["Già visitato", "Mi è piaciuto"]), P("a2", ["Da provare", "Amici"])]).every((x) => x.posto.id !== "t") && !fe.raccoltaDelleFeste(["Natalia"]) && !fe.raccoltaDaTavolata(["Festival jazz"]) && !fe.raccoltaDaTavolata(["Pranzi di lavoro"]) && fe.raccoltaDaTavolata(["Cene di lavoro"]) === "Cene di lavoro" && !fe.raccoltaDelleFeste(["Festa di laurea"]) && fe.raccoltaDelleFeste(["Xmas 2026"]) === "Xmas 2026", "feste: mai un posto chiuso per ora; 'Natalia', 'Festival', 'Festa di laurea' e 'Pranzi di lavoro' non contano; 'Cene di lavoro' e 'Xmas' sì");
+    ok(fe.postiFeste([P("t", ["Da provare", "Famiglia"], { businessStatus: "CLOSED_TEMPORARILY" }), P("a1", ["Già visitato", "Mi è piaciuto"]), P("a2", ["Da provare", "Amici"])]).every((x) => x.posto.id !== "t") && !fe.raccoltaDelleFeste(["Natalia"]) && !fe.raccoltaDaTavolata(["Festival jazz"]) && !fe.raccoltaDaTavolata(["Pranzi di lavoro"]) && fe.raccoltaDaTavolata(["Cene di lavoro"]) === "Cene di lavoro" && !fe.raccoltaDelleFeste(["Festa di laurea"]) && fe.raccoltaDelleFeste(["Xmas 2026"]) === "Xmas 2026" && !fe.raccoltaDelleFeste(["Feste di compleanno"]) && fe.raccoltaDelleFeste(["Cena di fine anno"]) && fe.raccoltaDaTavolata(["Cena aziendale"]), "feste: mai un posto chiuso per ora; 'Natalia', 'Festival', 'Festa di laurea' e 'Pranzi di lavoro' non contano; 'Cene di lavoro' e 'Xmas' sì");
     ok(fe.postiFeste([P("a", ["Già visitato", "Mi è piaciuto"]), P("e", ["Da provare", "Romantico"])]).length === 0, "feste: con un posto solo la card non compare (niente riempitivi)");
+    // Proposta 90 "Menu delle feste" detto dal locale (26/11): funzioni pure.
+    { const mf = await import(new URL("../../src/lib/menu-feste.ts", import.meta.url).href);
+      const sp = (x) => String(x).replace(/\u00a0/g, " ");
+      const m = mf.pulisciMenuFeste("65", true, ["12-25", "12-24", "xx"], "12", "2026-11-26T20:00:00Z");
+      ok(m && m.prezzo === 65 && m.giorni.join() === "12-24,12-25" && m.gruppi === 12 && !mf.pulisciMenuFeste(0, true, ["12-24"], null, "") && !mf.pulisciMenuFeste(600, true, ["12-24"], null, "") && !mf.pulisciMenuFeste(50, true, [], null, "") && !mf.pulisciMenuFeste(50, true, ["12-24"], 1, "") && !mf.pulisciMenuFeste(50, true, ["12-24"], 120, "") && mf.pulisciMenuFeste(50, "true", ["12-24"], "", "").bevande === false, "menu feste: prezzo 1–500, almeno un giorno noto in ordine di calendario, gruppi 2–99 o vuoto");
+      ok(mf.stagioneMenu("2026-11-01") === 2026 && mf.stagioneMenu("2026-12-31") === 2026 && mf.stagioneMenu("2027-01-06") === 2026 && mf.stagioneMenu("2027-01-07") == null && mf.stagioneMenu("2026-10-31") == null, "menu feste: stagione dal 1/11 al 6/1");
+      const r = mf.rigaMenuFeste(m, "2026-12-05");
+      ok(r && r.prezzo === "Menu feste 65 €" && sp(r.dettagli.join(" · ")) === "bevande incluse · 24 e 25 dic", `menu feste: la riga della scheda, corta (${JSON.stringify(r)})`);
+      ok(mf.rigaMenuFeste(m, "2026-12-26") == null && mf.rigaMenuFeste(m, "2027-12-05") == null && mf.rigaMenuFeste({ ...m, at: "2025-12-01T10:00:00Z" }, "2026-12-05") == null && sp(mf.rigaMenuFeste(m, "2026-12-25").dettagli[1]) === "25 dic", "menu feste: sparisce dopo l'ultimo giorno indicato e non torna l'anno dopo; mostra solo i giorni che restano");
+      ok(sp(mf.fraseGiorni(["12-24", "12-25", "12-31", "01-01"])) === "24, 25, 31 dic e 1 gen" && sp(mf.fraseGiorni(["01-01"])) === "1 gen" && sp(mf.fraseGiorni(["12-31"])) === "31 dic" && sp(mf.rigaMenuFeste(mf.pulisciMenuFeste(80, false, ["12-31", "01-01"], null, "2026-12-30T10:00:00Z"), "2027-01-01").dettagli.join("|")) === "bevande escluse|1 gen", "menu feste: giorni detti per bene, Capodanno nell'anno dopo"); }
     const fctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     await fctx.route("**/api/events", (r2) => r2.fulfill({ status: 204, body: "" }));
     const sav = (i, name, tags) => ({ created_at: new Date(Date.UTC(2026, 9, 1) + i * 3_600_000).toISOString(), tags, note: null, places: { id: `00000000-0000-4000-8000-0000000089${String(i).padStart(2, "0")}`, name, category: "restaurant", address: `Via di Prova ${i}, 00153 Roma RM, Italy`, lat: 41.889 + i * 0.001, lng: 12.469, google_place_id: `GF${i}`, rating: 4.4, price_level: 2 } });
@@ -3271,7 +3281,7 @@ else {
     await pf.goto(`${BASE}/mappa?vista=salvati&oggi=2026-12-05`, { waitUntil: "networkidle" }).catch(() => {});
     await pf.getByTestId("salvati-lista").waitFor({ timeout: 8000 }).catch(() => {});
     await pf.waitForTimeout(800);
-    ok((await pf.getByTestId("feste-card").count()) === 0, "feste: spenta per tutti (senza ?beta=feste nessuna card, anche a dicembre)");
+    ok((await pf.getByTestId("feste-card").count()) === 1, "feste: accesa per tutti (anche senza ?beta=feste, a dicembre c'è la card)");
     await pf.goto(`${BASE}/mappa?vista=salvati&beta=feste&oggi=2026-12-05`, { waitUntil: "networkidle" }).catch(() => {});
     await pf.getByTestId("salvati-lista").waitFor({ timeout: 8000 }).catch(() => {});
     await pf.waitForTimeout(800);
@@ -8238,6 +8248,23 @@ else {
     { const pl = ((await rp.getByTestId("posto-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
       const main = ((await rp.locator("main").textContent().catch(() => "")) ?? "");
       ok(conGoogle && pl.includes("💶 25–35 € a testa, bevande escluse") && pl.includes("Stasera c'è posto") && (pl.match(/dice il locale/g) ?? []).length === 1 && !main.includes("€€€"), `pagina del locale: prezzo del titolare e 'c'è posto' in un riquadro, senza la fascia € di Google (che senza prezzo c'è: ${conGoogle}) (${pl})`); }
+    // "Menu delle feste" (proposta 90) sulla pagina pubblica: solo dal 1/11 al 6/1 (oggi è dentro o fuori: lo dice stagioneMenu).
+    { const mf = await import(new URL("../../src/lib/menu-feste.ts", import.meta.url).href);
+      const oggiR = mf.oggiRomaFeste();
+      const s0 = mf.stagioneMenu(oggiR);
+      // Revisore 26/11: con prezzo a testa e "c'è posto" resta UN riquadro del titolare, un solo "dice il locale", al massimo 3 righe.
+      await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: true, giorni: [g], at: new Date().toISOString(), prezzo: { min: 25, max: 35, bevande: false }, feste: { prezzo: 65, bevande: true, giorni: ["12-24", "12-25", "12-31", "01-01"], gruppi: null, at: new Date().toISOString() } });
+      await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z", prezzo_min: 25, prezzo_max: 35 } });
+      await rp.reload({ waitUntil: "networkidle" });
+      await rp.getByTestId("menu-feste-scheda").waitFor({ timeout: 5000 }).catch(() => {});
+      const t = ((await rp.getByTestId("menu-feste-scheda").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
+      const pl = ((await rp.getByTestId("posto-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
+      const hb = await rp.getByTestId("parola-locale").evaluate((el) => el.getBoundingClientRect().height).catch(() => 999);
+      ok(s0 == null ? t === "" : t.startsWith("🎄 Menu feste 65 €, bevande incluse") && t.includes("24, 25, 31 dic e 1 gen") && (pl.match(/dice il locale/g) ?? []).length === 1 && pl.includes("Stasera c'è posto") && (await rp.getByTestId("parola-locale").count()) === 1 && hb <= 64, `pagina del locale: '🎄 Menu feste 65 €, bevande incluse · … · 🌙 … · dice il locale' in un solo riquadro di al massimo 3 righe, niente fuori stagione (${s0}: ${pl} / ${Math.round(hb)} px)`);
+      if (s0 != null) await rp.getByTestId("posto-locale").screenshot({ path: `${OUT}/90-locale-feste.png` }).catch(() => {});
+      await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: false, giorni: [], feste: { prezzo: 65, bevande: true, giorni: ["01-01"], gruppi: null, at: new Date().toISOString() } });
+      const j = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
+      ok(j.feste == null, `menu feste: locale non verificato → la scheda non riceve il menu (${JSON.stringify(j.feste)})`); }
     await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z" } });
     await rctx.clearCookies({ name: "e2e_serate" }); }
   await rp.screenshot({ path: `${OUT}/70-locale-verificato.png`, caret: "initial" });
@@ -8357,6 +8384,33 @@ else {
       await pm.getByTestId("prezzo-da").blur();
       ok(await pm.getByTestId("prezzo-salva").isDisabled() && zittoMentreScrivi && await pm.getByRole("alert").isVisible(), "pannello ristoratore: 'da' più alto di 'a' → Salva spento; l'avviso solo uscendo dal campo, non mentre si scrive");
       await rp.getByTestId("pannello-prezzo").screenshot({ path: `${OUT}/71b-pannello-prezzo.png` }); }
+    // "Menu delle feste" (proposta 90): in stagione si salva e la scheda lo rilegge; serate intatte; fuori stagione la sezione non c'è.
+    { const mf = await import(new URL("../../src/lib/menu-feste.ts", import.meta.url).href);
+      if (mf.stagioneMenu(mf.oggiRomaFeste()) == null) ok((await rp.getByTestId("pannello-feste").count()) === 0, "pannello: fuori stagione nessun 'Menu delle feste'");
+      else {
+        const mfs = rp.getByTestId("menu-feste");
+        ok((await rp.getByTestId("pannello-feste").count()) === 1 && (await mfs.getByTestId("feste-salva").isDisabled()), "pannello: 'Menu delle feste' in stagione, Salva spento finché non c'è niente");
+        await mfs.getByRole("button", { name: /Natale/ }).click();
+        await mfs.getByRole("button", { name: /Vigilia/ }).click();
+        await mfs.getByTestId("feste-prezzo").fill("65");
+        await mfs.getByTestId("feste-bevande").check();
+        const ant = ((await mfs.getByTestId("feste-anteprima").textContent()) ?? "").replace(/\s+/g, " ");
+        await mfs.getByTestId("feste-salva").click();
+        await mfs.getByText("Salvato").waitFor({ timeout: 5000 }).catch(() => {});
+        const jf = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
+        const senzaGiorni = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, feste: { prezzo: 65, bevande: true, giorni: [], gruppi: null } } });
+        const caro = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, feste: { prezzo: 900, bevande: true, giorni: ["12-25"], gruppi: null } } });
+        const bvs = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, feste: { prezzo: 65, bevande: "sì", giorni: ["12-25"], gruppi: null } } });
+        ok(jf.feste?.prezzo === 65 && jf.feste?.giorni?.join() === "12-24,12-25" && jf.feste?.bevande === true && JSON.stringify(jf.giorni) === "[5]" && ant.includes("🎄 Menu feste 65 €") && ant.includes("24 e 25 dic") && senzaGiorni.status() === 400 && caro.status() === 400 && bvs.status() === 400, `pannello: menu delle feste salvato e riletto dalla scheda, serate intatte; senza giorni, oltre 500 € o bevande non sì/no rifiutati (${JSON.stringify(jf.feste)} / ${ant} / ${senzaGiorni.status()} ${caro.status()} ${bvs.status()})`);
+        { const o = await rp.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+          const bassi = await mfs.locator("button, input").evaluateAll((els) => els.filter((e) => e.type !== "checkbox" && e.getBoundingClientRect().height < 44).length);
+          ok(o <= 0 && bassi === 0, `pannello: menu delle feste senza sbordamenti e con tocchi da 44 px (${o} / ${bassi})`); }
+        await rp.getByTestId("pannello-feste").screenshot({ path: `${OUT}/90-pannello-feste.png` });
+        await mfs.getByTestId("feste-togli").click();
+        await mfs.getByText("Salvato").waitFor({ timeout: 5000 }).catch(() => {});
+        const jt = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
+        ok(jt.feste == null && JSON.stringify(jt.giorni) === "[5]" && ((await mfs.getByTestId("feste-anteprima").textContent()) ?? "").includes("non compare niente"), `pannello: 'Togli' leva il menu delle feste dalla scheda (${JSON.stringify(jt.feste)})`);
+      } }
     // "Omaggio a chi torna" (PROPOSTE 12): niente denaro, si salva, codice del giorno uguale a quello del cliente.
     { const om = rp.getByTestId("pannello-omaggio");
       await om.getByTestId("omaggio-testo").fill("10% di sconto");

@@ -1028,7 +1028,8 @@ export default function VenueSheet({
             )}
             {/* Aperto da poco (PROPOSTE.md, proposta 7): parola del titolare verificato, solo il primo anno. */}
             <AperturaPillola info={infoLocale} />
-            {/* Prezzo a testa detto dal titolare verificato (PROPOSTE.md 65), separato dai € di Google. */}
+            {/* Prezzo a testa detto dal titolare verificato (PROPOSTE.md 65), separato dai € di Google; dal 1/11 al 6/1
+                il menu delle feste (PROPOSTE.md 90) prende il suo posto nello stesso riquadro. */}
             <PrezzoLocale info={infoLocale} />
             {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1).
                 Subito dopo il prezzo: le due frasi del titolare vicine, un solo "· dice il locale" (revisore 17/11). */}

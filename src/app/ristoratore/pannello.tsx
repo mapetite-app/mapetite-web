@@ -9,6 +9,8 @@ import Schede from "./schede";
 import SerateTranquille from "./serate";
 import ApertoDal from "./aperto-dal";
 import PrezzoMedio from "./prezzo-medio";
+import MenuFesteModulo from "./menu-feste";
+import { oggiRomaFeste, stagioneMenu, type MenuFeste } from "@/lib/menu-feste";
 import OmaggioRitorno from "./omaggio";
 import type { Omaggio } from "@/lib/omaggio";
 import type { Prezzo } from "@/lib/prezzo-locale";
@@ -379,7 +381,7 @@ export default function Pannello({
   demo?: boolean;
   avviso?: string | null;
   vista?: string;
-  serate?: { giorni: number[]; at: string | null; apertoDal?: string | null; prezzo?: Prezzo | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
+  serate?: { giorni: number[]; at: string | null; apertoDal?: string | null; prezzo?: Prezzo | null; feste?: MenuFeste | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
   prenotazioni?: { tavoli: number; diParola: number; persone: number; personeParola: number } | null;
   // Proposta 58: tra chi ti vuole provare, quanti l'hanno salvato su consiglio di un amico. Solo il numero, mai chi.
   passaparola?: number;
@@ -612,6 +614,15 @@ export default function Pannello({
   // Serate tranquille (POSIZIONAMENTO.md, proposta 1): lo strumento gratuito contro i tavoli vuoti, prima dei posti in evidenza.
   const promozione = (
     <>
+      {/* Dal 1/11 al 6/1 (nell'esempio sempre), per primo: a dicembre è la cosa che conta. Fuori stagione non c'è. */}
+      {(demo || stagioneMenu(oggiRomaFeste()) != null) && (
+        <>
+        {/* "Menu delle feste" (PROPOSTE.md, proposta 90): giorni, prezzo e gruppi detti dal locale, prima che il gruppo scelga. */}
+        <Sezione titolo="Menu delle feste" nota="Giorni e prezzo a persona. Lo vede chi apre la tua scheda, fino all'ultimo giorno." piano="Verified" testId="pannello-feste">
+          <MenuFesteModulo placeId={locale.id} iniziale={demo ? { prezzo: 65, bevande: true, giorni: ["12-24", "12-25"], gruppi: null, at: new Date().toISOString() } : serate.feste ?? null} verificato={verificato} demo={demo} />
+        </Sezione>
+        </>
+      )}
       <Sezione titolo="Serate tranquille" nota="I giorni in cui di solito hai posto. Chi ti ha salvato lo vede nella tua scheda: niente sconti, niente commissioni." piano="Verified" testId="pannello-serate">
         <SerateTranquille placeId={locale.id} iniziali={demo ? [2, 3] : serate.giorni} at={demo ? new Date().toISOString() : serate.at} verificato={verificato} demo={demo} />
       </Sezione>

@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { frasePosto } from "@/lib/serate";
 import { fraseApertura } from "@/lib/aperto-dal";
 import { frasePrezzo } from "@/lib/prezzo-locale";
+import { oggiRomaFeste, pulisciMenuFeste, rigaMenuFeste } from "@/lib/menu-feste";
 
 // Parola del titolare nella scheda (POSIZIONAMENTO.md: "al massimo un badge e una riga"):
 // se il titolare l'ha detto, "🌙 Martedì c'è posto". Solo locali verificati; per tutti gli altri
 // non compare niente (nemmeno uno spazio vuoto). Dati da /api/ristoratore/serate.
 // Il badge "Verificato" non sta qui: la scheda lo mette come spunta accanto al nome (Semplificare,
 // 20/10), la pagina pubblica del locale ha il suo.
-export type InfoLocale = { verificato: boolean; giorni: number[]; at: string | null; apertoDal?: string | null; prezzo?: { min?: unknown; max?: unknown; bevande?: unknown } | null; omaggio?: { testo?: unknown; soglia?: unknown } | null };
+export type InfoLocale = { verificato: boolean; giorni: number[]; at: string | null; apertoDal?: string | null; prezzo?: { min?: unknown; max?: unknown; bevande?: unknown } | null; omaggio?: { testo?: unknown; soglia?: unknown } | null; feste?: { prezzo?: unknown; bevande?: unknown; giorni?: unknown; gruppi?: unknown; at?: unknown } | null };
 
 // Una sola richiesta per locale anche se la scheda la chiede da più punti (pillole e omaggio):
 // la risposta resta in memoria 60 secondi, poi si rilegge (il titolare può averla cambiata).
@@ -48,11 +49,17 @@ export function useInfoLocaleStato(venueId: string): { info: InfoLocale | null; 
   return info?.id === venueId ? { info: info.info, pronto: true } : { info: null, pronto: false };
 }
 
+/** Il menu delle feste del titolare verificato, se oggi c'è ancora qualcosa da dire (PROPOSTE.md 90). */
+function festeDi(info: InfoLocale | null) {
+  const f = info?.verificato && info.feste ? pulisciMenuFeste(info.feste.prezzo, info.feste.bevande, info.feste.giorni, info.feste.gruppi, info.feste.at) : null;
+  return rigaMenuFeste(f, oggiRomaFeste());
+}
+
 /** Pillola "🌙 … c'è posto · dice il locale", o niente. */
 export function PostoPillola({ info, conPrezzo = false }: { info: InfoLocale | null; conPrezzo?: boolean }) {
   const posto = frasePosto(info);
   // Nella scheda, con il prezzo del locale, "c'è posto" sta già nel riquadro del prezzo (PrezzoLocale).
-  if (!posto || (conPrezzo && info?.verificato && frasePrezzo(info.prezzo))) return null;
+  if (!posto || (conPrezzo && info?.verificato && (frasePrezzo(info.prezzo) || festeDi(info)))) return null;
   return (
     <span data-testid="posto-stasera" className="inline-flex items-center gap-1 rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
       🌙 {posto}
@@ -77,14 +84,23 @@ export function AperturaPillola({ info }: { info: InfoLocale | null }) {
  *  Revisore 3 (17/11): con anche "c'è posto" le due frasi del titolare stanno in UN solo riquadro che finisce
  *  con "· dice il locale" (prima il prezzo restava senza fonte e i segnali andavano su 3–4 righe). */
 export function PrezzoLocale({ info }: { info: InfoLocale | null }) {
-  const f = info?.verificato ? frasePrezzo(info.prezzo, true) : null;
-  if (!f) return null;
+  const prezzo = info?.verificato ? frasePrezzo(info.prezzo, true) : null;
+  // "Menu delle feste" (PROPOSTE.md 90): nello stesso riquadro, al posto del prezzo di tutti i giorni (revisore 26/11:
+  // due riquadri del titolare e due "dice il locale" portavano i segnali a 5 righe). Il prezzo di sempre resta nel title.
+  const feste = festeDi(info);
+  if (!prezzo && !feste) return null;
   const posto = frasePosto(info);
+  // Ogni pezzo porta il suo "·" in fondo, così una riga che va a capo non comincia mai con un punto.
+  const pezzi: { id: string; testo: string }[] = [
+    ...(feste ? [{ id: "menu-feste-scheda", testo: `🎄 ${feste.prezzo}, ${feste.dettagli.join("\u00a0· ")}` }] : [{ id: "prezzo-locale", testo: `💶 ${prezzo}` }]),
+    ...(posto ? [{ id: "posto-stasera", testo: `🌙 ${posto}` }] : []),
+  ];
   return (
-    <span data-testid="parola-locale" title={frasePrezzo(info?.prezzo) ?? undefined} className={`inline-flex flex-wrap items-center gap-x-1 ${posto ? "rounded-btn py-1" : "rounded-pill py-0.5"} bg-accent-light px-2.5 text-xs font-display font-semibold text-accent`}>
-      <span data-testid="prezzo-locale"><span aria-hidden>💶</span> {f}</span>
-      {posto && (<><span aria-hidden className="font-sans font-normal text-text-muted">·</span><span data-testid="posto-stasera">🌙 {posto}</span></>)}
-      <span className="font-sans font-normal text-text-muted">· dice il locale</span>
+    <span data-testid="parola-locale" title={frasePrezzo(info?.prezzo) ?? undefined} className={`inline-flex flex-wrap items-center gap-x-1 ${posto || feste ? "rounded-btn py-[3px]" : "rounded-pill py-0.5"} bg-accent-light px-2.5 text-xs font-display font-semibold text-accent`}>
+      {pezzi.map((x) => (
+        <span key={x.id}><span data-testid={x.id}>{x.testo}</span><span aria-hidden className="font-sans font-normal text-text-muted">{"\u00a0·"}</span></span>
+      ))}
+      <span className="font-sans font-normal text-text-muted">dice il locale</span>
     </span>
   );
 }
@@ -92,10 +108,11 @@ export function PrezzoLocale({ info }: { info: InfoLocale | null }) {
 export default function PostoLocale({ venueId, prezzo = null }: { venueId: string; prezzo?: InfoLocale["prezzo"] }) {
   const letta = useInfoLocale(venueId);
   // Pagina pubblica: il prezzo arriva già dal server (niente salto della pagina, e resta anche se la richiesta fallisce).
-  const info: InfoLocale | null = prezzo ? { verificato: true, giorni: letta?.giorni ?? [], at: letta?.at ?? null, prezzo } : letta;
+  const info: InfoLocale | null = prezzo ? { verificato: true, giorni: letta?.giorni ?? [], at: letta?.at ?? null, prezzo, feste: letta?.feste ?? null } : letta;
   // Pagina pubblica del locale: anche il prezzo a testa del titolare (PROPOSTE.md 65), nello stesso riquadro di "c'è posto".
   const conPrezzo = !!(info?.verificato && frasePrezzo(info.prezzo));
-  if (!frasePosto(info) && !conPrezzo) return null;
+  const conFeste = !!festeDi(info);
+  if (!frasePosto(info) && !conPrezzo && !conFeste) return null;
   return (
     <p data-testid="posto-locale" className="mt-2 flex flex-wrap items-center gap-1.5">
       <PrezzoLocale info={info} />
