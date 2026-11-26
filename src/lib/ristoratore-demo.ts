@@ -47,7 +47,7 @@ function pick<T>(r: () => number, list: [T, number][]): T {
 const ATTESA: [string[], number][] = [
   [["Da provare"], 12], [["Da provare", "Con amici"], 9], [["Da provare", "Romantico"], 7],
   [["Da provare", "Cena di lavoro"], 3], [["Già visitato", "Con amici", "Mi è piaciuto"], 6],
-  [["Già visitato", "Mi è piaciuto"], 4], [["Già visitato"], 2], [["Già visitato", "Non fa per me"], 1],
+  [["Già visitato", "Mi è piaciuto"], 4], [["Già visitato"], 2], [["Già visitato", "Non fa per me"], 3],
 ];
 
 export function demoDati(now: number = Date.now()): { locale: RistLocale; citta: string; simili: RistLocale[]; eventi: RistEvento[]; salvati: RistSalvataggio[]; attesa: RistSalvataggio[] } {

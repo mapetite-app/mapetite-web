@@ -395,6 +395,9 @@ export default function Pannello({
 
   const attesa = p.inAttesa;
   const risposte = p.visite.piaciuto + p.visite.nonPiaciuto;
+  // 👍 "N su M" solo se sia chi l'ha messo sia chi no sono almeno SOGLIA (come la 87): con "10 su 11"
+  // il locale, che sa chi è venuto, capirebbe il voto dell'unica persona a cui non è piaciuto.
+  const voti = p.visite.piaciuto >= SOGLIA && p.visite.nonPiaciuto >= SOGLIA;
   // Tavoli da Mapetite (PROPOSTE.md 3, passo 3): solo da SOGLIA persone, altrimenti si riconoscerebbe chi.
   const tavoli = prenotazioni && prenotazioni.persone >= SOGLIA ? prenotazioni : null;
   // "Di parola" solo se sia chi lo è sia chi non lo è sono almeno SOGLIA persone: il locale conosce i
@@ -402,7 +405,7 @@ export default function Pannello({
   const parola = tavoli && tavoli.personeParola >= SOGLIA && tavoli.persone - tavoli.personeParola >= SOGLIA ? tavoli.diParola : null;
   // Arrivati dai reel (proposta 76): solo da SOGLIA persone, come gli altri numeri.
   const daReel = reel && reel.persone >= SOGLIA ? reel : null;
-  const primaTavoli = attesa.persone > 0 || risposte >= SOGLIA || p.disdette.n > 0;
+  const primaTavoli = attesa.persone > 0 || voti || p.disdette.n > 0;
   const panoramica = (
     <>
       <section data-testid="pannello-azioni" aria-label={`Le persone e il tuo locale negli ultimi ${p.giorni} giorni`} className="mt-3 grid grid-cols-2 gap-2">
@@ -436,13 +439,13 @@ export default function Pannello({
           {/* Dal 1/11: il periodo si scrive una volta sola, in testa ai numeri del periodo; ogni riga è
               numero + 2–3 parole, il dettaglio (se serve) su una seconda riga piccola. "Ti vogliono provare"
               resta sopra perché non dipende dal periodo (chi ha salvato e non è ancora venuto, oggi). */}
-          {(risposte >= SOGLIA || p.disdette.n > 0 || tavoli) && (
+          {(voti || p.disdette.n > 0 || tavoli) && (
             <div data-testid="pannello-periodo" className={attesa.persone > 0 ? "mt-2.5 border-t border-white/15 pt-2" : ""}>
               <p className="text-[11px] font-display font-semibold uppercase tracking-wide text-white/60">Ultimi {p.giorni}{"\u00a0"}giorni</p>
               <ul className="mt-1.5 space-y-2">
                 {/* Visite vere (POSIZIONAMENTO.md, proposta 4): solo sopra la soglia di risposte,
                     con 1 o 2 si riconoscerebbe chi ha risposto. */}
-                {risposte >= SOGLIA && (
+                {voti && (
                   <Riga testId="pannello-visite-vere" numero={`👍 ${p.visite.piaciuto.toLocaleString("it-IT")}`} testo="è piaciuto" sotto={`su ${risposte.toLocaleString("it-IT")} che sono venuti e hanno risposto`} />
                 )}
                 {/* Tavoli liberati per tempo (PROBLEMI.md 1): "Non vado più" invece di non presentarsi. */}
