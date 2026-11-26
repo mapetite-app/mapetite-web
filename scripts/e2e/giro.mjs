@@ -353,6 +353,9 @@ await shot("04-scheda");
   const r2 = await page.request.post(`${BASE}/api/events`, { data: { type: "ricerca" } });
   const r3 = await page.request.post(`${BASE}/api/events`, { data: { type: "qualsiasi" } });
   ok(r1.status() === 204 && r2.status() === 400 && r3.status() === 400, `segnali: /api/events accetta solo i tipi previsti (${r1.status()}/${r2.status()}/${r3.status()}), anche senza la tabella`); }
+{ const src = readFileSync(new URL("../../src/app/api/events/route.ts", import.meta.url), "utf8");
+  const solo = [...(src.match(/const SOLO_SERVER[^=]*= \[([^\]]*)\]/)?.[1] ?? "").matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
+  ok(["verdetto_salvato", "orari_google", "prova_reel_server"].every((n) => solo.includes(n)) && /SOLO_SERVER\.includes\(body\.props\.nome\)/.test(src), `segnali: dal telefono non si scrivono i contatori delle quote (verdetti, orari) (${solo.join(", ")})`); }
 
 // 4a. Scheda: trascinando verso il basso si chiude
 await page.getByTestId("scheda-trascinabile").evaluate((el) => {
@@ -8339,7 +8342,7 @@ else {
         ok(r7.includes("3 persone ti hanno salvato da un reel negli ultimi 7 giorni.") && !/\d+ da (Instagram|TikTok)/.test(r7), `pannello demo a 7 giorni: 3 dai reel senza fonti sotto 3 (${r7})`);
         await rp.goto(`${BASE}/ristoratore/demo`, { waitUntil: "networkidle" }); }
       ok(t.includes("31 ti vogliono provare") && t.includes("Con amici · 9") && t.includes("Romantico · 7") && t.includes("Cena di lavoro · 3"), `pannello demo: 'ti vogliono provare' con le occasioni (${t.slice(0, 120)})`);
-      ok(((await rp.getByTestId("pannello-visite-vere").innerText()) ?? "").replace(/\s+/g, " ").match(/👍 10 è piaciuto su 11/) !== null, "pannello demo: visite vere con il 'Com'è andata?' (👍 10 è piaciuto, su 11)");
+      ok(((await rp.getByTestId("pannello-visite-vere").innerText()) ?? "").replace(/\s+/g, " ").match(/👍 10 è piaciuto su 13/) !== null, "pannello demo: visite vere con il 'Com'è andata?' (👍 10 è piaciuto, su 13: anche i 👎 sono almeno 3)");
       { const d = ((await rp.getByTestId("pannello-disdette").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ");
         ok(/🪑 \d+ tavol[oi] liberat[oi] per tempo/.test(d) && /in media \d+ ore prima/.test(d), `pannello demo: tavoli liberati per tempo da Mapetite (${d.slice(0, 120)})`); }
       // Dal 1/11: riquadro scuro asciutto, il periodo scritto una volta sola in testa ai numeri del periodo.
