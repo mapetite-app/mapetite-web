@@ -10,13 +10,16 @@ const isStateTag = (t: string) => (STATE_TAGS as readonly string[]).includes(t);
 
 export const MAX_FESTE = 3;
 export const MIN_FESTE = 2; // con un posto solo non è una scelta: la card non compare
+// Con pochi salvati la card ripeterebbe la lista che sta subito sotto (revisore 26/11): da 8 in su, come gli scaffali.
+export const MIN_SALVATI_FESTE = 8;
 const ULTIMO_GIORNO = 20;
 
 // Nomi di raccolta. Le feste dette in chiaro (Natale, Capodanno, cenone…) vengono prima di tutto: è
 // l'intenzione esplicita della persona. Poi quelle da tavolata (amici, colleghi, compleanno…).
 // Parole intere all'inizio: "Natalia", "Festival" e "Team" non contano (revisore 26/11).
-const FESTE = /(^|[^\p{L}])(natal[ei](?!\p{L})|natalizi|capodann|cenon|vigilia|feste\b|festa\b|festivit|san silvestro)/iu;
-const DA_TAVOLATA = /(^|[^\p{L}])(amic|collegh|compleann|grupp|famigli|tavolat|lavoro|ufficio|parenti|addio al)/iu;
+// "Festa di laurea" o "della mamma" non sono le feste di fine anno (revisore 26/11): solo "feste" al plurale.
+const FESTE = /(^|[^\p{L}])(natal[ei](?!\p{L})|natalizi|capodann|cenon|vigilia|feste\b|festivit|san silvestro|xmas|christmas)/iu;
+const DA_TAVOLATA = /(^|[^\p{L}])(amic|collegh|compleann|grupp|famigli|tavolat|cen[ae] di lavoro|ufficio|parenti|addio al)/iu;
 
 export type PostoFeste = {
   id: string;
@@ -49,7 +52,7 @@ export function raccoltaDaTavolata(tags: readonly string[] | null | undefined): 
 /**
  * I posti per la card. `posti` arriva dal più vecchio al più nuovo (come i salvati): qui si guarda dal più
  * recente. Ordine: (1) quelli in una raccolta delle feste, (2) i 👍, (3) i "Da provare" da tavolata; se ci
- * sono posti da tavolata, almeno uno ha il suo posto. Tutti della stessa città (quella del primo scelto):
+ * sono posti da tavolata, almeno uno ha il suo posto. Tutti della stessa città (quella con più posti adatti):
  * una tavolata non si vota tra Roma e Milano (revisore 26/11). Fuori: 👎, chiusi (anche per ora),
  * "Solo per me" (la card porta a "Manda al gruppo"), visitati senza 👍. Meno di MIN_FESTE: lista vuota.
  */
@@ -69,20 +72,31 @@ export function postiFeste<T extends PostoFeste>(posti: readonly T[], cittaDi: (
     const nome = !presi.has(p.id) && daProvare(p) ? raccoltaDaTavolata(p.tags) : null;
     return nome ? [{ posto: p, motivo: { tipo: "raccolta", nome } as Motivo }] : [];
   });
-  const primo = feste[0] ?? piaciuti[0] ?? tavolata[0];
-  if (!primo) return [];
-  const citta = cittaDi(primo.posto);
-  const qui = (x: { posto: T }) => citta === null || cittaDi(x.posto) === citta;
-  const [f, l, t] = [feste.filter(qui), piaciuti.filter(qui), tavolata.filter(qui)];
+  // La città con più posti adatti (revisore 26/11: non quella dell'ultimo salvato, un weekend a Milano non
+  // deve togliere la card a chi vive a Roma); se lì non arrivano a MIN_FESTE, la successiva.
+  const tutti = [...feste, ...piaciuti, ...tavolata];
+  const conta = new Map<string | null, number>();
+  for (const x of tutti) { const c = cittaDi(x.posto); conta.set(c, (conta.get(c) ?? 0) + 1); }
+  // Senza città leggibile si contano a parte e vengono per ultimi: mai mescolati con una città vera.
+  const citta = [...conta.entries()].sort((a, b) => (a[0] === null ? 1 : 0) - (b[0] === null ? 1 : 0) || b[1] - a[1]).map(([c]) => c);
+  for (const c of citta) {
+    const qui = (x: { posto: T }) => cittaDi(x.posto) === c;
+    const scelti = componi(feste.filter(qui), piaciuti.filter(qui), tavolata.filter(qui));
+    if (scelti.length >= MIN_FESTE) return scelti;
+  }
+  return [];
+}
+
+function componi<X>(f: X[], l: X[], t: X[]): X[] {
   const scelti = f.slice(0, MAX_FESTE);
   const liberi = MAX_FESTE - scelti.length;
   const perTavolata = t.length > 0 && liberi > 0 ? 1 : 0;
   scelti.push(...l.slice(0, liberi - perTavolata));
   scelti.push(...t.slice(0, MAX_FESTE - scelti.length));
   if (scelti.length < MAX_FESTE) scelti.push(...l.filter((x) => !scelti.includes(x)).slice(0, MAX_FESTE - scelti.length));
-  return scelti.length >= MIN_FESTE ? scelti : [];
+  return scelti;
 }
 
 export function etichettaFeste(m: Motivo): string {
-  return m.tipo === "piaciuto" ? "Ci sei stato · 👍" : `Da provare · ${m.nome}`;
+  return m.tipo === "piaciuto" ? "Ci sono stato · 👍" : `Da provare · ${m.nome}`;
 }
