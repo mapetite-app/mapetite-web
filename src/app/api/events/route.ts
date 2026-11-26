@@ -16,6 +16,9 @@ const PROP_KEYS = [
   "ore",
 ] as const;
 const LONG_PROPS: readonly string[] = ["messaggio"];
+// Nomi che scrive solo il server: alcuni fanno da contatore delle quote (25 verdetti e 20 letture di
+// orari al giorno per tutta l'app). Dal telefono non si accettano, così nessuno consuma il tetto a vuoto.
+const SOLO_SERVER: readonly string[] = ["verdetto_salvato", "orari_google", "prova_reel_server"];
 
 // Freno alle scritture (la route è aperta anche a chi non ha fatto l'accesso): al massimo
 // 200 segnali all'ora per persona o indirizzo, così un ciclo non riempie i dati di comportamento.
@@ -40,6 +43,7 @@ export async function POST(request: Request) {
   const { data } = await supabase.auth.getUser();
   if (!allowEvent(clientKey(request, data?.user?.id))) return new NextResponse(null, { status: 204 });
   if (isAutomated(request)) return new NextResponse(null, { status: 204 });
+  if (typeof body?.props?.nome === "string" && SOLO_SERVER.includes(body.props.nome)) return new NextResponse(null, { status: 204 });
   const props: Record<string, string | number> = {};
   for (const k of PROP_KEYS) {
     const v = body?.props?.[k];
