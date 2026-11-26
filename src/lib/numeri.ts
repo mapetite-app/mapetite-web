@@ -73,6 +73,8 @@ export const FUNZIONI_NOTE = [
   "vicino_adesso", "raggio",
   // Stasera "A che ora?" (84), anno a tavola (49) e anno del locale (87): misurati dal 25/11.
   "orari_google", "anno_tavola_vista", "anno_tavola_condividi", "anno_locale_vista", "anno_locale_condividi",
+  // "Le feste si prenotano adesso" (89): dal 1 al 20 dicembre.
+  "feste_vista", "feste_apri", "feste_posto", "feste_chiudi",
 ] as const;
 const AZIONI_DIRETTE = ["apri_scheda", "salva", "rimuovi", "ci_sono_stato", "voglio_andarci", "percorso", "chiama", "sito", "condividi"];
 
@@ -118,6 +120,10 @@ const ETICHETTE: Record<string, string> = {
   benvenuto_importa: "Primo accesso: importa",
   benvenuto_fine: "Primo accesso: finito",
   orari_google: "Stasera: orari letti da Google",
+  feste_vista: "Feste: card vista in Salvati",
+  feste_apri: "Feste: card aperta",
+  feste_posto: "Feste: posto aperto dalla card",
+  feste_chiudi: "Feste: \"Non quest'anno\"",
   anno_tavola_vista: "Anno a tavola: aperto",
   anno_tavola_condividi: "Anno a tavola: condiviso",
   anno_locale_vista: "Anno del locale: aperto",
