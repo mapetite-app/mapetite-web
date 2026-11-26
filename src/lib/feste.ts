@@ -1,15 +1,22 @@
 // "Le feste si prenotano adesso" (proposta 89, PROBLEMI.md 36): dal 1 al 20 dicembre, in cima a Salvati,
-// 3 dei tuoi posti per la cena delle feste. Prima quelli dove sei stato e ti sono piaciuti, poi i "Da provare"
-// messi in una raccolta da tavolata (amici, colleghi, compleanno…). Ordine: il tuo, mai le recensioni.
+// 3 dei tuoi posti per la cena delle feste: prima quelli in una raccolta delle feste, poi quelli dove sei stato
+// e ti sono piaciuti, poi i "Da provare" da tavolata. Dal più recente, mai per recensioni.
 // Nessuna chiamata a Google o all'AI: solo i salvati già caricati. Funzioni pure (le prova il giro).
-import { OPINION_DISLIKE, OPINION_LIKE, STATE_TAGS, isStateTag } from "./tags";
+// Senza import (il giro la prova da sola): gli stessi valori di tags.ts.
+const OPINION_LIKE = "Mi è piaciuto";
+const OPINION_DISLIKE = "Non fa per me";
+const STATE_TAGS = ["Da provare", "Già visitato"] as const;
+const isStateTag = (t: string) => (STATE_TAGS as readonly string[]).includes(t);
 
 export const MAX_FESTE = 3;
 export const MIN_FESTE = 2; // con un posto solo non è una scelta: la card non compare
 const ULTIMO_GIORNO = 20;
 
-// Nomi di raccolta da tavolata. Parole intere all'inizio (amic- copre amici, amiche, amicizia).
-const DA_TAVOLATA = /(^|[^\p{L}])(amic|collegh|compleann|grupp|fest|natal|capodann|famigli|tavolat|cena di lavoro|ufficio|team|parenti|cenone)/iu;
+// Nomi di raccolta. Le feste dette in chiaro (Natale, Capodanno, cenone…) vengono prima di tutto: è
+// l'intenzione esplicita della persona. Poi quelle da tavolata (amici, colleghi, compleanno…).
+// Parole intere all'inizio: "Natalia", "Festival" e "Team" non contano (revisore 26/11).
+const FESTE = /(^|[^\p{L}])(natal[ei](?!\p{L})|natalizi|capodann|cenon|vigilia|feste\b|festa\b|festivit|san silvestro)/iu;
+const DA_TAVOLATA = /(^|[^\p{L}])(amic|collegh|compleann|grupp|famigli|tavolat|lavoro|ufficio|parenti|addio al)/iu;
 
 export type PostoFeste = {
   id: string;
@@ -31,25 +38,48 @@ export function chiaveChiusa(oggi: string): string {
   return `mapetite:feste-chiusa:${oggi.slice(0, 4)}`;
 }
 
+const raccolte = (tags: readonly string[] | null | undefined) => (tags ?? []).filter((t) => !isStateTag(t) && t !== OPINION_LIKE && t !== OPINION_DISLIKE);
+export function raccoltaDelleFeste(tags: readonly string[] | null | undefined): string | null {
+  return raccolte(tags).find((t) => FESTE.test(t)) ?? null;
+}
 export function raccoltaDaTavolata(tags: readonly string[] | null | undefined): string | null {
-  return (tags ?? []).find((t) => !isStateTag(t) && t !== OPINION_LIKE && t !== OPINION_DISLIKE && DA_TAVOLATA.test(t)) ?? null;
+  return raccolte(tags).find((t) => DA_TAVOLATA.test(t)) ?? null;
 }
 
 /**
- * I posti per la card, nell'ordine della lista ricevuta (quella di Salvati, già nel tuo ordine).
- * Fuori: 👎, chiusi per sempre, "Solo per me" (la card porta a "Manda al gruppo").
- * Meno di MIN_FESTE: lista vuota (niente riempitivi).
+ * I posti per la card. `posti` arriva dal più vecchio al più nuovo (come i salvati): qui si guarda dal più
+ * recente. Ordine: (1) quelli in una raccolta delle feste, (2) i 👍, (3) i "Da provare" da tavolata; se ci
+ * sono posti da tavolata, almeno uno ha il suo posto. Tutti della stessa città (quella del primo scelto):
+ * una tavolata non si vota tra Roma e Milano (revisore 26/11). Fuori: 👎, chiusi (anche per ora),
+ * "Solo per me" (la card porta a "Manda al gruppo"), visitati senza 👍. Meno di MIN_FESTE: lista vuota.
  */
-export function postiFeste<T extends PostoFeste>(posti: readonly T[]): { posto: T; motivo: Motivo }[] {
-  const ok = posti.filter((p) => !p.soloPerMe && !(p.tags ?? []).includes(OPINION_DISLIKE) && p.businessStatus !== "CLOSED_PERMANENTLY");
-  const piaciuti = ok.filter((p) => (p.tags ?? []).includes(STATE_TAGS[1]) && (p.tags ?? []).includes(OPINION_LIKE));
-  const scelti: { posto: T; motivo: Motivo }[] = piaciuti.slice(0, MAX_FESTE).map((posto) => ({ posto, motivo: { tipo: "piaciuto" } }));
+export function postiFeste<T extends PostoFeste>(posti: readonly T[], cittaDi: (p: T) => string | null = () => null): { posto: T; motivo: Motivo }[] {
+  const ok = [...posti].reverse().filter((p) => !p.soloPerMe && !(p.tags ?? []).includes(OPINION_DISLIKE) && (p.businessStatus == null || p.businessStatus === "OPERATIONAL"));
+  const tags = (p: T) => p.tags ?? [];
+  const piace = (p: T) => tags(p).includes(STATE_TAGS[1]) && tags(p).includes(OPINION_LIKE);
+  const daProvare = (p: T) => !tags(p).includes(STATE_TAGS[1]);
+  const feste: { posto: T; motivo: Motivo }[] = [];
   for (const p of ok) {
-    if (scelti.length >= MAX_FESTE) break;
-    if ((p.tags ?? []).includes(STATE_TAGS[1])) continue; // già visitato senza 👍: non è un consiglio
-    const nome = raccoltaDaTavolata(p.tags);
-    if (nome) scelti.push({ posto: p, motivo: { tipo: "raccolta", nome } });
+    const nome = raccoltaDelleFeste(p.tags);
+    if (nome && (piace(p) || daProvare(p))) feste.push({ posto: p, motivo: piace(p) ? { tipo: "piaciuto" } : { tipo: "raccolta", nome } });
   }
+  const presi = new Set(feste.map((x) => x.posto.id));
+  const piaciuti = ok.filter((p) => !presi.has(p.id) && piace(p)).map((posto) => ({ posto, motivo: { tipo: "piaciuto" } as Motivo }));
+  const tavolata = ok.flatMap((p) => {
+    const nome = !presi.has(p.id) && daProvare(p) ? raccoltaDaTavolata(p.tags) : null;
+    return nome ? [{ posto: p, motivo: { tipo: "raccolta", nome } as Motivo }] : [];
+  });
+  const primo = feste[0] ?? piaciuti[0] ?? tavolata[0];
+  if (!primo) return [];
+  const citta = cittaDi(primo.posto);
+  const qui = (x: { posto: T }) => citta === null || cittaDi(x.posto) === citta;
+  const [f, l, t] = [feste.filter(qui), piaciuti.filter(qui), tavolata.filter(qui)];
+  const scelti = f.slice(0, MAX_FESTE);
+  const liberi = MAX_FESTE - scelti.length;
+  const perTavolata = t.length > 0 && liberi > 0 ? 1 : 0;
+  scelti.push(...l.slice(0, liberi - perTavolata));
+  scelti.push(...t.slice(0, MAX_FESTE - scelti.length));
+  if (scelti.length < MAX_FESTE) scelti.push(...l.filter((x) => !scelti.includes(x)).slice(0, MAX_FESTE - scelti.length));
   return scelti.length >= MIN_FESTE ? scelti : [];
 }
 
