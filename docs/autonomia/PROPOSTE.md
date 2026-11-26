@@ -32,7 +32,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** TheFork e Google mostrano i menu di Natale dei locali famosi; Mapstr e Corner non ricordano niente. Noi partiamo dai posti che la persona ha già scelto, nel momento giusto (VISIONE: "ritrovarlo nel momento giusto").
 - **Valore per l'utente:** la cena delle feste sistemata prima che sia tardi, da posti che già conosce o vuole provare. **Per il ristoratore:** tavolate prenotate presto da chi lo ama già.
 - **Sforzo:** S (salvati, visite, 👍 e nomi delle raccolte già nel database; una card, un controllo di date, un "chiudi" in memoria del telefono). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA, da costruire **prima del 1/12**. In demo: si mostra cambiando la data di prova.
+- **Stato proposto:** PRONTA, da costruire **prima del 1/12**. In demo: si mostra cambiando la data di prova. **Costruita il 26/11** (sessione delle 03:05): card in cima a Salvati, "Manda al gruppo" e "Non quest'anno"; "Prenota" sta nella scheda del posto (un tocco); demo con `?oggi=2026-12-05`.
 
 ### 90. "Menu delle feste" detto dal locale nel pannello
 - **Problema:** `PROBLEMI.md` 36: il 72,4% dei locali punta su menu tutto compreso per Natale, 82 € a persona in media nel 2025 (analisi FIPE, [Gambero Rosso](https://www.gamberorosso.it/notizie/attualita/pranzo-natale-2025-ristorante-prezzi-analisi-fipe/)), ma chi ha salvato il posto non lo sa e deve chiamare.
