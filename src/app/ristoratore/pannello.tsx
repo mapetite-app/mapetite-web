@@ -368,6 +368,7 @@ export default function Pannello({
   demo = false,
   avviso,
   vista,
+  menuFeste = false,
   serate = { giorni: [], at: null },
   prenotazioni = null,
   passaparola = 0,
@@ -381,6 +382,8 @@ export default function Pannello({
   demo?: boolean;
   avviso?: string | null;
   vista?: string;
+  // Proposta 90: spenta finché un revisore nuovo non la approva (bocciata due volte il 26/11): solo con ?beta=menufeste.
+  menuFeste?: boolean;
   serate?: { giorni: number[]; at: string | null; apertoDal?: string | null; prezzo?: Prezzo | null; feste?: MenuFeste | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
   prenotazioni?: { tavoli: number; diParola: number; persone: number; personeParola: number } | null;
   // Proposta 58: tra chi ti vuole provare, quanti l'hanno salvato su consiglio di un amico. Solo il numero, mai chi.
@@ -615,9 +618,9 @@ export default function Pannello({
   const promozione = (
     <>
       {/* Dal 1/11 al 6/1 (nell'esempio sempre), per primo: a dicembre è la cosa che conta. Fuori stagione non c'è. */}
-      {(demo || stagioneMenu(oggiRomaFeste()) != null) && (
+      {menuFeste && (demo || stagioneMenu(oggiRomaFeste()) != null) && (
         <>
-        {/* "Menu delle feste" (PROPOSTE.md, proposta 90): giorni, prezzo e gruppi detti dal locale, prima che il gruppo scelga. */}
+        {/* "Menu delle feste" (PROPOSTE.md, proposta 90): giorni e prezzo detti dal locale, prima che il gruppo scelga. */}
         <Sezione titolo="Menu delle feste" nota="Giorni e prezzo a persona. Lo vede chi apre la tua scheda, fino all'ultimo giorno." piano="Verified" testId="pannello-feste">
           <MenuFesteModulo placeId={locale.id} iniziale={demo ? { prezzo: 65, bevande: true, giorni: ["12-24", "12-25"], gruppi: null, at: new Date().toISOString() } : serate.feste ?? null} verificato={verificato} demo={demo} />
         </Sezione>

@@ -1,7 +1,7 @@
 -- Migration: "Menu delle feste" detto dal locale (docs/autonomia/PROPOSTE.md, proposta 90), 26/11/2026.
 -- Il titolare di un locale verificato indica i giorni delle feste con il menu (24, 25, 26, 31 dicembre, 1 gennaio),
 -- il prezzo a persona e se le bevande sono incluse (feste_gruppi resta per dopo: oggi la scheda non lo mostra). La scheda mostra
--- "🎄 Menu delle feste 65 € · … · dice il locale" solo nella stagione in cui è stato scritto (1/11–6/1).
+-- "🎄 Menu feste 65 €, bevande incluse · 24 e 25 dic · dice il locale" solo nella stagione in cui è stato scritto (1/11–6/1).
 -- Non cambia l'ordine dei risultati. Scrive solo il server (/api/ristoratore/serate, chiave di servizio) dopo il
 -- controllo del titolare, come prezzo_min. Idempotente, solo aggiunta, nessun dato toccato.
 alter table public.places add column if not exists feste_prezzo smallint;

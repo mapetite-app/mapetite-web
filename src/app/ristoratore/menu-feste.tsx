@@ -5,7 +5,7 @@ import { Check } from "lucide-react";
 import { FESTE_PREZZO_MAX, GIORNI_FESTE, dataFeste, oggiRomaFeste, pulisciMenuFeste, rigaMenuFeste, stagioneMenu, type GiornoFeste, type MenuFeste } from "@/lib/menu-feste";
 
 // "Menu delle feste" nel pannello del ristoratore (PROPOSTE.md, proposta 90): giorni, prezzo a persona, bevande
-// (revisore 26/11: i gruppi tolti, la riga della scheda resta corta). Chi ha salvato il locale vede nella scheda "🎄 Menu delle feste 65 € · … · dice il locale",
+// (revisore 26/11: i gruppi tolti, la riga della scheda resta corta). Chi apre la scheda vede "🎄 Menu feste 65 €, bevande incluse · … · dice il locale",
 // solo fino all'ultimo giorno indicato. Niente testo libero. Nell'esempio dimostrativo si prova ma non si salva.
 const cifre = (v: string, n: number) => v.replace(/[^0-9]/g, "").slice(0, n);
 const chiave = (m: Pick<MenuFeste, "prezzo" | "bevande" | "giorni"> | null) => (m ? `${m.prezzo}|${m.bevande}|${m.giorni.join()}` : "");
@@ -31,7 +31,9 @@ export default function MenuFesteModulo({ placeId, iniziale, verificato, demo }:
   const vuoto = giorni.length === 0 && prezzo === "";
   const pulito = vuoto ? null : pulisciMenuFeste(prezzo, bevande, giorni.filter((k) => !passato(k)), null, new Date().toISOString());
   const valido = vuoto || pulito != null;
-  const cambiato = valido && chiave(pulito) !== chiave(salvato);
+  // Il salvato si confronta senza i giorni già passati, come il modulo (revisore 26/11 (2): il 25/12 "Salva" si accendeva da solo).
+  const salvatoOggi = salvato ? { ...salvato, giorni: salvato.giorni.filter((k) => !passato(k)) } : null;
+  const cambiato = valido && chiave(pulito) !== chiave(salvatoOggi?.giorni.length ? salvatoOggi : null);
   const avviso = !valido && uscito ? (giorni.length === 0 ? "Scegli almeno un giorno." : `Prezzo a persona tra 1 e ${FESTE_PREZZO_MAX} €.`) : null;
 
   const tocca = (k: GiornoFeste) => {
@@ -109,7 +111,7 @@ export default function MenuFesteModulo({ placeId, iniziale, verificato, demo }:
       </div>
       <p data-testid="feste-anteprima" className="mt-3 text-xs font-sans leading-snug text-text-muted">
         {riga ? (
-          <>Nella tua scheda: <strong className="font-display text-text">🎄 {riga.prezzo}</strong> · {riga.dettagli.join(" · ")} · dice il locale. Sparisce da sola dopo l&apos;ultimo giorno.</>
+          <>Nella tua scheda: <strong className="font-display text-text">🎄 {riga.prezzo}, {riga.dettagli.join(" · ")}</strong> · dice il locale. Sparisce da sola dopo l&apos;ultimo giorno.</>
         ) : (
           "Nessun menu delle feste: nella tua scheda non compare niente."
         )}

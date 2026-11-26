@@ -3263,7 +3263,7 @@ else {
       ok(m && m.prezzo === 65 && m.giorni.join() === "12-24,12-25" && m.gruppi === 12 && !mf.pulisciMenuFeste(0, true, ["12-24"], null, "") && !mf.pulisciMenuFeste(600, true, ["12-24"], null, "") && !mf.pulisciMenuFeste(50, true, [], null, "") && !mf.pulisciMenuFeste(50, true, ["12-24"], 1, "") && !mf.pulisciMenuFeste(50, true, ["12-24"], 120, "") && mf.pulisciMenuFeste(50, "true", ["12-24"], "", "").bevande === false, "menu feste: prezzo 1–500, almeno un giorno noto in ordine di calendario, gruppi 2–99 o vuoto");
       ok(mf.stagioneMenu("2026-11-01") === 2026 && mf.stagioneMenu("2026-12-31") === 2026 && mf.stagioneMenu("2027-01-06") === 2026 && mf.stagioneMenu("2027-01-07") == null && mf.stagioneMenu("2026-10-31") == null, "menu feste: stagione dal 1/11 al 6/1");
       const r = mf.rigaMenuFeste(m, "2026-12-05");
-      ok(r && r.prezzo === "Menu feste 65 €" && sp(r.dettagli.join(" · ")) === "bevande incluse · 24 e 25 dic", `menu feste: la riga della scheda, corta (${JSON.stringify(r)})`);
+      ok(r && sp(r.prezzo) === "Menu feste 65 €" && sp(r.dettagli.join(" · ")) === "bevande incluse · 24 e 25 dic", `menu feste: la riga della scheda, corta (${JSON.stringify(r)})`);
       ok(mf.rigaMenuFeste(m, "2026-12-26") == null && mf.rigaMenuFeste(m, "2027-12-05") == null && mf.rigaMenuFeste({ ...m, at: "2025-12-01T10:00:00Z" }, "2026-12-05") == null && sp(mf.rigaMenuFeste(m, "2026-12-25").dettagli[1]) === "25 dic", "menu feste: sparisce dopo l'ultimo giorno indicato e non torna l'anno dopo; mostra solo i giorni che restano");
       ok(sp(mf.fraseGiorni(["12-24", "12-25", "12-31", "01-01"])) === "24, 25, 31 dic e 1 gen" && sp(mf.fraseGiorni(["01-01"])) === "1 gen" && sp(mf.fraseGiorni(["12-31"])) === "31 dic" && sp(mf.rigaMenuFeste(mf.pulisciMenuFeste(80, false, ["12-31", "01-01"], null, "2026-12-30T10:00:00Z"), "2027-01-01").dettagli.join("|")) === "bevande escluse|1 gen", "menu feste: giorni detti per bene, Capodanno nell'anno dopo"); }
     const fctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -8253,16 +8253,21 @@ else {
       const oggiR = mf.oggiRomaFeste();
       const s0 = mf.stagioneMenu(oggiR);
       // Revisore 26/11: con prezzo a testa e "c'è posto" resta UN riquadro del titolare, un solo "dice il locale", al massimo 3 righe.
-      await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: true, giorni: [g], at: new Date().toISOString(), prezzo: { min: 25, max: 35, bevande: false }, feste: { prezzo: 65, bevande: true, giorni: ["12-24", "12-25", "12-31", "01-01"], gruppi: null, at: new Date().toISOString() } });
+      await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: true, giorni: [g], at: new Date().toISOString(), prezzo: { min: 25, max: 35, bevande: false }, feste: { prezzo: 65, bevande: true, giorni: ["12-24", "12-25", "12-31", "01-01"], at: new Date().toISOString() } });
       await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z", prezzo_min: 25, prezzo_max: 35 } });
+      // Spenta per tutti (bocciata due volte il 26/11): senza ?beta=menufeste torna il prezzo di tutti i giorni.
       await rp.reload({ waitUntil: "networkidle" });
+      await rp.getByTestId("prezzo-locale").waitFor({ timeout: 5000 }).catch(() => {});
+      ok((await rp.getByTestId("menu-feste-scheda").count()) === 0 && (await rp.getByTestId("prezzo-locale").count()) === 1, "menu feste: spento per tutti (senza ?beta=menufeste la scheda mostra il prezzo di sempre)");
+      await rp.goto(`${BASE}/locali/${LOC}?beta=menufeste`, { waitUntil: "networkidle" });
       await rp.getByTestId("menu-feste-scheda").waitFor({ timeout: 5000 }).catch(() => {});
       const t = ((await rp.getByTestId("menu-feste-scheda").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
       const pl = ((await rp.getByTestId("posto-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
       const hb = await rp.getByTestId("parola-locale").evaluate((el) => el.getBoundingClientRect().height).catch(() => 999);
       ok(s0 == null ? t === "" : t.startsWith("🎄 Menu feste 65 €, bevande incluse") && t.includes("24, 25, 31 dic e 1 gen") && (pl.match(/dice il locale/g) ?? []).length === 1 && pl.includes("Stasera c'è posto") && (await rp.getByTestId("parola-locale").count()) === 1 && hb <= 64, `pagina del locale: '🎄 Menu feste 65 €, bevande incluse · … · 🌙 … · dice il locale' in un solo riquadro di al massimo 3 righe, niente fuori stagione (${s0}: ${pl} / ${Math.round(hb)} px)`);
       if (s0 != null) await rp.getByTestId("posto-locale").screenshot({ path: `${OUT}/90-locale-feste.png` }).catch(() => {});
-      await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: false, giorni: [], feste: { prezzo: 65, bevande: true, giorni: ["01-01"], gruppi: null, at: new Date().toISOString() } });
+      await rp.goto(`${BASE}/locali/${LOC}`, { waitUntil: "networkidle" });
+      await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: false, giorni: [], feste: { prezzo: 65, bevande: true, giorni: ["01-01"], at: new Date().toISOString() } });
       const j = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
       ok(j.feste == null, `menu feste: locale non verificato → la scheda non riceve il menu (${JSON.stringify(j.feste)})`); }
     await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z" } });
@@ -8384,8 +8389,11 @@ else {
       await pm.getByTestId("prezzo-da").blur();
       ok(await pm.getByTestId("prezzo-salva").isDisabled() && zittoMentreScrivi && await pm.getByRole("alert").isVisible(), "pannello ristoratore: 'da' più alto di 'a' → Salva spento; l'avviso solo uscendo dal campo, non mentre si scrive");
       await rp.getByTestId("pannello-prezzo").screenshot({ path: `${OUT}/71b-pannello-prezzo.png` }); }
+    const serateSalvate = await st.getByText("Salvato").isVisible().catch(() => false);
     // "Menu delle feste" (proposta 90): in stagione si salva e la scheda lo rilegge; serate intatte; fuori stagione la sezione non c'è.
     { const mf = await import(new URL("../../src/lib/menu-feste.ts", import.meta.url).href);
+      ok((await rp.getByTestId("pannello-feste").count()) === 0, "pannello: 'Menu delle feste' spento per tutti (senza ?beta=menufeste)");
+      await rp.goto(`${BASE}/ristoratore/${LOC}?vista=promozione&beta=menufeste`, { waitUntil: "networkidle" });
       if (mf.stagioneMenu(mf.oggiRomaFeste()) == null) ok((await rp.getByTestId("pannello-feste").count()) === 0, "pannello: fuori stagione nessun 'Menu delle feste'");
       else {
         const mfs = rp.getByTestId("menu-feste");
@@ -8436,7 +8444,7 @@ else {
       await om.getByText("Salvato").waitFor({ timeout: 5000 }).catch(() => {});
       const j4 = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
       ok(j4.omaggio === null && (await om.getByTestId("omaggio-codice-oggi").count()) === 0, `omaggio pannello: 'Spegni' lo toglie dalla scheda (${JSON.stringify(j4.omaggio)})`); }
-    ok(await st.getByText("Salvato").isVisible() && JSON.stringify(j.giorni) === "[5]" && j.verificato === true && !!j.at && vietato.status() === 403, `pannello ristoratore: serate tranquille salvate e rilette dalla scheda; un altro locale è vietato (${JSON.stringify(j)} / ${vietato.status()})`);
+    ok(serateSalvate && JSON.stringify(j.giorni) === "[5]" && j.verificato === true && !!j.at && vietato.status() === 403, `pannello ristoratore: serate tranquille salvate e rilette dalla scheda; un altro locale è vietato (${JSON.stringify(j)} / ${vietato.status()})`);
     // Locale non verificato: anche con un prezzo scritto, la scheda non riceve niente.
     { await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: false, giorni: [], prezzo: { min: 25, max: 35, bevande: false } });
       const j6 = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();

@@ -2,6 +2,7 @@
 // il titolare di un locale VERIFICATO dice in quali giorni delle feste fa il menu (24, 25, 26, 31 dicembre,
 // 1 gennaio), quanto costa a persona, se le bevande sono incluse e fino a quante persone prende i gruppi.
 // Sulla scheda, nel riquadro del titolare: "🎄 Menu feste 65 €, bevande incluse · 24 e 25 dic · dice il locale".
+// Revisore 26/11 (2): spazi fissi dentro "65 €", "bevande incluse" e le date, così il riquadro va a capo solo tra i pezzi.
 // Niente testo libero, niente recensioni: solo parola del titolare. La riga vale solo nella stagione in cui è
 // stata scritta (1 novembre – 6 gennaio) e sparisce da sola quando i giorni indicati sono passati.
 // Funzioni pure e nessun import, così il giro automatico le prova anche senza server.
@@ -74,9 +75,10 @@ export function fraseGiorni(giorni: GiornoFeste[]): string {
   // Spazi che non vanno a capo tra numero e mese: mai "31" da una parte e "dic" dall'altra.
   const dic = GIORNI_FESTE.filter((g) => g.mese === "dic" && giorni.includes(g.k)).map((g) => String(g.n));
   const gen = giorni.includes("01-01");
-  if (!dic.length) return gen ? "1\u00a0gen" : "";
-  if (gen) return `${dic.join(", ")}\u00a0dic e 1\u00a0gen`;
-  return `${dic.length > 1 ? `${dic.slice(0, -1).join(", ")} e ${dic[dic.length - 1]}` : dic[0]}\u00a0dic`;
+  const n = "\u00a0";
+  if (!dic.length) return gen ? `1${n}gen` : "";
+  if (gen) return `${dic.join(`,${n}`)}${n}dic e${n}1${n}gen`;
+  return `${dic.length > 1 ? `${dic.slice(0, -1).join(`,${n}`)}${n}e${n}${dic[dic.length - 1]}` : dic[0]}${n}dic`;
 }
 
 /** Le parti della riga della scheda, o null se oggi non c'è niente da dire. */
@@ -84,8 +86,8 @@ export function rigaMenuFeste(menu: MenuFeste | null | undefined, oggi: string):
   const g = giorniValidi(menu, oggi);
   if (!menu || !g.length) return null;
   return {
-    prezzo: `Menu feste ${menu.prezzo} €`,
+    prezzo: `Menu feste ${menu.prezzo}\u00a0€`,
     // Revisore 26/11: riga corta (i gruppi restano nel dato, non sulla scheda).
-    dettagli: [`bevande ${menu.bevande ? "incluse" : "escluse"}`, fraseGiorni(g)],
+    dettagli: [`bevande\u00a0${menu.bevande ? "incluse" : "escluse"}`, fraseGiorni(g)],
   };
 }
