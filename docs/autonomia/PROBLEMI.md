@@ -325,3 +325,10 @@ Ultimo aggiornamento: 25/11/2026.
 - **OGGI nell'app:** verdetto onesto su ogni posto, "Quanto si spende davvero" da chi c'è stato (64) e "Il locale dice" (65); filtro "più economico" con un tocco (47).
 - **DAVVERO, in futuro:** proposta 86 ("A pranzo costa meno", dalle recensioni, zero costi). Lato locale: proposta 87 (riepilogo dell'anno per il ristoratore, per mostrargli chi lo vuole provare). Offerte e sconti legati alla visita restano DA DECIDERE LORENZO (pagamenti e accordi).
 - **Primo passo:** team (86 e 87).
+
+## 36. "Per la cena delle feste bisogna scegliere un mese prima, in tanti, e nessuno decide; il locale vuole numeri e menu certi" — 26/11 (CEO che chiude)
+- **Chi lo ha:** entrambi.
+- **Quanto pesa:** per Natale 2025 la FIPE stimava 5,5 milioni di italiani al ristorante per il pranzo, 82 € a persona (+5,1% sul 2024), 451 milioni di euro in tutto; il 72,4% dei locali puntava su menu tutto compreso ([Gambero Rosso, analisi FIPE](https://www.gamberorosso.it/notizie/attualita/pranzo-natale-2025-ristorante-prezzi-analisi-fipe/)). Il consiglio comune è prenotare le tavolate circa un mese prima ([Zero](https://zero.eu/guide/le-tavolate-del-natale/)); a Milano i locali vengono presi d'assalto nelle due settimane prima del 24/12 per i brindisi aziendali ([Gambero Rosso](https://www.gamberorosso.it/ristoranti/cenone-della-vigilia-milano-ristoranti/)). Le stime FIPE per Natale 2026: non ancora uscite (di solito a metà dicembre). Quante cene di gruppo saltano perché nessuno decide: dato non trovato.
+- **OGGI nell'app:** liste di gruppo (`/gruppi`), "Manda al gruppo" con il voto senza app (56), "In comune" sul profilo di un amico.
+- **DAVVERO, in futuro:** proposta 88 (i posti che piacciono già a più persone del gruppo, dai loro salvati), 89 (promemoria "le feste si prenotano adesso" dai tuoi posti), 90 (il menu delle feste detto dal locale nel pannello).
+- **Primo passo:** team (88, 89, 90).

@@ -16,6 +16,32 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 26/11/2026 (giovedì, CEO che chiude — tema: la cena delle feste, scelta in gruppo)
+
+### 88. "Piace già a 3 di voi": nella lista di gruppo, i posti che i membri hanno già salvato
+- **Problema:** `PROBLEMI.md` 36: la cena delle feste si sceglie in tanti e un mese prima, e nessuno decide. Oggi in una lista di gruppo si parte vuoti e qualcuno deve proporre a mano.
+- **Cosa fa:** in cima a una lista di gruppo, una riga "Piace già a più di voi" con al massimo 3 posti salvati da almeno 2 membri (o segnati "Ci sono stato" con 👍), con "Salvato da Giulia e Marco". Un tocco: "Proponi" lo mette nella lista; da lì "Manda al gruppo" (56) fa votare. Mai i posti con il lucchetto "Solo per me" (59), mai quelli 👎 da qualcuno; con meno di 2 posti in comune la riga non compare.
+- **Da dove nasce:** Google Ask Maps cerca nei salvati di una sola persona (`COMPETITOR.md`, 26/11); Beli confronta i gusti con il "Match Score", Corner e Mapstr mostrano le liste degli amici. Nessuno incrocia i salvati di un gruppo per dire dove andare insieme. È gusto condiviso, non popolarità: conta quanti del gruppo lo vogliono, non quante recensioni ha.
+- **Valore per l'utente:** la tavolata decisa partendo da posti che piacciono già, in un minuto. **Per il ristoratore:** gruppi che arrivano già convinti; dopo, nel pannello, "Proposto in 4 liste di gruppo" (solo conteggi da 3 in su).
+- **Sforzo:** S/M (salvataggi e membri dei gruppi già nel database; una query lato server, una riga nella vista del gruppo; revisione di privacy: i salvati dei membri non lasciano il server, si mostrano solo quelli in comune, come "In comune" sul profilo). **Costo Google/Haiku:** zero (foto nella quota di 200, altrimenti emoji).
+- **Stato proposto:** PRONTA.
+
+### 89. "Le feste si prenotano adesso": dal 1 al 20 dicembre, i tuoi 3 posti per la tavolata
+- **Problema:** `PROBLEMI.md` 36: le tavolate di Natale si prenotano circa un mese prima e a metà dicembre i posti sono pieni (Zero, Gambero Rosso). Chi aspetta trova tutto esaurito.
+- **Cosa fa:** dal 1 al 20 dicembre, in cima a Salvati una sola card "Cena delle feste? Si prenota adesso" con 3 posti scelti dai tuoi: prima quelli dove sei stato con 👍, poi i "Da provare" in raccolte con parole di gruppo o festa ("amici", "colleghi", "compleanno"); ordine per gusto, mai per recensioni. Sotto, "Manda al gruppo" (56) e "Prenota" dove c'è già. "Non quest'anno" la chiude fino a dicembre prossimo. Senza almeno 2 posti adatti la card non compare.
+- **Da dove nasce:** TheFork e Google mostrano i menu di Natale dei locali famosi; Mapstr e Corner non ricordano niente. Noi partiamo dai posti che la persona ha già scelto, nel momento giusto (VISIONE: "ritrovarlo nel momento giusto").
+- **Valore per l'utente:** la cena delle feste sistemata prima che sia tardi, da posti che già conosce o vuole provare. **Per il ristoratore:** tavolate prenotate presto da chi lo ama già.
+- **Sforzo:** S (salvati, visite, 👍 e nomi delle raccolte già nel database; una card, un controllo di date, un "chiudi" in memoria del telefono). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA, da costruire **prima del 1/12**. In demo: si mostra cambiando la data di prova.
+
+### 90. "Menu delle feste" detto dal locale nel pannello
+- **Problema:** `PROBLEMI.md` 36: il 72,4% dei locali punta su menu tutto compreso per Natale, 82 € a persona in media nel 2025 (analisi FIPE, [Gambero Rosso](https://www.gamberorosso.it/notizie/attualita/pranzo-natale-2025-ristorante-prezzi-analisi-fipe/)), ma chi ha salvato il posto non lo sa e deve chiamare.
+- **Cosa fa:** nel pannello del locale verificato, "Menu delle feste": giorni (24, 25, 31 dicembre, 1 gennaio), prezzo a persona, bevande incluse sì/no, posti per gruppi fino a N. Sulla scheda una riga "Menu di Natale: 65 € · lo dice il locale" (stesso stile di "Il locale dice", 65). La riga sparisce da sola dopo il 6 gennaio. Niente testo libero da interpretare, niente recensioni.
+- **Da dove nasce:** la 86 è stata fermata perché le recensioni non bastano; il prezzo detto dal locale era la strada indicata. TheFork mostra le offerte dei locali, ma non a chi li aveva già salvati.
+- **Valore per l'utente:** sa quanto spende prima di proporlo al gruppo. **Per il ristoratore:** il menu delle feste davanti a chi lo vuole già provare; il primo motivo concreto per verificare il locale a dicembre.
+- **Sforzo:** S/M (una tabella piccola o colonne nel profilo del locale verificato, un modulo nel pannello, una riga nella scheda). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA (serve almeno un locale verificato per vederla dal vivo; in demo con il locale di prova).
+
 ## 25/11/2026 (mercoledì, CEO che chiude — tema: cene che devono valere la pena, e il riepilogo dell'anno)
 
 ### 86. "A pranzo costa meno": il menu del pranzo detto dalle recensioni, con la frase
