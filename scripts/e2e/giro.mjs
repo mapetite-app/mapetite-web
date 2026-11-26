@@ -3238,6 +3238,46 @@ else {
       ok((await ps.getByTestId("scaffali").count()) === 0 && (await ps.getByTestId("salvati-tipo-pillola").count()) > 0, "scaffali: con 7 salvati niente scaffali, la fila dei filtri di sempre");
       await sc.close(); } }
 
+  // Proposta 89 "Le feste si prenotano adesso" (26/11): dal 1 al 20 dicembre, in cima a Salvati, 3 posti per la tavolata:
+  // prima i 👍, poi i "Da provare" in una raccolta da tavolata; mai 👎, chiusi o "Solo per me". "Non quest'anno" la chiude.
+  { const fe = await import(new URL("../../src/lib/feste.ts", import.meta.url).href);
+    ok(fe.stagioneFeste("2026-12-01") && fe.stagioneFeste("2026-12-20") && !fe.stagioneFeste("2026-12-21") && !fe.stagioneFeste("2026-11-30") && !fe.stagioneFeste("x"), "feste: finestra dal 1 al 20 dicembre");
+    const P = (id, tags, extra = {}) => ({ id, tags, ...extra });
+    const r = fe.postiFeste([P("a", ["Da provare", "Con amici"]), P("b", ["Già visitato", "Mi è piaciuto"]), P("c", ["Già visitato", "Non fa per me", "Con amici"]), P("d", ["Già visitato", "Mi è piaciuto"], { soloPerMe: true }), P("e", ["Da provare", "Romantico"]), P("f", ["Già visitato", "Mi è piaciuto"], { businessStatus: "CLOSED_PERMANENTLY" }), P("g", ["Già visitato", "Compleanno Marta"]), P("h", ["Da provare", "Cene coi colleghi"])]);
+    ok(r.map((x) => x.posto.id).join(",") === "b,a,h" && fe.etichettaFeste(r[0].motivo) === "Ci sei stato · 👍" && fe.etichettaFeste(r[1].motivo) === "Da provare · Con amici", `feste: prima i 👍, poi le raccolte da tavolata; fuori 👎, lucchetto, chiusi, visitati senza 👍 e raccolte romantiche (${r.map((x) => x.posto.id).join(",")})`);
+    ok(fe.postiFeste([P("a", ["Già visitato", "Mi è piaciuto"]), P("e", ["Da provare", "Romantico"])]).length === 0, "feste: con un posto solo la card non compare (niente riempitivi)");
+    const fctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await fctx.route("**/api/events", (r2) => r2.fulfill({ status: 204, body: "" }));
+    const sav = (i, name, tags) => ({ created_at: new Date(Date.UTC(2026, 9, 1) + i * 3_600_000).toISOString(), tags, note: null, places: { id: `00000000-0000-4000-8000-0000000089${String(i).padStart(2, "0")}`, name, category: "restaurant", address: `Via di Prova ${i}, 00153 Roma RM, Italy`, lat: 41.889 + i * 0.001, lng: 12.469, google_place_id: `GF${i}`, rating: 4.4, price_level: 2 } });
+    const rowsF = [sav(1, "Trattoria Piaciuta", ["Già visitato", "Mi è piaciuto"]), sav(2, "Osteria del Gruppo", ["Da provare", "Con amici"]), sav(3, "Pizzeria No", ["Già visitato", "Non fa per me", "Con amici"]), sav(4, "Bistrot Romantico", ["Da provare", "Romantico"])];
+    await fctx.route("**/rest/v1/saved_places**", (r2) => r2.request().url().includes("select=place_id") ? r2.fulfill({ json: rowsF.map((x) => ({ place_id: x.places.id })) }) : r2.fulfill({ json: rowsF }));
+    for (const t of ["place_synthesis", "profiles", "contenuti_locali", "foto_locali"]) await fctx.route(`**/rest/v1/${t}**`, (r2) => r2.fulfill({ json: [] }));
+    const pf = await fctx.newPage();
+    await pf.goto(`${BASE}/mappa?vista=salvati&oggi=2026-11-26`, { waitUntil: "networkidle" }).catch(() => {});
+    await pf.getByTestId("salvati-lista").waitFor({ timeout: 8000 }).catch(() => {});
+    await pf.waitForTimeout(800);
+    ok((await pf.getByTestId("feste-card").count()) === 0, "feste: a novembre in Salvati nessuna card");
+    await pf.goto(`${BASE}/mappa?vista=salvati&oggi=2026-12-05`, { waitUntil: "networkidle" }).catch(() => {});
+    await pf.getByTestId("salvati-lista").waitFor({ timeout: 8000 }).catch(() => {});
+    await pf.waitForTimeout(800);
+    const card = pf.getByTestId("feste-card");
+    const nomiF = (await card.getByTestId("feste-posto").locator("span.font-semibold").allTextContents().catch(() => [])).map((t) => t.trim());
+    const motivi = await card.getByTestId("feste-motivo").allTextContents().catch(() => []);
+    ok(await card.isVisible().catch(() => false) && nomiF.join("|") === "Trattoria Piaciuta|Osteria del Gruppo" && motivi[1]?.startsWith("Da provare · Con amici") && (await card.getByTestId("manda-gruppo").count()) === 1, `feste: il 5 dicembre la card con il 👍 e il posto 'Con amici', senza 👎 né romantici, e 'Manda al gruppo' (${nomiF.join(" | ")})`);
+    { const yc = (await card.boundingBox())?.y ?? 9999, yl = (await pf.getByTestId("salvati-lista-posti").boundingBox())?.y ?? -1;
+      const o = await pf.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+      const hT = await card.getByTestId("feste-posto").evaluateAll((els) => Math.min(...els.map((e) => e.getBoundingClientRect().height)));
+      ok(yc < yl && yc + ((await card.boundingBox())?.height ?? 999) < 844 && o <= 0 && hT >= 44, `feste: card sopra la lista, intera nella prima schermata, niente sbordamenti, tocchi da 44px (y ${Math.round(yc)}, ${o}, ${hT})`); }
+    await pf.screenshot({ path: `${OUT}/89-feste-salvati.png` });
+    await card.getByTestId("feste-non-quest-anno").click().catch(() => {});
+    await pf.waitForTimeout(300);
+    ok((await pf.getByTestId("feste-card").count()) === 0, "feste: 'Non quest'anno' chiude la card");
+    await pf.reload({ waitUntil: "networkidle" }).catch(() => {});
+    await pf.getByTestId("salvati-lista").waitFor({ timeout: 8000 }).catch(() => {});
+    await pf.waitForTimeout(800);
+    ok((await pf.getByTestId("feste-card").count()) === 0, "feste: chiusa resta chiusa anche ricaricando");
+    await fctx.close(); }
+
   // Proposta 45 "Ha chiuso?" (4/11): un salvato che Google dà chiuso per sempre va in fondo, con "Ha chiuso",
   // fuori da "aspettano da mesi"; chiuso per ora ha la sua pillola; la scheda lo dice. Mai tolto.
   { const cctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["geolocation"], geolocation: { latitude: 41.8935, longitude: 12.472 } });

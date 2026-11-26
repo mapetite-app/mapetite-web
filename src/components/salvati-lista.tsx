@@ -18,6 +18,7 @@ import { trackFeature } from "@/lib/track";
 import { fotoUrl } from "@/lib/foto-utenti";
 import { distanzaQuartiere, quartiereDi, raggioVicino, tipoPlurale } from "@/lib/scaffali-salvati";
 import { mappaStatica } from "@/lib/mappa-statica";
+import FesteCard from "@/components/feste-card";
 
 // Schermata "Salvati" (mockup C "Card bianche" vestito in stile A "Editoriale", scelto da Lorenzo
 // nella PR #87; rifatta dopo il giro del 1/11 come Places/Albo): fondo carta, titolo in serif, filtri
@@ -994,6 +995,8 @@ export default function SalvatiLista({
 
         {/* Scaffali (Lorenzo 8/11, libreria di Places e Albo): con 500 salvati il posto giusto in due tocchi.
             Revisore 8/11: un riquadro solo, tre schede e una fila di copertine; sotto, subito la lista. */}
+        {/* Proposta 89: dal 1 al 20 dicembre, la cena delle feste dai tuoi posti. Solo a lista intera (senza filtri). */}
+        {!filtrando && !rispostaAI && <FesteCard posti={baseZona} verdicts={verdicts} onOpen={apriRiga} />}
         {schedaOn && (
           <section data-testid="scaffali" aria-label="Scaffali" className="mt-1">
             <div className="flex items-center">

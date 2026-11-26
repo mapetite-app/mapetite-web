@@ -34,7 +34,7 @@ function primiTre(tutti: PostoDaMandare[], provati?: string[]): string[] {
 export default function MandaAlGruppo({ posti: tutti, toccoClass, pillolaClass, da = "mappa", provati, accediDa = "/mappa" }: {
   posti: PostoDaMandare[]; toccoClass: string; pillolaClass: string;
   // Da dove si manda (per i numeri) e i posti già provati (si propongono per ultimi).
-  da?: "mappa" | "raccolta"; provati?: string[]; accediDa?: string;
+  da?: "mappa" | "raccolta" | "feste"; provati?: string[]; accediDa?: string;
 }) {
   const scegliere = tutti.length > MAX_SCELTI;
   const [scelti, setScelti] = useState<string[]>(() => primiTre(tutti, provati));
