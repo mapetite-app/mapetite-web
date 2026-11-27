@@ -29,6 +29,7 @@ import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocaleStato } from 
 import AvvisoPosto from "@/components/avviso-posto";
 import { frasePrezzo } from "@/lib/prezzo-locale";
 import { fraseFreschezza } from "@/lib/freschezza-verdetto";
+import { titoloGlutine, type Glutine } from "@/lib/glutine";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 import { salvatoDa } from "@/lib/ricordo-salvato";
@@ -91,6 +92,8 @@ export type Venue = {
   percheTiPiacera?: string | null;
   // Requisiti della ricerca confermati, con la frase della recensione che li prova (proposta 18).
   requisiti?: { r: string; prova: string }[] | null;
+  // Proposta 91 "Per chi è celiaco": cosa dicono del senza glutine le recensioni Google lette (src/lib/glutine.ts).
+  glutine?: Glutine | null;
   // Frase di Google sul locale: si mostra, dichiarata, solo se il verdetto manca.
   editorialSummary?: string | null;
   // Proposta 45: stato da Google ("CLOSED_PERMANENTLY", "CLOSED_TEMPORARILY"), solo se noto.
@@ -1106,6 +1109,37 @@ export default function VenueSheet({
                 <p data-testid="prova-recensione" className="mt-2 scroll-mb-28 text-[13.5px] font-sans leading-snug text-[#3d4248]">
                   <span className={`${SERIF} italic text-[#141414]`}>«{venue.requisiti!.find((x) => x.r === provaAperta)!.prova}»</span>
                   <span className="text-text-muted"> · da una recensione su Google</span>
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Proposta 91 "Per chi è celiaco": solo per chi ha "Senza glutine" tra i gusti o lo cerca (il server manda il
+              campo solo allora). Cosa dicono le recensioni, con la frase copiata; mai "sicuro" o "adatto ai celiaci". */}
+          {venue.glutine && (
+            <div data-testid="glutine-scheda" data-stato={venue.glutine.stato} className="mt-3.5 text-[13.5px] font-sans leading-snug text-[#3d4248]">
+              <p className="flex flex-wrap items-center gap-x-1.5">
+                <b className="font-display font-semibold text-brand"><span aria-hidden>🌾</span> Senza glutine</b>
+                <span aria-hidden className="text-text-muted">·</span>
+                <span className={venue.glutine.stato === "attenzione" ? "font-semibold text-[#b3261e]" : ""}>
+                  {venue.glutine.stato === "bene" && <span aria-hidden className="text-success">✓ </span>}
+                  {venue.glutine.stato === "attenzione" && <span aria-hidden>⚠️ </span>}
+                  {titoloGlutine(venue.glutine)}
+                </span>
+              </p>
+              {venue.glutine.frase ? (
+                <p data-testid="glutine-frase" className="mt-1">
+                  <span className={`${SERIF} italic text-[#141414]`}>«{venue.glutine.frase}»</span>
+                  <span className="text-text-muted"> · da una recensione su Google</span>
+                </p>
+              ) : (
+                <p className="mt-0.5 flex items-center gap-2 text-text-muted">
+                  <span>Chiedi al locale prima di andare.</span>
+                  {telHref && (
+                    <a data-testid="glutine-chiama" href={telHref} onClick={() => signal("chiama")} className="inline-flex min-h-11 items-center gap-1 font-display font-semibold text-brand">
+                      <Phone size={14} aria-hidden /> Chiama
+                    </a>
+                  )}
                 </p>
               )}
             </div>

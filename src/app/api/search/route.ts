@@ -15,6 +15,7 @@ import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteForChicche, demoteMainstream, demoteTouristTraps, lowerMassFromTop, massPredicate } from "@/lib/mainstream";
 import { amatiValidi, fraseDiceTipo, suPerGusti } from "@/lib/tipi-locale";
 import { gustiPerRicerca, gustiValidi, inFondoPerGusti } from "@/lib/gusti";
+import { glutineDalleRecensioni, glutineRichiesto, type Glutine } from "@/lib/glutine";
 import { pulisciMappa, scopertaPer } from "@/lib/mappa-gusto";
 import { demoteOffType } from "@/lib/off-type";
 import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType, stripMood } from "@/lib/named-city";
@@ -673,6 +674,24 @@ ESEMPI (input → output atteso):
   // Un locale = un solo oggetto completo: fonde la sintesi nei risultati,
   // sostituisce reviewTexts (server-only) con le recensioni selezionate per la scheda.
   // Nel ramo saved `sintesi` è {}, quindi i campi editoriali risultano null.
+  // Proposta 91 "Per chi è celiaco": solo per chi ha "Senza glutine" tra i gusti (e non l'ha spento per questa
+  // conversazione) o lo scrive nella ricerca. Regole sulle 5 recensioni già arrivate: zero chiamate in più.
+  const dieteFinali = ((await profiloPromise)?.diete ?? []).filter((d) => !strings(body?.skipGusti).includes(d));
+  const glutine: Record<string, Glutine> = {};
+  if (source === "world" && glutineRichiesto(query, dieteFinali)) {
+    for (const p of risultati) {
+      const g = glutineDalleRecensioni(p.reviewItems ?? (p.reviewTexts ?? []).map((text) => ({ text, rating: null })));
+      if (g) glutine[p.id] = g;
+    }
+    // La ricerca chiede il senza glutine e una recensione mette in guardia: in fondo, mai escluso (regola sui requisiti espliciti).
+    if (glutineRichiesto(query, [])) {
+      const giu = risultati.filter((p) => glutine[p.id]?.stato === "attenzione");
+      if (giu.length > 0 && giu.length < risultati.length) {
+        risultati = [...risultati.filter((p) => glutine[p.id]?.stato !== "attenzione"), ...giu];
+        console.log(`[search-glutine] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo ${giu.length} locali (una recensione mette in guardia): ${JSON.stringify(giu.map((p) => p.name))}`);
+      }
+    }
+  }
   const risultatiFinali = risultati.filter((p) => !esclusi.includes(p.id)).map((p) => {
     const s = sintesi[p.id];
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -692,6 +711,7 @@ ESEMPI (input → output atteso):
       // "✓ terrazza": solo quelli confermati dall'AI (ricerca con i filtri, verdetti subito); nel
       // primo tempo arrivano con i verdetti, da /api/search/synthesis.
       requisiti: s?.requisiti?.length ? s.requisiti : null,
+      ...(glutine[p.id] ? { glutine: glutine[p.id] } : {}),
       // Da quante recensioni parla il verdetto (proposta 67): solo se c'è il verdetto.
       ...(s?.verdict && s.recensioniN ? { recensioniN: s.recensioniN, recensioneUltima: s.recensioneUltima } : {}),
       // Dati Google firmati per il catalogo condiviso: /api/places/add accetta solo questi
