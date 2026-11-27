@@ -254,6 +254,33 @@ export default function VenueSheet({
   // passando a un altro con "‹ ›" non si apre lì.
   // "Come lo sai?" (proposta 18): quale ✓ mostra la sua frase di recensione.
   const [provaAperta, setProvaAperta] = useState<string | null>(null);
+  // Segnali sotto il nome: oltre 2 righe passano a una riga che scorre (si misura quando arrivano, per locale).
+  const segnaliRef = useRef<HTMLDivElement>(null);
+  const [segnaliScorre, setSegnaliScorre] = useState(false);
+  const [segnaliDi, setSegnaliDi] = useState(venue.id);
+  if (segnaliDi !== venue.id) { setSegnaliDi(venue.id); setSegnaliScorre(false); }
+  useEffect(() => {
+    const el = segnaliRef.current;
+    if (!el || segnaliScorre) return;
+    const misura = () => {
+      const kids = Array.from(el.children) as HTMLElement[];
+      if (kids.length < 2) return;
+      // Righe vere: un elemento apre una riga nuova se comincia sotto il fondo della riga prima (pillole e riquadro
+      // alti diversi, centrati, non hanno lo stesso offsetTop).
+      let righe = 0, fondo = -Infinity;
+      for (const k of [...kids].sort((a, b) => a.offsetTop - b.offsetTop)) {
+        if (k.offsetHeight === 0) continue;
+        if (k.offsetTop >= fondo - 2) { righe++; fondo = k.offsetTop + k.offsetHeight; } else fondo = Math.max(fondo, k.offsetTop + k.offsetHeight);
+      }
+      if (righe > 2) setSegnaliScorre(true);
+    };
+    misura();
+    const ro = new ResizeObserver(misura);
+    ro.observe(el);
+    const mo = new MutationObserver(misura);
+    mo.observe(el, { childList: true, subtree: true });
+    return () => { ro.disconnect(); mo.disconnect(); };
+  }, [segnaliScorre, venue.id]);
   // Proposta 91 "Per chi è celiaco": bocciata due volte il 27/11 (7,5 e 7,5), corretta e spenta per tutti
   // finché un revisore nuovo non la approva: si accende con ?beta=celiaco.
   const glutineScheda = useOptIn("celiaco") ? venue.glutine ?? null : null;
@@ -1029,7 +1056,14 @@ export default function VenueSheet({
           )}
           {/* Semplificare (20/10): i segnali brevi in UNA riga di pillole, non una riga ciascuno.
               Il contenitore sparisce se nessuno ha niente da dire (PostoLocale e BuoniPastoRiga arrivano dopo). */}
-          <div data-testid="segnali-scheda" className="mt-2.5 flex flex-wrap items-center gap-1.5 empty:hidden">
+          {/* Voce "Semplificare" (27/11): oltre 2 righe (fino a 132 px a 360 con prezzo, "c'è posto", aperto da poco e 👍)
+              i segnali diventano una riga sola che scorre di lato, come le pillole di Places. */}
+          <div
+            ref={segnaliRef}
+            data-testid="segnali-scheda"
+            data-scorre={segnaliScorre ? "1" : undefined}
+            className={`mt-2.5 flex items-center gap-1.5 empty:hidden ${segnaliScorre ? "-mx-[22px] snap-x flex-nowrap overflow-x-auto px-[22px] pb-0.5 [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden" : "flex-wrap"}`}
+          >
             {gem && (
               <span data-testid="gemma" className="inline-flex rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
                 💎 Poco conosciuto

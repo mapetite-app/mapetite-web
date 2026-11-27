@@ -13050,6 +13050,50 @@ else {
   await ac.close();
 }
 // FINE-ACCESSO-APPLE
+// SEGNALI-SCORRONO (Semplificare, 27/11): oltre 2 righe i segnali della scheda diventano una riga che scorre
+{
+  console.log("\n— Segnali della scheda in una riga —");
+  const sc = await browser.newContext({ viewport: { width: 360, height: 640 }, deviceScaleFactor: 2 });
+  await sc.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
+  await sc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await sc.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+  for (const t of ["saved_places", "place_synthesis", "profiles"]) await sc.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+  const S1 = mk("S1", "Osteria Piena", 41.888, 12.53, { category: "restaurant", types: ["restaurant"], rating: 4.7, userRatingCount: 140 });
+  const S2 = mk("S2", "Osteria Due Segnali", 41.889, 12.531, { category: "restaurant", types: ["restaurant"] });
+  await sc.route("**/api/search", (r) => r.fulfill({ json: { risultati: [S1, S2], filtri_usati: { categoria: "ristorante", parole_chiave: [], vicino_a_me: false, zona: "Roma" }, sintesi_pendente: null } }));
+  await sc.route("**/api/search/synthesis", (r) => r.fulfill({ json: { dettagli: {}, esclusi: [] } }));
+  const dal = new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10);
+  await sc.route("**/api/ristoratore/serate**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "S1" ? { verificato: true, giorni: [1, 2, 4], at: new Date().toISOString(), apertoDal: dal, prezzo: { min: 25, max: 35, bevande: true } } : { verificato: false, giorni: [], at: null } }));
+  await sc.route("**/rest/v1/rpc/buoni_pasto_conteggio**", (r) => r.fulfill({ json: r.request().postDataJSON()?.p_place === "S1" ? [{ si: 3, no: 0 }] : [{ si: 3, no: 0 }] }));
+  await sc.route("**/api/places/visite**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "S1" ? { persone: 6, piaciuto: 5 } : { persone: 0, piaciuto: 0 } }));
+  await sc.route("**/rest/v1/rpc/spesa_testa_fascia**", (r) => r.fulfill({ json: [{ fascia: 2, risposte: 5 }] }));
+  const sp = await sc.newPage();
+  const serr = []; sp.on("pageerror", (e) => serr.push(e.message));
+  const apriS = async (nome) => {
+    await sp.goto(`${BASE}/mappa?q=${encodeURIComponent("osteria a Roma")}&at=41.888,12.53`, { waitUntil: "networkidle" });
+    const card = sp.locator("ul.snap-x li").filter({ hasText: nome }).first();
+    await card.click();
+    if (!(await sp.locator("h2", { hasText: nome }).isVisible().catch(() => false))) { await sp.waitForTimeout(500); await card.click(); }
+    await sp.locator("h2", { hasText: nome }).waitFor({ timeout: 6000 });
+    await sp.waitForTimeout(1500);
+  };
+  await apriS("Osteria Piena");
+  { const seg = sp.getByTestId("segnali-scheda");
+    const m = await seg.evaluate((el) => ({ h: el.getBoundingClientRect().height, sw: el.scrollWidth, cw: el.clientWidth, n: el.children.length, scorre: el.dataset.scorre ?? null, ox: getComputedStyle(el).overflowX }));
+    ok(m.n >= 4 && m.scorre === "1" && m.h <= 52 && m.sw > m.cw && m.ox === "auto", `segnali: con ${m.n} segnali a 360 px una riga sola che scorre (${Math.round(m.h)} px, ${m.sw}/${m.cw})`);
+    const w = await sp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 360, `segnali: la pagina non scorre di lato (${w})`);
+    await seg.evaluate((el) => { el.scrollLeft = el.scrollWidth; });
+    const ultimo = await seg.evaluate((el) => { const k = el.lastElementChild.getBoundingClientRect(); return k.right <= 360 + 1 && k.left >= 0; });
+    ok(ultimo, "segnali: scorrendo si arriva all'ultimo segnale, intero");
+    await seg.evaluate((el) => { el.scrollLeft = 0; }); }
+  await sp.screenshot({ path: `${OUT}/92a-segnali-scorrono-360.png` });
+  await apriS("Osteria Due Segnali");
+  { const m = await sp.getByTestId("segnali-scheda").evaluate((el) => ({ n: el.children.length, scorre: el.dataset.scorre ?? null, wrap: getComputedStyle(el).flexWrap }));
+    ok(m.scorre === null && m.wrap === "wrap", `segnali: con pochi segnali restano come prima, a capo (${m.n} segnali)`); }
+  ok(serr.length === 0, `segnali: nessun errore nella pagina (${serr.join(" | ").slice(0, 200)})`);
+  await sc.close();
+}
+// FINE-SEGNALI-SCORRONO
 // CELIACO (proposta 91): "🌾 Senza glutine" in scheda, dalle recensioni Google lette, solo frasi copiate
 {
   console.log("\n— Per chi è celiaco (proposta 91) —");
