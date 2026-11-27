@@ -1,0 +1,51 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+body,.screen{background:#0f2427;color:#fff}
+.map{position:absolute;left:0;right:0;top:0;height:470px}
+.glass{background:rgba(22,48,51,.66);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.10);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.top{position:absolute;top:56px;left:16px;right:16px;display:flex;justify-content:space-between;align-items:center}
+.seg{display:flex;padding:4px;border-radius:999px;font-size:13px;font-weight:600}
+.seg span{padding:7px 16px;border-radius:999px;color:rgba(255,255,255,.65);display:flex;gap:6px;align-items:center}
+.seg .on{background:#fff;color:var(--brand)}
+.rb{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:18px}
+.pin{position:absolute}
+.pin>div{width:38px;height:38px;border-radius:50%;border:2.5px solid #2f6a70;box-shadow:0 4px 12px rgba(0,0,0,.4);--es:18px}
+.pin.v>div{border-color:#fff}
+.pin.v::after{content:"";position:absolute;right:-3px;bottom:-2px;width:16px;height:16px;border-radius:50%;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%231a3c40' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/11px no-repeat}
+.leg{position:absolute;top:418px;left:16px;display:flex;gap:12px;font-size:11.5px;color:rgba(255,255,255,.75);padding:6px 12px;border-radius:999px}
+.leg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.sheet{position:absolute;left:0;right:0;top:456px;bottom:0;background:#0b1719;border-radius:26px 26px 0 0;border-top:1px solid rgba(255,255,255,.08);padding:10px 16px 0;box-shadow:0 -10px 30px rgba(0,0,0,.4)}
+.grab{width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,.25);margin:0 auto 12px}
+.sh{display:flex;justify-content:space-between;align-items:baseline}
+.sh b{font-family:var(--display);font-weight:600;font-size:21px}
+.sh span{font-size:13px;color:rgba(255,255,255,.55)}
+.ch{display:flex;gap:8px;margin-top:12px}
+.ch span{padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);font-size:12.5px;font-weight:500;white-space:nowrap}
+.ch .on{background:var(--accent);border-color:var(--accent)}
+.it{display:flex;gap:12px;align-items:center;margin-top:14px}
+.it .ph,.it .crop{width:52px;height:52px;border-radius:14px;--es:24px;flex:none}
+.it b{font-family:var(--display);font-weight:600;font-size:15px;display:block}
+.it span{font-size:12.5px;color:rgba(255,255,255,.6)}
+.it .st{margin-left:auto;font-size:11.5px;font-weight:600;padding:5px 9px;border-radius:999px}
+.st.p{background:rgba(47,106,112,.35);color:#9fd3d6}.st.ok{background:rgba(34,160,107,.18);color:#5fd39f}
+</style></head><body><div class="screen">
+<div class="map" data-map="dark" data-seed="41" data-river=".3" data-labels="MONTI,250,190|TESTACCIO,60,380|PIGNETO,300,330"></div>
+<div data-sb="dark"></div>
+<div class="top"><div class="seg glass"><span class="on"><i data-i="map"></i>Mappa</span><span><i data-i="list"></i>Lista</span></div><div class="rb glass"><i data-i="search"></i></div></div>
+<div class="pin" style="left:44px;top:140px"><div data-crop="pin3"></div></div>
+<div class="pin v" style="left:150px;top:128px"><div class="ph ph-coffee" data-e="🥐"></div></div>
+<div class="pin" style="left:300px;top:150px"><div data-crop="pin2"></div></div>
+<div class="pin" style="left:226px;top:220px"><div class="ph ph-trat" data-e="🍝"></div></div>
+<div class="pin v" style="left:96px;top:250px"><div class="ph ph-cocktail" data-e="🍸"></div></div>
+<div class="pin" style="left:322px;top:262px"><div class="ph ph-wine" data-e="🍷"></div></div>
+<div class="pin" style="left:170px;top:318px"><div class="ph ph-pizza" data-e="🍕"></div></div>
+<div class="pin v" style="left:262px;top:345px"><div data-crop="pin4"></div></div>
+<div class="pin" style="left:30px;top:330px"><div class="ph ph-green" data-e="🥗"></div></div>
+<div class="leg glass"><span><i style="background:#2f6a70;border:1.5px solid #5aa"></i>Da provare</span><span><i style="background:#fff"></i>Ci sono stato</span></div>
+<div class="sheet"><div class="grab"></div>
+ <div class="sh"><b>I tuoi posti</b><span>27 · Roma</span></div>
+ <div class="ch"><span class="on">Tutti</span><span>🌙 Romantici</span><span>🍸 Aperitivi</span><span>🧳 Milano</span></div>
+ <div class="it"><div class="ph ph-trat" data-e="🍝"></div><div><b>Trattoria Sora Nella</b><span>Testaccio · 1,2 km</span></div><span class="st p">Da provare</span></div>
+ <div class="it"><div class="ph ph-cocktail" data-e="🍸"></div><div><b>Bar Clivio</b><span>Monti · 400 m</span></div><span class="st ok">✓ Ci sono stato</span></div>
+</div>
+<div data-tabs="Salvati" data-mode="dark"></div><div class="home-ind l"></div>
+</div><script src="base.js"></script></body></html>

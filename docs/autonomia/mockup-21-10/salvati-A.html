@@ -1,0 +1,43 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+body,.screen{background:var(--paper)}
+.hd{position:absolute;top:62px;left:20px;right:20px}
+.hd .k{color:var(--muted);font-size:10.5px}
+.hd h1{font-family:var(--serif);font-weight:400;font-size:42px;letter-spacing:-.02em;line-height:1;margin-top:6px}
+.hd .ic{position:absolute;right:0;top:4px;display:flex;gap:10px}
+.hd .ic div{width:38px;height:38px;border-radius:50%;border:1px solid #ddd5c8;display:grid;place-items:center;font-size:17px;color:var(--text)}
+.tabs2{position:absolute;top:166px;left:20px;right:20px;display:flex;gap:22px;border-bottom:1px solid #e3ddd2;font-size:15px}
+.tabs2 span{padding-bottom:10px;color:var(--muted);font-weight:500}
+.tabs2 .on{color:var(--text);font-weight:600;border-bottom:2px solid var(--accent);margin-bottom:-1px}
+.tabs2 sup{font-size:11px;margin-left:3px;color:var(--muted)}
+.lab{position:absolute;left:20px;font-size:10.5px;color:var(--muted)}
+.grid{position:absolute;top:240px;left:16px;right:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cv{height:150px;border-radius:18px;position:relative;--es:50px}
+.cv::after{top:34%;left:66%}
+.cv .t{position:absolute;left:13px;bottom:11px;right:10px;z-index:3;color:#fff}
+.cv .t b{display:block;font-family:var(--serif);font-weight:500;font-size:20px;line-height:1.05;letter-spacing:-.01em}
+.cv .t span{font-size:12px;opacity:.85}
+.cv .g{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(0,0,0,.65));z-index:2;border-radius:18px}
+.list{position:absolute;top:592px;left:20px;right:20px}
+.it{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #ece6dc}
+.it .ph,.it .crop{width:50px;height:50px;border-radius:12px;--es:24px;flex:none}
+.it b{font-family:var(--serif);font-weight:500;font-size:18px;display:block;letter-spacing:-.01em}
+.it span{font-size:12.5px;color:var(--muted);display:flex;gap:5px;align-items:center}
+.it .r{margin-left:auto;color:var(--muted)}
+</style></head><body><div class="screen">
+<div data-sb=""></div>
+<div class="hd"><div class="caps k">27 posti · Roma e Milano</div><h1>I tuoi posti</h1><div class="ic"><div><i data-i="map"></i></div><div><i data-i="plus"></i></div></div></div>
+<div class="tabs2"><span class="on">Da provare<sup>18</sup></span><span>Ci sono stato<sup>9</sup></span></div>
+<div class="lab caps" style="top:214px">Raccolte</div>
+<div class="grid">
+ <div class="cv" data-crop="roof-right"><div class="g"></div><div class="t"><b>Cene romantiche</b><span>6 posti</span></div></div>
+ <div class="cv ph ph-cocktail" data-e="🍸"><div class="g"></div><div class="t"><b>Aperitivi</b><span>9 posti</span></div></div>
+ <div class="cv ph ph-pizza" data-e="🍕"><div class="g"></div><div class="t"><b>Weekend a Milano</b><span>5 posti</span></div></div>
+ <div class="cv ph ph-coffee" data-e="🥐"><div class="g"></div><div class="t"><b>Colazioni</b><span>4 posti</span></div></div>
+</div>
+<div class="lab caps" style="top:566px">Ultimi salvati</div>
+<div class="list">
+ <div class="it"><div class="ph ph-wine" data-e="🍷"></div><div><b>Vineria Ombretta</b><span><i data-i="reel"></i>Pigneto · da un reel</span></div><i data-i="chev" class="r"></i></div>
+ <div class="it" style="border:0"><div class="ph ph-trat" data-e="🍝"></div><div><b>Osteria del Cardo</b><span>Monti · consigliato da Marta</span></div><i data-i="chev" class="r"></i></div>
+</div>
+<div data-tabs="Salvati" data-mode="paper"></div><div class="home-ind"></div>
+</div><script src="base.js"></script></body></html>

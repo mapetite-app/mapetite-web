@@ -1,0 +1,40 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+body,.screen{background:#0f2427;color:#fff}
+.map{position:absolute;inset:0}
+.top{position:absolute;top:56px;left:16px;right:16px;display:flex;justify-content:space-between;align-items:center;z-index:5}
+.logo{font-family:var(--display);font-weight:600;font-size:18px;display:flex;gap:6px;align-items:center;text-shadow:0 2px 10px rgba(0,0,0,.4)}
+.glass{background:rgba(22,48,51,.66);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.10);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.seg{display:flex;padding:4px;border-radius:999px;font-size:12.5px;font-weight:600}
+.seg span{padding:6px 12px;border-radius:999px;color:rgba(255,255,255,.65)}
+.seg .on{background:#fff;color:var(--brand)}
+.pin{position:absolute}
+.pin>div{width:40px;height:40px;border-radius:50%;border:2.5px solid #2f6a70;box-shadow:0 4px 12px rgba(0,0,0,.4);--es:20px}
+.pin.new>div{width:50px;height:50px;border-color:var(--accent);box-shadow:0 0 0 6px rgba(255,107,74,.18),0 0 26px rgba(255,107,74,.6)}
+.pin.new::after{content:"Nuovo";position:absolute;left:50%;top:56px;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:6px;font-family:var(--display)}
+.me{position:absolute;left:196px;top:420px;width:18px;height:18px;border-radius:50%;background:#4ea8ff;border:3px solid #fff;box-shadow:0 0 0 10px rgba(78,168,255,.18)}
+.sugg{position:absolute;left:16px;right:16px;bottom:186px;border-radius:22px;padding:12px;display:flex;gap:12px;align-items:center}
+.sugg .ph,.sugg .crop{width:66px;height:66px;border-radius:15px;flex:none;--es:32px}
+.sugg .k{font-size:10px;color:#ffb3a1;display:flex;gap:5px;align-items:center}
+.sugg .n{font-family:var(--display);font-weight:600;font-size:16.5px;margin-top:3px}
+.sugg .m{font-size:12.5px;color:rgba(255,255,255,.7);margin-top:1px}
+.sugg .sv{margin-left:auto;width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(255,255,255,.6);display:grid;place-items:center;font-size:16px;flex:none}
+.chips{position:absolute;left:16px;right:0;bottom:162px;display:flex;gap:8px;display:none}
+.sbar{position:absolute;left:16px;right:16px;bottom:100px;height:58px;border-radius:20px;display:flex;align-items:center;gap:11px;padding:0 8px 0 18px;font-size:16px;color:rgba(255,255,255,.7);background:rgba(255,255,255,.12);backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,.18)}
+.sbar .mic{margin-left:auto;width:42px;height:42px;border-radius:14px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:19px}
+</style></head><body><div class="screen">
+<div class="map" data-map="dark" data-seed="23" data-river=".18" data-labels="TRASTEVERE,40,520|MONTI,270,300|TESTACCIO,120,640|PIGNETO,300,470"></div>
+<div data-sb="dark"></div>
+<div class="top"><div class="logo"><i data-i="pin" class="spark"></i>mapetite</div><div class="seg glass"><span class="on">Stasera</span><span>Da provare</span><span>Tutti</span></div></div>
+<div class="pin" style="left:60px;top:170px"><div data-crop="pin3"></div></div>
+<div class="pin" style="left:300px;top:150px"><div data-crop="pin2"></div></div>
+<div class="pin" style="left:230px;top:250px"><div class="ph ph-trat" data-e="🍝"></div></div>
+<div class="pin" style="left:120px;top:330px"><div class="ph ph-coffee" data-e="🥐"></div></div>
+<div class="pin" style="left:320px;top:360px"><div class="ph ph-wine" data-e="🍷"></div></div>
+<div class="pin" style="left:40px;top:430px"><div data-crop="pin4"></div></div>
+<div class="pin new" style="left:150px;top:200px"><div class="ph ph-pizza" data-e="🍕"></div></div>
+<div class="pin new" style="left:250px;top:430px"><div class="ph ph-cocktail" data-e="🍸"></div></div>
+<div class="me"></div>
+<div class="sugg glass"><div class="ph ph-trat" data-e="🍝"></div><div><div class="caps k"><i data-i="spark"></i>Per te stasera</div><div class="n">Trattoria Sora Nella</div><div class="m">Testaccio · 1,2 km · €€</div><div class="m" style="color:#ffb3a1">Di quartiere, come piace a te</div></div><div class="sv"><i data-i="bookmark"></i></div></div>
+<div class="sbar"><i data-i="spark" class="spark" style="font-size:20px"></i>Cosa cerchi?<div class="mic"><i data-i="mic"></i></div></div>
+<div data-tabs="Mappa" data-mode="dark"></div><div class="home-ind l"></div>
+</div><script src="base.js"></script></body></html>
