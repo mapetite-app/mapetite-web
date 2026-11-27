@@ -1880,6 +1880,7 @@ await shot("15-scheda-b");
   await page.waitForTimeout(300);
   await shot("15b-confronto-scheda");
   await mp.click();
+  await page.waitForTimeout(300); // l'evento parte dopo il tocco: senza attesa il controllo a volte arrivava prima
   ok(await page.getByTestId("scheda-tab-recensioni").getAttribute("aria-selected") === "true", "confronto: tocco su Mapetite → resta nelle Recensioni (scende alla community)");
   ok(events.some((e) => e.props?.nome === "confronto_fonte" && e.props?.contesto === "mapetite" && e.props?.stato === "voti"), "confronto: tocco su Mapetite registrato");
   // Locale senza dati Google nella scheda (come i salvati): la riga Google è solo il link.

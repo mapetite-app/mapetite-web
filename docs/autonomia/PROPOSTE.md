@@ -50,7 +50,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google Ask Maps cerca nei salvati di una sola persona (`COMPETITOR.md`, 26/11); Beli confronta i gusti con il "Match Score", Corner e Mapstr mostrano le liste degli amici. Nessuno incrocia i salvati di un gruppo per dire dove andare insieme. È gusto condiviso, non popolarità: conta quanti del gruppo lo vogliono, non quante recensioni ha.
 - **Valore per l'utente:** la tavolata decisa partendo da posti che piacciono già, in un minuto. **Per il ristoratore:** gruppi che arrivano già convinti; dopo, nel pannello, "Proposto in 4 liste di gruppo" (solo conteggi da 3 in su).
 - **Sforzo:** S/M (salvataggi e membri dei gruppi già nel database; una query lato server, una riga nella vista del gruppo; revisione di privacy: i salvati dei membri non lasciano il server, si mostrano solo quelli in comune, come "In comune" sul profilo). **Costo Google/Haiku:** zero (foto nella quota di 200, altrimenti emoji).
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **FATTA il 27/11 notte, accesa** (secondo revisore 8,7): "Già salvati da più di voi", solo numeri, solo profili pubblici, conta solo il proprio "Non fa per me" (migrazione `20261127_in_comune_gruppo`).
 
 ### 89. "Le feste si prenotano adesso": dal 1 al 20 dicembre, i tuoi 3 posti per la tavolata
 - **Problema:** `PROBLEMI.md` 36: le tavolate di Natale si prenotano circa un mese prima e a metà dicembre i posti sono pieni (Zero, Gambero Rosso). Chi aspetta trova tutto esaurito.
@@ -66,7 +66,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** la 86 è stata fermata perché le recensioni non bastano; il prezzo detto dal locale era la strada indicata. TheFork mostra le offerte dei locali, ma non a chi li aveva già salvati.
 - **Valore per l'utente:** sa quanto spende prima di proporlo al gruppo. **Per il ristoratore:** il menu delle feste davanti a chi lo vuole già provare; il primo motivo concreto per verificare il locale a dicembre.
 - **Sforzo:** S/M (una tabella piccola o colonne nel profilo del locale verificato, un modulo nel pannello, una riga nella scheda). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA (serve almeno un locale verificato per vederla dal vivo; in demo con il locale di prova). **Costruita il 26/11 sera:** pannello (giorni, prezzo a persona, bevande; i gruppi tolti dopo il primo revisore per tenere corta la riga) e riga nel riquadro unico del titolare sulla scheda e sulla pagina pubblica, al posto del prezzo di tutti i giorni finché restano giorni delle feste. Migrazione `20261126_menu_feste`.
+- **Stato proposto:** PRONTA (serve almeno un locale verificato per vederla dal vivo; in demo con il locale di prova). **Costruita il 26/11 sera:** pannello (giorni, prezzo a persona, bevande; i gruppi tolti dopo il primo revisore per tenere corta la riga) e riga nel riquadro unico del titolare sulla scheda e sulla pagina pubblica, al posto del prezzo di tutti i giorni finché restano giorni delle feste. Migrazione `20261126_menu_feste`. **Accesa per tutti il 27/11** (quarto revisore 8,6).
 
 ## 25/11/2026 (mercoledì, CEO che chiude — tema: cene che devono valere la pena, e il riepilogo dell'anno)
 
