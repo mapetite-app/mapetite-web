@@ -13057,6 +13057,14 @@ else {
     ok(r?.n === 2 && gl.titoloGlutine(r) === "2 recensioni ne parlano bene", `celiaco: conta le recensioni che ne parlano bene (${r && gl.titoloGlutine(r)})`); }
   { const lunga = "Siamo stati qui sabato sera con amici e abbiamo provato molte cose del menu: tra tutte la pizza senza glutine è stata ottima, croccante e leggera, servita con grande cura e attenzione.";
     const r = g([{ text: lunga, rating: 5 }]); ok(r?.stato === "bene" && r.frase.length <= 142 && /glutine/.test(r.frase) && lunga.includes(r.frase.replace(/^…|…$/g, "")), `celiaco: frase lunga tagliata attorno alla parola, copiata (${r?.frase})`); }
+  // Prova vera del 27/11 (40 locali di Roma e Milano): i casi che sbagliava la prima versione.
+  ok(g([{ text: "Per chi deve mangiare senza glutine è un sogno: mangiare in totale tranquillità, senza preoccuparsi di contaminazioni.", rating: 5 }])?.stato !== "attenzione", "celiaco: 'senza preoccuparsi di contaminazioni' non è un avviso");
+  { const r = g([{ text: "Pizza senza glutine buonissima, molto curata.", rating: 5 }, { text: "Ho chiesto conferma. Infatti era un pane normale con il glutine !", rating: 1 }]);
+    ok(r?.stato === "attenzione" && r.voto === 1 && r.frase === "Infatti era un pane normale con il glutine !" && gl.titoloGlutine(r) === "Una recensione da 1 stella ne parla", `celiaco: una recensione da 1 stella che ne parla vince sul ✓, con la frase del fatto (${r && gl.titoloGlutine(r)}: ${r?.frase})`); }
+  ok(g([{ text: "Dichiarano di essere gluten free, ma non hanno due cucine separate.", rating: 3 }])?.stato === "attenzione", "celiaco: 'non hanno due cucine separate' mette in guardia");
+  ok(g([{ text: "Dovevo venire con la mia ragazza celiaca ma purtroppo ha avuto un problema.", rating: 5 }, { text: "Pizza senza glutine buona mentre quella classica non mi è piaciuta.", rating: 3 }])?.frase?.startsWith("Pizza senza glutine"), "celiaco: per 'ne parla' la frase sulla cosa, non sulla persona");
+  { const f = "Grazie davvero per il bellissimo pranzo e soprattutto per l'emozione provata nel gustare i fritti e la cacio e pepe senza glutine, bravissimi tutti quanti voi!";
+    const r = g([{ text: f, rating: 5 }]); ok(r?.frase?.endsWith("bravissimi tutti quanti voi!") && /senza glutine/.test(r.frase), `celiaco: frase lunga che finisce poco dopo la parola, presa fino alla fine (${r?.frase})`); }
   ok(gl.glutineRichiesto("pizzeria senza glutine a Monti", []) && gl.glutineRichiesto("trattoria", ["celiaco"]) && gl.glutineRichiesto("posto per celiaci", []) && !gl.glutineRichiesto("trattoria a Monti", ["vegano"]), "celiaco: la riga serve solo con il gusto o se la ricerca lo chiede");
   for (const st of ["bene", "attenzione", "ne-parla", "niente"]) ok(!/sicur|adatt/i.test(gl.titoloGlutine({ stato: st, frase: null, n: 1, lette: 5 })), `celiaco: '${st}' non dice mai 'sicuro' o 'adatto'`);
 
