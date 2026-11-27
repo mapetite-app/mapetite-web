@@ -254,6 +254,8 @@ export default function VenueSheet({
   // passando a un altro con "‹ ›" non si apre lì.
   // "Come lo sai?" (proposta 18): quale ✓ mostra la sua frase di recensione.
   const [provaAperta, setProvaAperta] = useState<string | null>(null);
+  // Proposta 91 (revisore 27/11): con la riga "🌾 Senza glutine" niente chip "✓ senza glutine" doppione (e mai un ✓ e un ⚠️ insieme).
+  const requisitiScheda = venue.glutine ? venue.requisiti?.filter((x) => !/glutin|celiac|gluten/i.test(x.r)) : venue.requisiti;
   // La frase si porta in vista SOLO quando si tocca un ✓ (prima ripartiva a ogni aggiornamento della scheda).
   useEffect(() => {
     if (!provaAperta) return;
@@ -784,7 +786,7 @@ export default function VenueSheet({
     )].slice(0, 2);
     // Nulla tra il verdetto e "Orari, contatti, recensioni": basta il filetto sotto il verdetto.
     const subitoDopoVerdetto = (headline != null || verdettoInArrivo || googleLine != null)
-      && (venue.requisiti?.length ?? 0) === 0 && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
+      && (requisitiScheda?.length ?? 0) === 0 && !venue.glutine && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
     const hasOverview =
       showSynthesisBelow || matchReasonBelow || hasTags || goForChips.length > 0 || dontExpectChips.length > 0;
     const hasReviewsTab = hasReviews || communitySlot != null;
@@ -1089,10 +1091,10 @@ export default function VenueSheet({
           )}
 
           {/* Requisiti della ricerca confermati: un tocco mostra la frase della recensione (copiata, mai riscritta). */}
-          {(venue.requisiti?.length ?? 0) > 0 && (
+          {(requisitiScheda?.length ?? 0) > 0 && (
             <div data-testid="requisiti-scheda" className="mt-3.5">
               <div className="flex flex-wrap gap-2">
-                {venue.requisiti!.map(({ r }) => (
+                {requisitiScheda!.map(({ r }) => (
                   <button
                     key={r}
                     type="button"
@@ -1105,9 +1107,9 @@ export default function VenueSheet({
                   </button>
                 ))}
               </div>
-              {provaAperta && venue.requisiti!.find((x) => x.r === provaAperta) && (
+              {provaAperta && requisitiScheda!.find((x) => x.r === provaAperta) && (
                 <p data-testid="prova-recensione" className="mt-2 scroll-mb-28 text-[13.5px] font-sans leading-snug text-[#3d4248]">
-                  <span className={`${SERIF} italic text-[#141414]`}>«{venue.requisiti!.find((x) => x.r === provaAperta)!.prova}»</span>
+                  <span className={`${SERIF} italic text-[#141414]`}>«{requisitiScheda!.find((x) => x.r === provaAperta)!.prova}»</span>
                   <span className="text-text-muted"> · da una recensione su Google</span>
                 </p>
               )}
@@ -1118,21 +1120,24 @@ export default function VenueSheet({
               campo solo allora). Cosa dicono le recensioni, con la frase copiata; mai "sicuro" o "adatto ai celiaci". */}
           {venue.glutine && (
             <div data-testid="glutine-scheda" data-stato={venue.glutine.stato} className="mt-3.5 text-[13.5px] font-sans leading-snug text-[#3d4248]">
-              <p className="flex flex-wrap items-center gap-x-1.5">
+              {/* Revisore 27/11: testo in linea (niente "·" orfano a fine riga quando va a capo). */}
+              <p>
                 <b className="font-display font-semibold text-brand"><span aria-hidden>🌾</span> Senza glutine</b>
-                <span aria-hidden className="text-text-muted">·</span>
                 <span className={venue.glutine.stato === "attenzione" ? "font-semibold text-[#b3261e]" : ""}>
+                  <span aria-hidden className="font-normal text-text-muted"> · </span>
                   {venue.glutine.stato === "bene" && <span aria-hidden className="text-success">✓ </span>}
                   {venue.glutine.stato === "attenzione" && <span aria-hidden>⚠️ </span>}
                   {titoloGlutine(venue.glutine)}
                 </span>
               </p>
-              {venue.glutine.frase ? (
+              {venue.glutine.frase && (
                 <p data-testid="glutine-frase" className="mt-1">
                   <span className={`${SERIF} italic text-[#141414]`}>«{venue.glutine.frase}»</span>
                   <span className="text-text-muted"> · da una recensione su Google</span>
                 </p>
-              ) : (
+              )}
+              {/* Chiama dove serve: senza notizie e con un avviso (revisore 27/11). */}
+              {(venue.glutine.stato === "niente" || venue.glutine.stato === "attenzione") && (
                 <p className="mt-0.5 flex items-center gap-2 text-text-muted">
                   <span>Chiedi al locale prima di andare.</span>
                   {telHref && (
@@ -1150,7 +1155,7 @@ export default function VenueSheet({
         {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} className="mx-[22px] mt-4" />}
 
         {/* Le tue note (stato, Com'era, classifica, tag e nota): solo per i salvati, in vista. */}
-        {showPersonalBlock && personalBlock(true, true, (headline != null || verdettoInArrivo || googleLine != null) && (venue.requisiti?.length ?? 0) === 0 && !perTeLine && !friendsData)}
+        {showPersonalBlock && personalBlock(true, true, (headline != null || verdettoInArrivo || googleLine != null) && (requisitiScheda?.length ?? 0) === 0 && !venue.glutine && !perTeLine && !friendsData)}
 
         {/* Locale non salvato senza barra Salva (scheda dall'assistente): le due scelte rapide aprono Salva. */}
         {!isSaved && onQuickSave && !saveSlot && (

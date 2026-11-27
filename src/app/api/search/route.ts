@@ -134,6 +134,8 @@ export async function POST(request: Request) {
 
   // Il ramo saved aggiunge tags/note personali (assenti nel ramo world): campi opzionali.
   let risultati: (PlaceResult & { tags?: string[] | null; note?: string | null })[];
+  // Proposta 91: "🌾 Senza glutine" per locale (solo ricerca nel mondo, solo se serve).
+  const glutine: Record<string, Glutine> = {};
   // Chiamate Text Search fatte da questa ricerca (1, o 2 con la seconda ricerca): nel segnale "ricerca",
   // così il pannello dei numeri sa quanta quota Google si è usata oggi.
   let googleCalls = 0;
@@ -459,6 +461,24 @@ export async function POST(request: Request) {
       }
     }
 
+    // Proposta 91 "Per chi è celiaco": solo per chi ha "Senza glutine" tra i gusti (e non l'ha spento per questa
+    // conversazione) o lo scrive nella ricerca. Regole sulle 5 recensioni già arrivate: zero chiamate in più.
+    const dieteFinali = ((await profiloPromise)?.diete ?? []).filter((d) => !strings(body?.skipGusti).includes(d));
+    if (glutineRichiesto(query, dieteFinali)) {
+      for (const p of risultati) {
+        const g = glutineDalleRecensioni(p.reviewItems ?? (p.reviewTexts ?? []).map((text) => ({ text, rating: null })));
+        if (g) glutine[p.id] = g;
+      }
+      // La ricerca chiede il senza glutine e una recensione mette in guardia: in fondo, mai escluso (regola sui requisiti espliciti).
+      if (glutineRichiesto(query, [])) {
+        const giu = risultati.filter((p) => glutine[p.id]?.stato === "attenzione");
+        if (giu.length > 0 && giu.length < risultati.length) {
+          risultati = [...risultati.filter((p) => glutine[p.id]?.stato !== "attenzione"), ...giu];
+          console.log(`[search-glutine] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo ${giu.length} locali (una recensione mette in guardia): ${JSON.stringify(giu.map((p) => p.name))}`);
+        }
+      }
+    }
+
     if (risultati.length > 0 && fastPhase) {
       // Primo tempo: niente Haiku. Il client chiede i verdetti con i dati firmati.
       try {
@@ -674,24 +694,6 @@ ESEMPI (input → output atteso):
   // Un locale = un solo oggetto completo: fonde la sintesi nei risultati,
   // sostituisce reviewTexts (server-only) con le recensioni selezionate per la scheda.
   // Nel ramo saved `sintesi` è {}, quindi i campi editoriali risultano null.
-  // Proposta 91 "Per chi è celiaco": solo per chi ha "Senza glutine" tra i gusti (e non l'ha spento per questa
-  // conversazione) o lo scrive nella ricerca. Regole sulle 5 recensioni già arrivate: zero chiamate in più.
-  const dieteFinali = ((await profiloPromise)?.diete ?? []).filter((d) => !strings(body?.skipGusti).includes(d));
-  const glutine: Record<string, Glutine> = {};
-  if (source === "world" && glutineRichiesto(query, dieteFinali)) {
-    for (const p of risultati) {
-      const g = glutineDalleRecensioni(p.reviewItems ?? (p.reviewTexts ?? []).map((text) => ({ text, rating: null })));
-      if (g) glutine[p.id] = g;
-    }
-    // La ricerca chiede il senza glutine e una recensione mette in guardia: in fondo, mai escluso (regola sui requisiti espliciti).
-    if (glutineRichiesto(query, [])) {
-      const giu = risultati.filter((p) => glutine[p.id]?.stato === "attenzione");
-      if (giu.length > 0 && giu.length < risultati.length) {
-        risultati = [...risultati.filter((p) => glutine[p.id]?.stato !== "attenzione"), ...giu];
-        console.log(`[search-glutine] q=${JSON.stringify(query.trim().slice(0, 80))} in fondo ${giu.length} locali (una recensione mette in guardia): ${JSON.stringify(giu.map((p) => p.name))}`);
-      }
-    }
-  }
   const risultatiFinali = risultati.filter((p) => !esclusi.includes(p.id)).map((p) => {
     const s = sintesi[p.id];
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
