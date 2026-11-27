@@ -13078,17 +13078,23 @@ else {
     await sp.waitForTimeout(1500);
   };
   await apriS("Osteria Piena");
-  { const seg = sp.getByTestId("segnali-scheda");
-    const m = await seg.evaluate((el) => ({ h: el.getBoundingClientRect().height, sw: el.scrollWidth, cw: el.clientWidth, n: el.children.length, scorre: el.dataset.scorre ?? null, ox: getComputedStyle(el).overflowX }));
-    ok(m.n >= 4 && m.scorre === "1" && m.h <= 52 && m.sw > m.cw && m.ox === "auto", `segnali: con ${m.n} segnali a 360 px una riga sola che scorre (${Math.round(m.h)} px, ${m.sw}/${m.cw})`);
+  { const seg = sp.getByTestId("segnali-scheda"), corti = sp.getByTestId("segnali-corti");
+    const m = await seg.evaluate((el) => ({ h: el.getBoundingClientRect().height, scorre: el.dataset.scorre ?? null }));
+    const c = await corti.evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth, n: el.children.length, ox: getComputedStyle(el).overflowX, tab: el.tabIndex, label: el.getAttribute("aria-label") }));
+    ok(m.scorre === "1" && m.h <= 90 && c.n >= 3 && c.sw > c.cw && c.ox === "auto" && c.tab === 0 && !!c.label, `segnali: a 360 px il blocco scende da 132 a ${Math.round(m.h)} px, le ${c.n} pillole corte scorrono (${c.sw}/${c.cw}), raggiungibili da tastiera`);
+    // Revisore 27/11: il riquadro del titolare si legge intero, nella prima schermata.
+    const r = await sp.getByTestId("parola-locale").boundingBox().catch(() => null) ?? await sp.getByTestId("prezzo-locale").boundingBox();
+    ok(r != null && r.x >= 0 && r.x + r.width <= 360 && r.y + r.height <= 640 - 100, `segnali: il riquadro del titolare (prezzo e 'c'è posto') intero e in vista (${r && Math.round(r.x)}–${r && Math.round(r.x + r.width)} px, y ${r && Math.round(r.y)})`);
     const w = await sp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 360, `segnali: la pagina non scorre di lato (${w})`);
-    await seg.evaluate((el) => { el.scrollLeft = el.scrollWidth; });
-    const ultimo = await seg.evaluate((el) => { const k = el.lastElementChild.getBoundingClientRect(); return k.right <= 360 + 1 && k.left >= 0; });
+    const larghe = await corti.evaluate((el) => [...el.children].filter((k) => k.getBoundingClientRect().width > el.clientWidth).length);
+    ok(larghe === 0, "segnali: ogni pillola che scorre è più stretta dello schermo (si legge intera)");
+    await corti.evaluate((el) => { el.scrollLeft = el.scrollWidth; });
+    const ultimo = await corti.evaluate((el) => { const k = el.lastElementChild.getBoundingClientRect(); return k.right <= 360 + 1 && k.left >= 0; });
     ok(ultimo, "segnali: scorrendo si arriva all'ultimo segnale, intero");
-    await seg.evaluate((el) => { el.scrollLeft = 0; }); }
+    await corti.evaluate((el) => { el.scrollLeft = 0; }); }
   await sp.screenshot({ path: `${OUT}/92a-segnali-scorrono-360.png` });
   await apriS("Osteria Due Segnali");
-  { const m = await sp.getByTestId("segnali-scheda").evaluate((el) => ({ n: el.children.length, scorre: el.dataset.scorre ?? null, wrap: getComputedStyle(el).flexWrap }));
+  { const m = await sp.getByTestId("segnali-scheda").evaluate((el) => ({ n: el.querySelectorAll(":scope > * > *").length, scorre: el.dataset.scorre ?? null, wrap: getComputedStyle(el).flexWrap }));
     ok(m.scorre === null && m.wrap === "wrap", `segnali: con pochi segnali restano come prima, a capo (${m.n} segnali)`); }
   ok(serr.length === 0, `segnali: nessun errore nella pagina (${serr.join(" | ").slice(0, 200)})`);
   await sc.close();

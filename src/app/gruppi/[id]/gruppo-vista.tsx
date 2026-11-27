@@ -65,7 +65,7 @@ export default function GruppoVista({
   useEffect(() => {
     if (!appena) return;
     const el = document.querySelector(`[data-testid=gruppo-posto][data-place="${CSS.escape(appena)}"]`);
-    el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    el?.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
     const t = setTimeout(() => setAppena(null), 2200);
     return () => clearTimeout(t);
   }, [appena]);
@@ -276,7 +276,7 @@ export default function GruppoVista({
                   data-voti={p.voti}
                   data-place={p.place_id}
                   data-appena={appena === p.place_id ? "1" : undefined}
-                  className={`flex scroll-my-24 items-center gap-3 rounded-card border bg-white p-3 shadow-card transition-shadow duration-500 ${inTesta ? "border-accent" : "border-border"} ${appena === p.place_id ? "ring-2 ring-accent/60" : ""}`}
+                  className={`flex scroll-my-24 items-center gap-3 rounded-card border p-3 shadow-card transition-colors duration-700 ${inTesta ? "border-accent" : "border-border"} ${appena === p.place_id ? "bg-accent-light" : "bg-white"}`}
                 >
                   <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-accent-light text-xl">
                     {getCategoryEmoji(p.category, p.name)}

@@ -2,7 +2,7 @@
 
 import { tagLabel, isStateTag } from "@/lib/tags";
 import { Lock, X, Quote, Navigation, Globe, Phone, Check, Share, Share2, Footprints, CalendarCheck, Ellipsis, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck, ChevronRight, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SchedaVisitaContext, type SchedaVisita } from "@/components/scheda-visita";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import Link from "next/link";
@@ -259,11 +259,13 @@ export default function VenueSheet({
   const [segnaliScorre, setSegnaliScorre] = useState(false);
   const [segnaliDi, setSegnaliDi] = useState(venue.id);
   if (segnaliDi !== venue.id) { setSegnaliDi(venue.id); setSegnaliScorre(false); }
-  useEffect(() => {
+  // Prima misura prima di disegnare (niente fotogramma a 5 righe). Una volta che scorre resta così per quel locale
+  // (anche se un segnale sparisce o il telefono gira): niente salti avanti e indietro.
+  useLayoutEffect(() => {
     const el = segnaliRef.current;
     if (!el || segnaliScorre) return;
     const misura = () => {
-      const kids = Array.from(el.children) as HTMLElement[];
+      const kids = Array.from(el.querySelectorAll(":scope > * > *")) as HTMLElement[];
       if (kids.length < 2) return;
       // Righe vere: un elemento apre una riga nuova se comincia sotto il fondo della riga prima (pillole e riquadro
       // alti diversi, centrati, non hanno lo stesso offsetTop).
@@ -1057,31 +1059,43 @@ export default function VenueSheet({
           {/* Semplificare (20/10): i segnali brevi in UNA riga di pillole, non una riga ciascuno.
               Il contenitore sparisce se nessuno ha niente da dire (PostoLocale e BuoniPastoRiga arrivano dopo). */}
           {/* Voce "Semplificare" (27/11): oltre 2 righe (fino a 132 px a 360 con prezzo, "c'è posto", aperto da poco e 👍)
-              i segnali diventano una riga sola che scorre di lato, come le pillole di Places. */}
+              il riquadro del titolare resta intero su una riga sua e le pillole corte vanno in una riga che scorre di lato,
+              con la sfumatura a destra (revisore 27/11: il riquadro tagliato e fuori schermo non andava). Con pochi segnali
+              tutto come prima, a capo. Il riquadro del titolare viene per primo: è il segnale più utile. */}
           <div
             ref={segnaliRef}
             data-testid="segnali-scheda"
             data-scorre={segnaliScorre ? "1" : undefined}
-            className={`mt-2.5 flex items-center gap-1.5 empty:hidden ${segnaliScorre ? "-mx-[22px] snap-x flex-nowrap overflow-x-auto px-[22px] pb-0.5 [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden" : "flex-wrap"}`}
+            className={`mt-2.5 hidden gap-1.5 has-[>*>*]:flex ${segnaliScorre ? "flex-col" : "flex-wrap items-center"}`}
           >
-            {gem && (
-              <span data-testid="gemma" className="inline-flex rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
-                💎 Poco conosciuto
-              </span>
-            )}
-            {/* Aperto da poco (PROPOSTE.md, proposta 7): parola del titolare verificato, solo il primo anno. */}
-            <AperturaPillola info={infoLocale} />
-            {/* Prezzo a testa detto dal titolare verificato (PROPOSTE.md 65), separato dai € di Google; dal 1/11 al 6/1
-                il menu delle feste (PROPOSTE.md 90) prende il suo posto nello stesso riquadro. */}
-            <PrezzoLocale info={infoLocale} />
-            {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1).
-                Subito dopo il prezzo: le due frasi del titolare vicine, un solo "· dice il locale" (revisore 17/11). */}
-            <PostoPillola info={infoLocale} conPrezzo />
-            {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
-            <BuoniPastoRiga venueId={venue.id} category={category} />
-            {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3), con quanto ha speso a testa
-                (PROPOSTE.md 64, da 5 risposte, fascia scelta da almeno 2 senza pareggi) nella stessa pillola, anche se il locale dichiara il suo prezzo (due fonti, mai nascoste l'una dall'altra). */}
-            <VisiteMapetite venueId={googlePlaceId ?? venue.id} spesaId={venue.id} />
+            <div data-testid="segnali-titolare" className={segnaliScorre ? "flex flex-wrap items-center gap-1.5 empty:hidden" : "contents"}>
+              {/* Prezzo a testa detto dal titolare verificato (PROPOSTE.md 65), separato dai € di Google; dal 1/11 al 6/1
+                  il menu delle feste (PROPOSTE.md 90) prende il suo posto nello stesso riquadro. */}
+              <PrezzoLocale info={infoLocale} />
+              {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1).
+                  Subito dopo il prezzo: le due frasi del titolare vicine, un solo "· dice il locale" (revisore 17/11). */}
+              <PostoPillola info={infoLocale} conPrezzo />
+            </div>
+            <div
+              data-testid="segnali-corti"
+              role={segnaliScorre ? "group" : undefined}
+              aria-label={segnaliScorre ? "Altri segnali del locale, scorri di lato" : undefined}
+              tabIndex={segnaliScorre ? 0 : undefined}
+              className={segnaliScorre ? "-mx-[22px] flex flex-nowrap items-center gap-1.5 overflow-x-auto px-[22px] pb-0.5 [mask-image:linear-gradient(to_right,#000_82%,transparent)] [scrollbar-width:none] empty:hidden [&::-webkit-scrollbar]:hidden [&>*]:shrink-0" : "contents"}
+            >
+              {gem && (
+                <span data-testid="gemma" className="inline-flex rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
+                  💎 Poco conosciuto
+                </span>
+              )}
+              {/* Aperto da poco (PROPOSTE.md, proposta 7): parola del titolare verificato, solo il primo anno. */}
+              <AperturaPillola info={infoLocale} />
+              {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
+              <BuoniPastoRiga venueId={venue.id} category={category} />
+              {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3), con quanto ha speso a testa
+                  (PROPOSTE.md 64, da 5 risposte, fascia scelta da almeno 2 senza pareggi) nella stessa pillola, anche se il locale dichiara il suo prezzo (due fonti, mai nascoste l'una dall'altra). */}
+              <VisiteMapetite venueId={googlePlaceId ?? venue.id} spesaId={venue.id} />
+            </div>
           </div>
 
           {/* IL VERDETTO MAPETITE: in corsivo tra due filetti, come una citazione di rivista.
