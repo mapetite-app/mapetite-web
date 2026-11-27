@@ -10820,6 +10820,16 @@ else {
     const w = writes.filter((x) => x.t === "posti-POST");
     ok(w.length === prima + 1 && w.at(-1)?.body?.place_id === PL(4) && w.at(-1)?.body?.aggiunto_da === ME, "piace già a più di voi: 'Proponi' mette il posto nella lista a tuo nome");
     ok((await righe.count()) === 1 && (await gp.getByTestId("gruppo-posto").filter({ hasText: "Bistrot Quattro" }).count()) === 1, "piace già a più di voi: il posto proposto passa nella lista ed esce dalla riga");
+    // Minore della 88 (27/11 sera): dopo "Proponi" il posto nuovo è in vista e illuminato un attimo.
+    { const nuovo = gp.getByTestId("gruppo-posto").filter({ hasText: "Bistrot Quattro" });
+      const acceso = await nuovo.getAttribute("data-appena");
+      await gp.waitForTimeout(700);
+      const b = await nuovo.boundingBox();
+      ok(acceso === "1" && b != null && b.y >= 0 && b.y + b.height <= 844, `piace già a più di voi: dopo 'Proponi' il posto nuovo è in vista e illuminato (${b && Math.round(b.y)}px)`);
+      await gp.waitForTimeout(2000);
+      ok((await nuovo.getAttribute("data-appena")) === null, "piace già a più di voi: la luce sul posto nuovo si spegne da sola"); }
+    // Minore della 88: "Piace a Giulia e Marco · proposto da …" su due righe, non tagliata.
+    ok(await gp.getByTestId("gruppo-posto-chi").first().evaluate((el) => el.scrollHeight <= el.clientHeight + 1), "lista di gruppo: la riga 'Piace a … · proposto da …' non si taglia");
     ok(gEv.some((e) => e?.props?.nome === "gruppo_aggiungi" && e?.props?.fonte === "in_comune") || gEv.some((e) => JSON.stringify(e).includes("in_comune")), "piace già a più di voi: evento gruppo_aggiungi con fonte in_comune");
     await setCookie(gctx, "e2e_gruppi", dati);
   }
