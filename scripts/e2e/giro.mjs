@@ -8255,11 +8255,8 @@ else {
       // Revisore 26/11: con prezzo a testa e "c'è posto" resta UN riquadro del titolare, un solo "dice il locale", al massimo 3 righe.
       await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: true, giorni: [g], at: new Date().toISOString(), prezzo: { min: 25, max: 35, bevande: false }, feste: { prezzo: 65, bevande: true, giorni: ["12-24", "12-25", "12-31", "01-01"], at: new Date().toISOString() } });
       await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z", prezzo_min: 25, prezzo_max: 35 } });
-      // Spenta per tutti (bocciata due volte il 26/11): senza ?beta=menufeste torna il prezzo di tutti i giorni.
-      await rp.reload({ waitUntil: "networkidle" });
-      await rp.getByTestId("prezzo-locale").waitFor({ timeout: 5000 }).catch(() => {});
-      ok((await rp.getByTestId("menu-feste-scheda").count()) === 0 && (await rp.getByTestId("prezzo-locale").count()) === 1, "menu feste: spento per tutti (senza ?beta=menufeste la scheda mostra il prezzo di sempre)");
-      await rp.goto(`${BASE}/locali/${LOC}?beta=menufeste`, { waitUntil: "networkidle" });
+      // Accesa per tutti dal 27/11 (terzo revisore 8,6): niente più ?beta=menufeste.
+      await rp.goto(`${BASE}/locali/${LOC}`, { waitUntil: "networkidle" });
       await rp.getByTestId("menu-feste-scheda").waitFor({ timeout: 5000 }).catch(() => {});
       const t = ((await rp.getByTestId("menu-feste-scheda").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
       const pl = ((await rp.getByTestId("posto-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
@@ -8392,8 +8389,7 @@ else {
     const serateSalvate = await st.getByText("Salvato").isVisible().catch(() => false);
     // "Menu delle feste" (proposta 90): in stagione si salva e la scheda lo rilegge; serate intatte; fuori stagione la sezione non c'è.
     { const mf = await import(new URL("../../src/lib/menu-feste.ts", import.meta.url).href);
-      ok((await rp.getByTestId("pannello-feste").count()) === 0, "pannello: 'Menu delle feste' spento per tutti (senza ?beta=menufeste)");
-      await rp.goto(`${BASE}/ristoratore/${LOC}?vista=promozione&beta=menufeste`, { waitUntil: "networkidle" });
+      await rp.goto(`${BASE}/ristoratore/${LOC}?vista=promozione`, { waitUntil: "networkidle" });
       if (mf.stagioneMenu(mf.oggiRomaFeste()) == null) ok((await rp.getByTestId("pannello-feste").count()) === 0, "pannello: fuori stagione nessun 'Menu delle feste'");
       else {
         const mfs = rp.getByTestId("menu-feste");

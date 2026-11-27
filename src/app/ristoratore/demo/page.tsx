@@ -27,5 +27,5 @@ export default async function RistoratoreDemoPage({ searchParams }: { searchPara
   const daReel = Math.round(giorni * 0.4);
   const ig = Math.round((daReel * 2) / 3);
   const reel = { persone: daReel, perFonte: [{ chiave: "Instagram", volte: ig, persone: ig }, { chiave: "TikTok", volte: daReel - ig, persone: daReel - ig }].filter((f) => f.persone > 0) };
-  return <Pannello reel={reel} p={p} locale={dati.locale} citta={dati.citta} verificato base="/ristoratore/demo" demo prenotazioni={prenotazioni} passaparola={passaparola} vista={typeof sp.vista === "string" ? sp.vista : undefined} menuFeste={sp.beta === "menufeste"} />;
+  return <Pannello reel={reel} p={p} locale={dati.locale} citta={dati.citta} verificato base="/ristoratore/demo" demo prenotazioni={prenotazioni} passaparola={passaparola} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
 }
