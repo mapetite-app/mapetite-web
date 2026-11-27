@@ -1079,22 +1079,22 @@ export default function VenueSheet({
             <div
               data-testid="segnali-corti"
               role={segnaliScorre ? "group" : undefined}
-              aria-label={segnaliScorre ? "Altri segnali del locale, scorri di lato" : undefined}
+              aria-label={segnaliScorre ? "Altri segnali del locale" : undefined}
               tabIndex={segnaliScorre ? 0 : undefined}
-              className={segnaliScorre ? "-mx-[22px] flex flex-nowrap items-center gap-1.5 overflow-x-auto px-[22px] pb-0.5 [mask-image:linear-gradient(to_right,#000_82%,transparent)] [scrollbar-width:none] empty:hidden [&::-webkit-scrollbar]:hidden [&>*]:shrink-0" : "contents"}
+              className={segnaliScorre ? "-mx-[22px] flex flex-nowrap items-center gap-1.5 overflow-x-auto px-[22px] pb-0.5 [mask-image:linear-gradient(to_right,#000_calc(100%-22px),transparent)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand [scrollbar-width:none] empty:hidden [&::-webkit-scrollbar]:hidden [&>*]:shrink-0" : "contents"}
             >
               {gem && (
                 <span data-testid="gemma" className="inline-flex rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
                   💎 Poco conosciuto
                 </span>
               )}
+              {/* Subito dopo 💎 (revisore 27/11): il segnale dei comportamenti si vede senza scorrere. Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3), con quanto ha speso a testa
+                  (PROPOSTE.md 64, da 5 risposte, fascia scelta da almeno 2 senza pareggi) nella stessa pillola, anche se il locale dichiara il suo prezzo (due fonti, mai nascoste l'una dall'altra). */}
+              <VisiteMapetite venueId={googlePlaceId ?? venue.id} spesaId={venue.id} />
               {/* Aperto da poco (PROPOSTE.md, proposta 7): parola del titolare verificato, solo il primo anno. */}
               <AperturaPillola info={infoLocale} />
               {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
               <BuoniPastoRiga venueId={venue.id} category={category} />
-              {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3), con quanto ha speso a testa
-                  (PROPOSTE.md 64, da 5 risposte, fascia scelta da almeno 2 senza pareggi) nella stessa pillola, anche se il locale dichiara il suo prezzo (due fonti, mai nascoste l'una dall'altra). */}
-              <VisiteMapetite venueId={googlePlaceId ?? venue.id} spesaId={venue.id} />
             </div>
           </div>
 
