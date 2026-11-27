@@ -470,7 +470,8 @@ export async function POST(request: Request) {
         if (g) glutine[p.id] = g;
       }
       // La ricerca chiede il senza glutine e una recensione mette in guardia: in fondo, mai escluso (regola sui requisiti espliciti).
-      if (glutineRichiesto(query, [])) {
+      // Spento finché la proposta 91 è spenta (bocciata due volte il 27/11): si accende con GLUTINE_IN_FONDO=1.
+      if (process.env.GLUTINE_IN_FONDO === "1" && glutineRichiesto(query, [])) {
         const giu = risultati.filter((p) => glutine[p.id]?.stato === "attenzione");
         if (giu.length > 0 && giu.length < risultati.length) {
           risultati = [...risultati.filter((p) => glutine[p.id]?.stato !== "attenzione"), ...giu];

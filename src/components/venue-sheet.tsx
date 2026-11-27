@@ -254,8 +254,12 @@ export default function VenueSheet({
   // passando a un altro con "‹ ›" non si apre lì.
   // "Come lo sai?" (proposta 18): quale ✓ mostra la sua frase di recensione.
   const [provaAperta, setProvaAperta] = useState<string | null>(null);
-  // Proposta 91 (revisore 27/11): con la riga "🌾 Senza glutine" niente chip "✓ senza glutine" doppione (e mai un ✓ e un ⚠️ insieme).
-  const requisitiScheda = venue.glutine ? venue.requisiti?.filter((x) => !/glutin|celiac|gluten/i.test(x.r)) : venue.requisiti;
+  // Proposta 91 "Per chi è celiaco": bocciata due volte il 27/11 (7,5 e 7,5), corretta e spenta per tutti
+  // finché un revisore nuovo non la approva: si accende con ?beta=celiaco.
+  const glutineScheda = useOptIn("celiaco") ? venue.glutine ?? null : null;
+  // Con la riga "🌾 Senza glutine" niente chip "✓ senza glutine" doppione (mai un ✓ e un ⚠️ insieme).
+  const SUL_GLUTINE = /glutin|celiac|gluten/i;
+  const requisitiScheda = glutineScheda ? venue.requisiti?.filter((x) => !SUL_GLUTINE.test(x.r)) : venue.requisiti;
   // La frase si porta in vista SOLO quando si tocca un ✓ (prima ripartiva a ogni aggiornamento della scheda).
   useEffect(() => {
     if (!provaAperta) return;
@@ -399,7 +403,7 @@ export default function VenueSheet({
   const verdictText =
     verdict != null && verdict.trim() !== "" ? verdict.trim() : null;
   const goForChips = senzaDoppioni(Array.isArray(goFor)
-    ? goFor.filter((c) => c != null && c.trim() !== "").map((c) => c.trim())
+    ? goFor.filter((c) => c != null && c.trim() !== "" && !(glutineScheda && SUL_GLUTINE.test(c))).map((c) => c.trim())
     : []);
   const dontExpectChips = Array.isArray(dontExpect)
     ? dontExpect.filter((c) => c != null && c.trim() !== "").map((c) => c.trim())
@@ -786,7 +790,7 @@ export default function VenueSheet({
     )].slice(0, 2);
     // Nulla tra il verdetto e "Orari, contatti, recensioni": basta il filetto sotto il verdetto.
     const subitoDopoVerdetto = (headline != null || verdettoInArrivo || googleLine != null)
-      && (requisitiScheda?.length ?? 0) === 0 && !venue.glutine && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
+      && (requisitiScheda?.length ?? 0) === 0 && !glutineScheda && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
     const hasOverview =
       showSynthesisBelow || matchReasonBelow || hasTags || goForChips.length > 0 || dontExpectChips.length > 0;
     const hasReviewsTab = hasReviews || communitySlot != null;
@@ -1118,26 +1122,26 @@ export default function VenueSheet({
 
           {/* Proposta 91 "Per chi è celiaco": solo per chi ha "Senza glutine" tra i gusti o lo cerca (il server manda il
               campo solo allora). Cosa dicono le recensioni, con la frase copiata; mai "sicuro" o "adatto ai celiaci". */}
-          {venue.glutine && (
-            <div data-testid="glutine-scheda" data-stato={venue.glutine.stato} className="mt-3.5 text-[13.5px] font-sans leading-snug text-[#3d4248]">
+          {glutineScheda && (
+            <div data-testid="glutine-scheda" data-stato={glutineScheda.stato} className="mt-3.5 text-[13.5px] font-sans leading-snug text-[#3d4248]">
               {/* Revisore 27/11: testo in linea (niente "·" orfano a fine riga quando va a capo). */}
               <p>
                 <b className="font-display font-semibold text-brand"><span aria-hidden>🌾</span> Senza glutine</b>
-                <span className={venue.glutine.stato === "attenzione" ? "font-semibold text-[#b3261e]" : ""}>
+                <span className={glutineScheda.stato === "attenzione" ? "font-semibold text-[#b3261e]" : ""}>
                   <span aria-hidden className="font-normal text-text-muted"> · </span>
-                  {venue.glutine.stato === "bene" && <span aria-hidden className="text-success">✓ </span>}
-                  {venue.glutine.stato === "attenzione" && <span aria-hidden>⚠️ </span>}
-                  {titoloGlutine(venue.glutine)}
+                  {glutineScheda.stato === "bene" && <span aria-hidden className="text-success">✓ </span>}
+                  {glutineScheda.stato === "attenzione" && <span aria-hidden>⚠️ </span>}
+                  {titoloGlutine(glutineScheda)}
                 </span>
               </p>
-              {venue.glutine.frase && (
+              {glutineScheda.frase && (
                 <p data-testid="glutine-frase" className="mt-1">
-                  <span className={`${SERIF} italic text-[#141414]`}>«{venue.glutine.frase}»</span>
+                  <span className={`${SERIF} italic text-[#141414]`}>«{glutineScheda.frase}»</span>
                   <span className="text-text-muted"> · da una recensione su Google</span>
                 </p>
               )}
               {/* Chiama dove serve: senza notizie e con un avviso (revisore 27/11). */}
-              {(venue.glutine.stato === "niente" || venue.glutine.stato === "attenzione") && (
+              {(glutineScheda.stato === "niente" || glutineScheda.stato === "attenzione") && (
                 <p className="mt-0.5 flex items-center gap-2 text-text-muted">
                   <span>Chiedi al locale prima di andare.</span>
                   {telHref && (
@@ -1155,7 +1159,7 @@ export default function VenueSheet({
         {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} className="mx-[22px] mt-4" />}
 
         {/* Le tue note (stato, Com'era, classifica, tag e nota): solo per i salvati, in vista. */}
-        {showPersonalBlock && personalBlock(true, true, (headline != null || verdettoInArrivo || googleLine != null) && (requisitiScheda?.length ?? 0) === 0 && !venue.glutine && !perTeLine && !friendsData)}
+        {showPersonalBlock && personalBlock(true, true, (headline != null || verdettoInArrivo || googleLine != null) && (requisitiScheda?.length ?? 0) === 0 && !glutineScheda && !perTeLine && !friendsData)}
 
         {/* Locale non salvato senza barra Salva (scheda dall'assistente): le due scelte rapide aprono Salva. */}
         {!isSaved && onQuickSave && !saveSlot && (

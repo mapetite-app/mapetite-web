@@ -29,12 +29,12 @@ function normalizza(t: string): string {
 // Se ne parla: glutine, celiaco/a/i, gluten free (anche nelle recensioni in inglese).
 const MENZIONE = /\b(glutine|gluten|celiac\w*|coeliac\w*|senza glutine|gluten.?free)\b/;
 // Mette in guardia: contaminazione, stare male, nessuna attenzione, "non hanno niente senza glutine".
-const ATTENZIONE = /contaminaz\w*|contamina\w*|cross.?contam\w*|\bstat[oaie] mal\w*|\bsentit[oaie] mal\w*|malessere|\bmal di pancia|got sick|\bpoca attenzione|\bnessuna attenzione|\bzero attenzione|\bnon (?:sono|erano|e|era|siete) (?:\w+ )?(?:attent\w*|preparat\w*|informat\w*|adatt\w*|sicur\w*)|\bnon (?:hanno|avevano|c'e|c'era|ci sono|c'erano|offrono|esiste|esistono) (?:\w+ ){0,4}(?:senza glutine|gluten|celiac\w*)|\bniente (?:di )?senza glutine|\bnessun\w* (?:piatt\w*|opzion\w*|alternativ\w*) (?:\w+ ){0,2}senza glutine|\bsconsigli\w*|\bnot (?:safe|suitable)|\bno gluten.?free|\bnon (?:hanno|c'e|ci sono|avevano) (?:\w+ ){0,2}(?:cucin\w*|forn\w*|spazi\w*|zon\w*|friggitri\w*|post\w*) separat\w*|\bstav[oaie] mal\w*|\bsto male|\bstar male|\bmalissimo|\bsintom\w*|\breazion\w*|\bglutinat\w*|glutened|\bgot (?:ill|sick)|\btracce\b|\bstess[oaie] (?:cucin\w*|friggitri\w*|olio|forn\w*|pal[ae]|pian\w*)|\bcucina in comune|\bper (?:sbaglio|errore)|\bnon sapev\w*|\bpoco chiar\w*|\bpoco bene\b|\bconfusion\w*|\bconfus[oaie]\b/;
+const ATTENZIONE = /contaminaz\w*|contamina\w*|cross.?contam\w*|\bstat[oaie] mal\w*|\bsentit[oaie] mal\w*|malessere|\bmal di pancia|got sick|\bpoca attenzione|\bnessuna attenzione|\bzero attenzione|\bnon (?:sono|erano|e|era|siete) (?:\w+ )?(?:attent\w*|preparat\w*|informat\w*|adatt\w*|sicur\w*)|\bnon (?:hanno|avevano|c'e|c'era|ci sono|c'erano|offrono|esiste|esistono) (?:\w+ ){0,4}(?:senza glutine|gluten|celiac\w*)|\bniente (?:di )?senza glutine|\bnessun\w* (?:piatt\w*|opzion\w*|alternativ\w*) (?:\w+ ){0,2}senza glutine|\bsconsigli\w*|\bnot (?:safe|suitable)|\bno gluten.?free|\bnon (?:hanno|c'e|ci sono|avevano) (?:\w+ ){0,2}(?:cucin\w*|forn\w*|spazi\w*|zon\w*|friggitri\w*|post\w*) separat\w*|\bstav[oaie] mal\w*|\bsto male|\bstar male|\bmalissimo|\bsintom\w*|\breazion\w*|\bglutinat\w*|glutened|\bgot (?:ill|sick)|\btracce\b|\bstess[oaie] (?:cucin\w*|friggitri\w*|olio|forn\w*|pal[ae]|pian\w*)|\bcucina in comune|\bper (?:sbaglio|errore)|\bnon sapev\w*|\bvomit\w*|pronto soccorso|\bin bagno\b|\bcrampi|dissenteria|diarrea|\bnause\w*|\bgonfi\w*|felt (?:ill|sick)|\bnon garantisc\w*|\b(?:portat\w*|servit\w*|dat[oaie]|era|erano|arrivat\w*) (?:\w+ ){0,3}(?:pane|pasta|pizza|birra|quella|quello) normale\b|\bstess[oaie] (?:acqua|bancone|tagliere|piastr\w*)|\bbriciole|\bdisastro|\b(?:stat|sentit|stav)[oaie] (?:\w+ )?mal\w*|\brischiare|\bpoco chiar\w*|\bpoco bene\b|\bconfusion\w*|\bconfus[oaie]\b/;
 // In una recensione da 1-2 stelle, la frase da mostrare: prima quella che dice il fatto ("era con glutine").
 const GRAVE = /\bcon (?:il )?glutine\b|errore|sbagliat\w*|imperdonabil\w*|grav[ei]\b|pericol\w*|rischi\w*|non (?:era|erano|fosse) (?:\w+ )?(?:senza glutine|gluten.?free)/;
 // Un avviso negato non è un avviso: "senza preoccuparsi di contaminazioni", "nessuna contaminazione",
 // "per evitare contaminazioni", "nessuno è stato male", "non sono stata male" (prova vera del 27/11).
-const NEGATO = /\b(?:senza|nessun\w*|zero|evit\w*|niente|alcun\w*|privo|priva|rischio zero|non c'e|mai(?! piu)|non|prevenire|previen\w*|no)\b(?:\s+\S+){0,6}\s+(?:contamina\w*|cross.?contam\w*|(?:e |sono |siamo )?(?:stat|sentit|stav)[oaie] mal\w*|st(?:ar|o) male|malissimo|malessere|sintom\w*|reazion\w*|problem\w*)/g;
+const NEGATO = /\b(?:senza|nessun\w*|zero|evit\w*|niente|alcun\w*|privo|priva|rischio zero|non c'e|non (?:ci sono stati|c'e stat\w*|ho avuto|abbiamo avuto|(?:sono|siamo|e) (?:mai )?stat[oaie])|mai (?:stat[oaie]|avuto)|prevenire|previen\w*|no)\b(?:\s+\S+){0,6}\s+(?:contamina\w*|cross.?contam\w*|(?:e |sono |siamo )?(?:stat|sentit|stav)[oaie] mal\w*|st(?:ar|o) male|malissimo|malessere|sintom\w*|reazion\w*|problem\w*)/g;
 // Il nome della cosa contiene "senza" (che altrove è un dubbio): si toglie prima del controllo.
 const NOME_COSA = /senza glutine|senza lattosio|gluten.?free|lactose.?free|per (?:i |le )?celiac\w*|ai celiac\w*|alle celiac\w*/g;
 // Negazioni, dubbi, confronti, attese deluse (come in prova-requisito.ts, più stretto: "ma" e "pero" compresi).
@@ -67,15 +67,19 @@ export function glutineDalleRecensioni(recensioni: { text: string; rating?: numb
   let attenzione: string | null = null;
   let basso: { f: string; voto: number; grave: number } | null = null;
   let neParla: { f: string; punti: number } | null = null;
+  let quante = 0; // recensioni che ne parlano (per "3 recensioni ne parlano")
   const bene: string[] = [];
   for (const r of lette) {
     const tutte = frasi(r.text);
     const sulGlutine = tutte.map((f) => ({ f, n: normalizza(f) })).map((x) => ({ ...x, at: x.n.search(MENZIONE) })).filter((x) => x.at >= 0);
     if (sulGlutine.length === 0) continue;
+    quante++;
     // Revisore 27/11: l'avviso si cerca in TUTTA la recensione che parla del glutine, non solo nella frase
     // («Pasta senza glutine ottima. Dopo sono stata malissimo.» dava ✓). La frase mostrata: quella dell'avviso,
     // preceduta da quella sul glutine se l'avviso da solo non lo nomina.
-    const avviso = tutte.find((f) => ATTENZIONE.test(normalizza(f).replace(NEGATO, " ")));
+    // La negazione evita solo il ⚠️ («nessuna contaminazione»), mai con «così male» o «non fanno nulla per evitare».
+    const senzaNegati = (n: string) => (/\bcosi\b|non (?:fanno|stanno|prestano|garantisc)/.test(n) ? n : n.replace(NEGATO, " "));
+    const avviso = tutte.find((f) => ATTENZIONE.test(senzaNegati(normalizza(f))));
     // "con il glutine", "per errore" contano da 3 stelle in giù: nelle 4-5 stelle sono confronti («buona come quella con il glutine»).
     const grave = (r.rating ?? 3) <= 3 ? sulGlutine.find((x) => GRAVE.test(x.n)) : undefined;
     if (avviso || grave) {
@@ -97,7 +101,10 @@ export function glutineDalleRecensioni(recensioni: { text: string; rating?: numb
     }
     const voto = r.rating ?? 3;
     // Il ✓ solo se nessuna frase sul glutine della recensione ha un dubbio («…ma solo un tipo», «anche se l'olio è lo stesso»).
-    const dubbia = sulGlutine.some((x) => DUBBIO.test(x.n.replace(NOME_COSA, " ")) || x.n.includes("?"));
+    // Secondo revisore 27/11: una parola d'avviso anche negata, o un "però / peccato / ma" in un'altra frase della
+    // stessa recensione, toglie il ✓ (la negazione evita il ⚠️, non regala il ✓).
+    const ombra = tutte.some((f) => ATTENZIONE.test(normalizza(f)) || /\b(pero|peccato|purtroppo|ma|tuttavia|but|though|unfortunately|scherz\w*|dubito|rischi\w*|come no)\b/.test(normalizza(f)));
+    const dubbia = ombra || sulGlutine.some((x) => DUBBIO.test(x.n.replace(NOME_COSA, " ")) || x.n.includes("?"));
     let beneQui: string | null = null;
     for (const x of sulGlutine) {
       const resto = x.n.replace(NOME_COSA, " ");
@@ -113,7 +120,7 @@ export function glutineDalleRecensioni(recensioni: { text: string; rating?: numb
   if (attenzione) return { stato: "attenzione", frase: attenzione, n: bene.length, lette: lette.length };
   if (basso) return { stato: "ne-parla", frase: basso.f, n: bene.length, lette: lette.length, voto: basso.voto };
   if (bene.length > 0) return { stato: "bene", frase: bene[0], n: bene.length, lette: lette.length };
-  if (neParla) return { stato: "ne-parla", frase: neParla.f, n: 0, lette: lette.length };
+  if (neParla) return { stato: "ne-parla", frase: neParla.f, n: quante, lette: lette.length };
   return { stato: "niente", frase: null, n: 0, lette: lette.length };
 }
 
@@ -126,6 +133,6 @@ export function glutineRichiesto(query: string | null | undefined, diete: string
 export function titoloGlutine(g: Glutine): string {
   if (g.stato === "attenzione") return "Una recensione mette in guardia";
   if (g.stato === "bene") return g.n === 1 ? "Una recensione ne parla bene" : `${g.n} recensioni ne parlano bene`;
-  if (g.stato === "ne-parla") return g.voto != null ? `Una recensione da ${g.voto === 1 ? "1 stella" : `${g.voto} stelle`} ne parla` : "Una recensione ne parla";
+  if (g.stato === "ne-parla") return g.voto != null ? `Una recensione da ${g.voto === 1 ? "1 stella" : `${g.voto} stelle`} ne parla` : g.n > 1 ? `${g.n} recensioni ne parlano` : "Una recensione ne parla";
   return "Nessuna recensione ne parla";
 }
