@@ -42,7 +42,15 @@ export default function MenuFesteModulo({ placeId, iniziale, verificato, demo }:
   };
 
   const salva = async (m: MenuFeste | null) => {
-    if (demo) { setSalvato(m); setStato("fatto"); return; }
+    // Revisore 27/11: anche nell'esempio "Togli" svuota il modulo, come il pannello vero.
+    if (demo) {
+      setSalvato(m);
+      setGiorni(m?.giorni ?? []);
+      setPrezzo(m ? String(m.prezzo) : "");
+      setBevande(m?.bevande ?? false);
+      setStato("fatto");
+      return;
+    }
     setStato("salvo");
     setErrore(null);
     try {
@@ -64,7 +72,10 @@ export default function MenuFesteModulo({ placeId, iniziale, verificato, demo }:
   const campo = "min-h-11 rounded-card border border-border bg-white px-3 text-sm font-sans text-text";
   // Anteprima con la stessa riga della scheda; nell'esempio anche fuori stagione si vede come verrebbe.
   const daMostrare = cambiato ? pulito : salvato;
-  const riga = daMostrare ? rigaMenuFeste({ ...daMostrare, at: new Date().toISOString() }, stagioneMenu(oggi) == null ? `${new Date().getFullYear()}-12-01` : oggi) : null;
+  // Fuori stagione (solo nell'esempio) data finta del 1/12 e menu scritto il 15/11 della stessa stagione (revisore 27/11).
+  const fuori = stagioneMenu(oggi) == null;
+  const annoFinto = new Date().getFullYear();
+  const riga = daMostrare ? rigaMenuFeste({ ...daMostrare, at: fuori ? `${annoFinto}-11-15T12:00:00Z` : new Date().toISOString() }, fuori ? `${annoFinto}-12-01` : oggi) : null;
   return (
     <div data-testid="menu-feste">
       <div className="grid grid-cols-5 gap-1" role="group" aria-label="Giorni con il menu delle feste">
