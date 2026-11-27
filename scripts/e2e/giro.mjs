@@ -10796,6 +10796,34 @@ else {
   { const w = writes.find((x) => x.t === "posti-POST"); ok(w?.body?.gruppo_id === G1 && w?.body?.place_id === PL(3) && w?.body?.aggiunto_da === ME, "lista di gruppo: 'Proponi' aggiunge il salvato (UUID del locale, a tuo nome)"); }
   ok((await gp.getByTestId("gruppo-posto").count()) === 3 && (await names())[2] === "Forno Tre" && (await gp.getByTestId("gruppo-posto").filter({ hasText: "Forno Tre" }).innerText()).includes("proposto da te"), "lista di gruppo: il posto proposto compare in fondo (0 voti), 'proposto da te'");
   ok((await gp.getByTestId("gruppo-numeri").textContent()) === "3 persone · 3 posti", "lista di gruppo: i numeri si aggiornano");
+  // Proposta 88 (27/11): "Piace già a più di voi", i posti salvati da almeno 2 membri (solo numeri, mai nomi).
+  ok((await gp.getByTestId("gruppo-in-comune").count()) === 0, "piace già a più di voi: senza posti in comune la riga non c'è");
+  {
+    const ic = (place, name, quanti, anche_tu, piaciuto) => ({ place_id: place, google_place_id: null, name, category: "restaurant", address: "Via dei Volsci 5, 00185 Roma RM, Italy", lat: 41.9, lng: 12.51, quanti, anche_tu, piaciuto });
+    await setCookie(gctx, "e2e_gruppi", { ...dati, inComune: { [G1]: [ic(PL(4), "Bistrot Quattro", 3, true, 2), ic(PL(5), "Enoteca Cinque", 2, false, 0), ic(PL(1), "Trattoria Uno", 2, true, 1)] } });
+    await gp.goto(`${BASE}/gruppi/${G1}`, { waitUntil: "networkidle" });
+    const righe = gp.getByTestId("gruppo-in-comune-posto");
+    const testi = await righe.allInnerTexts();
+    ok((await righe.count()) === 2 && testi[0].includes("Bistrot Quattro") && testi[1].includes("Enoteca Cinque"), `piace già a più di voi: i posti in comune, senza quelli già nella lista (${testi.join(" | ")})`);
+    const chi = await gp.getByTestId("gruppo-in-comune-chi").allInnerTexts();
+    ok(chi[0] === "Salvato da te e da altri 2 · 👍 da 2" && chi[1] === "Salvato da 2 di voi", `piace già a più di voi: solo numeri, mai nomi (${chi.join(" | ")})`);
+    const body = await gp.getByTestId("gruppo-in-comune").innerText();
+    ok(!/Giulia|Marco/.test(body), "piace già a più di voi: nessun nome dei membri nella riga");
+    const yC = (await gp.getByTestId("gruppo-in-comune").boundingBox())?.y ?? 9999;
+    const bP = await gp.getByTestId("gruppo-posti").boundingBox();
+    const bC = await gp.getByTestId("gruppo-in-comune").boundingBox();
+    ok(bP && yC < bP.y && bC && bC.y + bC.height <= 844, `piace già a più di voi: sopra i posti proposti e nella prima schermata (${Math.round(yC)} / ${Math.round((bC?.y ?? 0) + (bC?.height ?? 0))} px)`);
+    await noHScroll("piace già a più di voi");
+    await gp.screenshot({ path: `${OUT}/95b-gruppo-in-comune.png`, caret: "initial" });
+    const prima = writes.filter((x) => x.t === "posti-POST").length;
+    await righe.first().getByTestId("gruppo-in-comune-proponi").click();
+    await gp.waitForTimeout(300);
+    const w = writes.filter((x) => x.t === "posti-POST");
+    ok(w.length === prima + 1 && w.at(-1)?.body?.place_id === PL(4) && w.at(-1)?.body?.aggiunto_da === ME, "piace già a più di voi: 'Proponi' mette il posto nella lista a tuo nome");
+    ok((await righe.count()) === 1 && (await gp.getByTestId("gruppo-posto").filter({ hasText: "Bistrot Quattro" }).count()) === 1, "piace già a più di voi: il posto proposto passa nella lista ed esce dalla riga");
+    ok(gEv.some((e) => e?.props?.nome === "gruppo_aggiungi" && e?.props?.fonte === "in_comune") || gEv.some((e) => JSON.stringify(e).includes("in_comune")), "piace già a più di voi: evento gruppo_aggiungi con fonte in_comune");
+    await setCookie(gctx, "e2e_gruppi", dati);
+  }
   const nonTrovato = await gp.goto(`${BASE}/gruppi/${G2}`, { waitUntil: "networkidle" });
   ok(nonTrovato?.status() === 200 && await gp.getByTestId("gruppo-non-trovato").isVisible(), "lista di gruppo: chi non è membro vede 'Lista non disponibile'");
 

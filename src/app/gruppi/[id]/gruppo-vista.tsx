@@ -9,7 +9,7 @@ import CondividiLink from "@/components/condividi-link";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
-import { invitoGruppoPath, numeriGruppo, ordinaPosti, votantiLabel, type Gruppo, type Membro, type PostoGruppo } from "@/lib/gruppi";
+import { inComuneLabel, invitoGruppoPath, numeriGruppo, ordinaPosti, votantiLabel, type Gruppo, type InComune, type Membro, type PostoGruppo } from "@/lib/gruppi";
 import { aggiungiPosto, esciDalGruppo, togliPosto, vota } from "@/lib/gruppi-write";
 import { trackFeature } from "@/lib/track";
 
@@ -33,6 +33,7 @@ export default function GruppoVista({
   membri,
   postiIniziali,
   salvati,
+  inComune = [],
   appenaCreata,
 }: {
   userId: string;
@@ -40,6 +41,7 @@ export default function GruppoVista({
   membri: Membro[];
   postiIniziali: PostoGruppo[];
   salvati: Salvato[];
+  inComune?: InComune[];
   appenaCreata: boolean;
 }) {
   const router = useRouter();
@@ -58,6 +60,8 @@ export default function GruppoVista({
     return salvati.filter((s) => !giaDentro.has(s.placeId) && (!q || s.name.toLowerCase().includes(q) || (s.address ?? "").toLowerCase().includes(q)));
   }, [salvati, giaDentro, filtro]);
   const invito = invitoGruppoPath(gruppo.codice);
+  // Proposta 88: i posti che più di voi hanno già salvato, finché non sono nella lista.
+  const comuni = useMemo(() => inComune.filter((c) => !giaDentro.has(c.place_id)), [inComune, giaDentro]);
 
   const toggleVoto = async (p: PostoGruppo) => {
     if (busy) return;
@@ -78,7 +82,7 @@ export default function GruppoVista({
     }
   };
 
-  const aggiungi = async (s: Salvato) => {
+  const aggiungi = async (s: Salvato, fonte: "salvati" | "in_comune" = "salvati") => {
     if (busy) return;
     setBusy(s.placeId);
     setErrore(null);
@@ -88,7 +92,7 @@ export default function GruppoVista({
       setErrore(r.errore);
       return;
     }
-    trackFeature("gruppo_aggiungi", { fonte: "salvati" });
+    trackFeature("gruppo_aggiungi", { fonte });
     setPosti((all) => [
       ...all,
       {
@@ -197,6 +201,39 @@ export default function GruppoVista({
             testId="gruppo-condividi"
             className="mt-3 w-full"
           />
+        </section>
+      )}
+
+      {comuni.length > 0 && (
+        <section data-testid="gruppo-in-comune" className="mt-6" aria-labelledby="in-comune-titolo">
+          <h2 id="in-comune-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">
+            Piace già a più di voi
+          </h2>
+          <ul className="mt-2 divide-y divide-border rounded-card border border-accent/40 bg-white px-3 shadow-card">
+            {comuni.map((c) => (
+              <li key={c.place_id} data-testid="gruppo-in-comune-posto" className="flex min-h-16 items-center gap-3 py-2">
+                <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-accent-light text-xl">
+                  {getCategoryEmoji(c.category, c.name)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <Link href={`/locali/${c.place_id}`} className="block truncate font-display text-[15px] font-semibold text-text">
+                    {c.name}
+                  </Link>
+                  <span data-testid="gruppo-in-comune-chi" className="block truncate text-xs text-text-muted">{inComuneLabel(c)}</span>
+                </div>
+                <button
+                  type="button"
+                  data-testid="gruppo-in-comune-proponi"
+                  onClick={() => aggiungi({ placeId: c.place_id, name: c.name, category: c.category, address: c.address, lat: c.lat, lng: c.lng, googlePlaceId: c.google_place_id }, "in_comune")}
+                  disabled={!!busy}
+                  aria-label={`Proponi ${c.name} nella lista`}
+                  className="flex min-h-11 shrink-0 items-center gap-1 rounded-pill bg-accent px-3 text-sm font-display font-semibold text-white active:scale-95 disabled:opacity-60"
+                >
+                  {busy === c.place_id ? "…" : <><Plus size={16} aria-hidden /> Proponi</>}
+                </button>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
