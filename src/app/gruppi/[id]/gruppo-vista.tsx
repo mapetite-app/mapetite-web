@@ -207,9 +207,9 @@ export default function GruppoVista({
       {comuni.length > 0 && (
         <section data-testid="gruppo-in-comune" className="mt-6" aria-labelledby="in-comune-titolo">
           <h2 id="in-comune-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">
-            Piace già a più di voi
+            Già salvati da più di voi
           </h2>
-          <ul className="mt-2 divide-y divide-border rounded-card border border-accent/40 bg-white px-3 shadow-card">
+          <ul className="mt-2 divide-y divide-border rounded-card border border-border bg-white px-3 shadow-card">
             {comuni.map((c) => (
               <li key={c.place_id} data-testid="gruppo-in-comune-posto" className="flex min-h-16 items-center gap-3 py-2">
                 <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-accent-light text-xl">
@@ -219,7 +219,7 @@ export default function GruppoVista({
                   <Link href={`/locali/${c.place_id}`} className="block truncate font-display text-[15px] font-semibold text-text">
                     {c.name}
                   </Link>
-                  <span data-testid="gruppo-in-comune-chi" className="block truncate text-xs text-text-muted">{inComuneLabel(c)}</span>
+                  <span data-testid="gruppo-in-comune-chi" className="mt-0.5 block text-xs leading-snug text-text-muted">{inComuneLabel(c)}</span>
                 </div>
                 <button
                   type="button"
@@ -227,9 +227,9 @@ export default function GruppoVista({
                   onClick={() => aggiungi({ placeId: c.place_id, name: c.name, category: c.category, address: c.address, lat: c.lat, lng: c.lng, googlePlaceId: c.google_place_id }, "in_comune")}
                   disabled={!!busy}
                   aria-label={`Proponi ${c.name} nella lista`}
-                  className="flex min-h-11 shrink-0 items-center gap-1 rounded-pill bg-accent px-3 text-sm font-display font-semibold text-white active:scale-95 disabled:opacity-60"
+                  className="flex min-h-11 shrink-0 items-center rounded-pill border border-accent bg-white px-3 text-sm font-display font-semibold text-accent active:scale-95 disabled:opacity-60"
                 >
-                  {busy === c.place_id ? "…" : <><Plus size={16} aria-hidden /> Proponi</>}
+                  {busy === c.place_id ? "…" : "Proponi"}
                 </button>
               </li>
             ))}
@@ -247,7 +247,9 @@ export default function GruppoVista({
 
         {errore && <p role="alert" className="mt-2 text-sm font-sans text-error">{errore}</p>}
 
-        {ordinati.length === 0 ? (
+        {ordinati.length === 0 && comuni.length > 0 ? (
+          <p data-testid="gruppo-vuoto" className="mt-2 text-sm text-text-muted">Ancora nessuno: proponi uno di quelli sopra o dai tuoi salvati.</p>
+        ) : ordinati.length === 0 ? (
           <div data-testid="gruppo-vuoto" className="mt-2 rounded-card border border-border bg-surface p-5 text-center">
             <p className="font-display text-base font-semibold text-brand">Nessun posto proposto</p>
             <p className="mx-auto mt-1 max-w-xs text-sm text-text-muted">Proponi il primo dai tuoi salvati, o dalla scheda di un locale con &quot;Proponi in una lista di gruppo&quot;.</p>

@@ -7,8 +7,10 @@
 --     vedono gli amici sul profilo); mai i posti col lucchetto "Solo per me" né quelli in una raccolta
 --     privata; un profilo privato non conta mai;
 --   - si restituisce solo il NUMERO di membri che l'hanno salvato e se l'hai salvato anche tu, mai i nomi;
---   - fuori i posti con "Non fa per me" di un qualunque membro, quelli già nella lista, quelli chiusi per
---     sempre, e i membri che chi chiede ha nascosto (utenti_nascosti).
+--   - un salvato con "Non fa per me" non conta (come in salvati_pubblici); il posto sparisce del tutto solo
+--     per il "Non fa per me" di chi guarda (revisore 27/11: escluderlo per il "Non fa per me" di un altro
+--     membro faceva intuire un giudizio privato, anche col lucchetto o con il profilo privato);
+--   - fuori quelli già nella lista, quelli chiusi per sempre, e i membri che chi chiede ha nascosto.
 -- Additiva: una funzione nuova, nessuna tabella o dato toccato.
 
 create or replace function public.in_comune_gruppo(p_gruppo uuid)
@@ -27,7 +29,7 @@ as $$
     join public.profiles p on p.id = m.user_id
     where m.gruppo_id = p_gruppo
       and public.membro_gruppo(p_gruppo)
-      and (m.user_id = auth.uid() or p.is_public)
+      and (m.user_id = auth.uid() or (p.is_public and p.handle is not null))
       and not exists (select 1 from public.utenti_nascosti n where n.user_id = auth.uid() and n.nascosto_id = m.user_id)
   ),
   salvati as (
@@ -36,14 +38,14 @@ as $$
     join membri mb on mb.user_id = s.user_id
     join public.profiles p on p.id = s.user_id
     where not s.solo_per_me
+      and not ('Non fa per me' = any (coalesce(s.tags, '{}')))
       and not (coalesce(s.tags, '{}') && coalesce(p.raccolte_private, '{}'))
   ),
   no_grazie as (
-    -- "Non fa per me" di QUALUNQUE membro (anche con profilo privato): quel posto non si propone.
-    select distinct s.place_id
+    -- Solo il "Non fa per me" di chi guarda.
+    select s.place_id
     from public.saved_places s
-    join public.gruppi_membri m on m.user_id = s.user_id and m.gruppo_id = p_gruppo
-    where 'Non fa per me' = any (coalesce(s.tags, '{}'))
+    where s.user_id = auth.uid() and 'Non fa per me' = any (coalesce(s.tags, '{}'))
   )
   select pl.id, pl.google_place_id, pl.name, pl.category, pl.address,
     pl.lat::double precision, pl.lng::double precision,

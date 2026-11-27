@@ -10802,7 +10802,7 @@ else {
     const testi = await righe.allInnerTexts();
     ok((await righe.count()) === 2 && testi[0].includes("Bistrot Quattro") && testi[1].includes("Enoteca Cinque"), `piace già a più di voi: i posti in comune, senza quelli già nella lista (${testi.join(" | ")})`);
     const chi = await gp.getByTestId("gruppo-in-comune-chi").allInnerTexts();
-    ok(chi[0] === "Salvato da te e da altri 2 · 👍 da 2" && chi[1] === "Salvato da 2 di voi", `piace già a più di voi: solo numeri, mai nomi (${chi.join(" | ")})`);
+    ok(chi[0] === "Tu e altri 2 · piaciuto a 2" && chi[1] === "2 di voi", `piace già a più di voi: solo numeri, mai nomi (${chi.join(" | ")})`);
     const body = await gp.getByTestId("gruppo-in-comune").innerText();
     ok(!/Giulia|Marco/.test(body), "piace già a più di voi: nessun nome dei membri nella riga");
     const yC = (await gp.getByTestId("gruppo-in-comune").boundingBox())?.y ?? 9999;
@@ -10810,6 +10810,8 @@ else {
     const bC = await gp.getByTestId("gruppo-in-comune").boundingBox();
     ok(bP && yC < bP.y && bC && bC.y + bC.height <= 844, `piace già a più di voi: sopra i posti proposti e nella prima schermata (${Math.round(yC)} / ${Math.round((bC?.y ?? 0) + (bC?.height ?? 0))} px)`);
     await noHScroll("piace già a più di voi");
+    // Revisore 27/11: la riga "chi" non si taglia (niente puntini) e il pulsante è secondario, col bordo.
+    ok(await gp.getByTestId("gruppo-in-comune-chi").first().evaluate((el) => el.scrollWidth <= el.clientWidth + 1), "piace già a più di voi: 'Tu e altri 2 · piaciuto a 2' intera, non tagliata");
     await gp.screenshot({ path: `${OUT}/95b-gruppo-in-comune.png`, caret: "initial" });
     const prima = writes.filter((x) => x.t === "posti-POST").length;
     await righe.first().getByTestId("gruppo-in-comune-proponi").click();

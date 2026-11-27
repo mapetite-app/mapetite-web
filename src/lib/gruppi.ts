@@ -85,9 +85,9 @@ export type InComune = {
   piaciuto: number;
 };
 
-/** "Salvato da te e da 1 altro", "Salvato da 3 di voi", "· 👍 da 2". */
+/** "Tu e altri 2 · piaciuto a 2", "2 di voi": corto, sta in una riga anche a 360 px (revisore 27/11). */
 export function inComuneLabel(p: { quanti: number; anche_tu: boolean; piaciuto: number }): string {
   const altri = p.quanti - 1;
-  const chi = p.anche_tu ? `Salvato da te e da ${altri === 1 ? "1 altro" : `altri ${altri}`}` : `Salvato da ${p.quanti} di voi`;
-  return p.piaciuto >= 2 ? `${chi} · 👍 da ${p.piaciuto}` : chi;
+  const chi = p.anche_tu ? `Tu e ${altri === 1 ? "un altro" : `altri ${altri}`}` : `${p.quanti} di voi`;
+  return p.piaciuto >= 2 ? `${chi} · piaciuto a ${p.piaciuto}` : chi;
 }
