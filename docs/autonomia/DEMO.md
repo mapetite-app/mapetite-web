@@ -21,6 +21,8 @@ Aggiornato con le funzioni dal 1/11 al 7/11. I testi tra virgolette sono quelli 
 
 **Passo in più se c'è tempo (21/11): decidere in gruppo (30 s).** Dopo la ricerca del passo 3, tocca **"Scegli tra 3"** e poi **"Manda al gruppo"** → "Crea il link" → **"Manda"** (WhatsApp). Apri il link su un secondo telefono: si vota con il nome, senza app, e si vede chi ha votato cosa. Dì: "Non devo convincere nessuno a scaricare l'app: votano dal link, e il voto lo vince il posto giusto, non il più famoso." Funziona anche da una raccolta (Profilo → raccolta → "Manda al gruppo", scegli 2 o 3 posti).
 
+**Passo in più per i gruppi (27/11): "Già salvati da più di voi" (15 s).** Account Sofia, una lista di gruppo con amici dal profilo pubblico: sopra "Posti proposti" ci sono fino a 3 posti che più di voi hanno già salvato ("Tu e altri 2 · piaciuto a 2"); tocca **"Proponi"**: il posto entra nella lista e si colora un attimo. Dì: "Il gruppo non parte da zero: parte dai posti che avete già scelto voi, senza dire chi ha salvato cosa."
+
 **Se qualcosa va storto:** quota Google finita → cerca tra i salvati; AI ferma → i risultati Google restano, i posti già visti hanno il verdetto. Mai indirizzi con `?beta=` ("Ti porterei qui" è ancora in prova). Non ricaricare la pagina della mappa dopo una ricerca: la ricerca si perde e rifarla costa una ricerca Google.
 
 ## Prova dal vivo 8/11 (voce 7b)

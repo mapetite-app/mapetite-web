@@ -24,7 +24,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google e TheFork hanno il filtro "senza glutine" ma non dicono quanto è sicura la prova; AIC Mobile elenca i locali AFC ma non i posti che hai salvato tu. Nessuno dice "non lo sappiamo". È il verdetto che non inventa (VISIONE).
 - **Valore per l'utente:** capisce in un colpo d'occhio se fidarsi, chiedere o lasciar perdere; chi esce con un amico celiaco sceglie senza imbarazzi. **Per il ristoratore:** chi cucina bene senza glutine viene trovato da chi lo cerca, anche senza la scritta sul menu (il 68% dei locali non AFC non la usa, `PROBLEMI.md` 37).
 - **Sforzo:** S/M (le recensioni sono già nella Text Search; un campo in più nella sintesi Haiku, "glutine": bene / contaminazione / niente, con la frase esatta presa dalla recensione e controllata come le altre prove; una riga nella scheda). **Costo Google/Haiku:** Google zero; Haiku poche decine di token in più per sintesi, solo per chi ha il gusto attivo.
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **27/11 sera:** costruita a regole, bocciata due volte (7,5 e 7,5), corretta e spenta dietro `?beta=celiaco`; prossimo passo: ✓ solo con la conferma dell'AI (vedi BACKLOG).
 
 ### 92. "Il locale dice: senza glutine" nel pannello del titolare
 - **Problema:** `PROBLEMI.md` 37: molti locali preparano piatti senza glutine ma non lo scrivono; il celiaco deve telefonare.
