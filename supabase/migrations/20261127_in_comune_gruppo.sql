@@ -60,7 +60,7 @@ as $$
   group by pl.id
   having count(distinct sv.user_id) >= 2
   order by quanti desc, piaciuto desc, max(sv.created_at) desc
-  limit 3;
+  limit 5; -- se ne mostrano 3: dopo un "Proponi" la sezione si riempie senza ricaricare
 $$;
 
 revoke all on function public.in_comune_gruppo(uuid) from public, anon;

@@ -92,14 +92,14 @@ export async function loadInComune(id: string): Promise<InComune[]> {
   if (!isUuid(id)) return [];
   const f = await fake();
   if (f === "in-arrivo") return [];
-  if (f) return (f.inComune?.[id] ?? []).slice(0, 3);
+  if (f) return (f.inComune?.[id] ?? []).slice(0, 5);
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("in_comune_gruppo", { p_gruppo: id });
   if (error) {
     console.error(`[gruppi] in_comune_gruppo: ${error.code ?? ""} ${error.message} (migrazione 20261127_in_comune_gruppo non applicata?)`);
     return [];
   }
-  return ((data ?? []) as InComune[]).slice(0, 3).map((p) => ({ ...p, lat: p.lat == null ? null : Number(p.lat), lng: p.lng == null ? null : Number(p.lng) }));
+  return ((data ?? []) as InComune[]).slice(0, 5).map((p) => ({ ...p, lat: p.lat == null ? null : Number(p.lat), lng: p.lng == null ? null : Number(p.lng) }));
 }
 
 export type InvitoPage = InArrivo | { stato: "non-trovato" } | { stato: "ok"; codice: string; invito: InvitoGruppo };

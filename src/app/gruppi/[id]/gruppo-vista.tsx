@@ -61,7 +61,7 @@ export default function GruppoVista({
   }, [salvati, giaDentro, filtro]);
   const invito = invitoGruppoPath(gruppo.codice);
   // Proposta 88: i posti che più di voi hanno già salvato, finché non sono nella lista.
-  const comuni = useMemo(() => inComune.filter((c) => !giaDentro.has(c.place_id)), [inComune, giaDentro]);
+  const comuni = useMemo(() => inComune.filter((c) => !giaDentro.has(c.place_id)).slice(0, 3), [inComune, giaDentro]);
 
   const toggleVoto = async (p: PostoGruppo) => {
     if (busy) return;
@@ -211,8 +211,8 @@ export default function GruppoVista({
           </h2>
           <ul className="mt-2 divide-y divide-border rounded-card border border-border bg-white px-3 shadow-card">
             {comuni.map((c) => (
-              <li key={c.place_id} data-testid="gruppo-in-comune-posto" className="flex min-h-16 items-center gap-3 py-2">
-                <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-accent-light text-xl">
+              <li key={c.place_id} data-testid="gruppo-in-comune-posto" className="flex min-h-14 items-center gap-3 py-1.5">
+                <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-btn bg-accent-light text-xl">
                   {getCategoryEmoji(c.category, c.name)}
                 </span>
                 <div className="min-w-0 flex-1">

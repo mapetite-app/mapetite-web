@@ -10716,7 +10716,7 @@ else {
   await gctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
   await gctx.route("**/rest/v1/rpc/crea_gruppo**", (r) => { writes.push({ t: "crea", body: r.request().postDataJSON() }); return r.fulfill({ json: [{ id: G1, codice: CODICE }] }); });
   await gctx.route("**/rest/v1/rpc/entra_gruppo**", (r) => { writes.push({ t: "entra", body: r.request().postDataJSON() }); return r.fulfill({ json: G1 }); });
-  await gctx.route("**/rest/v1/gruppi_posti**", (r) => { writes.push({ t: `posti-${r.request().method()}`, body: r.request().postDataJSON?.() ?? null }); return r.fulfill({ json: { id: "pNuovo" } }); });
+  await gctx.route("**/rest/v1/gruppi_posti**", (r) => { writes.push({ t: `posti-${r.request().method()}`, body: r.request().postDataJSON?.() ?? null }); return r.fulfill({ json: { id: `pNuovo${writes.length}` } }); });
   await gctx.route("**/rest/v1/gruppi_voti**", (r) => { writes.push({ t: `voti-${r.request().method()}`, body: r.request().method() === "POST" ? r.request().postDataJSON() : null, url: r.request().url() }); return r.fulfill({ status: r.request().method() === "POST" ? 201 : 204, body: "" }); });
   const gp = await gctx.newPage();
   gp.on("pageerror", (e) => errors.push(e.message));
