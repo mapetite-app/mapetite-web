@@ -9,7 +9,7 @@ import CondividiLink from "@/components/condividi-link";
 import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { cityFromAddress } from "@/lib/city";
-import { invitoGruppoPath, numeriGruppo, ordinaPosti, votantiLabel, type Gruppo, type Membro, type PostoGruppo } from "@/lib/gruppi";
+import { inComuneLabel, invitoGruppoPath, numeriGruppo, ordinaPosti, votantiLabel, type Gruppo, type InComune, type Membro, type PostoGruppo } from "@/lib/gruppi";
 import { aggiungiPosto, esciDalGruppo, togliPosto, vota } from "@/lib/gruppi-write";
 import { trackFeature } from "@/lib/track";
 
@@ -33,6 +33,7 @@ export default function GruppoVista({
   membri,
   postiIniziali,
   salvati,
+  inComune = [],
   appenaCreata,
 }: {
   userId: string;
@@ -40,6 +41,7 @@ export default function GruppoVista({
   membri: Membro[];
   postiIniziali: PostoGruppo[];
   salvati: Salvato[];
+  inComune?: InComune[];
   appenaCreata: boolean;
 }) {
   const router = useRouter();
@@ -58,6 +60,8 @@ export default function GruppoVista({
     return salvati.filter((s) => !giaDentro.has(s.placeId) && (!q || s.name.toLowerCase().includes(q) || (s.address ?? "").toLowerCase().includes(q)));
   }, [salvati, giaDentro, filtro]);
   const invito = invitoGruppoPath(gruppo.codice);
+  // Proposta 88: i posti che più di voi hanno già salvato, finché non sono nella lista.
+  const comuni = useMemo(() => inComune.filter((c) => !giaDentro.has(c.place_id)).slice(0, 3), [inComune, giaDentro]);
 
   const toggleVoto = async (p: PostoGruppo) => {
     if (busy) return;
@@ -78,7 +82,7 @@ export default function GruppoVista({
     }
   };
 
-  const aggiungi = async (s: Salvato) => {
+  const aggiungi = async (s: Salvato, fonte: "salvati" | "in_comune" = "salvati") => {
     if (busy) return;
     setBusy(s.placeId);
     setErrore(null);
@@ -88,7 +92,7 @@ export default function GruppoVista({
       setErrore(r.errore);
       return;
     }
-    trackFeature("gruppo_aggiungi", { fonte: "salvati" });
+    trackFeature("gruppo_aggiungi", { fonte });
     setPosti((all) => [
       ...all,
       {
@@ -200,6 +204,39 @@ export default function GruppoVista({
         </section>
       )}
 
+      {comuni.length > 0 && (
+        <section data-testid="gruppo-in-comune" className="mt-6" aria-labelledby="in-comune-titolo">
+          <h2 id="in-comune-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">
+            Già salvati da più di voi
+          </h2>
+          <ul className="mt-2 divide-y divide-border rounded-card border border-border bg-white px-3 shadow-card">
+            {comuni.map((c) => (
+              <li key={c.place_id} data-testid="gruppo-in-comune-posto" className="flex min-h-14 items-center gap-3 py-1.5">
+                <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-btn bg-accent-light text-xl">
+                  {getCategoryEmoji(c.category, c.name)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <Link href={`/locali/${c.place_id}`} className="block truncate font-display text-[15px] font-semibold text-text">
+                    {c.name}
+                  </Link>
+                  <span data-testid="gruppo-in-comune-chi" className="mt-0.5 block text-xs leading-snug text-text-muted">{inComuneLabel(c)}</span>
+                </div>
+                <button
+                  type="button"
+                  data-testid="gruppo-in-comune-proponi"
+                  onClick={() => aggiungi({ placeId: c.place_id, name: c.name, category: c.category, address: c.address, lat: c.lat, lng: c.lng, googlePlaceId: c.google_place_id }, "in_comune")}
+                  disabled={!!busy}
+                  aria-label={`Proponi ${c.name} nella lista`}
+                  className="flex min-h-11 shrink-0 items-center rounded-pill border border-accent bg-white px-3 text-sm font-display font-semibold text-accent active:scale-95 disabled:opacity-60"
+                >
+                  {busy === c.place_id ? "…" : "Proponi"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="mt-6" aria-labelledby="posti-titolo">
         <div className="flex items-center justify-between gap-2">
           <h2 id="posti-titolo" className="text-xs font-display font-semibold uppercase tracking-wider text-text-muted">
@@ -210,7 +247,9 @@ export default function GruppoVista({
 
         {errore && <p role="alert" className="mt-2 text-sm font-sans text-error">{errore}</p>}
 
-        {ordinati.length === 0 ? (
+        {ordinati.length === 0 && comuni.length > 0 ? (
+          <p data-testid="gruppo-vuoto" className="mt-2 text-sm text-text-muted">Ancora nessuno: proponi uno di quelli sopra o dai tuoi salvati.</p>
+        ) : ordinati.length === 0 ? (
           <div data-testid="gruppo-vuoto" className="mt-2 rounded-card border border-border bg-surface p-5 text-center">
             <p className="font-display text-base font-semibold text-brand">Nessun posto proposto</p>
             <p className="mx-auto mt-1 max-w-xs text-sm text-text-muted">Proponi il primo dai tuoi salvati, o dalla scheda di un locale con &quot;Proponi in una lista di gruppo&quot;.</p>

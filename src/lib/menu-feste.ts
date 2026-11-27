@@ -77,7 +77,7 @@ export function fraseGiorni(giorni: GiornoFeste[]): string {
   const gen = giorni.includes("01-01");
   const n = "\u00a0";
   if (!dic.length) return gen ? `1${n}gen` : "";
-  if (gen) return `${dic.join(`,${n}`)}${n}dic e${n}1${n}gen`;
+  if (gen) return `${dic.join(`,${n}`)}${n}dic${n}e${n}1${n}gen`;
   return `${dic.length > 1 ? `${dic.slice(0, -1).join(`,${n}`)}${n}e${n}${dic[dic.length - 1]}` : dic[0]}${n}dic`;
 }
 

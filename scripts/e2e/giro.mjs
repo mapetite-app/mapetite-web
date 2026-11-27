@@ -1880,6 +1880,7 @@ await shot("15-scheda-b");
   await page.waitForTimeout(300);
   await shot("15b-confronto-scheda");
   await mp.click();
+  await page.waitForTimeout(300); // l'evento parte dopo il tocco: senza attesa il controllo a volte arrivava prima
   ok(await page.getByTestId("scheda-tab-recensioni").getAttribute("aria-selected") === "true", "confronto: tocco su Mapetite → resta nelle Recensioni (scende alla community)");
   ok(events.some((e) => e.props?.nome === "confronto_fonte" && e.props?.contesto === "mapetite" && e.props?.stato === "voti"), "confronto: tocco su Mapetite registrato");
   // Locale senza dati Google nella scheda (come i salvati): la riga Google è solo il link.
@@ -8255,11 +8256,8 @@ else {
       // Revisore 26/11: con prezzo a testa e "c'è posto" resta UN riquadro del titolare, un solo "dice il locale", al massimo 3 righe.
       await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: true, giorni: [g], at: new Date().toISOString(), prezzo: { min: 25, max: 35, bevande: false }, feste: { prezzo: 65, bevande: true, giorni: ["12-24", "12-25", "12-31", "01-01"], at: new Date().toISOString() } });
       await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z", prezzo_min: 25, prezzo_max: 35 } });
-      // Spenta per tutti (bocciata due volte il 26/11): senza ?beta=menufeste torna il prezzo di tutti i giorni.
-      await rp.reload({ waitUntil: "networkidle" });
-      await rp.getByTestId("prezzo-locale").waitFor({ timeout: 5000 }).catch(() => {});
-      ok((await rp.getByTestId("menu-feste-scheda").count()) === 0 && (await rp.getByTestId("prezzo-locale").count()) === 1, "menu feste: spento per tutti (senza ?beta=menufeste la scheda mostra il prezzo di sempre)");
-      await rp.goto(`${BASE}/locali/${LOC}?beta=menufeste`, { waitUntil: "networkidle" });
+      // Accesa per tutti dal 27/11 (terzo revisore 8,6): niente più ?beta=menufeste.
+      await rp.goto(`${BASE}/locali/${LOC}`, { waitUntil: "networkidle" });
       await rp.getByTestId("menu-feste-scheda").waitFor({ timeout: 5000 }).catch(() => {});
       const t = ((await rp.getByTestId("menu-feste-scheda").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
       const pl = ((await rp.getByTestId("posto-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
@@ -8392,8 +8390,7 @@ else {
     const serateSalvate = await st.getByText("Salvato").isVisible().catch(() => false);
     // "Menu delle feste" (proposta 90): in stagione si salva e la scheda lo rilegge; serate intatte; fuori stagione la sezione non c'è.
     { const mf = await import(new URL("../../src/lib/menu-feste.ts", import.meta.url).href);
-      ok((await rp.getByTestId("pannello-feste").count()) === 0, "pannello: 'Menu delle feste' spento per tutti (senza ?beta=menufeste)");
-      await rp.goto(`${BASE}/ristoratore/${LOC}?vista=promozione&beta=menufeste`, { waitUntil: "networkidle" });
+      await rp.goto(`${BASE}/ristoratore/${LOC}?vista=promozione`, { waitUntil: "networkidle" });
       if (mf.stagioneMenu(mf.oggiRomaFeste()) == null) ok((await rp.getByTestId("pannello-feste").count()) === 0, "pannello: fuori stagione nessun 'Menu delle feste'");
       else {
         const mfs = rp.getByTestId("menu-feste");
@@ -10720,7 +10717,7 @@ else {
   await gctx.route("**/api/places/photo**", (r) => r.fulfill({ status: 429, json: {} }));
   await gctx.route("**/rest/v1/rpc/crea_gruppo**", (r) => { writes.push({ t: "crea", body: r.request().postDataJSON() }); return r.fulfill({ json: [{ id: G1, codice: CODICE }] }); });
   await gctx.route("**/rest/v1/rpc/entra_gruppo**", (r) => { writes.push({ t: "entra", body: r.request().postDataJSON() }); return r.fulfill({ json: G1 }); });
-  await gctx.route("**/rest/v1/gruppi_posti**", (r) => { writes.push({ t: `posti-${r.request().method()}`, body: r.request().postDataJSON?.() ?? null }); return r.fulfill({ json: { id: "pNuovo" } }); });
+  await gctx.route("**/rest/v1/gruppi_posti**", (r) => { writes.push({ t: `posti-${r.request().method()}`, body: r.request().postDataJSON?.() ?? null }); return r.fulfill({ json: { id: `pNuovo${writes.length}` } }); });
   await gctx.route("**/rest/v1/gruppi_voti**", (r) => { writes.push({ t: `voti-${r.request().method()}`, body: r.request().method() === "POST" ? r.request().postDataJSON() : null, url: r.request().url() }); return r.fulfill({ status: r.request().method() === "POST" ? 201 : 204, body: "" }); });
   const gp = await gctx.newPage();
   gp.on("pageerror", (e) => errors.push(e.message));
@@ -10796,6 +10793,36 @@ else {
   { const w = writes.find((x) => x.t === "posti-POST"); ok(w?.body?.gruppo_id === G1 && w?.body?.place_id === PL(3) && w?.body?.aggiunto_da === ME, "lista di gruppo: 'Proponi' aggiunge il salvato (UUID del locale, a tuo nome)"); }
   ok((await gp.getByTestId("gruppo-posto").count()) === 3 && (await names())[2] === "Forno Tre" && (await gp.getByTestId("gruppo-posto").filter({ hasText: "Forno Tre" }).innerText()).includes("proposto da te"), "lista di gruppo: il posto proposto compare in fondo (0 voti), 'proposto da te'");
   ok((await gp.getByTestId("gruppo-numeri").textContent()) === "3 persone · 3 posti", "lista di gruppo: i numeri si aggiornano");
+  // Proposta 88 (27/11): "Piace già a più di voi", i posti salvati da almeno 2 membri (solo numeri, mai nomi).
+  ok((await gp.getByTestId("gruppo-in-comune").count()) === 0, "piace già a più di voi: senza posti in comune la riga non c'è");
+  {
+    const ic = (place, name, quanti, anche_tu, piaciuto) => ({ place_id: place, google_place_id: null, name, category: "restaurant", address: "Via dei Volsci 5, 00185 Roma RM, Italy", lat: 41.9, lng: 12.51, quanti, anche_tu, piaciuto });
+    await setCookie(gctx, "e2e_gruppi", { ...dati, inComune: { [G1]: [ic(PL(4), "Bistrot Quattro", 3, true, 2), ic(PL(5), "Enoteca Cinque", 2, false, 0), ic(PL(1), "Trattoria Uno", 2, true, 1)] } });
+    await gp.goto(`${BASE}/gruppi/${G1}`, { waitUntil: "networkidle" });
+    const righe = gp.getByTestId("gruppo-in-comune-posto");
+    const testi = await righe.allInnerTexts();
+    ok((await righe.count()) === 2 && testi[0].includes("Bistrot Quattro") && testi[1].includes("Enoteca Cinque"), `piace già a più di voi: i posti in comune, senza quelli già nella lista (${testi.join(" | ")})`);
+    const chi = await gp.getByTestId("gruppo-in-comune-chi").allInnerTexts();
+    ok(chi[0] === "Tu e altri 2 · piaciuto a 2" && chi[1] === "2 di voi", `piace già a più di voi: solo numeri, mai nomi (${chi.join(" | ")})`);
+    const body = await gp.getByTestId("gruppo-in-comune").innerText();
+    ok(!/Giulia|Marco/.test(body), "piace già a più di voi: nessun nome dei membri nella riga");
+    const yC = (await gp.getByTestId("gruppo-in-comune").boundingBox())?.y ?? 9999;
+    const bP = await gp.getByTestId("gruppo-posti").boundingBox();
+    const bC = await gp.getByTestId("gruppo-in-comune").boundingBox();
+    ok(bP && yC < bP.y && bC && bC.y + bC.height <= 844, `piace già a più di voi: sopra i posti proposti e nella prima schermata (${Math.round(yC)} / ${Math.round((bC?.y ?? 0) + (bC?.height ?? 0))} px)`);
+    await noHScroll("piace già a più di voi");
+    // Revisore 27/11: la riga "chi" non si taglia (niente puntini) e il pulsante è secondario, col bordo.
+    ok(await gp.getByTestId("gruppo-in-comune-chi").first().evaluate((el) => el.scrollWidth <= el.clientWidth + 1), "piace già a più di voi: 'Tu e altri 2 · piaciuto a 2' intera, non tagliata");
+    await gp.screenshot({ path: `${OUT}/95b-gruppo-in-comune.png`, caret: "initial" });
+    const prima = writes.filter((x) => x.t === "posti-POST").length;
+    await righe.first().getByTestId("gruppo-in-comune-proponi").click();
+    await gp.waitForTimeout(300);
+    const w = writes.filter((x) => x.t === "posti-POST");
+    ok(w.length === prima + 1 && w.at(-1)?.body?.place_id === PL(4) && w.at(-1)?.body?.aggiunto_da === ME, "piace già a più di voi: 'Proponi' mette il posto nella lista a tuo nome");
+    ok((await righe.count()) === 1 && (await gp.getByTestId("gruppo-posto").filter({ hasText: "Bistrot Quattro" }).count()) === 1, "piace già a più di voi: il posto proposto passa nella lista ed esce dalla riga");
+    ok(gEv.some((e) => e?.props?.nome === "gruppo_aggiungi" && e?.props?.fonte === "in_comune") || gEv.some((e) => JSON.stringify(e).includes("in_comune")), "piace già a più di voi: evento gruppo_aggiungi con fonte in_comune");
+    await setCookie(gctx, "e2e_gruppi", dati);
+  }
   const nonTrovato = await gp.goto(`${BASE}/gruppi/${G2}`, { waitUntil: "networkidle" });
   ok(nonTrovato?.status() === 200 && await gp.getByTestId("gruppo-non-trovato").isVisible(), "lista di gruppo: chi non è membro vede 'Lista non disponibile'");
 

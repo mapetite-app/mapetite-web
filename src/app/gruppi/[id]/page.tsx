@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { loadGruppo } from "@/lib/gruppi-server";
+import { loadGruppo, loadInComune } from "@/lib/gruppi-server";
 import { loadMySaved, myUserId } from "@/lib/raccolte-server";
 import { GruppiAccedi, GruppiInArrivo } from "../gruppi-ui";
 import GruppoVista from "./gruppo-vista";
@@ -31,7 +31,7 @@ export default async function GruppoPage({ params, searchParams }: Props) {
   const userId = await myUserId();
   if (!userId) return <GruppiAccedi next={`/gruppi/${encodeURIComponent(id)}`} />;
 
-  const [data, saved] = await Promise.all([loadGruppo(id), loadMySaved(userId)]);
+  const [data, saved, inComune] = await Promise.all([loadGruppo(id), loadMySaved(userId), loadInComune(id)]);
 
   if (data.stato !== "ok") {
     return (
@@ -65,6 +65,7 @@ export default async function GruppoPage({ params, searchParams }: Props) {
         membri={data.membri}
         postiIniziali={data.posti}
         salvati={salvati}
+        inComune={inComune}
         appenaCreata={sp.nuova === "1"}
       />
     </div>

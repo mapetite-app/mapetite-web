@@ -2,7 +2,7 @@
 
 Per ogni partner: chi è, quanti locali raggiunge (con fonte), cosa ci darebbe, cosa ci guadagna lui, se ha un'API o un programma partner pubblico, e una bozza di email pronta per Lorenzo o Roberto.
 **Nessuno è stato contattato.** Le email sono bozze: le manda Lorenzo o Roberto, quando vogliono.
-Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornamento: 18/11/2026.
+Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornamento: 27/11/2026.
 
 ## Ordine consigliato
 1. **Zenchef/CoverManager** e **Zucchetti**: risolvono il no-show vero (la prenotazione entra nell'agenda del locale) e non sono concorrenti sul cliente finale.
@@ -203,6 +203,17 @@ Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornament
 - **Bozza di email (per Lorenzo, da NON inviare senza decisione):**
   > Oggetto: Mapetite × Osterie d'Italia — la Chiocciola dove le persone salvano i posti
   > Buongiorno, sono Lorenzo, founder di Mapetite, app italiana per salvare e ritrovare bar e ristoranti scoperti sui social, a Roma e Milano. Il nostro obiettivo è far emergere i locali buoni e non di massa, lo stesso spirito della vostra guida. Vorremmo mostrare la Chiocciola sulle schede dei locali premiati, con un link alla vostra app, così il premio arriva anche a chi non ha ancora la guida. Avreste 20 minuti per capire se e come è possibile?
+  > Grazie, Lorenzo
+
+## AIC — Associazione Italiana Celiachia (programma "Alimentazione Fuori Casa") — aggiunto il 27/11, DA DECIDERE LORENZO (proposta 93)
+- **Chi è:** l'associazione dei celiaci in Italia; gestisce la rete AFC di locali formati sul senza glutine e l'app AIC Mobile.
+- **Quanti locali:** oltre 4.500 nella rete AFC ([AIC, Linee guida AFC dell'8/4/2026](https://static.celiachia.it/assets/uploads/2026/04/Linee-Guida-Programma-AFC_08_04_2026.pdf.pdf)). Quanti a Roma e Milano: dato non trovato. L'app AIC Mobile è gratis per i soci, a pagamento per gli altri ([App Store](https://apps.apple.com/it/app/aic-mobile/id393650916)); un documento AIC del 2025 parla di oltre 100.000 utenti (letto solo dall'estratto, da verificare).
+- **Cosa ci darebbe:** un segno di garanzia sul senza glutine dato da un ente, non dalle recensioni né dalla popolarità; credibilità verso i celiaci, un pubblico che sceglie con attenzione e torna.
+- **Cosa ci guadagna:** la rete AFC davanti a chi salva e sceglie i posti; nuovi iscritti alla sua app; dati aggregati (solo conteggi) su cosa cercano i celiaci a Roma e Milano.
+- **API o programma partner pubblico:** dato non trovato. L'elenco è pubblicato sul sito e nell'app, ma non lo leggiamo senza accordo.
+- **Bozza di email (per Lorenzo o Roberto, da NON inviare senza decisione):**
+  > Oggetto: Mapetite × AIC — i locali AFC dove le persone salvano i posti
+  > Buongiorno, sono Lorenzo, founder di Mapetite, app italiana per salvare e ritrovare bar e ristoranti scoperti sui social, a Roma e Milano. Per chi è celiaco mostriamo sulla scheda di ogni locale cosa dicono le recensioni sul senza glutine, senza mai promettere sicurezze che non possiamo dare. Vorremmo mostrare il segno della rete AFC sui locali aderenti, con un link alla vostra app, così la vostra garanzia arriva anche a chi non vi conosce ancora. Avreste 20 minuti per capire se e come è possibile?
   > Grazie, Lorenzo
 
 ## Nota del 20/11 (CEO che chiude) — segnali da verificare, nessun contatto

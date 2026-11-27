@@ -84,6 +84,8 @@ export async function POST(request: Request) {
   const at0 = new Date().toISOString();
   const feste = conFeste && body.feste != null ? pulisciMenuFeste(body.feste?.prezzo, body.feste?.bevande, body.feste?.giorni, body.feste?.gruppi, at0) : null;
   if (conFeste && body.feste != null && typeof body.feste?.bevande !== "boolean") return NextResponse.json({ error: "Bevande incluse: sì o no." }, { status: 400 });
+  // Revisore 27/11: un giorno sconosciuto non si scarta in silenzio.
+  if (conFeste && body.feste != null && Array.isArray(body.feste?.giorni) && feste && body.feste.giorni.length !== feste.giorni.length) return NextResponse.json({ error: "Giorni non validi." }, { status: 400 });
   if (conFeste && body.feste != null && !feste) return NextResponse.json({ error: "Scegli almeno un giorno e un prezzo tra 1 e 500 €." }, { status: 400 });
   if (conFeste && body.feste != null && stagioneMenu(oggiRomaFeste()) == null) return NextResponse.json({ error: "Il menu delle feste si scrive dal 1 novembre al 6 gennaio." }, { status: 409 });
   // Revisore 26/11: un menu con soli giorni già passati non si vedrebbe mai.

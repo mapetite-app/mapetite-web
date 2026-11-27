@@ -16,6 +16,32 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 27/11/2026 (venerdì, CEO che chiude — tema: mangiare fuori senza glutine, senza rischi)
+
+### 91. "Per chi è celiaco": una riga onesta sulla scheda, con la frase o con "nessuno ne parla"
+- **Problema:** `PROBLEMI.md` 37: il celiaco non sa dove mangiare tranquillo; oggi il ✓ "senza glutine" compare solo quando le recensioni ne parlano bene, e il silenzio non si distingue dall'assenza di prova.
+- **Cosa fa:** solo per chi ha "Senza glutine" tra i gusti (o lo scrive nella ricerca), sulla scheda una riga fissa sotto il verdetto. Tre casi: "✓ 3 recensioni ne parlano bene" con la frase (come "Come lo sai?", 18); "⚠️ una recensione parla di contaminazione" con la frase; "Nessuna recensione ne parla: chiedi al locale" con il tasto Chiama. Mai scritto "sicuro" o "adatto ai celiaci": solo cosa dicono le recensioni. L'ordine dei risultati non cambia per popolarità; un ⚠️ sposta il posto in fondo solo se la ricerca chiedeva il senza glutine (regola già approvata sui requisiti espliciti).
+- **Da dove nasce:** Google e TheFork hanno il filtro "senza glutine" ma non dicono quanto è sicura la prova; AIC Mobile elenca i locali AFC ma non i posti che hai salvato tu. Nessuno dice "non lo sappiamo". È il verdetto che non inventa (VISIONE).
+- **Valore per l'utente:** capisce in un colpo d'occhio se fidarsi, chiedere o lasciar perdere; chi esce con un amico celiaco sceglie senza imbarazzi. **Per il ristoratore:** chi cucina bene senza glutine viene trovato da chi lo cerca, anche senza la scritta sul menu (il 68% dei locali non AFC non la usa, `PROBLEMI.md` 37).
+- **Sforzo:** S/M (le recensioni sono già nella Text Search; un campo in più nella sintesi Haiku, "glutine": bene / contaminazione / niente, con la frase esatta presa dalla recensione e controllata come le altre prove; una riga nella scheda). **Costo Google/Haiku:** Google zero; Haiku poche decine di token in più per sintesi, solo per chi ha il gusto attivo.
+- **Stato proposto:** PRONTA.
+
+### 92. "Il locale dice: senza glutine" nel pannello del titolare
+- **Problema:** `PROBLEMI.md` 37: molti locali preparano piatti senza glutine ma non lo scrivono; il celiaco deve telefonare.
+- **Cosa fa:** nel pannello del locale verificato tre scelte a tocco: "Piatti senza glutine: sì / su richiesta / no", "Preparati a parte: sì / no", "Socio AFC di AIC: sì / no". Sulla scheda, nel riquadro unico del titolare (come 65 e 90): "Senza glutine su richiesta, preparati a parte · lo dice il locale". Niente testo libero. Se le recensioni dicono il contrario (⚠️ della 91) si vedono tutte e due: il locale non può coprire una recensione.
+- **Da dove nasce:** il "Il locale dice" (65) e il menu delle feste (90) hanno funzionato come strada per fatti che le recensioni non danno. TheFork chiede al locale le diete in modo generico; nessuno mette accanto la parola del locale e quella dei clienti.
+- **Valore per l'utente:** sa prima cosa aspettarsi. **Per il ristoratore:** un motivo concreto per verificare il locale; i clienti celiaci tornano (e portano gli amici) dove si sentono sicuri.
+- **Sforzo:** S (tre colonne nel profilo del locale verificato, un modulo nel pannello, una riga nella scheda). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA (dal vivo serve un locale verificato; in demo con il locale di prova). "Socio AFC" è dichiarato dal locale e va scritto come tale, finché non c'è un accordo con AIC (93).
+
+### 93. Il segno "AFC" di AIC sulla scheda, con un accordo con l'Associazione Italiana Celiachia
+- **Problema:** `PROBLEMI.md` 37: il 55% dei celiaci preferisce i locali della rete AFC (oltre 4.500), ma l'elenco sta in un'app a pagamento per chi non è socio, separata da dove le persone salvano i posti.
+- **Cosa fa:** con un accordo, sulle schede dei locali della rete AFC un segno "AFC · Associazione Italiana Celiachia" con link all'app AIC; nella ricerca con "senza glutine", la pillola "Solo AFC". Il segno viene da AIC, non da noi e non dalle recensioni.
+- **Da dove nasce:** stessa strada della Chiocciola Slow Food (proposta 57): un segnale di qualità dato da persone, non dalla popolarità. Nessuna app per chi esce lo mostra accanto ai posti salvati.
+- **Valore per l'utente:** la garanzia AIC dove già sceglie. **Per il ristoratore:** i locali AFC trovati da chi li cerca; per AIC più visibilità della rete e dell'app.
+- **Sforzo:** M dopo l'accordo (un elenco da AIC collegato ai Place ID, un segno, una pillola). Niente lettura delle loro pagine senza accordo. **Costo Google/Haiku:** zero.
+- **Stato proposto:** **DA DECIDERE LORENZO** — "Vuoi che Roberto scriva ad AIC (bozza in `PARTNER.md`) per mostrare il segno AFC sulle schede?"
+
 ## 26/11/2026 (giovedì, CEO che chiude — tema: la cena delle feste, scelta in gruppo)
 
 ### 88. "Piace già a 3 di voi": nella lista di gruppo, i posti che i membri hanno già salvato
@@ -24,7 +50,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google Ask Maps cerca nei salvati di una sola persona (`COMPETITOR.md`, 26/11); Beli confronta i gusti con il "Match Score", Corner e Mapstr mostrano le liste degli amici. Nessuno incrocia i salvati di un gruppo per dire dove andare insieme. È gusto condiviso, non popolarità: conta quanti del gruppo lo vogliono, non quante recensioni ha.
 - **Valore per l'utente:** la tavolata decisa partendo da posti che piacciono già, in un minuto. **Per il ristoratore:** gruppi che arrivano già convinti; dopo, nel pannello, "Proposto in 4 liste di gruppo" (solo conteggi da 3 in su).
 - **Sforzo:** S/M (salvataggi e membri dei gruppi già nel database; una query lato server, una riga nella vista del gruppo; revisione di privacy: i salvati dei membri non lasciano il server, si mostrano solo quelli in comune, come "In comune" sul profilo). **Costo Google/Haiku:** zero (foto nella quota di 200, altrimenti emoji).
-- **Stato proposto:** PRONTA.
+- **Stato proposto:** PRONTA. **FATTA il 27/11 notte, accesa** (secondo revisore 8,7): "Già salvati da più di voi", solo numeri, solo profili pubblici, conta solo il proprio "Non fa per me" (migrazione `20261127_in_comune_gruppo`).
 
 ### 89. "Le feste si prenotano adesso": dal 1 al 20 dicembre, i tuoi 3 posti per la tavolata
 - **Problema:** `PROBLEMI.md` 36: le tavolate di Natale si prenotano circa un mese prima e a metà dicembre i posti sono pieni (Zero, Gambero Rosso). Chi aspetta trova tutto esaurito.
@@ -40,7 +66,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** la 86 è stata fermata perché le recensioni non bastano; il prezzo detto dal locale era la strada indicata. TheFork mostra le offerte dei locali, ma non a chi li aveva già salvati.
 - **Valore per l'utente:** sa quanto spende prima di proporlo al gruppo. **Per il ristoratore:** il menu delle feste davanti a chi lo vuole già provare; il primo motivo concreto per verificare il locale a dicembre.
 - **Sforzo:** S/M (una tabella piccola o colonne nel profilo del locale verificato, un modulo nel pannello, una riga nella scheda). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA (serve almeno un locale verificato per vederla dal vivo; in demo con il locale di prova). **Costruita il 26/11 sera:** pannello (giorni, prezzo a persona, bevande; i gruppi tolti dopo il primo revisore per tenere corta la riga) e riga nel riquadro unico del titolare sulla scheda e sulla pagina pubblica, al posto del prezzo di tutti i giorni finché restano giorni delle feste. Migrazione `20261126_menu_feste`.
+- **Stato proposto:** PRONTA (serve almeno un locale verificato per vederla dal vivo; in demo con il locale di prova). **Costruita il 26/11 sera:** pannello (giorni, prezzo a persona, bevande; i gruppi tolti dopo il primo revisore per tenere corta la riga) e riga nel riquadro unico del titolare sulla scheda e sulla pagina pubblica, al posto del prezzo di tutti i giorni finché restano giorni delle feste. Migrazione `20261126_menu_feste`. **Accesa per tutti il 27/11** (quarto revisore 8,6).
 
 ## 25/11/2026 (mercoledì, CEO che chiude — tema: cene che devono valere la pena, e il riepilogo dell'anno)
 

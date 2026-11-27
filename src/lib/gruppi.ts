@@ -70,3 +70,24 @@ export function votantiLabel(votanti: string[]): string {
   if (votanti.length <= 2) return `Piace a ${votanti.join(" e ")}`;
   return `Piace a ${votanti.slice(0, 2).join(", ")} e altri ${votanti.length - 2}`;
 }
+
+/** Proposta 88: un posto salvato da almeno 2 membri (solo il numero, mai i nomi). */
+export type InComune = {
+  place_id: string; // UUID Supabase (places.id)
+  google_place_id: string | null;
+  name: string;
+  category: string | null;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  quanti: number;
+  anche_tu: boolean;
+  piaciuto: number;
+};
+
+/** "Tu e altri 2 · piaciuto a 2", "2 di voi": corto, sta in una riga anche a 360 px (revisore 27/11). */
+export function inComuneLabel(p: { quanti: number; anche_tu: boolean; piaciuto: number }): string {
+  const altri = p.quanti - 1;
+  const chi = p.anche_tu ? `Tu e ${altri === 1 ? "un altro" : `altri ${altri}`}` : `${p.quanti} di voi`;
+  return p.piaciuto >= 2 ? `${chi} · piaciuto a ${p.piaciuto}` : chi;
+}

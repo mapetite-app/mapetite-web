@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { cleanCodiceGruppo, isUuid, ordinaPosti, type Gruppo, type InvitoGruppo, type Membro, type PostoGruppo } from "@/lib/gruppi";
+import { cleanCodiceGruppo, isUuid, ordinaPosti, type Gruppo, type InComune, type InvitoGruppo, type Membro, type PostoGruppo } from "@/lib/gruppi";
 
 // Liste di gruppo (piano 5.5): letture lato server per /gruppi, /gruppi/<id> e /gruppi/entra/<codice>.
 // Tutto passa dalle funzioni della migrazione 20261016_liste_gruppo.sql (che controllano da sole
@@ -19,6 +19,7 @@ type FakeGruppi = {
   membri?: Record<string, Membro[]>;
   posti?: Record<string, PostoGruppo[]>;
   inviti?: Record<string, InvitoGruppo>;
+  inComune?: Record<string, InComune[]>;
 };
 const dev = () => process.env.NODE_ENV === "development" && !!process.env.E2E_FAKE_USER;
 
@@ -82,6 +83,23 @@ export async function loadGruppo(id: string): Promise<GruppoPage> {
   if (ps.error) logMissing("posti_gruppo", ps.error);
   const posti = ((ps.data ?? []) as PostoGruppo[]).map((p) => ({ ...p, votanti: p.votanti ?? [], lat: p.lat == null ? null : Number(p.lat), lng: p.lng == null ? null : Number(p.lng) }));
   return { stato: "ok", gruppo, membri: (ms.data ?? []) as Membro[], posti: ordinaPosti(posti) };
+}
+
+// Proposta 88: fino a 3 posti salvati da almeno 2 membri (la funzione controlla da sola chi è membro,
+// conta solo i profili pubblici e chi chiede, mai lucchetto né raccolte private; solo numeri, mai nomi).
+// Se la migrazione 20261127_in_comune_gruppo non è applicata, nessuna riga: la lista resta com'era.
+export async function loadInComune(id: string): Promise<InComune[]> {
+  if (!isUuid(id)) return [];
+  const f = await fake();
+  if (f === "in-arrivo") return [];
+  if (f) return (f.inComune?.[id] ?? []).slice(0, 5);
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("in_comune_gruppo", { p_gruppo: id });
+  if (error) {
+    console.error(`[gruppi] in_comune_gruppo: ${error.code ?? ""} ${error.message} (migrazione 20261127_in_comune_gruppo non applicata?)`);
+    return [];
+  }
+  return ((data ?? []) as InComune[]).slice(0, 5).map((p) => ({ ...p, lat: p.lat == null ? null : Number(p.lat), lng: p.lng == null ? null : Number(p.lng) }));
 }
 
 export type InvitoPage = InArrivo | { stato: "non-trovato" } | { stato: "ok"; codice: string; invito: InvitoGruppo };

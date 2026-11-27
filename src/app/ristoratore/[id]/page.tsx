@@ -217,5 +217,5 @@ export default async function RistoratorePage({ params, searchParams }: { params
   }
   const p = computeRistoratore(dati, giorni);
   const reel = daiReel(dati.reel ?? [], dati.attesa, dati.locale.id, giorni);
-  return <Pannello reel={reel} p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} serate={dati.serate} prenotazioni={sp.beta === "-tavoli" ? null : dati.prenotazioni} passaparola={dati.passaparola ?? 0} vista={typeof sp.vista === "string" ? sp.vista : undefined} menuFeste={sp.beta === "menufeste"} />;
+  return <Pannello reel={reel} p={p} locale={dati.locale} citta={dati.citta} verificato={dati.verificato} base={`/ristoratore/${id}`} avviso={dati.avviso} serate={dati.serate} prenotazioni={sp.beta === "-tavoli" ? null : dati.prenotazioni} passaparola={dati.passaparola ?? 0} vista={typeof sp.vista === "string" ? sp.vista : undefined} />;
 }
