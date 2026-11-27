@@ -10820,6 +10820,16 @@ else {
     const w = writes.filter((x) => x.t === "posti-POST");
     ok(w.length === prima + 1 && w.at(-1)?.body?.place_id === PL(4) && w.at(-1)?.body?.aggiunto_da === ME, "piace già a più di voi: 'Proponi' mette il posto nella lista a tuo nome");
     ok((await righe.count()) === 1 && (await gp.getByTestId("gruppo-posto").filter({ hasText: "Bistrot Quattro" }).count()) === 1, "piace già a più di voi: il posto proposto passa nella lista ed esce dalla riga");
+    // Minore della 88 (27/11 sera): dopo "Proponi" il posto nuovo è in vista e illuminato un attimo.
+    { const nuovo = gp.getByTestId("gruppo-posto").filter({ hasText: "Bistrot Quattro" });
+      const acceso = await nuovo.getAttribute("data-appena");
+      await gp.waitForTimeout(700);
+      const b = await nuovo.boundingBox();
+      ok(acceso === "1" && b != null && b.y >= 0 && b.y + b.height <= 844, `piace già a più di voi: dopo 'Proponi' il posto nuovo è in vista e illuminato (${b && Math.round(b.y)}px)`);
+      await gp.waitForTimeout(2000);
+      ok((await nuovo.getAttribute("data-appena")) === null, "piace già a più di voi: la luce sul posto nuovo si spegne da sola"); }
+    // Minore della 88: "Piace a Giulia e Marco · proposto da …" su due righe, non tagliata.
+    ok(await gp.getByTestId("gruppo-posto-chi").first().evaluate((el) => el.scrollHeight <= el.clientHeight + 1), "lista di gruppo: la riga 'Piace a … · proposto da …' non si taglia");
     ok(gEv.some((e) => e?.props?.nome === "gruppo_aggiungi" && e?.props?.fonte === "in_comune") || gEv.some((e) => JSON.stringify(e).includes("in_comune")), "piace già a più di voi: evento gruppo_aggiungi con fonte in_comune");
     await setCookie(gctx, "e2e_gruppi", dati);
   }
@@ -13040,6 +13050,165 @@ else {
   await ac.close();
 }
 // FINE-ACCESSO-APPLE
+// SEGNALI-SCORRONO (Semplificare, 27/11): oltre 2 righe i segnali della scheda diventano una riga che scorre
+{
+  console.log("\n— Segnali della scheda in una riga —");
+  const sc = await browser.newContext({ viewport: { width: 360, height: 640 }, deviceScaleFactor: 2 });
+  await sc.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
+  await sc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await sc.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+  for (const t of ["saved_places", "place_synthesis", "profiles"]) await sc.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+  const S1 = mk("S1", "Osteria Piena", 41.888, 12.53, { category: "restaurant", types: ["restaurant"], rating: 4.7, userRatingCount: 140 });
+  const S2 = mk("S2", "Osteria Due Segnali", 41.889, 12.531, { category: "restaurant", types: ["restaurant"] });
+  await sc.route("**/api/search", (r) => r.fulfill({ json: { risultati: [S1, S2], filtri_usati: { categoria: "ristorante", parole_chiave: [], vicino_a_me: false, zona: "Roma" }, sintesi_pendente: null } }));
+  await sc.route("**/api/search/synthesis", (r) => r.fulfill({ json: { dettagli: {}, esclusi: [] } }));
+  const dal = new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10);
+  await sc.route("**/api/ristoratore/serate**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "S1" ? { verificato: true, giorni: [1, 2, 4], at: new Date().toISOString(), apertoDal: dal, prezzo: { min: 25, max: 35, bevande: true } } : { verificato: false, giorni: [], at: null } }));
+  await sc.route("**/rest/v1/rpc/buoni_pasto_conteggio**", (r) => r.fulfill({ json: r.request().postDataJSON()?.p_place === "S1" ? [{ si: 3, no: 0 }] : [{ si: 3, no: 0 }] }));
+  await sc.route("**/api/places/visite**", (r) => r.fulfill({ json: new URL(r.request().url()).searchParams.get("id") === "S1" ? { persone: 6, piaciuto: 5 } : { persone: 0, piaciuto: 0 } }));
+  await sc.route("**/rest/v1/rpc/spesa_testa_fascia**", (r) => r.fulfill({ json: [{ fascia: 2, risposte: 5 }] }));
+  const sp = await sc.newPage();
+  const serr = []; sp.on("pageerror", (e) => serr.push(e.message));
+  const apriS = async (nome) => {
+    await sp.goto(`${BASE}/mappa?q=${encodeURIComponent("osteria a Roma")}&at=41.888,12.53`, { waitUntil: "networkidle" });
+    const card = sp.locator("ul.snap-x li").filter({ hasText: nome }).first();
+    await card.click();
+    if (!(await sp.locator("h2", { hasText: nome }).isVisible().catch(() => false))) { await sp.waitForTimeout(500); await card.click(); }
+    await sp.locator("h2", { hasText: nome }).waitFor({ timeout: 6000 });
+    await sp.waitForTimeout(1500);
+  };
+  await apriS("Osteria Piena");
+  { const seg = sp.getByTestId("segnali-scheda"), corti = sp.getByTestId("segnali-corti");
+    const m = await seg.evaluate((el) => ({ h: el.getBoundingClientRect().height, scorre: el.dataset.scorre ?? null }));
+    const c = await corti.evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth, n: el.children.length, ox: getComputedStyle(el).overflowX, tab: el.tabIndex, label: el.getAttribute("aria-label") }));
+    ok(m.scorre === "1" && m.h <= 90 && c.n >= 3 && c.sw > c.cw && c.ox === "auto" && c.tab === 0 && !!c.label, `segnali: a 360 px il blocco scende da 132 a ${Math.round(m.h)} px, le ${c.n} pillole corte scorrono (${c.sw}/${c.cw}), raggiungibili da tastiera`);
+    // Revisore 27/11: il riquadro del titolare si legge intero, nella prima schermata.
+    const r = await sp.getByTestId("parola-locale").boundingBox().catch(() => null) ?? await sp.getByTestId("prezzo-locale").boundingBox();
+    ok(r != null && r.x >= 0 && r.x + r.width <= 360 && r.y + r.height <= 640 - 100, `segnali: il riquadro del titolare (prezzo e 'c'è posto') intero e in vista (${r && Math.round(r.x)}–${r && Math.round(r.x + r.width)} px, y ${r && Math.round(r.y)})`);
+    const w = await sp.evaluate(() => document.documentElement.scrollWidth); ok(w <= 360, `segnali: la pagina non scorre di lato (${w})`);
+    const larghe = await corti.evaluate((el) => [...el.children].filter((k) => k.getBoundingClientRect().width > el.clientWidth).length);
+    ok(larghe === 0, "segnali: ogni pillola che scorre è più stretta dello schermo (si legge intera)");
+    await corti.evaluate((el) => { el.scrollLeft = el.scrollWidth; });
+    const ultimo = await corti.evaluate((el) => { const k = el.lastElementChild.getBoundingClientRect(); return k.right <= 360 + 1 && k.left >= 0; });
+    ok(ultimo, "segnali: scorrendo si arriva all'ultimo segnale, intero");
+    await corti.evaluate((el) => { el.scrollLeft = 0; }); }
+  await sp.screenshot({ path: `${OUT}/92a-segnali-scorrono-360.png` });
+  await apriS("Osteria Due Segnali");
+  { const m = await sp.getByTestId("segnali-scheda").evaluate((el) => ({ n: el.querySelectorAll(":scope > * > *").length, scorre: el.dataset.scorre ?? null, wrap: getComputedStyle(el).flexWrap }));
+    ok(m.scorre === null && m.wrap === "wrap", `segnali: con pochi segnali restano come prima, a capo (${m.n} segnali)`); }
+  ok(serr.length === 0, `segnali: nessun errore nella pagina (${serr.join(" | ").slice(0, 200)})`);
+  await sc.close();
+}
+// FINE-SEGNALI-SCORRONO
+// CELIACO (proposta 91): "🌾 Senza glutine" in scheda, dalle recensioni Google lette, solo frasi copiate
+{
+  console.log("\n— Per chi è celiaco (proposta 91) —");
+  const gl = await import(new URL("../../src/lib/glutine.ts", import.meta.url).href);
+  const g = (rs) => gl.glutineDalleRecensioni(rs);
+  ok(g([{ text: "Pizza buonissima. Impasto senza glutine ottimo e preparato a parte!", rating: 5 }])?.stato === "bene", "celiaco: frase da 5 stelle che ne parla bene → ✓");
+  ok(g([{ text: "Ottima pasta senza glutine.", rating: 5 }, { text: "La mia amica celiaca è stata male dopo cena.", rating: 2 }])?.stato === "attenzione", "celiaco: un avviso vince sempre sul ✓");
+  ok(g([{ text: "Attenzione alla contaminazione per i celiaci, cucina piccola.", rating: 4 }])?.stato === "attenzione" && g([{ text: "Non hanno opzioni senza glutine.", rating: 4 }])?.stato === "attenzione", "celiaco: contaminazione e 'non hanno opzioni senza glutine' mettono in guardia");
+  ok(g([{ text: "Hanno la pasta senza glutine ma solo un tipo.", rating: 5 }])?.stato === "ne-parla", "celiaco: frase con un 'ma' non è un ✓ (resta 'ne parla')");
+  ok(g([{ text: "Mio marito è celiaco, io ho preso la carbonara buonissima.", rating: 5 }])?.stato === "ne-parla", "celiaco: la persona celiaca non basta, la frase deve parlare del senza glutine");
+  ok(g([{ text: "Senza glutine ottima, molto buona, me l'hanno consigliata?", rating: 5 }])?.stato === "ne-parla", "celiaco: una domanda non è un ✓");
+  ok(g([{ text: "Pasta senza glutine ottima e personale attento.", rating: 3 }])?.stato === "ne-parla", "celiaco: il ✓ solo da recensioni da 4-5 stelle");
+  ok(g([{ text: "Carbonara top, servizio veloce.", rating: 5 }])?.stato === "niente" && g([]) === null && g(null) === null, "celiaco: nessuna menzione → 'niente'; senza recensioni → nessuna riga");
+  { const r = g([{ text: "Pasta senza glutine squisita, bravi.", rating: 5 }, { text: "Molto attenti alle esigenze dei celiaci, ottimo.", rating: 4 }]);
+    ok(r?.n === 2 && gl.titoloGlutine(r) === "2 recensioni ne parlano bene", `celiaco: conta le recensioni che ne parlano bene (${r && gl.titoloGlutine(r)})`); }
+  { const lunga = "Siamo stati qui sabato sera con amici e abbiamo provato molte cose del menu: tra tutte la pizza senza glutine è stata ottima, croccante e leggera, servita con grande cura e attenzione.";
+    const r = g([{ text: lunga, rating: 5 }]); ok(r?.stato === "bene" && r.frase.length <= 142 && /glutine/.test(r.frase) && lunga.includes(r.frase.replace(/^…|…$/g, "")), `celiaco: frase lunga tagliata attorno alla parola, copiata (${r?.frase})`); }
+  // Prova vera del 27/11 (40 locali di Roma e Milano): i casi che sbagliava la prima versione.
+  ok(g([{ text: "Per chi deve mangiare senza glutine è un sogno: mangiare in totale tranquillità, senza preoccuparsi di contaminazioni.", rating: 5 }])?.stato !== "attenzione", "celiaco: 'senza preoccuparsi di contaminazioni' non è un avviso");
+  { const r = g([{ text: "Pizza senza glutine buonissima, molto curata.", rating: 5 }, { text: "Ho chiesto conferma per errore. Infatti era un pane normale con il glutine !", rating: 1 }]);
+    ok(r?.stato === "attenzione" && r.frase === "Infatti era un pane normale con il glutine !", `celiaco: 'era un pane normale con il glutine' (1 stella) vince sul ✓, con la frase del fatto (${r?.frase})`); }
+  { const r = g([{ text: "Pizza senza glutine buonissima, molto curata.", rating: 5 }, { text: "Prodotti senza glutine arrivati schiacciati dal fattorino.", rating: 2 }]);
+    ok(r?.stato === "ne-parla" && r.voto === 2 && gl.titoloGlutine(r) === "Una recensione da 2 stelle ne parla", `celiaco: 2 stelle senza avvisi → 'ne parla' col voto, senza ⚠️ (${r && gl.titoloGlutine(r)})`); }
+  ok(g([{ text: "Pizza senza glutine buonissima, come quella con il glutine.", rating: 5 }])?.stato === "bene", "celiaco: 'come quella con il glutine' in 5 stelle è un confronto, non un avviso");
+  // Revisore 27/11: l'avviso in un'altra frase della stessa recensione toglie il ✓.
+  for (const t of ["Pasta senza glutine ottima. Dopo sono stata malissimo.", "Pizza senza glutine buonissima. Il giorno dopo mia figlia ha avuto sintomi.", "Ottima pasta senza glutine! Purtroppo poi ho avuto una reazione.", "Pasta senza glutine buonissima. Il cameriere non sapeva cosa fosse la celiachia.", "Pizza senza glutine ottima. Ci hanno portato il pane con glutine per sbaglio.", "Opzioni senza glutine ottime, preparate nella stessa cucina.", "Pizza senza glutine perfetta, contiene tracce di glutine.", "Il menù senza glutine è ottimo, cucina in comune.", "Gluten free pizza was great but I got glutened."])
+    ok(g([{ text: t, rating: 5 }])?.stato === "attenzione", `celiaco: avviso riconosciuto («${t}»)`);
+  for (const t of ["Fritti senza glutine buonissimi, anche se l'olio è lo stesso.", "Pizza senza glutine ottima. Mi hanno portato il pane normale anche se avevo detto di essere celiaca.", "Pasta senza glutine ottima. Peccato che mi sia sentita poco bene dopo."])
+    ok(g([{ text: t, rating: 5 }])?.stato !== "bene", `celiaco: niente ✓ con un dubbio nella recensione («${t}»)`);
+  for (const t of ["Ottimo per celiaci, non ci sono stati problemi di contaminazione.", "Nessun problema di contaminazione, pizza senza glutine ottima.", "Mi aiutano a capire il frumento deglutinato, pasta senza glutine ottima.", "Poter mangiare senza il pensiero di dover star male, pizza senza glutine ottima."])
+    ok(g([{ text: t, rating: 5 }])?.stato !== "attenzione", `celiaco: nessun falso avviso («${t}»)`);
+  ok(g([{ text: "Dichiarano di essere gluten free, ma non hanno due cucine separate.", rating: 3 }])?.stato === "attenzione", "celiaco: 'non hanno due cucine separate' mette in guardia");
+  ok(g([{ text: "Dovevo venire con la mia ragazza celiaca ma purtroppo ha avuto un problema.", rating: 5 }, { text: "Pizza senza glutine buona mentre quella classica non mi è piaciuta.", rating: 3 }])?.frase?.startsWith("Pizza senza glutine"), "celiaco: per 'ne parla' la frase sulla cosa, non sulla persona");
+  { const f = "Grazie davvero per il bellissimo pranzo e soprattutto per l'emozione provata nel gustare i fritti e la cacio e pepe senza glutine, bravissimi tutti quanti voi!";
+    const r = g([{ text: f, rating: 5 }]); ok(r?.frase?.endsWith("bravissimi tutti quanti voi!") && /senza glutine/.test(r.frase), `celiaco: frase lunga che finisce poco dopo la parola, presa fino alla fine (${r?.frase})`); }
+  // Secondo revisore 27/11: avvisi con altre parole e negazioni che non devono spegnere un avviso vero.
+  for (const t of ["Locale bellissimo e pizza senza glutine squisita. Mio figlio celiaco ha passato la notte in bagno.", "Pizza senza glutine ottima. Non sono mai stata così male in vita mia.", "Ottimo menu senza glutine. Il giorno dopo però avevo crampi e dissenteria.", "Bel posto, pizza senza glutine super buona. Ma la mia amica celiaca è finita al pronto soccorso.", "Pizza senza glutine eccellente. Non garantiscono l'assenza di contaminazione.", "Pizza senza glutine buonissima. La seconda volta mi hanno portato quella normale.", "Bella atmosfera. Il senza glutine c'è ma non sono attenti alla contaminazione.", "Menu senza glutine ottimo. Non fanno nulla per evitare contaminazioni."])
+    ok(g([{ text: t, rating: 5 }])?.stato === "attenzione", `celiaco: avviso riconosciuto («${t}»)`);
+  for (const t of ["Buona la pizza senza glutine. Però il forno è lo stesso.", "Il menù per celiaci è ottimo... se ti piace rischiare.", "Amazing gluten free options. My celiac wife felt ill afterwards though."])
+    ok(g([{ text: t, rating: 5 }])?.stato !== "bene", `celiaco: niente ✓ («${t}»)`);
+  ok(g([{ text: "Il menù senza glutine è identico a quello normale, ottimo.", rating: 5 }])?.stato === "bene", "celiaco: 'identico a quello normale' non è un avviso");
+  { const r = g([{ text: "Gluten free consigliato, non si sente la differenza.", rating: 5 }, { text: "Tutto senza glutine, non sembra.", rating: 5 }]); ok(r?.stato === "ne-parla" && gl.titoloGlutine(r) === "2 recensioni ne parlano", `celiaco: 'ne parla' conta le recensioni (${r && gl.titoloGlutine(r)})`); }
+  ok(gl.glutineRichiesto("pizzeria senza glutine a Monti", []) && gl.glutineRichiesto("trattoria", ["celiaco"]) && gl.glutineRichiesto("posto per celiaci", []) && !gl.glutineRichiesto("trattoria a Monti", ["vegano"]), "celiaco: la riga serve solo con il gusto o se la ricerca lo chiede");
+  for (const st of ["bene", "attenzione", "ne-parla", "niente"]) ok(!/sicur|adatt/i.test(gl.titoloGlutine({ stato: st, frase: null, n: 1, lette: 5 })), `celiaco: '${st}' non dice mai 'sicuro' o 'adatto'`);
+
+  const GL = [
+    mk("G1", "Pizzeria Bene", 41.9, 12.49, { category: "pizzeria", types: ["pizza_restaurant"], requisiti: [{ r: "senza glutine", prova: "Impasto senza glutine ottimo." }], glutine: { stato: "bene", frase: "Impasto senza glutine ottimo e preparato a parte!", n: 2, lette: 5 } }),
+    mk("G2", "Trattoria Avviso", 41.901, 12.492, { category: "restaurant", types: ["restaurant"], glutine: { stato: "attenzione", frase: "La mia amica celiaca è stata male dopo cena.", n: 0, lette: 5 } }),
+    mk("G3", "Osteria Muta", 41.902, 12.494, { category: "restaurant", types: ["restaurant"], glutine: { stato: "niente", frase: null, n: 0, lette: 5 } }),
+    mk("G4", "Bar Senza Riga", 41.903, 12.495),
+  ];
+  const cc = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  await cc.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
+  await cc.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+  await cc.route("**/api/places/photo**", (r) => r.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#c96"/></svg>' }));
+  for (const t of ["saved_places", "place_synthesis", "profiles"]) await cc.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+  await cc.route("**/api/search", (r) => r.fulfill({ json: { risultati: GL, filtri_usati: { categoria: "pizzeria", parole_chiave: ["senza glutine"], vicino_a_me: false, zona: "Roma" }, sintesi_pendente: null } }));
+  await cc.route("**/api/search/synthesis", (r) => r.fulfill({ json: { dettagli: {}, esclusi: [] } }));
+  let cp = null;
+  const cerr = [];
+  // Una pagina nuova per ogni locale: ricaricando, la ricerca e la scheda aperta restano (D25).
+  const apri = async (nome, w = 390) => {
+    if (cp) await cp.close();
+    cp = await cc.newPage(); cp.on("pageerror", (e) => cerr.push(e.message));
+    await cp.setViewportSize({ width: w, height: w === 390 ? 844 : 640 });
+    await cp.goto(`${BASE}/mappa?q=${encodeURIComponent("pizzeria senza glutine a Roma")}&at=41.9,12.49&beta=celiaco`, { waitUntil: "networkidle" });
+    // La card dei risultati (il nome sulla mappa sceglie solo il segnalino); se non è la prima, un secondo tocco la apre.
+    const card = cp.locator("ul.snap-x li").filter({ hasText: nome }).first();
+    await card.click();
+    if (!(await cp.locator("h2", { hasText: nome }).isVisible().catch(() => false))) { await cp.waitForTimeout(500); await card.click(); }
+    await cp.locator("h2", { hasText: nome }).waitFor({ timeout: 6000 });
+  };
+  const testo = async () => ((await cp.getByTestId("glutine-scheda").innerText().catch(() => "")) ?? "").replace(/\s+/g, " ").trim();
+  await apri("Pizzeria Bene");
+  { const t = await testo(); ok(await cp.getByTestId("glutine-scheda").getAttribute("data-stato") === "bene" && t.includes("Senza glutine") && t.includes("✓ 2 recensioni ne parlano bene") && t.includes("«Impasto senza glutine ottimo e preparato a parte!» · da una recensione su Google"), `celiaco scheda: ✓ con la frase copiata (${t})`); }
+  ok(await cp.getByTestId("requisiti-scheda").count() === 0, "celiaco scheda: con la riga 🌾 niente chip '✓ senza glutine' doppione");
+  { const b = await cp.getByTestId("glutine-scheda").boundingBox(); ok(b != null && b.y + b.height < 844 && b.height <= 80, `celiaco scheda: la riga sta nella prima schermata e in poco spazio (${b && Math.round(b.y)}+${b && Math.round(b.height)}px)`); }
+  await cp.screenshot({ path: `${OUT}/91a-celiaco-bene.png` });
+  await apri("Trattoria Avviso");
+  { const t = await testo(); const col = await cp.getByTestId("glutine-scheda").locator("span.font-semibold").first().evaluate((el) => getComputedStyle(el).color).catch(() => "");
+    ok(t.includes("⚠️ Una recensione mette in guardia") && t.includes("«La mia amica celiaca è stata male dopo cena.»") && !t.includes("✓") && (await cp.getByTestId("glutine-chiama").count()) === 1, `celiaco scheda: ⚠️ con la frase e Chiama, senza ✓ (${t})`);
+    ok(/rgb\(179, 38, 30\)/.test(col), `celiaco scheda: l'avviso in rosso scuro leggibile (${col})`); }
+  await cp.screenshot({ path: `${OUT}/91b-celiaco-attenzione.png` });
+  await apri("Osteria Muta");
+  { const t = await testo(); const h = (await cp.getByTestId("glutine-chiama").boundingBox())?.height ?? 0;
+    ok(t.includes("Nessuna recensione ne parla") && t.includes("Chiedi al locale prima di andare.") && (await cp.getByTestId("glutine-chiama").getAttribute("href")) === "tel:+390612345678" && h >= 44, `celiaco scheda: 'nessuna recensione ne parla' con Chiama da 44px (${t}, ${Math.round(h)}px)`); }
+  await cp.screenshot({ path: `${OUT}/91c-celiaco-niente.png` });
+  await apri("Osteria Muta", 360);
+  { const w = await cp.evaluate(() => document.documentElement.scrollWidth); const b = await cp.getByTestId("glutine-scheda").boundingBox(); ok(w <= 360 && b != null && b.x >= 0 && b.x + b.width <= 360, `celiaco scheda a 360px: niente scorrimento orizzontale (${w})`); }
+  await cp.screenshot({ path: `${OUT}/91d-celiaco-360.png` });
+  await apri("Bar Senza Riga");
+  ok(await cp.getByTestId("glutine-scheda").count() === 0, "celiaco scheda: senza il campo dal server nessuna riga (chi non lo chiede non la vede)");
+  { // Contesto pulito, senza ?beta=celiaco: la riga non c'è (spenta per tutti) e il chip ✓ dei punti forti resta.
+    const c3 = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await c3.addInitScript(() => { try { localStorage.setItem("mapetite.intro", "visto"); localStorage.setItem("mapetite.prenota.popup", "[\"*\"]"); } catch { /* ignorato */ } });
+    await c3.route("**/api/events", (r) => r.fulfill({ status: 204, body: "" }));
+    for (const t of ["saved_places", "place_synthesis", "profiles"]) await c3.route(`**/rest/v1/${t}**`, (r) => r.fulfill({ json: [] }));
+    await c3.route("**/api/search", (r) => r.fulfill({ json: { risultati: GL, filtri_usati: { categoria: "pizzeria", parole_chiave: ["senza glutine"], vicino_a_me: false, zona: "Roma" }, sintesi_pendente: null } }));
+    const p3 = await c3.newPage();
+    await p3.goto(`${BASE}/mappa?q=${encodeURIComponent("pizzeria senza glutine a Roma")}&at=41.9,12.49`, { waitUntil: "networkidle" });
+    await p3.locator("ul.snap-x li").filter({ hasText: "Pizzeria Bene" }).first().click();
+    await p3.locator("h2", { hasText: "Pizzeria Bene" }).waitFor({ timeout: 6000 }).catch(() => {});
+    ok(await p3.locator("h2", { hasText: "Pizzeria Bene" }).isVisible() && await p3.getByTestId("glutine-scheda").count() === 0, "celiaco: senza ?beta=celiaco la riga non c'è (spenta per tutti dopo due bocciature)");
+    await c3.close();
+  }
+  ok(cerr.length === 0, `celiaco: nessun errore nella pagina (${cerr.join(" | ").slice(0, 200)})`);
+  await cc.close();
+}
+// FINE-CELIACO
 await browser.close();
 console.log(failed === 0 ? "\nTUTTO OK" : `\n${failed} CONTROLLI FALLITI`);
 process.exit(failed === 0 ? 0 : 1);

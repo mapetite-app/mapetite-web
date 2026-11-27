@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, ThumbsUp, X } from "lucide-react";
 import Avatar from "@/components/avatar";
 import CondividiLink from "@/components/condividi-link";
@@ -61,6 +61,14 @@ export default function GruppoVista({
   }, [salvati, giaDentro, filtro]);
   const invito = invitoGruppoPath(gruppo.codice);
   // Proposta 88: i posti che più di voi hanno già salvato, finché non sono nella lista.
+  const [appena, setAppena] = useState<string | null>(null);
+  useEffect(() => {
+    if (!appena) return;
+    const el = document.querySelector(`[data-testid=gruppo-posto][data-place="${CSS.escape(appena)}"]`);
+    el?.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    const t = setTimeout(() => setAppena(null), 2200);
+    return () => clearTimeout(t);
+  }, [appena]);
   const comuni = useMemo(() => inComune.filter((c) => !giaDentro.has(c.place_id)).slice(0, 3), [inComune, giaDentro]);
 
   const toggleVoto = async (p: PostoGruppo) => {
@@ -93,6 +101,8 @@ export default function GruppoVista({
       return;
     }
     trackFeature("gruppo_aggiungi", { fonte });
+    // Minore della 88: dopo "Proponi" il posto nuovo si vede (scorre fin lì e si illumina un attimo).
+    setAppena(s.placeId);
     setPosti((all) => [
       ...all,
       {
@@ -264,7 +274,9 @@ export default function GruppoVista({
                   key={p.posto_id}
                   data-testid="gruppo-posto"
                   data-voti={p.voti}
-                  className={`flex items-center gap-3 rounded-card border bg-white p-3 shadow-card ${inTesta ? "border-accent" : "border-border"}`}
+                  data-place={p.place_id}
+                  data-appena={appena === p.place_id ? "1" : undefined}
+                  className={`flex scroll-my-24 items-center gap-3 rounded-card border p-3 shadow-card transition-colors duration-700 ${inTesta ? "border-accent" : "border-border"} ${appena === p.place_id ? "bg-accent-light" : "bg-white"}`}
                 >
                   <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn bg-accent-light text-xl">
                     {getCategoryEmoji(p.category, p.name)}
@@ -279,7 +291,8 @@ export default function GruppoVista({
                       {p.name}
                     </Link>
                     {m && <span className="block truncate text-xs text-text-muted">{m}</span>}
-                    <span className="mt-0.5 block truncate text-xs text-text-muted">
+                    {/* Minore della 88: su due righe al massimo invece di "proposto d…" tagliato. */}
+                    <span data-testid="gruppo-posto-chi" className="mt-0.5 line-clamp-2 text-xs leading-snug text-text-muted">
                       {votantiLabel(p.votanti)}
                       {p.aggiunto_da_nome ? ` · proposto da ${p.aggiunto_da === userId ? "te" : p.aggiunto_da_nome}` : ""}
                     </span>

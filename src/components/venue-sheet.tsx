@@ -2,7 +2,7 @@
 
 import { tagLabel, isStateTag } from "@/lib/tags";
 import { Lock, X, Quote, Navigation, Globe, Phone, Check, Share, Share2, Footprints, CalendarCheck, Ellipsis, UsersRound, Store, ExternalLink, MapPin, Clock, Pencil, BadgeCheck, ChevronRight, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SchedaVisitaContext, type SchedaVisita } from "@/components/scheda-visita";
 import { useBeta, useOptIn, useVariant } from "@/lib/beta";
 import Link from "next/link";
@@ -29,6 +29,7 @@ import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocaleStato } from 
 import AvvisoPosto from "@/components/avviso-posto";
 import { frasePrezzo } from "@/lib/prezzo-locale";
 import { fraseFreschezza } from "@/lib/freschezza-verdetto";
+import { titoloGlutine, type Glutine } from "@/lib/glutine";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 import { salvatoDa } from "@/lib/ricordo-salvato";
@@ -91,6 +92,8 @@ export type Venue = {
   percheTiPiacera?: string | null;
   // Requisiti della ricerca confermati, con la frase della recensione che li prova (proposta 18).
   requisiti?: { r: string; prova: string }[] | null;
+  // Proposta 91 "Per chi è celiaco": cosa dicono del senza glutine le recensioni Google lette (src/lib/glutine.ts).
+  glutine?: Glutine | null;
   // Frase di Google sul locale: si mostra, dichiarata, solo se il verdetto manca.
   editorialSummary?: string | null;
   // Proposta 45: stato da Google ("CLOSED_PERMANENTLY", "CLOSED_TEMPORARILY"), solo se noto.
@@ -251,6 +254,41 @@ export default function VenueSheet({
   // passando a un altro con "‹ ›" non si apre lì.
   // "Come lo sai?" (proposta 18): quale ✓ mostra la sua frase di recensione.
   const [provaAperta, setProvaAperta] = useState<string | null>(null);
+  // Segnali sotto il nome: oltre 2 righe passano a una riga che scorre (si misura quando arrivano, per locale).
+  const segnaliRef = useRef<HTMLDivElement>(null);
+  const [segnaliScorre, setSegnaliScorre] = useState(false);
+  const [segnaliDi, setSegnaliDi] = useState(venue.id);
+  if (segnaliDi !== venue.id) { setSegnaliDi(venue.id); setSegnaliScorre(false); }
+  // Prima misura prima di disegnare (niente fotogramma a 5 righe). Una volta che scorre resta così per quel locale
+  // (anche se un segnale sparisce o il telefono gira): niente salti avanti e indietro.
+  useLayoutEffect(() => {
+    const el = segnaliRef.current;
+    if (!el || segnaliScorre) return;
+    const misura = () => {
+      const kids = Array.from(el.querySelectorAll(":scope > * > *")) as HTMLElement[];
+      if (kids.length < 2) return;
+      // Righe vere: un elemento apre una riga nuova se comincia sotto il fondo della riga prima (pillole e riquadro
+      // alti diversi, centrati, non hanno lo stesso offsetTop).
+      let righe = 0, fondo = -Infinity;
+      for (const k of [...kids].sort((a, b) => a.offsetTop - b.offsetTop)) {
+        if (k.offsetHeight === 0) continue;
+        if (k.offsetTop >= fondo - 2) { righe++; fondo = k.offsetTop + k.offsetHeight; } else fondo = Math.max(fondo, k.offsetTop + k.offsetHeight);
+      }
+      if (righe > 2) setSegnaliScorre(true);
+    };
+    misura();
+    const ro = new ResizeObserver(misura);
+    ro.observe(el);
+    const mo = new MutationObserver(misura);
+    mo.observe(el, { childList: true, subtree: true });
+    return () => { ro.disconnect(); mo.disconnect(); };
+  }, [segnaliScorre, venue.id]);
+  // Proposta 91 "Per chi è celiaco": bocciata due volte il 27/11 (7,5 e 7,5), corretta e spenta per tutti
+  // finché un revisore nuovo non la approva: si accende con ?beta=celiaco.
+  const glutineScheda = useOptIn("celiaco") ? venue.glutine ?? null : null;
+  // Con la riga "🌾 Senza glutine" niente chip "✓ senza glutine" doppione (mai un ✓ e un ⚠️ insieme).
+  const SUL_GLUTINE = /glutin|celiac|gluten/i;
+  const requisitiScheda = glutineScheda ? venue.requisiti?.filter((x) => !SUL_GLUTINE.test(x.r)) : venue.requisiti;
   // La frase si porta in vista SOLO quando si tocca un ✓ (prima ripartiva a ogni aggiornamento della scheda).
   useEffect(() => {
     if (!provaAperta) return;
@@ -394,7 +432,7 @@ export default function VenueSheet({
   const verdictText =
     verdict != null && verdict.trim() !== "" ? verdict.trim() : null;
   const goForChips = senzaDoppioni(Array.isArray(goFor)
-    ? goFor.filter((c) => c != null && c.trim() !== "").map((c) => c.trim())
+    ? goFor.filter((c) => c != null && c.trim() !== "" && !(glutineScheda && SUL_GLUTINE.test(c))).map((c) => c.trim())
     : []);
   const dontExpectChips = Array.isArray(dontExpect)
     ? dontExpect.filter((c) => c != null && c.trim() !== "").map((c) => c.trim())
@@ -781,7 +819,7 @@ export default function VenueSheet({
     )].slice(0, 2);
     // Nulla tra il verdetto e "Orari, contatti, recensioni": basta il filetto sotto il verdetto.
     const subitoDopoVerdetto = (headline != null || verdettoInArrivo || googleLine != null)
-      && (venue.requisiti?.length ?? 0) === 0 && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
+      && (requisitiScheda?.length ?? 0) === 0 && !glutineScheda && !perTeLine && !friendsData && !showPersonalBlock && !(!isSaved && onQuickSave && !saveSlot);
     const hasOverview =
       showSynthesisBelow || matchReasonBelow || hasTags || goForChips.length > 0 || dontExpectChips.length > 0;
     const hasReviewsTab = hasReviews || communitySlot != null;
@@ -1020,25 +1058,44 @@ export default function VenueSheet({
           )}
           {/* Semplificare (20/10): i segnali brevi in UNA riga di pillole, non una riga ciascuno.
               Il contenitore sparisce se nessuno ha niente da dire (PostoLocale e BuoniPastoRiga arrivano dopo). */}
-          <div data-testid="segnali-scheda" className="mt-2.5 flex flex-wrap items-center gap-1.5 empty:hidden">
-            {gem && (
-              <span data-testid="gemma" className="inline-flex rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
-                💎 Poco conosciuto
-              </span>
-            )}
-            {/* Aperto da poco (PROPOSTE.md, proposta 7): parola del titolare verificato, solo il primo anno. */}
-            <AperturaPillola info={infoLocale} />
-            {/* Prezzo a testa detto dal titolare verificato (PROPOSTE.md 65), separato dai € di Google; dal 1/11 al 6/1
-                il menu delle feste (PROPOSTE.md 90) prende il suo posto nello stesso riquadro. */}
-            <PrezzoLocale info={infoLocale} />
-            {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1).
-                Subito dopo il prezzo: le due frasi del titolare vicine, un solo "· dice il locale" (revisore 17/11). */}
-            <PostoPillola info={infoLocale} conPrezzo />
-            {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
-            <BuoniPastoRiga venueId={venue.id} category={category} />
-            {/* Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3), con quanto ha speso a testa
-                (PROPOSTE.md 64, da 5 risposte, fascia scelta da almeno 2 senza pareggi) nella stessa pillola, anche se il locale dichiara il suo prezzo (due fonti, mai nascoste l'una dall'altra). */}
-            <VisiteMapetite venueId={googlePlaceId ?? venue.id} spesaId={venue.id} />
+          {/* Voce "Semplificare" (27/11): oltre 2 righe (fino a 132 px a 360 con prezzo, "c'è posto", aperto da poco e 👍)
+              il riquadro del titolare resta intero su una riga sua e le pillole corte vanno in una riga che scorre di lato,
+              con la sfumatura a destra (revisore 27/11: il riquadro tagliato e fuori schermo non andava). Con pochi segnali
+              tutto come prima, a capo. Il riquadro del titolare viene per primo: è il segnale più utile. */}
+          <div
+            ref={segnaliRef}
+            data-testid="segnali-scheda"
+            data-scorre={segnaliScorre ? "1" : undefined}
+            className={`mt-2.5 hidden gap-1.5 has-[>*>*]:flex ${segnaliScorre ? "flex-col" : "flex-wrap items-center"}`}
+          >
+            <div data-testid="segnali-titolare" className={segnaliScorre ? "flex flex-wrap items-center gap-1.5 empty:hidden" : "contents"}>
+              {/* Prezzo a testa detto dal titolare verificato (PROPOSTE.md 65), separato dai € di Google; dal 1/11 al 6/1
+                  il menu delle feste (PROPOSTE.md 90) prende il suo posto nello stesso riquadro. */}
+              <PrezzoLocale info={infoLocale} />
+              {/* Se il titolare di un locale verificato l'ha detto, "🌙 Martedì c'è posto" (POSIZIONAMENTO.md, proposta 1).
+                  Subito dopo il prezzo: le due frasi del titolare vicine, un solo "· dice il locale" (revisore 17/11). */}
+              <PostoPillola info={infoLocale} conPrezzo />
+            </div>
+            <div
+              data-testid="segnali-corti"
+              role={segnaliScorre ? "group" : undefined}
+              aria-label={segnaliScorre ? "Altri segnali del locale" : undefined}
+              tabIndex={segnaliScorre ? 0 : undefined}
+              className={segnaliScorre ? "-mx-[22px] flex flex-nowrap items-center gap-1.5 overflow-x-auto px-[22px] pb-0.5 [mask-image:linear-gradient(to_right,#000_calc(100%-22px),transparent)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand [scrollbar-width:none] empty:hidden [&::-webkit-scrollbar]:hidden [&>*]:shrink-0" : "contents"}
+            >
+              {gem && (
+                <span data-testid="gemma" className="inline-flex rounded-pill bg-accent-light px-2.5 py-0.5 text-xs font-display font-semibold text-accent">
+                  💎 Poco conosciuto
+                </span>
+              )}
+              {/* Subito dopo 💎 (revisore 27/11): il segnale dei comportamenti si vede senza scorrere. Chi ci è stato su Mapetite e com'era (solo da 5 voti in su, PROBLEMI.md 3), con quanto ha speso a testa
+                  (PROPOSTE.md 64, da 5 risposte, fascia scelta da almeno 2 senza pareggi) nella stessa pillola, anche se il locale dichiara il suo prezzo (due fonti, mai nascoste l'una dall'altra). */}
+              <VisiteMapetite venueId={googlePlaceId ?? venue.id} spesaId={venue.id} />
+              {/* Aperto da poco (PROPOSTE.md, proposta 7): parola del titolare verificato, solo il primo anno. */}
+              <AperturaPillola info={infoLocale} />
+              {/* Buoni pasto: solo se almeno 2 persone che ci sono state concordano (PROPOSTE.md 19/10). */}
+              <BuoniPastoRiga venueId={venue.id} category={category} />
+            </div>
           </div>
 
           {/* IL VERDETTO MAPETITE: in corsivo tra due filetti, come una citazione di rivista.
@@ -1086,10 +1143,10 @@ export default function VenueSheet({
           )}
 
           {/* Requisiti della ricerca confermati: un tocco mostra la frase della recensione (copiata, mai riscritta). */}
-          {(venue.requisiti?.length ?? 0) > 0 && (
+          {(requisitiScheda?.length ?? 0) > 0 && (
             <div data-testid="requisiti-scheda" className="mt-3.5">
               <div className="flex flex-wrap gap-2">
-                {venue.requisiti!.map(({ r }) => (
+                {requisitiScheda!.map(({ r }) => (
                   <button
                     key={r}
                     type="button"
@@ -1102,10 +1159,44 @@ export default function VenueSheet({
                   </button>
                 ))}
               </div>
-              {provaAperta && venue.requisiti!.find((x) => x.r === provaAperta) && (
+              {provaAperta && requisitiScheda!.find((x) => x.r === provaAperta) && (
                 <p data-testid="prova-recensione" className="mt-2 scroll-mb-28 text-[13.5px] font-sans leading-snug text-[#3d4248]">
-                  <span className={`${SERIF} italic text-[#141414]`}>«{venue.requisiti!.find((x) => x.r === provaAperta)!.prova}»</span>
+                  <span className={`${SERIF} italic text-[#141414]`}>«{requisitiScheda!.find((x) => x.r === provaAperta)!.prova}»</span>
                   <span className="text-text-muted"> · da una recensione su Google</span>
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Proposta 91 "Per chi è celiaco": solo per chi ha "Senza glutine" tra i gusti o lo cerca (il server manda il
+              campo solo allora). Cosa dicono le recensioni, con la frase copiata; mai "sicuro" o "adatto ai celiaci". */}
+          {glutineScheda && (
+            <div data-testid="glutine-scheda" data-stato={glutineScheda.stato} className="mt-3.5 text-[13.5px] font-sans leading-snug text-[#3d4248]">
+              {/* Revisore 27/11: testo in linea (niente "·" orfano a fine riga quando va a capo). */}
+              <p>
+                <b className="font-display font-semibold text-brand"><span aria-hidden>🌾</span> Senza glutine</b>
+                <span className={glutineScheda.stato === "attenzione" ? "font-semibold text-[#b3261e]" : ""}>
+                  <span aria-hidden className="font-normal text-text-muted"> · </span>
+                  {glutineScheda.stato === "bene" && <span aria-hidden className="text-success">✓ </span>}
+                  {glutineScheda.stato === "attenzione" && <span aria-hidden>⚠️ </span>}
+                  {titoloGlutine(glutineScheda)}
+                </span>
+              </p>
+              {glutineScheda.frase && (
+                <p data-testid="glutine-frase" className="mt-1">
+                  <span className={`${SERIF} italic text-[#141414]`}>«{glutineScheda.frase}»</span>
+                  <span className="text-text-muted"> · da una recensione su Google</span>
+                </p>
+              )}
+              {/* Chiama dove serve: senza notizie e con un avviso (revisore 27/11). */}
+              {(glutineScheda.stato === "niente" || glutineScheda.stato === "attenzione") && (
+                <p className="mt-0.5 flex items-center gap-2 text-text-muted">
+                  <span>Chiedi al locale prima di andare.</span>
+                  {telHref && (
+                    <a data-testid="glutine-chiama" href={telHref} onClick={() => signal("chiama")} className="inline-flex min-h-11 items-center gap-1 font-display font-semibold text-brand">
+                      <Phone size={14} aria-hidden /> Chiama
+                    </a>
+                  )}
                 </p>
               )}
             </div>
@@ -1116,7 +1207,7 @@ export default function VenueSheet({
         {friendsData && <AmiciQuiBox visitati={friendsData.visitati} daProvare={friendsData.daProvare} className="mx-[22px] mt-4" />}
 
         {/* Le tue note (stato, Com'era, classifica, tag e nota): solo per i salvati, in vista. */}
-        {showPersonalBlock && personalBlock(true, true, (headline != null || verdettoInArrivo || googleLine != null) && (venue.requisiti?.length ?? 0) === 0 && !perTeLine && !friendsData)}
+        {showPersonalBlock && personalBlock(true, true, (headline != null || verdettoInArrivo || googleLine != null) && (requisitiScheda?.length ?? 0) === 0 && !glutineScheda && !perTeLine && !friendsData)}
 
         {/* Locale non salvato senza barra Salva (scheda dall'assistente): le due scelte rapide aprono Salva. */}
         {!isSaved && onQuickSave && !saveSlot && (

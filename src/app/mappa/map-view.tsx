@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, useTransition, type FormEvent } from "react";
 import type { Orari } from "@/lib/orari";
+import type { Glutine } from "@/lib/glutine";
 import type { BookingDetails } from "@/lib/booking";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -853,6 +854,8 @@ type VenueDetails = {
   perTe?: string | null;
   // Requisiti della richiesta confermati dalle recensioni ("terrazza", "romantico"): "✓" sulla card.
   requisiti?: { r: string; prova: string }[] | null;
+  // Proposta 91: cosa dicono del senza glutine le recensioni (solo per chi lo chiede o ha il gusto).
+  glutine?: Glutine | null;
   photoRef?: string | null;
   photoAuthor?: string | null;
   editorialSummary?: string | null;
@@ -2176,7 +2179,7 @@ export default function MapView({
         rating: number | null; priceLevel: number | null; address: string | null;
         userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
         selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null; recensioniN?: number | null; recensioneUltima?: string | null;
+        goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; glutine?: Glutine | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null; recensioniN?: number | null; recensioneUltima?: string | null;
       };
       const raw: RawPlace[] = (data.risultati ?? []).filter((p: RawPlace) => p.lat != null && p.lng != null);
       const places: Place[] = raw.map((p) => ({ id: p.id, name: p.name, category: p.category, address: p.address ?? null, lat: p.lat as number, lng: p.lng as number, tags: null, note: null, rating: p.rating ?? null, priceLevel: p.priceLevel ?? null, types: p.types ?? null }));
@@ -2197,6 +2200,7 @@ export default function MapView({
           matchReason: p.matchReason ?? null,
           perTe: p.perTe ?? null,
           requisiti: p.requisiti ?? null,
+          glutine: p.glutine ?? null,
           photoRef: p.photoRef ?? null,
           photoAuthor: p.photoAuthor ?? null,
           editorialSummary: p.editorialSummary ?? null,
@@ -2823,7 +2827,7 @@ export default function MapView({
           rating: number | null; priceLevel: number | null; address: string | null;
           userRatingCount: number | null; openNow: boolean | null; websiteUri: string | null; phone: string | null;
           selectedReviews: { text: string }[] | null; synthesis: string | null; tags: string[] | null; verdict: string | null;
-          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null; recensioniN?: number | null; recensioneUltima?: string | null;
+          goFor: string[] | null; dontExpect: string[] | null; matchReason: string | null; perTe?: string | null; requisiti?: { r: string; prova: string }[] | null; glutine?: Glutine | null; photoRef?: string | null; photoAuthor?: string | null; editorialSummary?: string | null; orari?: Orari | null; types?: string[] | null; recensioniN?: number | null; recensioneUltima?: string | null;
         };
         // "Altri come questo": il posto di partenza non torna tra i risultati (stesso id o stesso nome).
         const fuori = new Set(opts.simile?.escludi ?? []);
@@ -2861,6 +2865,7 @@ export default function MapView({
             matchReason: p.matchReason ?? null,
           perTe: p.perTe ?? null,
           requisiti: p.requisiti ?? null,
+          glutine: p.glutine ?? null,
             photoRef: p.photoRef ?? null,
             photoAuthor: p.photoAuthor ?? null,
             editorialSummary: p.editorialSummary ?? null,
