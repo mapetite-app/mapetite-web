@@ -12999,13 +12999,15 @@ else {
     await mp.screenshot({ path: `${OUT}/97d-chi-viene-organizza.png` });
     // Il giorno stesso: 2 sì su 6 prenotati → "Avvisa Trattoria Prima: siete in 2", messaggio pronto.
     const tavoloIso = await mp.evaluate(async (c) => (await (await fetch(`/api/voto/${c}`)).json()).tavolo?.alle, codice);
-    await ctx.addCookies([{ name: "e2e_voto_ora", value: new Date(new Date(tavoloIso).getTime() - 2 * 3_600_000).toISOString(), url: BASE }]);
+    const dueOrePrima = new Date(new Date(tavoloIso).getTime() - 2 * 3_600_000);
+    await ctx.addCookies([{ name: "e2e_voto_ora", value: dueOrePrima.toISOString(), url: BASE }]);
+    await mp.clock.setFixedTime(dueOrePrima); // l'avviso si calcola con l'orologio del telefono
     await mp.reload({ waitUntil: "networkidle" });
     const av = mp.getByTestId("avvisa-locale");
     const testoAv = (await mp.getByTestId("avvisa-locale-testo").innerText().catch(() => "")).trim();
     ok(await av.isVisible() && (await av.innerText()).includes("siete in 2") && testoAv.includes("ho prenotato per 6 persone") && testoAv.includes("a nome Lorenzo: saremo in 2"), `chi viene: il giorno stesso l'avviso al locale col messaggio pronto (${testoAv})`);
     await mp.screenshot({ path: `${OUT}/97e-chi-viene-avvisa.png` });
-    await av.locator("a, button").first().evaluate((e) => { e.addEventListener("click", (ev) => ev.preventDefault(), { once: true }); e.click(); });
+    await av.locator("a, button").first().evaluate((e) => { e.addEventListener("click", (ev) => ev.preventDefault(), { once: true }); e.click(); }, null, { timeout: 5000 }).catch(() => {});
     await mp.getByTestId("avvisa-locale").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
     ok((await mp.getByTestId("avvisa-locale").count()) === 0 && (await mp.getByTestId("voto-sottotitolo").innerText()).trim().endsWith("tavolo per 2"), `chi viene: avvisato il locale, il tavolo passa a 2 e l'avviso sparisce (${await mp.getByTestId("voto-sottotitolo").innerText()})`);
     { const sw = await mp.evaluate(() => document.documentElement.scrollWidth); ok(sw <= 390, `chi viene: niente scorrimento di lato a 390 (${sw})`); }
