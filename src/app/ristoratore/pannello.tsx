@@ -10,6 +10,8 @@ import SerateTranquille from "./serate";
 import ApertoDal from "./aperto-dal";
 import PrezzoMedio from "./prezzo-medio";
 import MenuFesteModulo from "./menu-feste";
+import GlutineModulo from "./glutine-locale";
+import type { GlutineLocale } from "@/lib/glutine-locale";
 import { oggiRomaFeste, stagioneMenu, type MenuFeste } from "@/lib/menu-feste";
 import OmaggioRitorno from "./omaggio";
 import type { Omaggio } from "@/lib/omaggio";
@@ -381,7 +383,7 @@ export default function Pannello({
   demo?: boolean;
   avviso?: string | null;
   vista?: string;
-  serate?: { giorni: number[]; at: string | null; apertoDal?: string | null; prezzo?: Prezzo | null; feste?: MenuFeste | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
+  serate?: { giorni: number[]; at: string | null; apertoDal?: string | null; prezzo?: Prezzo | null; feste?: MenuFeste | null; glutine?: GlutineLocale | null; omaggio?: Omaggio | null; codiceOggi?: string | null; omaggiMostrati?: number };
   prenotazioni?: { tavoli: number; diParola: number; persone: number; personeParola: number } | null;
   // Proposta 58: tra chi ti vuole provare, quanti l'hanno salvato su consiglio di un amico. Solo il numero, mai chi.
   passaparola?: number;
@@ -623,6 +625,10 @@ export default function Pannello({
         </Sezione>
         </>
       )}
+      {/* "Il locale dice: senza glutine" (PROPOSTE.md, proposta 92): tre scelte a tocco, nella scheda accanto alle recensioni. */}
+      <Sezione titolo="Senza glutine" nota="Tre scelte a tocco. Lo vede chi apre la tua scheda, accanto a quello che dicono le recensioni." piano="Verified" testId="pannello-glutine">
+        <GlutineModulo placeId={locale.id} iniziale={demo ? { piatti: "richiesta", separati: true, afc: null, at: new Date().toISOString() } : serate.glutine ?? null} verificato={verificato} demo={demo} />
+      </Sezione>
       <Sezione titolo="Serate tranquille" nota="I giorni in cui di solito hai posto. Chi ti ha salvato lo vede nella tua scheda: niente sconti, niente commissioni." piano="Verified" testId="pannello-serate">
         <SerateTranquille placeId={locale.id} iniziali={demo ? [2, 3] : serate.giorni} at={demo ? new Date().toISOString() : serate.at} verificato={verificato} demo={demo} />
       </Sezione>
