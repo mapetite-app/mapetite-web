@@ -50,7 +50,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google e TheFork hanno il filtro "senza glutine" ma non dicono quanto è sicura la prova; AIC Mobile elenca i locali AFC ma non i posti che hai salvato tu. Nessuno dice "non lo sappiamo". È il verdetto che non inventa (VISIONE).
 - **Valore per l'utente:** capisce in un colpo d'occhio se fidarsi, chiedere o lasciar perdere; chi esce con un amico celiaco sceglie senza imbarazzi. **Per il ristoratore:** chi cucina bene senza glutine viene trovato da chi lo cerca, anche senza la scritta sul menu (il 68% dei locali non AFC non la usa, `PROBLEMI.md` 37).
 - **Sforzo:** S/M (le recensioni sono già nella Text Search; un campo in più nella sintesi Haiku, "glutine": bene / contaminazione / niente, con la frase esatta presa dalla recensione e controllata come le altre prove; una riga nella scheda). **Costo Google/Haiku:** Google zero; Haiku poche decine di token in più per sintesi, solo per chi ha il gusto attivo.
-- **Stato proposto:** PRONTA. **27/11 sera:** costruita a regole, bocciata due volte (7,5 e 7,5), corretta e spenta dietro `?beta=celiaco`; prossimo passo: ✓ solo con la conferma dell'AI (vedi BACKLOG).
+- **Stato proposto:** PRONTA. **27/11 sera:** costruita a regole, bocciata due volte (7,5 e 7,5), corretta e spenta dietro `?beta=celiaco`; prossimo passo: ✓ solo con la conferma dell'AI (vedi BACKLOG). **28/11:** seconda versione (✓ solo con la conferma dell'AI su tutte le recensioni lette; testi dell'AI sul glutine nascosti senza ✓; niente citazione per "ne parla"): prova AI 0 ✓ falsi su 71 trabocchetti; due revisori nuovi 6,5 e 8,0, tutto corretto: **resta spenta**, serve un terzo revisore.
 
 ### 92. "Il locale dice: senza glutine" nel pannello del titolare
 - **Problema:** `PROBLEMI.md` 37: molti locali preparano piatti senza glutine ma non lo scrivono; il celiaco deve telefonare.
@@ -58,7 +58,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** il "Il locale dice" (65) e il menu delle feste (90) hanno funzionato come strada per fatti che le recensioni non danno. TheFork chiede al locale le diete in modo generico; nessuno mette accanto la parola del locale e quella dei clienti.
 - **Valore per l'utente:** sa prima cosa aspettarsi. **Per il ristoratore:** un motivo concreto per verificare il locale; i clienti celiaci tornano (e portano gli amici) dove si sentono sicuri.
 - **Sforzo:** S (tre colonne nel profilo del locale verificato, un modulo nel pannello, una riga nella scheda). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA (dal vivo serve un locale verificato; in demo con il locale di prova). "Socio AFC" è dichiarato dal locale e va scritto come tale, finché non c'è un accordo con AIC (93).
+- **Stato proposto:** PRONTA (dal vivo serve un locale verificato; in demo con il locale di prova). "Socio AFC" è dichiarato dal locale e va scritto come tale, finché non c'è un accordo con AIC (93). **28/11: FATTA, in produzione** (revisore 8,5; migrazione `20261128_glutine_locale` applicata).
 
 ### 93. Il segno "AFC" di AIC sulla scheda, con un accordo con l'Associazione Italiana Celiachia
 - **Problema:** `PROBLEMI.md` 37: il 55% dei celiaci preferisce i locali della rete AFC (oltre 4.500), ma l'elenco sta in un'app a pagamento per chi non è socio, separata da dove le persone salvano i posti.
