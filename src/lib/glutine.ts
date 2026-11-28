@@ -18,7 +18,26 @@ export type Glutine = {
   n: number; // recensioni che ne parlano bene (solo "bene")
   voto?: number | null; // "ne-parla" da una recensione da 1-2 stelle senza parole d'avviso: "Una recensione da 1 stella ne parla"
   lette: number; // recensioni lette
+  frasi?: string[]; // solo "bene": tutte le frasi che ne parlano bene (copiate), nell'ordine
+  // Solo "bene": le frasi da far confermare all'AI con la recensione intera (contesto). Il ✓ si vede solo se
+  // l'AI le conferma (src/lib/conferma-prove.ts, due giri); il contesto resta sul server (si toglie in route).
+  candidati?: { frase: string; contesto: string }[];
 };
+
+// Il requisito con cui le frasi "bene" passano dalla conferma dell'AI (stessa chiamata del "✓ terrazza").
+// Nome a parte: la scheda non lo mostra mai come chip, solo nella riga "🌾 Senza glutine".
+export const R_GLUTINE = "senza glutine (piatti per celiaci)";
+
+// Quante frasi "bene" l'AI ha confermato: il ✓ vale solo per quelle (proposta 91, seconda versione del 28/11).
+// Senza conferma (AI spenta, oltre il tetto, oltre 7 s) la riga resta "ne parla", in grigio, con la frase.
+export function glutineConfermato(g: Glutine | null | undefined, requisiti: { r: string; prova: string }[] | null | undefined): Glutine | null {
+  if (!g) return null;
+  if (g.stato !== "bene") return g;
+  const ok = new Set((requisiti ?? []).filter((x) => x.r === R_GLUTINE).map((x) => x.prova));
+  const confermate = (g.frasi ?? [g.frase ?? ""]).filter((f) => ok.has(f));
+  if (confermate.length > 0) return { ...g, frase: confermate[0], n: confermate.length };
+  return { ...g, stato: "ne-parla", n: Math.max(1, g.frasi?.length ?? 1) };
+}
 
 const MAX = 140;
 
@@ -29,7 +48,7 @@ function normalizza(t: string): string {
 // Se ne parla: glutine, celiaco/a/i, gluten free (anche nelle recensioni in inglese).
 const MENZIONE = /\b(glutine|gluten|celiac\w*|coeliac\w*|senza glutine|gluten.?free)\b/;
 // Mette in guardia: contaminazione, stare male, nessuna attenzione, "non hanno niente senza glutine".
-const ATTENZIONE = /contaminaz\w*|contamina\w*|cross.?contam\w*|\bstat[oaie] mal\w*|\bsentit[oaie] mal\w*|malessere|\bmal di pancia|got sick|\bpoca attenzione|\bnessuna attenzione|\bzero attenzione|\bnon (?:sono|erano|e|era|siete) (?:\w+ )?(?:attent\w*|preparat\w*|informat\w*|adatt\w*|sicur\w*)|\bnon (?:hanno|avevano|c'e|c'era|ci sono|c'erano|offrono|esiste|esistono) (?:\w+ ){0,4}(?:senza glutine|gluten|celiac\w*)|\bniente (?:di )?senza glutine|\bnessun\w* (?:piatt\w*|opzion\w*|alternativ\w*) (?:\w+ ){0,2}senza glutine|\bsconsigli\w*|\bnot (?:safe|suitable)|\bno gluten.?free|\bnon (?:hanno|c'e|ci sono|avevano) (?:\w+ ){0,2}(?:cucin\w*|forn\w*|spazi\w*|zon\w*|friggitri\w*|post\w*) separat\w*|\bstav[oaie] mal\w*|\bsto male|\bstar male|\bmalissimo|\bsintom\w*|\breazion\w*|\bglutinat\w*|glutened|\bgot (?:ill|sick)|\btracce\b|\bstess[oaie] (?:cucin\w*|friggitri\w*|olio|forn\w*|pal[ae]|pian\w*)|\bcucina in comune|\bper (?:sbaglio|errore)|\bnon sapev\w*|\bvomit\w*|pronto soccorso|\bin bagno\b|\bcrampi|dissenteria|diarrea|\bnause\w*|\bgonfi\w*|felt (?:ill|sick)|\bnon garantisc\w*|\b(?:portat\w*|servit\w*|dat[oaie]|era|erano|arrivat\w*) (?:\w+ ){0,3}(?:pane|pasta|pizza|birra|quella|quello) normale\b|\bstess[oaie] (?:acqua|bancone|tagliere|piastr\w*)|\bbriciole|\bdisastro|\b(?:stat|sentit|stav)[oaie] (?:\w+ )?mal\w*|\brischiare|\bpoco chiar\w*|\bpoco bene\b|\bconfusion\w*|\bconfus[oaie]\b/;
+const ATTENZIONE = /contaminaz\w*|contamina\w*|cross.?contam\w*|\bstat[oaie] mal\w*|\bsentit[oaie] mal\w*|malessere|\bmal di pancia|got sick|\bpoca attenzione|\bnessuna attenzione|\bzero attenzione|\bnon (?:sono|erano|e|era|siete) (?:\w+ )?(?:attent\w*|preparat\w*|informat\w*|adatt\w*|sicur\w*)|\bnon (?:hanno|avevano|c'e|c'era|ci sono|c'erano|offrono|esiste|esistono) (?:\w+ ){0,4}(?:senza glutine|gluten|celiac\w*)|\bniente (?:di )?senza glutine|\bnessun\w* (?:piatt\w*|opzion\w*|alternativ\w*) (?:\w+ ){0,2}senza glutine|\bsconsigli\w*|\bnot (?:safe|suitable)|\bno gluten.?free|\bnon (?:hanno|c'e|ci sono|avevano) (?:\w+ ){0,2}(?:cucin\w*|forn\w*|spazi\w*|zon\w*|friggitri\w*|post\w*) separat\w*|\bstav[oaie] mal\w*|\bsto male|\bstar male|\bmalissimo|\bsintom\w*|\breazion\w*|\bglutinat\w*|glutened|\bgot (?:ill|sick)|\btracce\b|\bstess[oaie] (?:cucin\w*|friggitri\w*|olio|forn\w*|pal[ae]|pian\w*)|\bcucina in comune|\bper (?:sbaglio|errore)|\bnon sapev\w*|\bvomit\w*|pronto soccorso|\bin bagno\b|\bcrampi|dissenteria|diarrea|\bnause\w*|\bgonfi\w*|felt (?:ill|sick)|\bnon garantisc\w*|\b(?:portat\w*|servit\w*|dat[oaie]|era|erano|arrivat\w*) (?:\w+ ){0,3}(?:pane|pasta|pizza|birra|quella|quello) normale\b|\bstess[oaie] (?:acqua|bancone|tagliere|piastr\w*)|\bbriciole|\bdisastro|\b(?:stat|sentit|stav)[oaie] (?:\w+ )?mal\w*|\brischiare|\bpoco chiar\w*|\bmal di (?:testa|stomaco)|\b(?:was|were|been|felt) (?:\w+ )?(?:sick|ill)\b|\bpoco bene\b|\bconfusion\w*|\bconfus[oaie]\b/;
 // In una recensione da 1-2 stelle, la frase da mostrare: prima quella che dice il fatto ("era con glutine").
 const GRAVE = /\bcon (?:il )?glutine\b|errore|sbagliat\w*|imperdonabil\w*|grav[ei]\b|pericol\w*|rischi\w*|non (?:era|erano|fosse) (?:\w+ )?(?:senza glutine|gluten.?free)/;
 // Un avviso negato non è un avviso: "senza preoccuparsi di contaminazioni", "nessuna contaminazione",
@@ -69,6 +88,7 @@ export function glutineDalleRecensioni(recensioni: { text: string; rating?: numb
   let neParla: { f: string; punti: number } | null = null;
   let quante = 0; // recensioni che ne parlano (per "3 recensioni ne parlano")
   const bene: string[] = [];
+  const contesti: string[] = [];
   for (const r of lette) {
     const tutte = frasi(r.text);
     const sulGlutine = tutte.map((f) => ({ f, n: normalizza(f) })).map((x) => ({ ...x, at: x.n.search(MENZIONE) })).filter((x) => x.at >= 0);
@@ -114,12 +134,12 @@ export function glutineDalleRecensioni(recensioni: { text: string; rating?: numb
       const punti = (cosa ? 20 : 0) + (positivo ? 10 : 0) + voto;
       if (!neParla || punti > neParla.punti) neParla = { f: corta(x.f, x.at), punti };
     }
-    if (beneQui) bene.push(beneQui);
+    if (beneQui) { bene.push(beneQui); contesti.push(r.text.slice(0, 1000)); }
   }
   // Un avviso vince sempre: un locale non può essere "✓" se anche una sola recensione mette in guardia.
   if (attenzione) return { stato: "attenzione", frase: attenzione, n: bene.length, lette: lette.length };
   if (basso) return { stato: "ne-parla", frase: basso.f, n: bene.length, lette: lette.length, voto: basso.voto };
-  if (bene.length > 0) return { stato: "bene", frase: bene[0], n: bene.length, lette: lette.length };
+  if (bene.length > 0) return { stato: "bene", frase: bene[0], n: bene.length, lette: lette.length, frasi: bene, candidati: bene.map((frase, i) => ({ frase, contesto: contesti[i] })) };
   if (neParla) return { stato: "ne-parla", frase: neParla.f, n: quante, lette: lette.length };
   return { stato: "niente", frase: null, n: 0, lette: lette.length };
 }

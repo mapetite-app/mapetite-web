@@ -29,7 +29,7 @@ import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocaleStato } from 
 import AvvisoPosto from "@/components/avviso-posto";
 import { frasePrezzo } from "@/lib/prezzo-locale";
 import { fraseFreschezza } from "@/lib/freschezza-verdetto";
-import { titoloGlutine, type Glutine } from "@/lib/glutine";
+import { glutineConfermato, R_GLUTINE, titoloGlutine, type Glutine } from "@/lib/glutine";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 import { salvatoDa } from "@/lib/ricordo-salvato";
@@ -285,10 +285,15 @@ export default function VenueSheet({
   }, [segnaliScorre, venue.id]);
   // Proposta 91 "Per chi è celiaco": bocciata due volte il 27/11 (7,5 e 7,5), corretta e spenta per tutti
   // finché un revisore nuovo non la approva: si accende con ?beta=celiaco.
-  const glutineScheda = useOptIn("celiaco") ? venue.glutine ?? null : null;
+  // Seconda versione (28/11): il ✓ solo per le frasi che l'AI ha confermato (glutineConfermato); senza conferma "ne parla".
+  const glutineScheda = glutineConfermato(useOptIn("celiaco") ? venue.glutine ?? null : null, venue.requisiti);
   // Con la riga "🌾 Senza glutine" niente chip "✓ senza glutine" doppione (mai un ✓ e un ⚠️ insieme).
+  // Il requisito della conferma (R_GLUTINE) non è mai una chip, nemmeno con la riga spenta.
   const SUL_GLUTINE = /glutin|celiac|gluten/i;
-  const requisitiScheda = glutineScheda ? venue.requisiti?.filter((x) => !SUL_GLUTINE.test(x.r)) : venue.requisiti;
+  const requisitiScheda = (glutineScheda ? venue.requisiti?.filter((x) => !SUL_GLUTINE.test(x.r)) : venue.requisiti?.filter((x) => x.r !== R_GLUTINE)) ?? venue.requisiti;
+  // Senza il ✓ confermato, niente frase dell'AI che parla di glutine o celiaci accanto alla riga (27/11: il
+  // "perché" poteva dire "ottimo per celiaci" accanto a un ⚠️). Con un ⚠️ anche il verdetto, se ne parla.
+  const glutineDubbio = glutineScheda != null && glutineScheda.stato !== "bene";
   // La frase si porta in vista SOLO quando si tocca un ✓ (prima ripartiva a ogni aggiornamento della scheda).
   useEffect(() => {
     if (!provaAperta) return;
@@ -428,9 +433,9 @@ export default function VenueSheet({
   // Verdetto bipolare come CHIP: filtra gli elementi non vuoti dell'array.
   // dont_expect è spesso [] per il vincolo feroce lato prompt → resta nascosto.
   const matchReasonText =
-    matchReason != null && matchReason.trim() !== "" ? matchReason.trim() : null;
+    matchReason != null && matchReason.trim() !== "" && !(glutineDubbio && SUL_GLUTINE.test(matchReason)) ? matchReason.trim() : null;
   const verdictText =
-    verdict != null && verdict.trim() !== "" ? verdict.trim() : null;
+    verdict != null && verdict.trim() !== "" && !(glutineScheda?.stato === "attenzione" && SUL_GLUTINE.test(verdict)) ? verdict.trim() : null;
   const goForChips = senzaDoppioni(Array.isArray(goFor)
     ? goFor.filter((c) => c != null && c.trim() !== "" && !(glutineScheda && SUL_GLUTINE.test(c))).map((c) => c.trim())
     : []);
@@ -785,7 +790,7 @@ export default function VenueSheet({
     // "Per te": prima il perché dai gusti (mappa del gusto, scritto dall'AI solo con i gusti veri),
     // altrimenti il perché per questa ricerca. Se ci sono tutti e due, il secondo va in "In breve".
     const daiTuoiPosti = venue.percheTiPiacera?.trim() || null;
-    const perTeText = daiTuoiPosti ?? (venue.perTe?.trim() || null);
+    const perTeText = [daiTuoiPosti, venue.perTe?.trim() || null].find((t) => t && !(glutineDubbio && SUL_GLUTINE.test(t))) ?? null;
     const perTeLine = perTeText ?? matchReasonText;
     const matchReasonBelow = perTeText != null && matchReasonText != null;
     // Senza verdetto (né in arrivo): la frase di Google o una recensione, dichiarate come tali.
