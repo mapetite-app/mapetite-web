@@ -49,6 +49,10 @@ begin
   if not (p_posto = any (v.posti)) then return 'posto'; end if;
   if p_alle < now() - interval '1 hour' or p_alle > v.created_at + interval '21 days' then return 'quando'; end if;
   if p_persone < 2 or p_persone > 30 then return 'quando'; end if;
+  -- Cambiati giorno, ora o posto: le risposte date per l'altro tavolo non valgono più.
+  if v.tavolo_alle is not null and (v.tavolo_alle <> p_alle or v.tavolo_posto <> p_posto) then
+    delete from public.voti_gruppo_presenze where voto_id = v.id;
+  end if;
   update public.voti_gruppo set tavolo_posto = p_posto, tavolo_alle = p_alle, tavolo_persone = p_persone where id = v.id;
   return 'ok';
 end $$;

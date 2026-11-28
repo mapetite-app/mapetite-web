@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, Copy, MessageCircle, Minus, Phone, Plus, X } from "lucide-react";
 import { loadBookings, telHref, whatsappNumber } from "@/lib/booking";
 import { trackFeature } from "@/lib/track";
-import { PERSONE_MAX, PERSONE_MIN, daAvvisare, giornoRoma, messaggioNumero, quandoTavolo, type VotoPosto, type VotoStato } from "@/lib/voto-gruppo";
+import { PERSONE_MAX, PERSONE_MIN, TAVOLO_GIORNI, daAvvisare, giornoRoma, messaggioNumero, quandoTavolo, type VotoPosto, type VotoStato } from "@/lib/voto-gruppo";
 import { chiHaVotato } from "./chi-ha-votato";
 
 // "Chi viene?" (proposta 94): dopo il voto, il link diventa la conferma. Chi ha proposto dice quando e per
@@ -78,22 +78,21 @@ export function FissaTavolo({ stato, posto, onFatto, onAnnulla }: { stato: VotoS
             data-testid="chi-viene-data"
             aria-label="Altro giorno"
             min={oggi}
+            max={giornoRoma(new Date(), TAVOLO_GIORNI - 1)}
             value={giorno}
             onChange={(e) => { if (e.target.value) setGiorno(e.target.value); }}
             className="absolute inset-0 cursor-pointer opacity-0"
           />
         </label>
       </div>
-      <div className="mt-3 flex items-center gap-3">
-        <label className="flex min-h-12 flex-1 items-center gap-2 rounded-pill border border-border bg-bg px-4">
-          <span className="text-[13px] font-sans text-text-muted">Alle</span>
-          <input type="time" data-testid="chi-viene-ora" value={ora} onChange={(e) => setOra(e.target.value)} className="min-w-0 flex-1 bg-transparent font-display text-[16px] font-semibold text-text outline-none" />
-        </label>
-        <div className="flex min-h-12 items-center gap-1 rounded-pill border border-border bg-bg px-1.5" role="group" aria-label="Persone">
-          <button type="button" aria-label="Una persona in meno" data-testid="chi-viene-meno" disabled={persone <= PERSONE_MIN} onClick={() => setPersone((n) => Math.max(PERSONE_MIN, n - 1))} className="flex h-10 w-10 items-center justify-center rounded-full text-brand disabled:opacity-40"><Minus size={16} /></button>
-          <span data-testid="chi-viene-persone" className="min-w-[4.5rem] text-center font-display text-[15px] font-semibold text-text">{persone} persone</span>
-          <button type="button" aria-label="Una persona in più" data-testid="chi-viene-piu" disabled={persone >= PERSONE_MAX} onClick={() => setPersone((n) => Math.min(PERSONE_MAX, n + 1))} className="flex h-10 w-10 items-center justify-center rounded-full text-brand disabled:opacity-40"><Plus size={16} /></button>
-        </div>
+      <label className="mt-3 flex min-h-12 items-center gap-2 rounded-pill border border-border bg-bg px-4">
+        <span className="text-[13px] font-sans text-text-muted">Alle</span>
+        <input type="time" data-testid="chi-viene-ora" value={ora} onChange={(e) => setOra(e.target.value)} className="min-w-0 flex-1 bg-transparent font-display text-[16px] font-semibold text-text outline-none" />
+      </label>
+      <div className="mt-2 flex min-h-12 items-center justify-between rounded-pill border border-border bg-bg px-1.5" role="group" aria-label="Persone">
+        <button type="button" aria-label="Una persona in meno" data-testid="chi-viene-meno" disabled={persone <= PERSONE_MIN} onClick={() => setPersone((n) => Math.max(PERSONE_MIN, n - 1))} className="flex h-10 w-10 items-center justify-center rounded-full text-brand disabled:opacity-40"><Minus size={16} /></button>
+        <span data-testid="chi-viene-persone" className="whitespace-nowrap text-center font-display text-[15px] font-semibold text-text">{persone} persone</span>
+        <button type="button" aria-label="Una persona in più" data-testid="chi-viene-piu" disabled={persone >= PERSONE_MAX} onClick={() => setPersone((n) => Math.min(PERSONE_MAX, n + 1))} className="flex h-10 w-10 items-center justify-center rounded-full text-brand disabled:opacity-40"><Plus size={16} /></button>
       </div>
       {errore && <p role="alert" data-testid="chi-viene-errore" className="mt-2 text-sm font-sans text-error">{errore}</p>}
       <button type="button" data-testid="chi-viene-salva" disabled={invio || !ora} onClick={() => void salva()} className={`${btnBase} mt-3 w-full bg-brand text-white`}>

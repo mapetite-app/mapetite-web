@@ -109,7 +109,8 @@ export default function VotoGruppo({ iniziale, foto, percorso, collegato }: { in
   const postoTavolo = tavolo ? stato.posti.find((p) => p.id === tavolo.posto) ?? null : null;
   // Con il tavolo fissato la pagina diventa la conferma: in vista solo il posto scelto e "Ci sei?".
   const conTavolo = !!(stato.chiuso && tavolo && postoTavolo);
-  const mostrati = conTavolo ? ordinati.filter((p) => p.id === postoTavolo!.id) : ordinati;
+  // (revisore 28/11: la card del posto ripeteva il titolo e i voti, non chi viene: tolta)
+  const mostrati = conTavolo ? [] : ordinati;
   const campoNome = (
     <>
       <label htmlFor="voto-nome" className="sr-only">Il tuo nome</label>

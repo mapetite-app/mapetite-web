@@ -12970,7 +12970,7 @@ else {
     await mod.getByTestId("chi-viene-salva").click();
     await mp.getByTestId("ci-sei").waitFor({ timeout: 4000 }).catch(() => {});
     const sotto = (await mp.getByTestId("voto-sottotitolo").innerText()).trim();
-    ok((await mp.getByTestId("voto-titolo").innerText()).trim() === "Trattoria Prima" && / alle 20:30 · tavolo per 6$/.test(sotto) && (await mp.getByTestId("voto-posto").count()) === 1 && await mp.getByTestId("chi-viene-manda").isVisible(), `chi viene: la pagina diventa la conferma, solo il posto scelto e "Chiedi al gruppo" (${sotto})`);
+    ok((await mp.getByTestId("voto-titolo").innerText()).trim() === "Trattoria Prima" && / alle 20:30 · tavolo per 6$/.test(sotto) && (await mp.getByTestId("voto-posto").count()) === 0 && await mp.getByTestId("chi-viene-manda").isVisible(), `chi viene: la pagina diventa la conferma, niente card dei voti e "Chiedi al gruppo" (${sotto})`);
     ok(((await mp.getByTestId("ci-sei-conto").innerText()).trim()) === "Ancora nessuna risposta · 4 senza risposta", `chi viene: chi organizza vede quanti non hanno risposto (${await mp.getByTestId("ci-sei-conto").innerText()})`);
     // Gli amici: Marco c'è, Giulia no (il nome è già quello del voto).
     await m.p.reload({ waitUntil: "networkidle" });

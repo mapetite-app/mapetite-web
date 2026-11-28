@@ -176,6 +176,8 @@ export async function segnaTavolo(codice: string, utente: string, posto: string,
     if (new Date(f.chiudeAlle) > now) return "aperto";
     if (!f.posti.some((p) => p.id === posto)) return "posto";
     if (alle.getTime() < now.getTime() - 3_600_000 || alle.getTime() > new Date(f.creato).getTime() + TAVOLO_GIORNI * 86_400_000) return "quando";
+    // Cambiati giorno o ora: le risposte date per l'altra data non valgono più.
+    if (f.tavolo && (f.tavolo.alle !== alle.toISOString() || f.tavolo.posto !== posto)) f.presenze = new Map();
     f.tavolo = { posto, alle: alle.toISOString(), persone };
     return "ok";
   }

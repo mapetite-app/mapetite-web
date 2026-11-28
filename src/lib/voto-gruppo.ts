@@ -164,18 +164,19 @@ export function risposteAperte(t: Tavolo | null, now: Date = new Date()): boolea
 }
 
 /**
- * Quanti ci sono, se conviene avvisare il locale: i "sì" sono diversi dal numero prenotato (almeno 1 sì),
- * e il conto è affidabile (hanno risposto tutti quelli che hanno votato, oppure manca meno di un giorno).
- * Mai prima che il tavolo sia fissato, mai dopo l'ora del tavolo.
+ * Quanti ci sono, se conviene avvisare il locale (revisore 28/11: mai un numero tirato a indovinare).
+ * Solo per chi organizza e dopo che ha risposto anche lui (se no il suo posto non è contato); i "sì" sono
+ * almeno 2 e diversi dal numero prenotato; e hanno risposto tutti quelli che hanno votato, oppure mancano
+ * meno di 3 ore (chi non ha risposto a quel punto non viene). Mai dopo l'ora del tavolo.
  */
-export function daAvvisare(stato: Pick<VotoStato, "tavolo" | "presenze" | "senzaRisposta">, now: Date = new Date()): number | null {
+export function daAvvisare(stato: Pick<VotoStato, "tavolo" | "presenze" | "senzaRisposta" | "sonoIo" | "miaPresenza">, now: Date = new Date()): number | null {
   const t = stato.tavolo;
-  if (!t) return null;
+  if (!t || !stato.sonoIo || stato.miaPresenza == null) return null;
   const mancaMs = new Date(t.alle).getTime() - now.getTime();
   if (mancaMs <= 0) return null;
   const si = stato.presenze.filter((p) => p.ciSono).length;
-  if (si < 1 || si === t.persone) return null;
-  if (stato.senzaRisposta > 0 && mancaMs > 86_400_000) return null;
+  if (si < PERSONE_MIN || si === t.persone) return null;
+  if (stato.senzaRisposta > 0 && mancaMs > 3 * 3_600_000) return null;
   return si;
 }
 
