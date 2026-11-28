@@ -24,7 +24,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** i sondaggi di WhatsApp non sono legati alla prenotazione; TheFork e i gestionali vedono solo il numero detto da chi prenota; Ask Maps (ora anche in Italia, `COMPETITOR.md` 28/11) ragiona sui salvati di una persona sola. Nessuno collega il gruppo al tavolo.
 - **Valore per l'utente:** chi organizza smette di contare i messaggi in chat e non fa brutte figure col locale. **Per il ristoratore:** sa ore prima che arrivano in 7 e non in 12; dopo, nel pannello, "tavolate da Mapetite avvisate in tempo" (solo conteggi da 3 in su, come la proposta 3).
 - **Sforzo:** S/M (una colonna di stato sulla pagina del voto già esistente, una tabella "ci sono / non ci sono" con gli stessi limiti anti-abuso dei voti, una riga e un messaggio pronto; riuso di `Disdetta`). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA, da costruire **prima di metà dicembre** (le cene aziendali si concentrano nelle due settimane prima del 24, `PROBLEMI.md` 36). In demo: un voto di prova già chiuso.
+- **Stato:** FATTA il 28/11 (sessione 10:05, approvata 8,5). Era: PRONTA, da costruire **prima di metà dicembre** (le cene aziendali si concentrano nelle due settimane prima del 24, `PROBLEMI.md` 36). In demo: un voto di prova già chiuso.
 
 ### 95. "Per le tavolate": le regole del locale per i gruppi, dette dal locale
 - **Problema:** `PROBLEMI.md` 38: alcuni locali chiedono caparra o penali fino a 250 € per disdette a meno di 48 ore, altri no; chi prenota per 10 lo scopre al telefono o quando è tardi.

@@ -12949,6 +12949,7 @@ else {
   // Proposta 94 "Chi viene?" (28/11): a voto chiuso chi ha proposto dice quando e per quanti ha il tavolo; il link
   // chiede a tutti "Ci sei?"; se i sì non tornano col numero prenotato, il messaggio per il locale è già scritto.
   { const r = m.c.request;
+    await mp.reload({ waitUntil: "networkidle" }); // chiude il foglio Prenota aperto dal passo prima
     const prima = await r.post(`${BASE}/api/voto/${codice}/presenza`, { data: { nome: "Marco", ciSono: true } });
     ok(prima.status() === 409 && (await m.p.getByTestId("ci-sei").count()) === 0 && (await mp.getByTestId("chi-viene-apri").isVisible()), `chi viene: prima del tavolo niente "Ci sei?" (${prima.status()}), chi ha proposto ha "Prenotato? Chiedi chi viene"`);
     const giornoTra = (n) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date(Date.now() + n * 86_400_000));
