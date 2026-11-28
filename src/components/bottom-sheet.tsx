@@ -209,8 +209,9 @@ function DaiTuoiSalvati({ items, onOpen, inline = false, aligned = false }: { it
 }
 
 // Proposta 91 (28/11): "Ottima per celiaci" dell'AI non si vede se le recensioni non danno un ✓ confermato.
-function percheSulGlutineNonConfermato(d: ListDetails): boolean {
-  return d.glutine != null && glutineConfermato(d.glutine, d.requisiti)?.stato !== "bene" && /glutin|celiac|gluten/i.test(d.matchReason ?? "");
+// Revisore 28/11: vale per ogni testo dell'AI sulla card (verdetto, "Per te", perché), non solo per il perché.
+function sulGlutineNonConfermato(d: ListDetails | undefined, testo: string | null | undefined): boolean {
+  return d?.glutine != null && glutineConfermato(d.glutine, d.requisiti)?.stato !== "bene" && /glutin|celiac|gluten/i.test(testo ?? "");
 }
 
 export type ListDetails = {
@@ -1164,7 +1165,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       )}
                       {/* Verdetto fino a 2 righe; mentre arriva, il segnaposto tiene le sue 2 righe. */}
                       <span className="mt-1.5 block">
-                        {d?.verdict ? (
+                        {d?.verdict && !sulGlutineNonConfermato(d, d.verdict) ? (
                           <>
                             <span data-testid="etichetta-verdetto" className="sr-only">Il verdetto Mapetite</span>
                             <span className="line-clamp-2 text-[15px] font-sans font-medium leading-[1.35] text-white"><span aria-hidden className="mr-1 text-accent">✦</span>{d.verdict}</span>
@@ -1176,7 +1177,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         ) : null}
                       </span>
                       {/* "Per te" (mockup A del 21/10): una riga dai gusti veri dell'utente, mai inventata. */}
-                      {d?.perTe && (
+                      {d?.perTe && !sulGlutineNonConfermato(d, d.perTe) && (
                         <span data-testid="per-te-card" className="mt-1 line-clamp-1 text-[13px] font-sans font-medium leading-5 text-[#ff9f8a]">
                           {/* In linea come il ✦ del verdetto: le due righe vanno a capo allo stesso modo. */}
                           <svg viewBox="0 0 24 24" className="mr-1 inline h-3.5 w-3.5 -translate-y-px align-middle" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
@@ -1393,7 +1394,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       </span>
                     )}
                   </span>
-                  {details?.[place.id]?.verdict ? (
+                  {details?.[place.id]?.verdict && !sulGlutineNonConfermato(details[place.id], details[place.id]!.verdict) ? (
                     <span className="mt-1.5 block text-sm font-sans font-medium leading-snug text-brand">
                       {details[place.id]!.verdict}
                     </span>
@@ -1404,7 +1405,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       {googleLine(details?.[place.id])}
                     </span>
                   ) : null}
-                  {details?.[place.id]?.matchReason && !percheSulGlutineNonConfermato(details[place.id]!) && (
+                  {details?.[place.id]?.matchReason && !sulGlutineNonConfermato(details[place.id], details[place.id]!.matchReason) && (
                     <span className="mt-1 line-clamp-2 text-xs font-sans leading-snug text-text-muted">
                       {details[place.id]!.matchReason}
                     </span>

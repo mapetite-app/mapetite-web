@@ -13132,7 +13132,7 @@ else {
   for (const t of ["Ottimo per celiaci, non ci sono stati problemi di contaminazione.", "Nessun problema di contaminazione, pizza senza glutine ottima.", "Mi aiutano a capire il frumento deglutinato, pasta senza glutine ottima.", "Poter mangiare senza il pensiero di dover star male, pizza senza glutine ottima."])
     ok(g([{ text: t, rating: 5 }])?.stato !== "attenzione", `celiaco: nessun falso avviso («${t}»)`);
   ok(g([{ text: "Dichiarano di essere gluten free, ma non hanno due cucine separate.", rating: 3 }])?.stato === "attenzione", "celiaco: 'non hanno due cucine separate' mette in guardia");
-  ok(g([{ text: "Dovevo venire con la mia ragazza celiaca ma purtroppo ha avuto un problema.", rating: 5 }, { text: "Pizza senza glutine buona mentre quella classica non mi è piaciuta.", rating: 3 }])?.frase?.startsWith("Pizza senza glutine"), "celiaco: per 'ne parla' la frase sulla cosa, non sulla persona");
+  ok(g([{ text: "Dovevo venire con la mia ragazza celiaca ma purtroppo ha avuto un problema.", rating: 5 }, { text: "Pizza senza glutine buona mentre quella classica non mi è piaciuta.", rating: 3 }])?.frase === null, "celiaco: 'ne parla' senza citazione (revisore 28/11: mezza frase rassicurava)");
   { const f = "Grazie davvero per il bellissimo pranzo e soprattutto per l'emozione provata nel gustare i fritti e la cacio e pepe senza glutine, bravissimi tutti quanti voi!";
     const r = g([{ text: f, rating: 5 }]); ok(r?.frase?.endsWith("bravissimi tutti quanti voi!") && /senza glutine/.test(r.frase), `celiaco: frase lunga che finisce poco dopo la parola, presa fino alla fine (${r?.frase})`); }
   // Secondo revisore 27/11: avvisi con altre parole e negazioni che non devono spegnere un avviso vero.
@@ -13150,6 +13150,10 @@ else {
     ok(una?.stato === "bene" && una.n === 1 && una.frase === b.frasi[1], `celiaco: con una frase confermata ✓ "Una recensione ne parla bene" con quella frase (${una && gl.titoloGlutine(una)})`);
     ok(gl.glutineConfermato(b, [{ r: "senza glutine", prova: b.frasi[0] }])?.stato === "ne-parla", "celiaco: vale solo la conferma del requisito interno, non un'altra chip");
     ok(gl.glutineConfermato({ stato: "attenzione", frase: "x", n: 0, lette: 5 }, [{ r: gl.R_GLUTINE, prova: "x" }])?.stato === "attenzione", "celiaco: la conferma non cambia mai un ⚠️"); }
+  { const r = g([{ text: "Pizza senza glutine buonissima, croccante.", rating: 5 }, { text: "Bel locale. Le pizze senza glutine vengono infornate insieme alle altre.", rating: 5 }]);
+    ok(r?.stato === "attenzione", `celiaco: 'infornate insieme alle altre' in un'altra recensione mette in guardia (${r?.stato})`); }
+  { const r = g([{ text: "Ottimi i supplì senza glutine, bravissimi.", rating: 5 }, { text: "Fanno il senza glutine, buono, cucina molto curata e personale gentile con i celiaci.", rating: 5 }]);
+    ok(r?.candidati?.every((c) => c.contesto.includes("Recensione 1") && c.contesto.includes("Recensione 2")), "celiaco: all'AI vanno tutte le recensioni del locale che parlano di glutine"); }
   { const cs = (await import("node:fs")).readFileSync(new URL("../../src/lib/conferma-prove.ts", import.meta.url), "utf8"); ok(cs.includes(gl.R_GLUTINE) && /contaminazione/.test(cs), "celiaco: la conferma dell'AI ha la regola del senza glutine (avvisi in tutta la recensione → no)"); }
   ok(gl.glutineRichiesto("pizzeria senza glutine a Monti", []) && gl.glutineRichiesto("trattoria", ["celiaco"]) && gl.glutineRichiesto("posto per celiaci", []) && !gl.glutineRichiesto("trattoria a Monti", ["vegano"]), "celiaco: la riga serve solo con il gusto o se la ricerca lo chiede");
   for (const st of ["bene", "attenzione", "ne-parla", "niente"]) ok(!/sicur|adatt/i.test(gl.titoloGlutine({ stato: st, frase: null, n: 1, lette: 5 })), `celiaco: '${st}' non dice mai 'sicuro' o 'adatto'`);
@@ -13158,7 +13162,7 @@ else {
     mk("G1", "Pizzeria Bene", 41.9, 12.49, { category: "pizzeria", types: ["pizza_restaurant"], requisiti: [{ r: "senza glutine", prova: "Impasto senza glutine ottimo." }, { r: gl.R_GLUTINE, prova: "Impasto senza glutine ottimo e preparato a parte!" }, { r: gl.R_GLUTINE, prova: "Molto attenti ai celiaci, bravissimi." }], glutine: { stato: "bene", frase: "Impasto senza glutine ottimo e preparato a parte!", frasi: ["Impasto senza glutine ottimo e preparato a parte!", "Molto attenti ai celiaci, bravissimi."], n: 2, lette: 5 } }),
     // Seconda versione (28/11): "bene" dalle regole ma l'AI non ha confermato la frase → niente ✓, "ne parla";
     // il "perché" dell'AI che dice "ottimo per celiaci" non si vede accanto.
-    mk("G5", "Pizzeria Non Confermata", 41.904, 12.496, { category: "pizzeria", types: ["pizza_restaurant"], matchReason: "Ottima per celiaci, con impasto senza glutine dedicato.", glutine: { stato: "bene", frase: "Senza glutine buonissima, ironia a parte.", frasi: ["Senza glutine buonissima, ironia a parte."], n: 1, lette: 5 } }),
+    mk("G5", "Pizzeria Non Confermata", 41.904, 12.496, { category: "pizzeria", types: ["pizza_restaurant"], matchReason: "Ottima per celiaci, con impasto senza glutine dedicato.", verdict: "Paradiso dei celiaci a Roma.", perTe: "Sicura per celiaci", glutine: { stato: "bene", frase: "Senza glutine buonissima, ironia a parte.", frasi: ["Senza glutine buonissima, ironia a parte."], n: 1, lette: 5 } }),
     mk("G2", "Trattoria Avviso", 41.901, 12.492, { category: "restaurant", types: ["restaurant"], glutine: { stato: "attenzione", frase: "La mia amica celiaca è stata male dopo cena.", n: 0, lette: 5 } }),
     mk("G3", "Osteria Muta", 41.902, 12.494, { category: "restaurant", types: ["restaurant"], glutine: { stato: "niente", frase: null, n: 0, lette: 5 } }),
     mk("G4", "Bar Senza Riga", 41.903, 12.495),
@@ -13204,8 +13208,8 @@ else {
   await cp.screenshot({ path: `${OUT}/91d-celiaco-360.png` });
   await apri("Pizzeria Non Confermata");
   { const t = await testo(); const tutto = (await cp.locator("[role=dialog], body").first().innerText()).replace(/\s+/g, " ");
-    ok(await cp.getByTestId("glutine-scheda").getAttribute("data-stato") === "ne-parla" && t.includes("Una recensione ne parla") && !t.includes("✓") && t.includes("«Senza glutine buonissima, ironia a parte.»"), `celiaco scheda: senza la conferma dell'AI niente ✓, resta 'ne parla' con la frase (${t})`);
-    ok(!tutto.includes("Ottima per celiaci"), "celiaco scheda: senza ✓ confermato il 'perché' dell'AI che parla di celiaci non si vede"); }
+    ok(await cp.getByTestId("glutine-scheda").getAttribute("data-stato") === "ne-parla" && t.includes("Una recensione ne parla") && !t.includes("✓") && !t.includes("ironia a parte") && (await cp.getByTestId("glutine-chiama").count()) === 1, `celiaco scheda: senza la conferma dell'AI niente ✓ né citazione, 'ne parla' con Chiama (${t})`);
+    ok(!tutto.includes("Ottima per celiaci") && !tutto.includes("Paradiso dei celiaci") && !tutto.includes("Sicura per celiaci"), "celiaco: senza ✓ confermato verdetto, 'Per te' e perché dell'AI sul glutine non si vedono (scheda e card)"); }
   await cp.screenshot({ path: `${OUT}/91e-celiaco-non-confermato.png` });
   await apri("Bar Senza Riga");
   ok(await cp.getByTestId("glutine-scheda").count() === 0, "celiaco scheda: senza il campo dal server nessuna riga (chi non lo chiede non la vede)");

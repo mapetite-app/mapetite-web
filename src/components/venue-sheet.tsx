@@ -435,7 +435,7 @@ export default function VenueSheet({
   const matchReasonText =
     matchReason != null && matchReason.trim() !== "" && !(glutineDubbio && SUL_GLUTINE.test(matchReason)) ? matchReason.trim() : null;
   const verdictText =
-    verdict != null && verdict.trim() !== "" && !(glutineScheda?.stato === "attenzione" && SUL_GLUTINE.test(verdict)) ? verdict.trim() : null;
+    verdict != null && verdict.trim() !== "" && !(glutineDubbio && SUL_GLUTINE.test(verdict)) ? verdict.trim() : null;
   const goForChips = senzaDoppioni(Array.isArray(goFor)
     ? goFor.filter((c) => c != null && c.trim() !== "" && !(glutineScheda && SUL_GLUTINE.test(c))).map((c) => c.trim())
     : []);
@@ -785,8 +785,8 @@ export default function VenueSheet({
       try { await navigator.clipboard.writeText(displayAddress(address)); setAddressCopied(true); setTimeout(() => setAddressCopied(false), 2000); } catch { /* appunti non disponibili */ }
     };
     // Il verdetto in vista: la frase editoriale; se manca, la sintesi (mai testo inventato).
-    const headline = verdictText ?? (synthesis?.trim() || null);
-    const showSynthesisBelow = verdictText != null && synthesis != null && synthesis.trim() !== "";
+    const headline = verdictText ?? (synthesis?.trim() && !(glutineDubbio && SUL_GLUTINE.test(synthesis)) ? synthesis.trim() : null);
+    const showSynthesisBelow = verdictText != null && synthesis != null && synthesis.trim() !== "" && !(glutineDubbio && SUL_GLUTINE.test(synthesis));
     // "Per te": prima il perché dai gusti (mappa del gusto, scritto dall'AI solo con i gusti veri),
     // altrimenti il perché per questa ricerca. Se ci sono tutti e due, il secondo va in "In breve".
     const daiTuoiPosti = venue.percheTiPiacera?.trim() || null;
@@ -1194,7 +1194,7 @@ export default function VenueSheet({
                 </p>
               )}
               {/* Chiama dove serve: senza notizie e con un avviso (revisore 27/11). */}
-              {(glutineScheda.stato === "niente" || glutineScheda.stato === "attenzione") && (
+              {glutineScheda.stato !== "bene" && (
                 <p className="mt-0.5 flex items-center gap-2 text-text-muted">
                   <span>Chiedi al locale prima di andare.</span>
                   {telHref && (
