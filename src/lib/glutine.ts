@@ -27,6 +27,8 @@ export type Glutine = {
 // Il requisito con cui le frasi "bene" passano dalla conferma dell'AI (stessa chiamata del "✓ terrazza").
 // Nome a parte: la scheda non lo mostra mai come chip, solo nella riga "🌾 Senza glutine".
 export const R_GLUTINE = "senza glutine (piatti per celiaci)";
+// Parole che l'app non dice mai sul glutine, nemmeno con il ✓ (revisore 28/11): i testi dell'AI che le usano si nascondono.
+export const TROPPO_SICURO = /sicur|adatt|perfett|garanti|paradiso|rifugio|\bsafe|perfect/i;
 
 // Quante frasi "bene" l'AI ha confermato: il ✓ vale solo per quelle (proposta 91, seconda versione del 28/11).
 // Senza conferma (AI spenta, oltre il tetto, oltre 7 s) la riga resta "ne parla", in grigio, con la frase.
@@ -90,9 +92,10 @@ export function glutineDalleRecensioni(recensioni: { text: string; rating?: numb
   let neParla: { f: string; punti: number } | null = null;
   let quante = 0; // recensioni che ne parlano (per "3 recensioni ne parlano")
   const bene: string[] = [];
-  // Revisore 28/11: all'AI vanno TUTTE le recensioni del locale che parlano di glutine, non solo quella della
+  // Revisori 28/11: all'AI vanno TUTTE le recensioni lette (max 5), anche quelle che non nominano il glutine («di notte è
+  // stata male come sempre quando sbagliano»), non solo quella della
   // frase («infornate insieme alle altre» in un'altra recensione da 5 stelle lasciava passare il ✓).
-  const tutteSulGlutine = lette.filter((r) => MENZIONE.test(normalizza(r.text))).map((r, i) => `Recensione ${i + 1}: ${r.text.slice(0, 700)}`).join("\n\n").slice(0, 2400);
+  const tutteSulGlutine = lette.map((r, i) => `Recensione ${i + 1}: ${r.text.slice(0, 600)}`).join("\n\n").slice(0, 2600);
   for (const r of lette) {
     const tutte = frasi(r.text);
     const sulGlutine = tutte.map((f) => ({ f, n: normalizza(f) })).map((x) => ({ ...x, at: x.n.search(MENZIONE) })).filter((x) => x.at >= 0);

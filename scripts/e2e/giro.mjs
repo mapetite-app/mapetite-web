@@ -13154,6 +13154,9 @@ else {
     ok(r?.stato === "attenzione", `celiaco: 'infornate insieme alle altre' in un'altra recensione mette in guardia (${r?.stato})`); }
   { const r = g([{ text: "Ottimi i supplì senza glutine, bravissimi.", rating: 5 }, { text: "Fanno il senza glutine, buono, cucina molto curata e personale gentile con i celiaci.", rating: 5 }]);
     ok(r?.candidati?.every((c) => c.contesto.includes("Recensione 1") && c.contesto.includes("Recensione 2")), "celiaco: all'AI vanno tutte le recensioni del locale che parlano di glutine"); }
+  { const r = g([{ text: "Pizza senza glutine squisita, impasto leggerissimo.", rating: 5 }, { text: "Lei ha preso la pizza speciale per lei. Di notte è stata male come sempre quando sbagliano, mai più.", rating: 4 }]);
+    ok(r?.candidati?.every((c) => c.contesto.includes("Di notte è stata male")), "celiaco: all'AI vanno anche le recensioni che non nominano il glutine (secondo revisore 28/11)"); }
+  ok(gl.TROPPO_SICURO.test("Perfetta per celiaci") && gl.TROPPO_SICURO.test("Il rifugio dei celiaci") && !gl.TROPPO_SICURO.test("Pizza senza glutine leggera"), "celiaco: 'perfetta / rifugio / sicura per celiaci' dell'AI si nasconde anche con il ✓");
   { const cs = (await import("node:fs")).readFileSync(new URL("../../src/lib/conferma-prove.ts", import.meta.url), "utf8"); ok(cs.includes(gl.R_GLUTINE) && /contaminazione/.test(cs), "celiaco: la conferma dell'AI ha la regola del senza glutine (avvisi in tutta la recensione → no)"); }
   ok(gl.glutineRichiesto("pizzeria senza glutine a Monti", []) && gl.glutineRichiesto("trattoria", ["celiaco"]) && gl.glutineRichiesto("posto per celiaci", []) && !gl.glutineRichiesto("trattoria a Monti", ["vegano"]), "celiaco: la riga serve solo con il gusto o se la ricerca lo chiede");
   for (const st of ["bene", "attenzione", "ne-parla", "niente"]) ok(!/sicur|adatt/i.test(gl.titoloGlutine({ stato: st, frase: null, n: 1, lette: 5 })), `celiaco: '${st}' non dice mai 'sicuro' o 'adatto'`);

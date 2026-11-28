@@ -29,7 +29,7 @@ import { AperturaPillola, PostoPillola, PrezzoLocale, useInfoLocaleStato } from 
 import AvvisoPosto from "@/components/avviso-posto";
 import { frasePrezzo } from "@/lib/prezzo-locale";
 import { fraseFreschezza } from "@/lib/freschezza-verdetto";
-import { glutineConfermato, R_GLUTINE, titoloGlutine, type Glutine } from "@/lib/glutine";
+import { glutineConfermato, R_GLUTINE, titoloGlutine, TROPPO_SICURO, type Glutine } from "@/lib/glutine";
 import { apertoIl, orariDelGiorno, prossimaApertura, prossimaChiusura, type Orari } from "@/lib/orari";
 import BuoniPastoRiga from "@/components/buoni-pasto-riga";
 import { salvatoDa } from "@/lib/ricordo-salvato";
@@ -293,7 +293,9 @@ export default function VenueSheet({
   const requisitiScheda = (glutineScheda ? venue.requisiti?.filter((x) => !SUL_GLUTINE.test(x.r)) : venue.requisiti?.filter((x) => x.r !== R_GLUTINE)) ?? venue.requisiti;
   // Senza il ✓ confermato, niente frase dell'AI che parla di glutine o celiaci accanto alla riga (27/11: il
   // "perché" poteva dire "ottimo per celiaci" accanto a un ⚠️). Con un ⚠️ anche il verdetto, se ne parla.
+  // Revisore 28/11: anche con il ✓, niente "perfetta / sicura / il rifugio dei celiaci" scritto dall'AI.
   const glutineDubbio = glutineScheda != null && glutineScheda.stato !== "bene";
+  const nascondiSulGlutine = (t: string | null | undefined) => glutineScheda != null && SUL_GLUTINE.test(t ?? "") && (glutineDubbio || TROPPO_SICURO.test(t ?? ""));
   // La frase si porta in vista SOLO quando si tocca un ✓ (prima ripartiva a ogni aggiornamento della scheda).
   useEffect(() => {
     if (!provaAperta) return;
@@ -433,9 +435,9 @@ export default function VenueSheet({
   // Verdetto bipolare come CHIP: filtra gli elementi non vuoti dell'array.
   // dont_expect è spesso [] per il vincolo feroce lato prompt → resta nascosto.
   const matchReasonText =
-    matchReason != null && matchReason.trim() !== "" && !(glutineDubbio && SUL_GLUTINE.test(matchReason)) ? matchReason.trim() : null;
+    matchReason != null && matchReason.trim() !== "" && !nascondiSulGlutine(matchReason) ? matchReason.trim() : null;
   const verdictText =
-    verdict != null && verdict.trim() !== "" && !(glutineDubbio && SUL_GLUTINE.test(verdict)) ? verdict.trim() : null;
+    verdict != null && verdict.trim() !== "" && !nascondiSulGlutine(verdict) ? verdict.trim() : null;
   const goForChips = senzaDoppioni(Array.isArray(goFor)
     ? goFor.filter((c) => c != null && c.trim() !== "" && !(glutineScheda && SUL_GLUTINE.test(c))).map((c) => c.trim())
     : []);
@@ -785,12 +787,12 @@ export default function VenueSheet({
       try { await navigator.clipboard.writeText(displayAddress(address)); setAddressCopied(true); setTimeout(() => setAddressCopied(false), 2000); } catch { /* appunti non disponibili */ }
     };
     // Il verdetto in vista: la frase editoriale; se manca, la sintesi (mai testo inventato).
-    const headline = verdictText ?? (synthesis?.trim() && !(glutineDubbio && SUL_GLUTINE.test(synthesis)) ? synthesis.trim() : null);
-    const showSynthesisBelow = verdictText != null && synthesis != null && synthesis.trim() !== "" && !(glutineDubbio && SUL_GLUTINE.test(synthesis));
+    const headline = verdictText ?? (synthesis?.trim() && !nascondiSulGlutine(synthesis) ? synthesis.trim() : null);
+    const showSynthesisBelow = verdictText != null && synthesis != null && synthesis.trim() !== "" && !nascondiSulGlutine(synthesis);
     // "Per te": prima il perché dai gusti (mappa del gusto, scritto dall'AI solo con i gusti veri),
     // altrimenti il perché per questa ricerca. Se ci sono tutti e due, il secondo va in "In breve".
     const daiTuoiPosti = venue.percheTiPiacera?.trim() || null;
-    const perTeText = [daiTuoiPosti, venue.perTe?.trim() || null].find((t) => t && !(glutineDubbio && SUL_GLUTINE.test(t))) ?? null;
+    const perTeText = [daiTuoiPosti, venue.perTe?.trim() || null].find((t) => t && !nascondiSulGlutine(t)) ?? null;
     const perTeLine = perTeText ?? matchReasonText;
     const matchReasonBelow = perTeText != null && matchReasonText != null;
     // Senza verdetto (né in arrivo): la frase di Google o una recensione, dichiarate come tali.
