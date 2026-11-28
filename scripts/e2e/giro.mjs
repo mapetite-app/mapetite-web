@@ -8453,7 +8453,7 @@ else {
       const jg = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
       const strano = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, glutine: { piatti: "forse", separati: true, afc: null } } });
       const stringa = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, glutine: { piatti: "si", separati: "sì", afc: null } } });
-      ok(jg.glutine?.piatti === "richiesta" && jg.glutine?.separati === true && jg.glutine?.afc === true && JSON.stringify(jg.giorni) === "[5]" && ant.includes("🌾 Senza glutine su richiesta, preparati a parte, socio AFC") && ant.includes("dice il locale") && strano.status() === 400 && stringa.status() === 400, `pannello: senza glutine salvato e riletto dalla scheda, serate intatte; valori strani rifiutati (${JSON.stringify(jg.glutine)} / ${ant} / ${strano.status()} ${stringa.status()})`);
+      ok(jg.glutine?.piatti === "richiesta" && jg.glutine?.separati === true && jg.glutine?.afc === true && JSON.stringify(jg.giorni) === "[5]" && ant.includes("🌾 Senza glutine su richiesta, preparati a parte, si dichiara socio AFC") && ant.includes("dice il locale") && strano.status() === 400 && stringa.status() === 400, `pannello: senza glutine salvato e riletto dalla scheda, serate intatte; valori strani rifiutati (${JSON.stringify(jg.glutine)} / ${ant} / ${strano.status()} ${stringa.status()})`);
       // Con "No" le altre due domande spariscono e non si salvano.
       await gm.getByTestId("glutine-piatti-no").click();
       ok((await gm.getByTestId("glutine-afc-true").count()) === 0 && ((await gm.getByTestId("glutine-anteprima").textContent()) ?? "").replace(/\s+/g, " ").includes("Niente senza glutine"), "pannello: con 'No' niente 'preparati a parte' né AFC, anteprima 'Niente senza glutine'");
@@ -13152,7 +13152,7 @@ else {
   const gx = await import(new URL("../../src/lib/glutine-locale.ts", import.meta.url).href);
   const f = (a, b, c) => gx.fraseGlutineLocale(gx.pulisciGlutineLocale(a, b, c, "2026-11-28T10:00:00Z"))?.replace(/\u00a0/g, " ");
   ok(f("richiesta", true, null) === "Senza glutine su richiesta, preparati a parte", `glutine locale: su richiesta e a parte (${f("richiesta", true, null)})`);
-  ok(f("si", false, true) === "Piatti senza glutine, cucina in comune, socio AFC", `glutine locale: 'cucina in comune' detto chiaro, AFC come dichiarazione (${f("si", false, true)})`);
+  ok(f("si", false, true) === "Piatti senza glutine, cucina in comune, si dichiara socio AFC", `glutine locale: 'cucina in comune' detto chiaro, AFC come dichiarazione (${f("si", false, true)})`);
   ok(f("si", null, false) === "Piatti senza glutine", "glutine locale: 'non lo dico' e 'non socio' non si scrivono");
   ok(f("no", true, true) === "Niente senza glutine" && gx.pulisciGlutineLocale("no", true, true, "")?.separati === null, "glutine locale: con 'no' niente altro, e lo si dice (evita un viaggio a vuoto)");
   ok(gx.pulisciGlutineLocale("forse", true, true, "") === null && gx.pulisciGlutineLocale(null, null, null, "") === null && gx.pulisciGlutineLocale("si", "true", 1, "")?.separati === null, "glutine locale: valori sconosciuti scartati");

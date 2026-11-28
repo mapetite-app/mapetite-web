@@ -21,7 +21,7 @@ export function pulisciGlutineLocale(piatti: unknown, separati: unknown, afc: un
 }
 
 /** La frase della scheda, senza "dice il locale" (lo aggiunge il riquadro del titolare), o null.
- *  Spazi fissi dentro i pezzi: il riquadro va a capo solo tra un pezzo e l'altro. */
+ *  AFC detto come dichiarazione del locale («si dichiara socio AFC»), mai come certificazione nostra (revisore 28/11). */
 export function fraseGlutineLocale(g: GlutineLocale | null | undefined): string | null {
   if (!g) return null;
   if (g.piatti === "no") return "Niente senza glutine";

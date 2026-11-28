@@ -81,7 +81,8 @@ export default function GlutineModulo({ placeId, iniziale, verificato, demo }: {
           className="min-h-11 rounded-pill bg-accent px-5 text-sm font-display font-semibold text-white active:scale-95 disabled:opacity-40">
           {stato === "salvo" ? "Salvo…" : "Salva"}
         </button>
-        {salvato && !cambiato && stato !== "salvo" && (
+        {/* Revisore 28/11: anche dopo aver tolto la scelta di "Piatti" (niente da salvare) resta "Togli". */}
+        {salvato && (!cambiato || !pulito) && stato !== "salvo" && (
           <button type="button" data-testid="glutine-togli" onClick={() => salva(null)} className="min-h-11 px-2 text-sm font-display font-semibold text-text-muted underline underline-offset-2">
             Togli
           </button>
