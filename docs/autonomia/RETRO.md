@@ -2,6 +2,30 @@
 
 Bilancio della settimana, scritto dalla prima sessione del sabato (regola del team gstack). Fonti: `git log` di `main`, PR, `BACKLOG.md`, database di produzione.
 
+## Settimana 21–27/11 (scritta sabato 28/11 alle 04:00, sessione delle 03:05)
+
+### Cosa è stato fatto
+- **In produzione (PR #177–#207):** 75 "prova con un reel", 74 e 56 (voto di gruppo), "Manda al gruppo" dalle raccolte, 72 "Avvisami quando c'è posto" (spenta finché mancano le chiavi), 52 "Salva il primo posto", 30 "Salvati di Instagram", 76, 78 "Potrebbe piacerti anche", app iPhone pronta da firmare (Condividi, accesso Google nativo), Segnala e nascondi con pagina Aiuto, persone nascoste, 84, 49, 87, 89 "Cena delle feste?", 90 "Menu delle feste", 88 "Già salvati da più di voi", segnali della scheda compatti.
+- **Spente dopo due bocciature:** 91 "Per chi è celiaco" (27/11; ripresa oggi con il ✓ confermato dall'AI). **Fermata dal CEO:** 86 (1 frase utile su 40 locali), 38 (catalogo).
+
+### Cosa è andato
+- **Una sessione ogni notte, merge quasi ogni notte**, nessuna produzione rotta, nessun revert.
+- **La doppia chiave regole + AI regge:** dove le regole da sole sbagliano (ironia, passato, "altro locale"), la conferma dell'AI a due giri le corregge. Oggi sulla 91: regole 9 ✓ falsi su 18 trabocchetti, con l'AI 0.
+
+### Cosa non è andato
+1. **Ancora nessuno usa l'app.** Database di produzione al 28/11: 7 utenti, **0 nuovi, 0 accessi e 0 posti salvati negli ultimi 7 giorni** (36 salvati in tutto). Seconda settimana di fila a zero.
+2. **App Store fermo da 5 giorni:** il pacchetto iPhone è pronto dal 23/11, manca l'iscrizione Apple di Lorenzo (DA-FARE 14 e 15). Senza, niente TestFlight e niente tester.
+3. **Proposte stagionali e di nicchia (89, 90, 91, 92)** danno valore vero ma a pochi; nessuna porta un utente nuovo dentro.
+
+### 3 cambi per la settimana dopo
+- **Prima della notifica di ogni sessione, una riga con i numeri d'uso** (utenti, accessi, salvati a 7 giorni), così Lorenzo vede che il collo di bottiglia sono i tester, non le funzioni.
+- **Appena c'è l'iscrizione Apple: TestFlight prima di qualsiasi altra voce** (Prossima sessione, voce 1).
+- **Voci nuove solo se entrano nel copione demo di 3 minuti (`DEMO.md`)** o se aiutano i primi 10 tester a restare (primo accesso, salva dal reel, avvisi).
+
+### Revisione dei documenti del team
+- **`PROPOSTE.md`:** 74–93 nuove in due settimane; fatte 30, 49, 52, 56, 72, 74–76, 78, 84, 87–90; 91 in seconda versione; 92 in costruzione; 93 (AFC con AIC) e 70 restano a Lorenzo.
+- **`COMPETITOR.md`, `PROBLEMI.md`, `PARTNER.md`:** aggiornati ogni giorno (problemi fino al 38). In `PARTNER.md` le bozze per AIC, Quandoo e TheFork aspettano Lorenzo; nessun contatto partito, giusto così.
+
 ## Settimana 14–20/11 (scritta sabato 21/11 alle 03:30, sessione delle 03:05)
 
 ### Cosa è stato fatto
