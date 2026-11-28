@@ -8268,6 +8268,23 @@ else {
       await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: false, giorni: [], feste: { prezzo: 65, bevande: true, giorni: ["01-01"], at: new Date().toISOString() } });
       const j = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
       ok(j.feste == null, `menu feste: locale non verificato → la scheda non riceve il menu (${JSON.stringify(j.feste)})`); }
+    // "Il locale dice: senza glutine" (proposta 92): nello stesso riquadro del titolare, un solo "dice il locale".
+    { await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: true, giorni: [g], at: new Date().toISOString(), prezzo: { min: 25, max: 35, bevande: false }, glutine: { piatti: "si", separati: true, afc: null, at: new Date().toISOString() } });
+      await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z", prezzo_min: 25, prezzo_max: 35 } });
+      for (const w of [390, 360]) {
+        await rp.setViewportSize({ width: w, height: w === 390 ? 844 : 640 });
+        await rp.goto(`${BASE}/locali/${LOC}`, { waitUntil: "networkidle" });
+        await rp.getByTestId("glutine-locale").waitFor({ timeout: 5000 }).catch(() => {});
+        const t = ((await rp.getByTestId("glutine-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
+        const pl = ((await rp.getByTestId("posto-locale").textContent().catch(() => "")) ?? "").replace(/\s+/g, " ");
+        const o = await rp.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+        ok(t === "🌾 Piatti senza glutine, preparati a parte" && (pl.match(/dice il locale/g) ?? []).length === 1 && pl.includes("💶 25–35 €") && (await rp.getByTestId("parola-locale").count()) === 1 && o <= 0, `pagina del locale a ${w} px: '🌾 Piatti senza glutine, preparati a parte' nel riquadro del titolare, un solo 'dice il locale' (${pl} / ${o})`);
+        await rp.getByTestId("posto-locale").screenshot({ path: `${OUT}/92-locale-glutine-${w}.png` }).catch(() => {});
+      }
+      await rp.setViewportSize({ width: 390, height: 844 });
+      await setCookie("e2e_serate", { id: LOC, gid: "GOSTERIA", verificato: false, giorni: [], glutine: { piatti: "si", separati: true, afc: true, at: new Date().toISOString() } });
+      const j = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
+      ok(j.glutine == null, `senza glutine: locale non verificato → la scheda non riceve niente (${JSON.stringify(j.glutine)})`); }
     await setCookie("e2e_locale", { ...locR, place: { ...locR.place, verified_at: "2026-10-14T10:00:00Z" } });
     await rctx.clearCookies({ name: "e2e_serate" }); }
   await rp.screenshot({ path: `${OUT}/70-locale-verificato.png`, caret: "initial" });
@@ -8416,6 +8433,35 @@ else {
         const jt = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
         ok(jt.feste == null && JSON.stringify(jt.giorni) === "[5]" && ((await mfs.getByTestId("feste-anteprima").textContent()) ?? "").includes("non compare niente"), `pannello: 'Togli' leva il menu delle feste dalla scheda (${JSON.stringify(jt.feste)})`);
       } }
+    // "Il locale dice: senza glutine" (proposta 92): tre scelte a tocco, si salva, la scheda rilegge, "Togli" svuota.
+    { await rp.goto(`${BASE}/ristoratore/${LOC}?vista=promozione`, { waitUntil: "networkidle" });
+      const gm = rp.getByTestId("glutine-modulo");
+      ok((await rp.getByTestId("pannello-glutine").count()) === 1 && await gm.getByTestId("glutine-salva").isDisabled() && (await gm.getByTestId("glutine-separati-true").count()) === 0, "pannello: 'Senza glutine' c'è, Salva spento e niente altre domande finché non si sceglie");
+      await gm.getByTestId("glutine-piatti-richiesta").click();
+      await gm.getByTestId("glutine-separati-true").click();
+      await gm.getByTestId("glutine-afc-true").click();
+      const ant = ((await gm.getByTestId("glutine-anteprima").textContent()) ?? "").replace(/\s+/g, " ");
+      await rp.setViewportSize({ width: 360, height: 640 });
+      { const o = await rp.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+        const bassi = await gm.locator("button").evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().height < 44).length);
+        ok(o <= 0 && bassi === 0, `pannello a 360 px: senza glutine senza sbordamenti e con tocchi da 44 px (${o} / ${bassi})`); }
+      await rp.getByTestId("pannello-glutine").screenshot({ path: `${OUT}/92-pannello-glutine-360.png` });
+      await rp.setViewportSize({ width: 390, height: 844 });
+      await rp.getByTestId("pannello-glutine").screenshot({ path: `${OUT}/92-pannello-glutine.png` });
+      await gm.getByTestId("glutine-salva").click();
+      await gm.getByText("Salvato").waitFor({ timeout: 5000 }).catch(() => {});
+      const jg = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
+      const strano = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, glutine: { piatti: "forse", separati: true, afc: null } } });
+      const stringa = await rp.request.post(`${BASE}/api/ristoratore/serate`, { data: { id: LOC, glutine: { piatti: "si", separati: "sì", afc: null } } });
+      ok(jg.glutine?.piatti === "richiesta" && jg.glutine?.separati === true && jg.glutine?.afc === true && JSON.stringify(jg.giorni) === "[5]" && ant.includes("🌾 Senza glutine su richiesta, preparati a parte, socio AFC") && ant.includes("dice il locale") && strano.status() === 400 && stringa.status() === 400, `pannello: senza glutine salvato e riletto dalla scheda, serate intatte; valori strani rifiutati (${JSON.stringify(jg.glutine)} / ${ant} / ${strano.status()} ${stringa.status()})`);
+      // Con "No" le altre due domande spariscono e non si salvano.
+      await gm.getByTestId("glutine-piatti-no").click();
+      ok((await gm.getByTestId("glutine-afc-true").count()) === 0 && ((await gm.getByTestId("glutine-anteprima").textContent()) ?? "").includes("Niente senza glutine"), "pannello: con 'No' niente 'preparati a parte' né AFC, anteprima 'Niente senza glutine'");
+      await gm.getByTestId("glutine-piatti-richiesta").click();
+      await gm.getByTestId("glutine-togli").click();
+      await gm.getByText("Salvato").waitFor({ timeout: 5000 }).catch(() => {});
+      const jt = await (await rp.request.get(`${BASE}/api/ristoratore/serate?id=GOSTERIA`)).json();
+      ok(jt.glutine == null && JSON.stringify(jt.giorni) === "[5]" && (await gm.getByTestId("glutine-piatti-richiesta").getAttribute("aria-pressed")) === "false", `pannello: 'Togli' leva il senza glutine dalla scheda e svuota le scelte (${JSON.stringify(jt.glutine)})`); }
     // "Omaggio a chi torna" (PROPOSTE 12): niente denaro, si salva, codice del giorno uguale a quello del cliente.
     { const om = rp.getByTestId("pannello-omaggio");
       await om.getByTestId("omaggio-testo").fill("10% di sconto");
@@ -13100,6 +13146,18 @@ else {
   await sc.close();
 }
 // FINE-SEGNALI-SCORRONO
+// GLUTINE DEL LOCALE (proposta 92): la parola del titolare, solo valori a tocco.
+{
+  console.log("\n— Il locale dice: senza glutine (proposta 92) —");
+  const gx = await import(new URL("../../src/lib/glutine-locale.ts", import.meta.url).href);
+  const f = (a, b, c) => gx.fraseGlutineLocale(gx.pulisciGlutineLocale(a, b, c, "2026-11-28T10:00:00Z"))?.replace(/\u00a0/g, " ");
+  ok(f("richiesta", true, null) === "Senza glutine su richiesta, preparati a parte", `glutine locale: su richiesta e a parte (${f("richiesta", true, null)})`);
+  ok(f("si", false, true) === "Piatti senza glutine, cucina in comune, socio AFC", `glutine locale: 'cucina in comune' detto chiaro, AFC come dichiarazione (${f("si", false, true)})`);
+  ok(f("si", null, false) === "Piatti senza glutine", "glutine locale: 'non lo dico' e 'non socio' non si scrivono");
+  ok(f("no", true, true) === "Niente senza glutine" && gx.pulisciGlutineLocale("no", true, true, "")?.separati === null, "glutine locale: con 'no' niente altro, e lo si dice (evita un viaggio a vuoto)");
+  ok(gx.pulisciGlutineLocale("forse", true, true, "") === null && gx.pulisciGlutineLocale(null, null, null, "") === null && gx.pulisciGlutineLocale("si", "true", 1, "")?.separati === null, "glutine locale: valori sconosciuti scartati");
+  ok(!/sicur|adatt|certificat|garant/i.test([f("si", true, true), f("richiesta", false, null), f("no")].join(" ")), "glutine locale: mai 'sicuro', 'adatto' o 'certificato'");
+}
 // CELIACO (proposta 91): "🌾 Senza glutine" in scheda, dalle recensioni Google lette, solo frasi copiate
 {
   console.log("\n— Per chi è celiaco (proposta 91) —");
