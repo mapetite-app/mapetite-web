@@ -90,7 +90,14 @@ export type VotoStato = {
   voti: { posto: string; nome: string }[];
   mioVoto: string | null;
   pieno: boolean;
+  // "Chi viene?" (proposta 94): il tavolo prenotato da chi ha proposto, e chi ha risposto "Ci sei?".
+  tavolo: Tavolo | null;
+  presenze: { nome: string; ciSono: boolean }[];
+  miaPresenza: boolean | null;
+  // Telefoni che hanno votato ma non hanno ancora detto se ci sono.
+  senzaRisposta: number;
 };
+export type Tavolo = { posto: string; alle: string; persone: number };
 
 /** Il più votato; a pari voti vince il primo in ordine (quello più in tema). null senza voti. */
 export function vincitore(stato: Pick<VotoStato, "posti" | "voti">): { id: string; pari: boolean } | null {
@@ -104,4 +111,77 @@ export function vincitore(stato: Pick<VotoStato, "posti" | "voti">): { id: strin
     if (n > max) { best = p.id; max = n; pari = false; } else if (n === max && n > 0) pari = true;
   }
   return best ? { id: best, pari } : null;
+}
+
+// ── "Chi viene?" (proposta 94) ─────────────────────────────────────────────────────────────────────────
+export const PERSONE_MIN = 2;
+export const PERSONE_MAX = 30;
+// Il tavolo si può fissare fino a 21 giorni dopo il voto (il voto si cancella dopo 30).
+export const TAVOLO_GIORNI = 21;
+// Dopo 3 ore dall'ora del tavolo non si risponde più.
+export const RISPOSTE_FINO_MS = 3 * 3_600_000;
+
+/** Il giorno `key` ("AAAA-MM-GG") alle `ora` ("HH:MM"), ora di Roma. null se non valido. */
+export function romaAlle(key: string, ora: string): Date | null {
+  const k = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  const o = /^(\d{1,2}):(\d{2})$/.exec(ora);
+  if (!k || !o) return null;
+  const [y, m, g, h, min] = [Number(k[1]), Number(k[2]), Number(k[3]), Number(o[1]), Number(o[2])];
+  if (m < 1 || m > 12 || g < 1 || g > 31 || h > 23 || min > 59) return null;
+  let t = Date.UTC(y, m - 1, g, h, min);
+  const q = romaParti(new Date(t));
+  t -= Date.UTC(q.y, q.m - 1, q.g, q.h, q.min) - Date.UTC(y, m - 1, g, h, min);
+  const d = new Date(t);
+  const r = romaParti(d);
+  return r.g === g && r.m === m && r.h === h && r.min === min ? d : null;
+}
+
+/** Il giorno di Roma ("AAAA-MM-GG") di una data, spostato di `piu` giorni. */
+export function giornoRoma(d: Date, piu = 0): string {
+  const r = romaParti(d);
+  const x = new Date(Date.UTC(r.y, r.m - 1, r.g + piu));
+  return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, "0")}-${String(x.getUTCDate()).padStart(2, "0")}`;
+}
+
+const GIORNI = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
+const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+
+/** "stasera alle 20:30", "oggi alle 13:00", "domani alle 20:30", "venerdì 19 dicembre alle 20:30". */
+export function quandoTavolo(iso: string, now: Date = new Date()): string {
+  const d = new Date(iso);
+  const r = romaParti(d);
+  const ora = `${r.h}:${String(r.min).padStart(2, "0")}`;
+  const giorno = giornoRoma(d);
+  if (giorno === giornoRoma(now)) return `${r.h >= 17 ? "stasera" : "oggi"} alle ${ora}`;
+  if (giorno === giornoRoma(now, 1)) return `domani alle ${ora}`;
+  const dow = new Date(Date.UTC(r.y, r.m - 1, r.g)).getUTCDay();
+  return `${GIORNI[dow]} ${r.g} ${MESI[r.m - 1]} alle ${ora}`;
+}
+
+/** Si risponde ancora a "Ci sei?" (fino a 3 ore dopo l'ora del tavolo). */
+export function risposteAperte(t: Tavolo | null, now: Date = new Date()): boolean {
+  return !!t && new Date(t.alle).getTime() + RISPOSTE_FINO_MS > now.getTime();
+}
+
+/**
+ * Quanti ci sono, se conviene avvisare il locale: i "sì" sono diversi dal numero prenotato (almeno 1 sì),
+ * e il conto è affidabile (hanno risposto tutti quelli che hanno votato, oppure manca meno di un giorno).
+ * Mai prima che il tavolo sia fissato, mai dopo l'ora del tavolo.
+ */
+export function daAvvisare(stato: Pick<VotoStato, "tavolo" | "presenze" | "senzaRisposta">, now: Date = new Date()): number | null {
+  const t = stato.tavolo;
+  if (!t) return null;
+  const mancaMs = new Date(t.alle).getTime() - now.getTime();
+  if (mancaMs <= 0) return null;
+  const si = stato.presenze.filter((p) => p.ciSono).length;
+  if (si < 1 || si === t.persone) return null;
+  if (stato.senzaRisposta > 0 && mancaMs > 86_400_000) return null;
+  return si;
+}
+
+/** Il messaggio pronto per il locale quando il numero cambia. */
+export function messaggioNumero(persone: number, nuovo: number, quando: string, nome: string | null, now: Date = new Date()): string {
+  const saluto = romaParti(now).h < 13 ? "Buongiorno" : "Buonasera";
+  const firma = nome?.trim() ? ` a nome ${nome.trim()}` : "";
+  return `${saluto}, ho prenotato per ${persone} persone ${quando}${firma}: saremo in ${nuovo}. Grazie!`;
 }

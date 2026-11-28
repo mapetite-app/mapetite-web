@@ -10,8 +10,10 @@ import { getCategoryEmoji } from "@/lib/emoji";
 import { categoryLabel } from "@/lib/category-label";
 import { withNext } from "@/lib/next-path";
 import { trackFeature } from "@/lib/track";
-import { NOME_MAX, oraChiusura, vincitore, type VotoPosto, type VotoStato } from "@/lib/voto-gruppo";
+import { NOME_MAX, oraChiusura, quandoTavolo, risposteAperte, vincitore, type VotoPosto, type VotoStato } from "@/lib/voto-gruppo";
 import { postoRicordato } from "@/lib/voto-gruppo-memoria";
+import { chiHaVotato } from "./chi-ha-votato";
+import { AvvisaLocale, CiSei, FissaTavolo } from "./chi-viene";
 
 // Pagina del voto (proposta 56): una cosa sola da fare, toccare il posto preferito. Il nome si scrive una
 // volta (si ricorda nel telefono, lo stesso di "Prenota"). Mentre il voto è aperto la pagina si aggiorna
@@ -28,16 +30,7 @@ function salvaNome(n: string) {
   try { localStorage.setItem(NAME_KEY, n.slice(0, 40)); } catch { /* storage non disponibile */ }
 }
 
-// "Giulia e Marco", "Giulia, Marco e altri 3": con nomi lunghi la riga non si taglia a metà di un nome
-// senza dire quanti sono. I nomi lunghi si accorciano a 14 caratteri.
-export function chiHaVotato(chi: string[]): string {
-  // Con il conto ("e altri 28") i nomi si accorciano di più, così il numero resta sempre in vista.
-  const max = chi.length > 2 ? 10 : 14;
-  const corto = (n: string) => (n.length > max ? `${n.slice(0, max - 1).trimEnd()}…` : n);
-  if (chi.length <= 2) return chi.map(corto).join(" e ");
-  const altri = chi.length - 2;
-  return `${corto(chi[0])}, ${corto(chi[1])} e ${altri === 1 ? "un altro" : `altri ${altri}`}`;
-}
+export { chiHaVotato } from "./chi-ha-votato";
 
 export default function VotoGruppo({ iniziale, foto, percorso, collegato }: { iniziale: VotoStato; foto: Record<string, string>; percorso: string; collegato: boolean }) {
   const [stato, setStato] = useState(iniziale);
@@ -45,6 +38,8 @@ export default function VotoGruppo({ iniziale, foto, percorso, collegato }: { in
   const [invio, setInvio] = useState<string | null>(null);
   const [errore, setErrore] = useState<string | null>(null);
   const [prenota, setPrenota] = useState<VotoPosto | null>(null);
+  // "Chi viene?" (proposta 94): il modulo del tavolo, aperto da chi ha proposto.
+  const [fissa, setFissa] = useState(false);
   const campo = useRef<HTMLInputElement>(null);
   // La memoria del telefono (telefono e sito per "Prenota") si legge solo dopo l'idratazione.
   const montato = useSyncExternalStore(subscribeNothing, () => true, () => false);
@@ -60,14 +55,20 @@ export default function VotoGruppo({ iniziale, foto, percorso, collegato }: { in
   };
 
   // Aggiornamento mentre è aperto (solo con la pagina in vista) e una volta all'ora di chiusura.
+  const tavolo = stato.tavolo;
+  const risposte = stato.chiuso && risposteAperte(tavolo);
   useEffect(() => {
+    if (risposte) {
+      const ogni = window.setInterval(() => { if (document.visibilityState === "visible") void aggiorna(); }, AGGIORNA_MS);
+      return () => window.clearInterval(ogni);
+    }
     if (stato.chiuso) return;
     const ogni = window.setInterval(() => { if (document.visibilityState === "visible") void aggiorna(); }, AGGIORNA_MS);
     const mancano = new Date(stato.chiudeAlle).getTime() - Date.now();
     const alla = mancano > 0 && mancano < 2 ** 31 ? window.setTimeout(() => void aggiorna(), mancano + 1000) : undefined;
     return () => { window.clearInterval(ogni); if (alla) window.clearTimeout(alla); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- si riarma solo quando cambia lo stato di chiusura
-  }, [stato.chiuso, stato.chiudeAlle]);
+  }, [stato.chiuso, stato.chiudeAlle, risposte]);
 
   const votaPer = async (p: VotoPosto) => {
     if (stato.chiuso || invio) return;
@@ -105,6 +106,29 @@ export default function VotoGruppo({ iniziale, foto, percorso, collegato }: { in
     : `Si vota fino ${oraChiusura(stato.chiudeAlle)}${quanti > 0 ? ` · ${quanti === 1 ? "1 voto" : `${quanti} voti`}` : ""}`;
   const ordinati = vince ? [...stato.posti].sort((a, b) => (a.id === vince.id ? -1 : b.id === vince.id ? 1 : 0)) : stato.posti;
   const ricordato = prenota ? postoRicordato(stato.codice, prenota.id) : null;
+  const postoTavolo = tavolo ? stato.posti.find((p) => p.id === tavolo.posto) ?? null : null;
+  // Con il tavolo fissato la pagina diventa la conferma: in vista solo il posto scelto e "Ci sei?".
+  const conTavolo = !!(stato.chiuso && tavolo && postoTavolo);
+  const mostrati = conTavolo ? ordinati.filter((p) => p.id === postoTavolo!.id) : ordinati;
+  const campoNome = (
+    <>
+      <label htmlFor="voto-nome" className="sr-only">Il tuo nome</label>
+      <input
+        ref={campo}
+        id="voto-nome"
+        data-testid="voto-nome"
+        value={nome}
+        onChange={(e) => { setNome(e.target.value.slice(0, NOME_MAX)); setErrore(null); }}
+        maxLength={NOME_MAX}
+        autoComplete="given-name"
+        placeholder="Il tuo nome"
+        className="min-h-12 w-full rounded-pill border border-border bg-surface px-5 text-[16px] font-sans text-text outline-none focus:border-brand"
+      />
+    </>
+  );
+  const condividiTavolo = conTavolo && risposte && stato.sonoIo
+    ? <CondividiLink path={percorso} cosa="voto" title="Ci sei?" text={`${postoTavolo!.nome}, ${quandoTavolo(tavolo!.alle)}: ci sei? Rispondi qui:`} label="Chiedi al gruppo" testId="chi-viene-manda" className="!min-h-9 !border-white/20 !bg-white/10 !text-white" />
+    : null;
 
   return (
     <main data-testid="voto-pagina" data-voto="" data-chiuso={stato.chiuso ? "1" : undefined} className="mx-auto flex min-h-dvh max-w-md flex-col bg-bg pb-6">
@@ -114,35 +138,30 @@ export default function VotoGruppo({ iniziale, foto, percorso, collegato }: { in
           <p className="inline-flex items-center gap-1.5 rounded-pill bg-white/10 px-3 py-1 font-display text-xs font-semibold">
             <span aria-hidden className="h-2 w-2 rounded-full bg-accent" />Mapetite
           </p>
+          {condividiTavolo}
           {stato.sonoIo && !stato.chiuso && (
             <CondividiLink path={percorso} cosa="voto" title="Dove andiamo? Vota" text="Dove andiamo? Tocca il posto che preferisci:" label="Rimanda" testId="voto-rimanda" className="!min-h-9 !border-white/20 !bg-white/10 !text-white" />
           )}
         </div>
         <h1 data-testid="voto-titolo" className="relative mt-3 font-title text-[1.6rem] font-semibold leading-tight">
-          {vince ? "Si va qui" : stato.chiuso ? "Il voto è chiuso" : "Dove andiamo?"}
+          {conTavolo ? postoTavolo!.nome : vince ? "Si va qui" : stato.chiuso ? "Il voto è chiuso" : "Dove andiamo?"}
         </h1>
-        <p data-testid="voto-sottotitolo" className="relative mt-1 text-sm font-sans text-white/80">{sottotitolo}</p>
+        <p data-testid="voto-sottotitolo" className="relative mt-1 text-sm font-sans text-white/80">
+          {conTavolo ? `${quandoTavolo(tavolo!.alle).replace(/^./, (c) => c.toUpperCase())} · tavolo per ${tavolo!.persone}` : sottotitolo}
+        </p>
       </header>
 
-      {!stato.chiuso && (
-        <div className="px-4 pt-4">
-          <label htmlFor="voto-nome" className="sr-only">Il tuo nome</label>
-          <input
-            ref={campo}
-            id="voto-nome"
-            data-testid="voto-nome"
-            value={nome}
-            onChange={(e) => { setNome(e.target.value.slice(0, NOME_MAX)); setErrore(null); }}
-            maxLength={NOME_MAX}
-            autoComplete="given-name"
-            placeholder="Il tuo nome"
-            className="min-h-12 w-full rounded-pill border border-border bg-surface px-5 text-[16px] font-sans text-text outline-none focus:border-brand"
-          />
+      {!stato.chiuso && <div className="px-4 pt-4">{campoNome}</div>}
+
+      {conTavolo && risposte && (
+        <div className="flex flex-col gap-2.5 px-4 pt-4">
+          {stato.sonoIo && <AvvisaLocale stato={stato} posto={postoTavolo!} telefono={postoRicordato(stato.codice, postoTavolo!.id)?.phone ?? null} nome={nome} onStato={setStato} />}
+          <CiSei stato={stato} nome={nome} onNome={(n) => { setNome(n); salvaNome(n); }} onStato={setStato} campoNome={campoNome} />
         </div>
       )}
 
       <ul className="flex flex-col gap-2.5 px-4 pt-3" aria-label="Posti da votare">
-        {ordinati.map((p) => {
+        {mostrati.map((p) => {
           const chi = stato.voti.filter((v) => v.posto === p.id).map((v) => v.nome);
           const mio = stato.mioVoto === p.id;
           const vinto = vince?.id === p.id;
@@ -190,7 +209,15 @@ export default function VotoGruppo({ iniziale, foto, percorso, collegato }: { in
 
       {/* Subito sotto i posti (prima stava in fondo allo schermo, con mezza pagina vuota in mezzo). */}
       <div className="px-4 pt-4">
-        {vince && stato.sonoIo ? (
+        {stato.sonoIo && vince && fissa ? (
+          <FissaTavolo stato={stato} posto={postoTavolo ?? stato.posti.find((x) => x.id === vince.id)!} onFatto={(s) => { setStato(s); setFissa(false); }} onAnnulla={() => setFissa(false)} />
+        ) : conTavolo ? (
+          stato.sonoIo && risposte ? (
+            <button type="button" data-testid="chi-viene-cambia" onClick={() => setFissa(true)} className="mx-auto flex min-h-11 items-center justify-center px-4 text-[13px] font-display font-semibold text-brand underline underline-offset-2">
+              Cambia giorno, ora o persone
+            </button>
+          ) : null
+        ) : vince && stato.sonoIo ? (
           (() => {
             const p = stato.posti.find((x) => x.id === vince.id)!;
             const r = montato ? postoRicordato(stato.codice, p.id) : null;
@@ -209,6 +236,11 @@ export default function VotoGruppo({ iniziale, foto, percorso, collegato }: { in
             {stato.pieno ? "Hanno già votato in 30: il voto è pieno." : stato.mioVoto ? "Fatto. Puoi cambiare voto finché è aperto." : votanti > 0 ? "Tocca un posto per votarlo." : "Tocca un posto per votarlo: sei il primo."}
           </p>
         ) : null}
+        {vince && stato.sonoIo && !conTavolo && !fissa && (
+          <button type="button" data-testid="chi-viene-apri" onClick={() => setFissa(true)} className="mt-2 flex min-h-12 w-full items-center justify-center rounded-pill border border-border bg-bg px-6 font-display text-[15px] font-semibold text-brand active:scale-[0.98]">
+            Prenotato? Chiedi chi viene
+          </button>
+        )}
         {/* Iscriversi è un invito alla fine, mai un obbligo per votare. */}
         {!collegato && (stato.mioVoto || stato.chiuso) && (
           <Link data-testid="voto-iscriviti" href={withNext("/signup", percorso)} className="mt-4 flex items-center gap-3 rounded-card bg-surface px-4 py-3.5 active:scale-[0.99]">

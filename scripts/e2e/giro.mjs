@@ -12946,6 +12946,75 @@ else {
   await m.p.reload({ waitUntil: "networkidle" });
   const tardi = await m.c.request.post(`${BASE}/api/voto/${codice}`, { data: { nome: "Marco", posto: "T3" } });
   ok((await m.p.getByTestId("voto-prenota").count()) === 0 && await m.p.getByTestId("voto-iscriviti").isVisible() && tardi.status() === 409, `voto chiuso: l'amico vede chi ha vinto e l'invito, non vota più (${tardi.status()})`);
+  // Proposta 94 "Chi viene?" (28/11): a voto chiuso chi ha proposto dice quando e per quanti ha il tavolo; il link
+  // chiede a tutti "Ci sei?"; se i sì non tornano col numero prenotato, il messaggio per il locale è già scritto.
+  { const r = m.c.request;
+    const prima = await r.post(`${BASE}/api/voto/${codice}/presenza`, { data: { nome: "Marco", ciSono: true } });
+    ok(prima.status() === 409 && (await m.p.getByTestId("ci-sei").count()) === 0 && (await mp.getByTestId("chi-viene-apri").isVisible()), `chi viene: prima del tavolo niente "Ci sei?" (${prima.status()}), chi ha proposto ha "Prenotato? Chiedi chi viene"`);
+    const giornoTra = (n) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date(Date.now() + n * 86_400_000));
+    const giorno = giornoTra(5);
+    const [anon, nonMio] = await Promise.all([
+      r.post(`${BASE}/api/voto/${codice}/tavolo`, { data: { posto: "T1", giorno, ora: "20:30", persone: 6 } }),
+      ctx.request.post(`${BASE}/api/voto/${codice}/tavolo`, { data: { posto: "T1", giorno: "2020-01-01", ora: "20:30", persone: 6 } }),
+    ]);
+    ok(anon.status() === 401 && nonMio.status() === 400, `chi viene: senza account non si fissa il tavolo, data passata rifiutata (${anon.status()}, ${nonMio.status()})`);
+    await mp.getByTestId("chi-viene-apri").click();
+    const mod = mp.getByTestId("chi-viene-modulo");
+    await mod.waitFor({ timeout: 3000 });
+    const base = Number(((await mod.getByTestId("chi-viene-persone").innerText()).match(/\d+/) ?? ["0"])[0]);
+    ok(base === 4 && (await mod.getByTestId("chi-viene-oggi").getAttribute("aria-checked")) === "true", `chi viene: il modulo parte da oggi e dal numero di chi ha votato (${base})`);
+    await mp.screenshot({ path: `${OUT}/97b-chi-viene-modulo.png` });
+    await mod.getByTestId("chi-viene-data").fill(giorno);
+    await mod.getByTestId("chi-viene-ora").fill("20:30");
+    await mod.getByTestId("chi-viene-piu").click(); await mod.getByTestId("chi-viene-piu").click();
+    await mod.getByTestId("chi-viene-salva").click();
+    await mp.getByTestId("ci-sei").waitFor({ timeout: 4000 }).catch(() => {});
+    const sotto = (await mp.getByTestId("voto-sottotitolo").innerText()).trim();
+    ok((await mp.getByTestId("voto-titolo").innerText()).trim() === "Trattoria Prima" && / alle 20:30 · tavolo per 6$/.test(sotto) && (await mp.getByTestId("voto-posto").count()) === 1 && await mp.getByTestId("chi-viene-manda").isVisible(), `chi viene: la pagina diventa la conferma, solo il posto scelto e "Chiedi al gruppo" (${sotto})`);
+    ok(((await mp.getByTestId("ci-sei-conto").innerText()).trim()) === "Ancora nessuna risposta · 4 senza risposta", `chi viene: chi organizza vede quanti non hanno risposto (${await mp.getByTestId("ci-sei-conto").innerText()})`);
+    // Gli amici: Marco c'è, Giulia no (il nome è già quello del voto).
+    await m.p.reload({ waitUntil: "networkidle" });
+    ok(await m.p.getByTestId("ci-sei").isVisible() && (await m.p.getByTestId("voto-nome").inputValue()) === "Marco" && (await m.p.getByTestId("chi-viene-cambia").count()) === 0, "chi viene: l'amico vede 'Ci sei?' col nome già scritto, non può cambiare il tavolo");
+    await m.p.getByTestId("ci-sei-si").click();
+    await m.p.locator("[data-testid=ci-sei-si][aria-pressed=true]").waitFor({ timeout: 4000 }).catch(() => {});
+    await g.c.addCookies([{ name: "e2e_voto_ora", value: dopo, url: BASE }]);
+    await gp.reload({ waitUntil: "networkidle" });
+    await gp.getByTestId("ci-sei-no").click();
+    await gp.locator("[data-testid=ci-sei-no][aria-pressed=true]").waitFor({ timeout: 4000 }).catch(() => {});
+    const contoG = (await gp.getByTestId("ci-sei-conto").innerText()).trim();
+    ok(contoG === "1 c'è · 1 no" && (await gp.getByTestId("voto-nome").count()) === 0, `chi viene: risposto, il campo nome sparisce; gli amici non vedono chi manca (${contoG})`);
+    await m.p.screenshot({ path: `${OUT}/97c-chi-viene-amico.png` });
+    const [vuoto, strano] = await Promise.all([
+      r.post(`${BASE}/api/voto/${codice}/presenza`, { data: { nome: " ", ciSono: true } }),
+      r.post(`${BASE}/api/voto/${codice}/presenza`, { data: { nome: "Marco", ciSono: "si" } }),
+    ]);
+    ok(vuoto.status() === 400 && strano.status() === 400, `chi viene: nome vuoto o risposta strana 400 (${vuoto.status()}, ${strano.status()})`);
+    // Chi organizza risponde anche lui; a 5 giorni con 2 senza risposta niente avviso al locale.
+    await mp.reload({ waitUntil: "networkidle" });
+    await mp.getByTestId("voto-nome").fill("Lorenzo");
+    await mp.getByTestId("ci-sei-si").click();
+    await mp.locator("[data-testid=ci-sei-si][aria-pressed=true]").waitFor({ timeout: 4000 }).catch(() => {});
+    ok(((await mp.getByTestId("ci-sei-conto").innerText()).trim()) === "2 ci sono · 1 no · 2 senza risposta" && (await mp.getByTestId("avvisa-locale").count()) === 0, `chi viene: con risposte mancanti e giorni di anticipo niente avviso (${await mp.getByTestId("ci-sei-conto").innerText()})`);
+    await mp.screenshot({ path: `${OUT}/97d-chi-viene-organizza.png` });
+    // Il giorno stesso: 2 sì su 6 prenotati → "Avvisa Trattoria Prima: siete in 2", messaggio pronto.
+    const tavoloIso = await mp.evaluate(async (c) => (await (await fetch(`/api/voto/${c}`)).json()).tavolo?.alle, codice);
+    await ctx.addCookies([{ name: "e2e_voto_ora", value: new Date(new Date(tavoloIso).getTime() - 2 * 3_600_000).toISOString(), url: BASE }]);
+    await mp.reload({ waitUntil: "networkidle" });
+    const av = mp.getByTestId("avvisa-locale");
+    const testoAv = (await mp.getByTestId("avvisa-locale-testo").innerText().catch(() => "")).trim();
+    ok(await av.isVisible() && (await av.innerText()).includes("siete in 2") && testoAv.includes("ho prenotato per 6 persone") && testoAv.includes("a nome Lorenzo: saremo in 2"), `chi viene: il giorno stesso l'avviso al locale col messaggio pronto (${testoAv})`);
+    await mp.screenshot({ path: `${OUT}/97e-chi-viene-avvisa.png` });
+    await av.locator("a, button").first().evaluate((e) => { e.addEventListener("click", (ev) => ev.preventDefault(), { once: true }); e.click(); });
+    await mp.getByTestId("avvisa-locale").waitFor({ state: "detached", timeout: 4000 }).catch(() => {});
+    ok((await mp.getByTestId("avvisa-locale").count()) === 0 && (await mp.getByTestId("voto-sottotitolo").innerText()).trim().endsWith("tavolo per 2"), `chi viene: avvisato il locale, il tavolo passa a 2 e l'avviso sparisce (${await mp.getByTestId("voto-sottotitolo").innerText()})`);
+    { const sw = await mp.evaluate(() => document.documentElement.scrollWidth); ok(sw <= 390, `chi viene: niente scorrimento di lato a 390 (${sw})`); }
+    // Passata la cena (più di 3 ore): niente più "Ci sei?", la risposta tardiva è rifiutata.
+    const tardissimo = new Date(new Date(tavoloIso).getTime() + 4 * 3_600_000).toISOString();
+    await m.c.addCookies([{ name: "e2e_voto_ora", value: tardissimo, url: BASE }]);
+    await m.p.reload({ waitUntil: "networkidle" });
+    const tardiva = await r.post(`${BASE}/api/voto/${codice}/presenza`, { data: { nome: "Marco", ciSono: false } });
+    ok((await m.p.getByTestId("ci-sei").count()) === 0 && tardiva.status() === 409, `chi viene: dopo la cena niente domanda, risposta rifiutata (${tardiva.status()})`);
+  }
   await ctx.clearCookies({ name: "e2e_voto_ora" }).catch(() => {});
   await g.c.close(); await m.c.close(); await mp.close();
 }
