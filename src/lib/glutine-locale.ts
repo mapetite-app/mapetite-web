@@ -28,6 +28,6 @@ export function fraseGlutineLocale(g: GlutineLocale | null | undefined): string 
   const parti = [g.piatti === "si" ? "Piatti senza glutine" : "Senza glutine su richiesta"];
   if (g.separati === true) parti.push("preparati a parte");
   if (g.separati === false) parti.push("cucina in comune");
-  if (g.afc === true) parti.push("socio AFC");
+  if (g.afc === true) parti.push("si dichiara socio AFC");
   return parti.join(", ");
 }
