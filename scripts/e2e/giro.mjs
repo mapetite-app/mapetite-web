@@ -13014,6 +13014,7 @@ else {
     // Passata la cena (più di 3 ore): niente più "Ci sei?", la risposta tardiva è rifiutata.
     const tardissimo = new Date(new Date(tavoloIso).getTime() + 4 * 3_600_000).toISOString();
     await m.c.addCookies([{ name: "e2e_voto_ora", value: tardissimo, url: BASE }]);
+    await m.p.clock.setFixedTime(new Date(tardissimo));
     await m.p.reload({ waitUntil: "networkidle" });
     const tardiva = await r.post(`${BASE}/api/voto/${codice}/presenza`, { data: { nome: "Marco", ciSono: false } });
     ok((await m.p.getByTestId("ci-sei").count()) === 0 && tardiva.status() === 409, `chi viene: dopo la cena niente domanda, risposta rifiutata (${tardiva.status()})`);
