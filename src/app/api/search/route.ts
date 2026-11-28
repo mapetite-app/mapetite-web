@@ -15,7 +15,7 @@ import { allowAi, clientKey, AI_LIMIT_MESSAGE } from "@/lib/ai-limit";
 import { demoteForChicche, demoteMainstream, demoteTouristTraps, lowerMassFromTop, massPredicate } from "@/lib/mainstream";
 import { amatiValidi, fraseDiceTipo, suPerGusti } from "@/lib/tipi-locale";
 import { gustiPerRicerca, gustiValidi, inFondoPerGusti } from "@/lib/gusti";
-import { glutineDalleRecensioni, glutineRichiesto, type Glutine } from "@/lib/glutine";
+import { glutineDalleRecensioni, glutineRichiesto, R_GLUTINE, type Glutine } from "@/lib/glutine";
 import { pulisciMappa, scopertaPer } from "@/lib/mappa-gusto";
 import { demoteOffType } from "@/lib/off-type";
 import { namedCity, cityNear, withDistrict, demoteOtherCity, wholeCity, cityArea, stripCity, isStreet, isOtherCity, namedOtherCity, ambiguousDistrict, districtCity, demoteFarFrom, districtCenter, stripDistrict, withDefaultType, stripMood } from "@/lib/named-city";
@@ -467,7 +467,12 @@ export async function POST(request: Request) {
     if (glutineRichiesto(query, dieteFinali)) {
       for (const p of risultati) {
         const g = glutineDalleRecensioni(p.reviewItems ?? (p.reviewTexts ?? []).map((text) => ({ text, rating: null })));
-        if (g) glutine[p.id] = g;
+        if (!g) continue;
+        // Seconda versione (28/11): il ✓ solo con la conferma dell'AI. Le frasi "bene" passano dalla stessa
+        // chiamata del "✓ terrazza" (dati firmati del secondo tempo); il contesto non va al telefono.
+        const { candidati, ...daMandare } = g;
+        glutine[p.id] = daMandare;
+        if (candidati?.length) (prove[p.id] ??= []).push(...candidati.map((c) => ({ r: R_GLUTINE, prova: c.frase, contesto: c.contesto })));
       }
       // La ricerca chiede il senza glutine e una recensione mette in guardia: in fondo, mai escluso (regola sui requisiti espliciti).
       // Spento finché la proposta 91 è spenta (bocciata due volte il 27/11): si accende con GLUTINE_IN_FONDO=1.

@@ -16,6 +16,32 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 
 ---
 
+## 28/11/2026 (sabato, CEO che chiude — tema: la tavolata di dicembre, dopo il voto)
+
+### 94. "Chi viene?": il link del voto diventa la conferma, e il numero giusto arriva al locale
+- **Problema:** `PROBLEMI.md` 38: in tavolata il numero cambia fino all'ultimo e il locale prepara per chi non arriva; il voto (56) sceglie il posto ma non dice chi c'è davvero.
+- **Cosa fa:** quando chi organizza risponde "Sì" a "L'hai prenotato?" sul vincitore, lo stesso link del voto mostra a tutti "Cena da Mario, ven 19 alle 20:30 · Ci sei? Sì / No" (un tocco, basta il nome, senza app come nel voto). Chi organizza vede "7 sì · 2 no · 3 senza risposta". Se i sì scendono sotto il numero prenotato, una sola riga: "Avvisa il locale: siete in 7" con il messaggio pronto (WhatsApp o chiamata, come "Non vado più"). Il giorno prima, chi non ha risposto vede la domanda in cima al link.
+- **Da dove nasce:** i sondaggi di WhatsApp non sono legati alla prenotazione; TheFork e i gestionali vedono solo il numero detto da chi prenota; Ask Maps (ora anche in Italia, `COMPETITOR.md` 28/11) ragiona sui salvati di una persona sola. Nessuno collega il gruppo al tavolo.
+- **Valore per l'utente:** chi organizza smette di contare i messaggi in chat e non fa brutte figure col locale. **Per il ristoratore:** sa ore prima che arrivano in 7 e non in 12; dopo, nel pannello, "tavolate da Mapetite avvisate in tempo" (solo conteggi da 3 in su, come la proposta 3).
+- **Sforzo:** S/M (una colonna di stato sulla pagina del voto già esistente, una tabella "ci sono / non ci sono" con gli stessi limiti anti-abuso dei voti, una riga e un messaggio pronto; riuso di `Disdetta`). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA, da costruire **prima di metà dicembre** (le cene aziendali si concentrano nelle due settimane prima del 24, `PROBLEMI.md` 36). In demo: un voto di prova già chiuso.
+
+### 95. "Per le tavolate": le regole del locale per i gruppi, dette dal locale
+- **Problema:** `PROBLEMI.md` 38: alcuni locali chiedono caparra o penali fino a 250 € per disdette a meno di 48 ore, altri no; chi prenota per 10 lo scopre al telefono o quando è tardi.
+- **Cosa fa:** nel pannello del locale verificato tre campi a tocco: "Tavolate fino a N persone", "Caparra da N persone in su: sì / no", "Disdetta senza costi fino a 24 / 48 ore prima". Sulla scheda la riga compare **solo** nel contesto di gruppo (dal voto 56, da una lista di gruppo o con "per 8" nella ricerca): "Tavolate fino a 14 · caparra da 10 · disdici entro 48 ore · lo dice il locale". Nel promemoria della prenotazione di gruppo: "Disdetta senza costi fino a mercoledì alle 20:30". Niente testo libero; senza dati la riga non c'è (mai indovinata dalle recensioni).
+- **Da dove nasce:** stesso riquadro unico del titolare di 65, 90 e 92. Nella 90 i gruppi erano stati tolti per tenere corta la riga: qui stanno in una riga a parte, visibile solo a chi organizza una tavolata. TheFork e i gestionali gestiscono la caparra, ma non dicono la regola prima della scelta.
+- **Valore per l'utente:** sceglie sapendo già cosa rischia; il promemoria con la scadenza aiuta a disdire in tempo. **Per il ristoratore:** meno discussioni sulla caparra, meno tavolate disdette tardi; un motivo concreto per verificare il locale a dicembre.
+- **Sforzo:** S (tre colonne nel profilo del locale verificato, un modulo nel pannello, una riga condizionata nella scheda, una frase nel promemoria). **Costo Google/Haiku:** zero.
+- **Stato proposto:** PRONTA (dal vivo serve un locale verificato; in demo il locale di prova). Non incassa niente: dice solo la regola.
+
+### 96. Caparra della tavolata divisa tra chi viene
+- **Problema:** `PROBLEMI.md` 38: la caparra riduce i no-show (12,8% contro 5,4%, dato di settore), ma per un gruppo la anticipa una persona sola, che poi deve rincorrere gli altri.
+- **Cosa fa:** con un partner di pagamento (Satispay è già in `PARTNER.md`), chi risponde "Ci sono" alla 94 versa la sua quota della caparra; il locale riceve la caparra intera. Se qualcuno disdice in tempo (regola della 95), la sua quota torna.
+- **Da dove nasce:** TheFork e Zenchef chiedono la carta a chi prenota, non dividono tra i partecipanti; nessuna app di scoperta lo fa.
+- **Valore per l'utente:** nessuno anticipa per tutti. **Per il ristoratore:** tavolate garantite senza fare il cassiere.
+- **Sforzo:** L (pagamenti, rimborsi, contratti con il partner e con i locali). **Costo Google/Haiku:** zero; costi del partner di pagamento da capire.
+- **Stato proposto:** **DA DECIDERE LORENZO** — "Vuoi che prepariamo con Satispay una bozza per la caparra di gruppo divisa tra i partecipanti?"
+
 ## 27/11/2026 (venerdì, CEO che chiude — tema: mangiare fuori senza glutine, senza rischi)
 
 ### 91. "Per chi è celiaco": una riga onesta sulla scheda, con la frase o con "nessuno ne parla"
@@ -24,7 +50,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** Google e TheFork hanno il filtro "senza glutine" ma non dicono quanto è sicura la prova; AIC Mobile elenca i locali AFC ma non i posti che hai salvato tu. Nessuno dice "non lo sappiamo". È il verdetto che non inventa (VISIONE).
 - **Valore per l'utente:** capisce in un colpo d'occhio se fidarsi, chiedere o lasciar perdere; chi esce con un amico celiaco sceglie senza imbarazzi. **Per il ristoratore:** chi cucina bene senza glutine viene trovato da chi lo cerca, anche senza la scritta sul menu (il 68% dei locali non AFC non la usa, `PROBLEMI.md` 37).
 - **Sforzo:** S/M (le recensioni sono già nella Text Search; un campo in più nella sintesi Haiku, "glutine": bene / contaminazione / niente, con la frase esatta presa dalla recensione e controllata come le altre prove; una riga nella scheda). **Costo Google/Haiku:** Google zero; Haiku poche decine di token in più per sintesi, solo per chi ha il gusto attivo.
-- **Stato proposto:** PRONTA. **27/11 sera:** costruita a regole, bocciata due volte (7,5 e 7,5), corretta e spenta dietro `?beta=celiaco`; prossimo passo: ✓ solo con la conferma dell'AI (vedi BACKLOG).
+- **Stato proposto:** PRONTA. **27/11 sera:** costruita a regole, bocciata due volte (7,5 e 7,5), corretta e spenta dietro `?beta=celiaco`; prossimo passo: ✓ solo con la conferma dell'AI (vedi BACKLOG). **28/11:** seconda versione (✓ solo con la conferma dell'AI su tutte le recensioni lette; testi dell'AI sul glutine nascosti senza ✓; niente citazione per "ne parla"): prova AI 0 ✓ falsi su 71 trabocchetti; due revisori nuovi 6,5 e 8,0, tutto corretto: **resta spenta**, serve un terzo revisore.
 
 ### 92. "Il locale dice: senza glutine" nel pannello del titolare
 - **Problema:** `PROBLEMI.md` 37: molti locali preparano piatti senza glutine ma non lo scrivono; il celiaco deve telefonare.
@@ -32,7 +58,7 @@ Regole che valgono per tutte: una cosa principale per schermata; nessun numero i
 - **Da dove nasce:** il "Il locale dice" (65) e il menu delle feste (90) hanno funzionato come strada per fatti che le recensioni non danno. TheFork chiede al locale le diete in modo generico; nessuno mette accanto la parola del locale e quella dei clienti.
 - **Valore per l'utente:** sa prima cosa aspettarsi. **Per il ristoratore:** un motivo concreto per verificare il locale; i clienti celiaci tornano (e portano gli amici) dove si sentono sicuri.
 - **Sforzo:** S (tre colonne nel profilo del locale verificato, un modulo nel pannello, una riga nella scheda). **Costo Google/Haiku:** zero.
-- **Stato proposto:** PRONTA (dal vivo serve un locale verificato; in demo con il locale di prova). "Socio AFC" è dichiarato dal locale e va scritto come tale, finché non c'è un accordo con AIC (93).
+- **Stato proposto:** PRONTA (dal vivo serve un locale verificato; in demo con il locale di prova). "Socio AFC" è dichiarato dal locale e va scritto come tale, finché non c'è un accordo con AIC (93). **28/11: FATTA, in produzione** (revisore 8,5; migrazione `20261128_glutine_locale` applicata).
 
 ### 93. Il segno "AFC" di AIC sulla scheda, con un accordo con l'Associazione Italiana Celiachia
 - **Problema:** `PROBLEMI.md` 37: il 55% dei celiaci preferisce i locali della rete AFC (oltre 4.500), ma l'elenco sta in un'app a pagamento per chi non è socio, separata da dove le persone salvano i posti.

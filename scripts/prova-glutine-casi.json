@@ -1,0 +1,427 @@
+[
+{
+"t": "Pizza senza glutine buonissima, croccante e leggera. Personale gentile.",
+"ok": true
+},
+{
+"t": "Locale perfetto per celiaci: pasta senza glutine squisita e cucina dedicata.",
+"ok": true
+},
+{
+"t": "Sono celiaca e qui mi sento tranquilla: menù senza glutine ampio e personale preparato.",
+"ok": true
+},
+{
+"t": "Ottima la carbonara senza glutine, non si sente la differenza. Torneremo!",
+"ok": true
+},
+{
+"t": "Molto attenti alle esigenze dei celiaci, ci hanno spiegato tutto. Fritti senza glutine ottimi.",
+"ok": true
+},
+{
+"t": "Gnocchi senza glutine eccellenti, servizio veloce e prezzi giusti.",
+"ok": true
+},
+{
+"t": "Dolci senza glutine fantastici, il tiramisù è il migliore che abbia mai mangiato.",
+"ok": true
+},
+{
+"t": "Great gluten free pizza, staff very careful about cross contact. Highly recommended.",
+"ok": true
+},
+{
+"t": "Pizzeria con forno separato per il senza glutine, impasto buonissimo. Consigliata a tutti i celiaci.",
+"ok": true
+},
+{
+"t": "Pane senza glutine caldo portato al tavolo, pasta ottima. Mia figlia celiaca era felicissima.",
+"ok": true
+},
+{
+"t": "Pizza senza glutine fantastica, se ami il sapore del cartone.",
+"ok": false
+},
+{
+"t": "Il personale è attentissimo ai celiaci, nel senso che ti guardano storto quando lo chiedi.",
+"ok": false
+},
+{
+"t": "Era il miglior posto senza glutine di Roma, fino al cambio di gestione. Ora non ci torno.",
+"ok": false
+},
+{
+"t": "Mi dicono che il senza glutine sia ottimo; io ho preso la carbonara normale, buonissima.",
+"ok": false
+},
+{
+"t": "Le opzioni senza glutine migliori sono nel locale di fronte, qui ho preso una pizza normale buona.",
+"ok": false
+},
+{
+"t": "Pasta senza glutine ottima. La sera stessa ho avuto mal di testa e pancia per due giorni.",
+"ok": false
+},
+{
+"t": "Senza glutine buonissimo, peccato che lo facciano solo il martedì.",
+"ok": false
+},
+{
+"t": "Pizza senza glutine ottima, quando c'è: a noi hanno detto che era finita.",
+"ok": false
+},
+{
+"t": "Fantastica la pizza senza glutine… almeno così dicono le recensioni, la nostra era immangiabile.",
+"ok": false
+},
+{
+"t": "Bravissimi con il senza glutine, anche se le patatine le friggono insieme al resto.",
+"ok": false
+},
+{
+"t": "Ottima pizza senza glutine, ma il cameriere ha messo il coltello della pizza normale nel mio piatto.",
+"ok": false
+},
+{
+"t": "Pasta senza glutine squisita. Il giorno dopo ho avuto tutti i sintomi della contaminazione.",
+"ok": false
+},
+{
+"t": "Gluten free pasta was delicious. Sadly I was sick all night.",
+"ok": false
+},
+{
+"t": "Menu senza glutine bellissimo da leggere: peccato che metà dei piatti non fossero disponibili.",
+"ok": false
+},
+{
+"t": "Il senza glutine è ottimo per chi non è celiaco ma vuole stare leggero; per i celiaci veri non lo consiglierei.",
+"ok": false
+},
+{
+"t": "Pizza senza glutine squisita, servita sullo stesso tagliere delle altre.",
+"ok": false
+},
+{
+"t": "Locale bellissimo, attenti ai celiaci. Pizza ottima. La birra senza glutine? Normale, l'hanno scambiata.",
+"ok": false
+},
+{
+"t": "Ottimi dolci senza glutine, anni fa. Oggi non li fanno più.",
+"ok": false
+},
+{
+"t": "Senza glutine? Certo, se per senza glutine intendi una pizza normale con un cartellino sopra. Bravissimi davvero.",
+"ok": false
+},
+{
+"t": "Ottimo menù senza glutine, peccato che a metà cena mi sia dovuta alzare di corsa e la serata sia finita lì.",
+"ok": false
+},
+{
+"t": "Pasta senza glutine buonissima. Il giorno dopo non sono andata al lavoro, ma il sapore era ottimo.",
+"ok": false
+},
+{
+"t": "Qualche anno fa avevano una pizza senza glutine eccezionale. Siamo tornati sabato: buona la pizza normale.",
+"ok": false
+},
+{
+"t": "Il nostro amico celiaco consiglia la pizzeria Da Mario dietro l'angolo per il senza glutine, qui abbiamo mangiato bene la carbonara classica.",
+"ok": false
+},
+{
+"t": "Pizza senza glutine ottima. Usano però la stessa pala per infornare tutte le pizze, un celiaco serio ci pensi.",
+"ok": false
+},
+{
+"t": "Fritti senza glutine croccanti e saporiti, li cuociono insieme alle olive ascolane impanate.",
+"ok": false
+},
+{
+"t": "Great gluten free options! My celiac husband spent the next day in bed though, so maybe not that great.",
+"ok": false
+},
+{
+"t": "Gluten free pizza was amazing, but they dusted the counter with regular flour right next to it.",
+"ok": false
+},
+{
+"t": "Gluten-free menu looked great on paper. The waiter had no idea what celiac meant and brought regular bread.",
+"ok": false
+},
+{
+"t": "Pasta senza glutine squisita! Unico neo: il cameriere non sapeva dirmi se il sugo avesse farina.",
+"ok": false
+},
+{
+"t": "Senza glutine buono, ma meglio portarsi i propri crackers: il pane senza glutine lo tengono nello stesso cestino.",
+"ok": false
+},
+{
+"t": "Pizza senza glutine deliziosa, il pizzaiolo ha usato le mani appena dopo aver steso un impasto normale.",
+"ok": false
+},
+{
+"t": "Ci hanno detto che la pasta era senza glutine ottima, invece da celiaca ho passato due giorni a letto. Fidatevi.",
+"ok": false
+},
+{
+"t": "Miglior senza glutine di Roma! Scherzo, il peggiore: tutto secco e insapore, e mi sono pure sentita poco bene.",
+"ok": false
+},
+{
+"t": "Dolci senza glutine fantastici nella pasticceria accanto, qui solo il caffè.",
+"ok": false
+},
+{
+"t": "Il senza glutine lo fanno, ottimo, ma la cucina è minuscola e la farina vola ovunque.",
+"ok": false
+},
+{
+"t": "Pizza senza glutine ottima, unica pecca: il mio test del glutine portatile è risultato positivo.",
+"ok": false
+},
+{
+"t": "Celiac friendly my foot. Lovely gluten free pasta, then hours of stomach pain.",
+"ok": false
+},
+{
+"t": "Pizza senza glutine buonissima, la preparano in un laboratorio separato. Mio figlio celiaco ci va da anni senza problemi.",
+"ok": true
+},
+{
+"t": "Lovely gluten free pasta, the chef came to explain how they keep it separate. Felt completely at ease as a coeliac.",
+"ok": true
+},
+{
+"t": "Supplì senza glutine strepitosi, friggitrice dedicata. Ci torneremo.",
+"ok": true
+},
+{
+"t": "Pizza senza glutine buonissima. Peccato che per i celiaci veri non sia il caso, la farina è ovunque.",
+"ok": false
+},
+{
+"t": "Pasta senza glutine ottima. Mia moglie celiaca però la notte non ha dormito.",
+"ok": false
+},
+{
+"t": "Gluten free pizza was fantastic. My coeliac daughter was up all night afterwards.",
+"ok": false
+},
+{
+"t": "Gluten free pasta was excellent. Unfortunately it was cooked in the same water as the regular pasta.",
+"ok": false
+},
+{
+"t": "Ottima la pizza senza glutine. Ho notato però che usavano lo stesso mestolo per il sugo di tutte.",
+"ok": false
+},
+{
+"t": "Supplì senza glutine buonissimi. Il cameriere ha ammesso che la panatura non è certificata.",
+"ok": false
+},
+{
+"t": "Dolci senza glutine squisiti. Purtroppo il giorno dopo stavo come se avessi mangiato una baguette.",
+"ok": false
+},
+{
+"t": "Pizza senza glutine ottima, come dice mia cugina che è stata qui l'anno scorso. Noi abbiamo trovato chiuso.",
+"ok": false
+},
+{
+"t": "Menù senza glutine ricchissimo. Oh wait, era il ristorante accanto. Qui niente.",
+"ok": false
+},
+{
+"t": "Pasta senza glutine eccezionale! Anzi no: era quella normale, me ne sono accorto dopo.",
+"ok": false
+},
+{
+"t": "Fantastica pizza senza glutine. Per chi non lo sapesse, il forno è lo stesso delle pizze normali.",
+"ok": false
+},
+{
+"t": "Gluten free buns were great. Our celiac friend still reacted, so be careful.",
+"ok": false
+},
+{
+"rs": [
+"Pizza senza glutine buonissima, consigliata.",
+"Attenzione: le pizze senza glutine vengono infornate insieme alle altre, ho visto con i miei occhi."
+],
+"ok": false
+},
+{
+"rs": [
+"Pasta senza glutine squisita.",
+"Da celiaca la sera ho avuto un brutto mal di pancia, mai più."
+],
+"ok": false
+},
+{
+"rs": [
+"Great gluten free pizza!",
+"Celiac here: the staff was clueless and the gluten free base touched the regular flour bench."
+],
+"ok": false
+},
+{
+"rs": [
+"Senza glutine ottimo!",
+"Per i celiaci non è il posto giusto: friggono tutto nello stesso olio."
+],
+"ok": false
+},
+{
+"rs": [
+"Ottimi i supplì senza glutine.",
+"Il cameriere ci ha detto che il senza glutine lo fanno ma senza garanzie per i celiaci."
+],
+"ok": false
+},
+{
+"t": "Pizza senza glutine ottima e preparata in zona dedicata, il personale ci ha spiegato tutto con cura.",
+"ok": true
+},
+{
+"t": "Gluten free pizza was delicious and the staff were really knowledgeable about coeliac needs.",
+"ok": true
+},
+{
+"t": "Locale con certificazione AIC, pizza senza glutine deliziosa e personale formato. Io celiaca qui mangio tranquilla da anni.",
+"ok": true
+},
+{
+"t": "Birra senza glutine artigianale buonissima e taglieri curati, ottimo posto per un aperitivo con amici celiaci.",
+"ok": true
+},
+{
+"t": "Il menù senza glutine è squisito, lo stesso menù identico a quello normale: lasagne, fritti e dolci, tutto in versione per celiaci.",
+"ok": true
+},
+{
+"t": "Tiramisù senza glutine buonissimo. Lo comprano già fatto al supermercato, si vede dalla confezione.",
+"ok": false
+},
+{
+"t": "Pizza senza glutine fantastica, croccantissima. Mi hanno detto di venire il giovedì, l'unico giorno in cui accendono il forno dedicato.",
+"ok": false
+},
+{
+"t": "Pasta senza glutine eccellente, servita con un sorriso. Il sugo all'amatriciana addensato con un cucchiaio di farina però non l'avevo previsto.",
+"ok": false
+},
+{
+"t": "Mia sorella, celiaca da vent'anni, dice che è il miglior senza glutine che abbia mai provato. Ci credo poco, ma lei è felice.",
+"ok": false
+},
+{
+"t": "Gnocchi senza glutine sublimi, ve lo dice una celiaca esigente. Il cameriere a fine cena ha chiesto se volevamo il pane normale per la scarpetta.",
+"ok": false
+},
+{
+"t": "Bravissimi! Pizza senza glutine perfetta: se cercate un modo garantito per passare il weekend in bagno, è il posto giusto.",
+"ok": false
+},
+{
+"t": "Buonissimi i dolci senza glutine, consigliati! Li preparano nella stessa planetaria del pan di spagna normale, ma lavata bene dicono.",
+"ok": false
+},
+{
+"t": "Gluten free pizza was superb and the waiter double-checked every topping with the kitchen. Ten out of ten for coeliacs.",
+"ok": true
+},
+{
+"t": "Fantastic gluten free carbonara. The fries though come from a shared fryer, so skip those.",
+"ok": false
+},
+{
+"rs": [
+"Pizza senza glutine squisita, impasto leggerissimo.",
+"Cena con la mia compagna: lei ha preso la pizza speciale per lei, io la margherita. Di notte lei è stata male come sempre quando sbagliano, mai più."
+],
+"ok": false
+},
+{
+"rs": [
+"Ottima scelta senza glutine, personale attento e gentile.",
+"Terzo anno che veniamo per il compleanno di nostro figlio celiaco. Quest'anno il senza glutine non lo fanno più, gli abbiamo dovuto portare la torta da casa."
+],
+"ok": false
+},
+{
+"rs": [
+"Menù senza glutine ampio e buonissimo!",
+"Il senza glutine c'è, ma il cuoco mi ha detto chiaramente che in cucina usano farina dappertutto e non si prende responsabilità.",
+"Pizza normale buona, servizio rapido."
+],
+"ok": false
+},
+{
+"rs": [
+"Supplì senza glutine buonissimi, fritti alla perfezione.",
+"Locale carino. Il mio amico celiaco ha preso i supplì senza glutine, buoni, ma il giorno dopo aveva le solite bolle sulla pelle."
+],
+"ok": false
+},
+{
+"rs": [
+"Pasta fresca senza glutine fatta in casa, la migliore di Milano.",
+"Sono celiaco e ci vengo ogni settimana: cucina dedicata, zero problemi in due anni.",
+"Pizza normale ottima, prezzi onesti."
+],
+"ok": true
+},
+{
+"rs": [
+"Gluten free options are amazing here, tasty and plentiful.",
+"As a coeliac I was nervous but the staff explained the separate prep area. Best GF meal of my trip to Rome."
+],
+"ok": true
+},
+{
+"rs": [
+"Pizza senza glutine strepitosa!",
+"Ho chiesto se la pizza senza glutine fosse adatta a un celiaco e mi hanno risposto 'boh, dovrebbe'. Non me la sono sentita."
+],
+"ok": false
+},
+{
+"rs": [
+"Ottimo il senza glutine, bravi!",
+"Senza glutine? Ottimo, come no. Se vi piace giocare alla roulette con l'intestino."
+],
+"ok": false
+},
+{
+"rs": [
+"Dolci senza glutine buonissimi, la torta caprese è da provare.",
+"Attenti ai celiaci: in vetrina i dolci senza glutine stanno sullo stesso vassoio dei cornetti."
+],
+"ok": false
+},
+{
+"rs": [
+"Pizzeria per celiaci top, forno separato e menù tutto senza glutine.",
+"Tutto il locale è senza glutine, quindi anche i non celiaci mangiano la stessa pizza: buonissima."
+],
+"ok": true
+},
+{
+"rs": [
+"Pasta senza glutine eccezionale e personale preparato.",
+"Da celiaca: il piatto senza glutine è arrivato con un crostino di pane sopra, l'hanno rifatto ma ho perso la fiducia."
+],
+"ok": false
+},
+{
+"rs": [
+"Great gluten free pizza, very careful staff.",
+"Lovely place. My wife (coeliac) had the GF pasta: delicious, though she spent the next morning feeling awful."
+],
+"ok": false
+}
+]

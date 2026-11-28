@@ -1,5 +1,6 @@
 "use client";
 
+import { glutineConfermato, R_GLUTINE, TROPPO_SICURO, type Glutine } from "@/lib/glutine";
 import { fraseDaRecensioni } from "@/lib/frase-recensione";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
@@ -207,6 +208,15 @@ function DaiTuoiSalvati({ items, onOpen, inline = false, aligned = false }: { it
   );
 }
 
+// Proposta 91 (28/11): "Ottima per celiaci" dell'AI non si vede se le recensioni non danno un ✓ confermato.
+// Revisore 28/11: vale per ogni testo dell'AI sulla card (verdetto, "Per te", perché), non solo per il perché.
+// Come in scheda: solo con la riga 🌾 accesa (?beta=celiaco); anche con il ✓ niente "sicura/adatta/perfetta per celiaci".
+function sulGlutineNonConfermato(d: ListDetails | undefined, testo: string | null | undefined, acceso: boolean): boolean {
+  if (!acceso || d?.glutine == null) return false;
+  const t = testo ?? "";
+  return /glutin|celiac|gluten/i.test(t) && (glutineConfermato(d.glutine, d.requisiti)?.stato !== "bene" || TROPPO_SICURO.test(t));
+}
+
 export type ListDetails = {
   userRatingCount: number | null;
   openNow: boolean | null;
@@ -214,6 +224,8 @@ export type ListDetails = {
   matchReason: string | null;
   perTe?: string | null;
   requisiti?: { r: string; prova: string }[] | null;
+  // Proposta 91: senza il ✓ confermato dall'AI, il "perché" che parla di celiaci non si mostra (come in scheda).
+  glutine?: Glutine | null;
   goFor: string[] | null;
   photoRef?: string | null;
   // Senza verdetto (oltre i primi 12 o se l'AI non risponde): descrizione o recensione di Google.
@@ -390,6 +402,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
   const distDa = (place: Place) => shownFrom && (!savedMode || distanceMeters(shownFrom, place) < 50_000) ? shownFrom : null;
   const nearestOn = nearest === undefined && origin != null && (quickFiltersOn || heading != null);
   const gemsOn = useOptIn("gemme");
+  const celiacoAcceso = useOptIn("celiaco");
   const [quickLocal, setQuickLocal] = useState<Set<QuickFilter>>(new Set());
   const quick = quickProp ?? quickLocal;
   // "Più vicini": riordina per distanza da te (o dal centro mappa). Solo ordine, nessun filtro.
@@ -752,7 +765,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
     const chiave = (r: string) => r.split(" ").map((w) => w.replace(/[aeio]$/, "")).join(" ");
     const n = new Map<string, { label: string; ids: Set<string> }>();
     for (const p of places) {
-      for (const { r } of details?.[p.id]?.requisiti ?? []) {
+      for (const { r } of (details?.[p.id]?.requisiti ?? []).filter((x) => x.r !== R_GLUTINE)) {
         const k = chiave(r);
         const k2 = [...n.keys()].find((x) => x === k || x.endsWith(` ${k}`) || k.endsWith(` ${x}`)) ?? k;
         const cur = n.get(k2) ?? { label: r, ids: new Set<string>() };
@@ -850,7 +863,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
       posti: places,
       ...frase,
       // Quanti posti in lista hanno il requisito confermato dalle recensioni (i "✓" sulle card).
-      requisiti: places.reduce<Record<string, number>>((m, p) => { for (const x of details?.[p.id]?.requisiti ?? []) m[x.r] = (m[x.r] ?? 0) + 1; return m; }, {}),
+      requisiti: places.reduce<Record<string, number>>((m, p) => { for (const x of (details?.[p.id]?.requisiti ?? []).filter((y) => y.r !== R_GLUTINE)) m[x.r] = (m[x.r] ?? 0) + 1; return m; }, {}),
       gemme: gemsOn ? places.filter((p) => !(offTopic?.includes(p.id) ?? false) && isGem(p.rating, details?.[p.id]?.userRatingCount, p.name)).length : 0,
       inArrivo: loadingVerdicts,
     }) : null;
@@ -1044,7 +1057,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
               const chips = corte.length >= 2 && corte[0].length + corte[1].length <= 30 ? corte.slice(0, 2) : (corte.length > 0 ? corte : goFor).slice(0, 1);
               const similar = similarTo?.(place.id) ?? null;
               // Requisiti della richiesta confermati dalle recensioni (chiave B): si vede che li rispetta.
-              const req = similar ? [] : (d?.requisiti ?? []).map((x) => x.r).slice(0, 2);
+              const req = similar ? [] : (d?.requisiti ?? []).filter((x) => x.r !== R_GLUTINE && !(celiacoAcceso && d?.glutine && /glutin|celiac|gluten/i.test(x.r))).map((x) => x.r).slice(0, 2);
               return (
                 <li key={place.id} data-id={place.id} onMouseEnter={onHover ? () => { if (window.matchMedia("(hover: hover) and (min-width: 1024px)").matches) { hoveredId.current = place.id; onHover(place); } } : undefined} className={`relative w-[calc(100vw-4.5rem)] max-w-sm shrink-0 snap-start transition-transform duration-200 lg:w-auto lg:max-w-none lg:rounded-[22px] ${focusedId != null && focusedId !== place.id ? "max-lg:scale-[0.94]" : ""} ${focusedId === place.id ? "lg:ring-2 lg:ring-accent lg:ring-offset-2" : ""}`}>
                   {onSave && (
@@ -1156,7 +1169,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       )}
                       {/* Verdetto fino a 2 righe; mentre arriva, il segnaposto tiene le sue 2 righe. */}
                       <span className="mt-1.5 block">
-                        {d?.verdict ? (
+                        {d?.verdict && !sulGlutineNonConfermato(d, d.verdict, celiacoAcceso) ? (
                           <>
                             <span data-testid="etichetta-verdetto" className="sr-only">Il verdetto Mapetite</span>
                             <span className="line-clamp-2 text-[15px] font-sans font-medium leading-[1.35] text-white"><span aria-hidden className="mr-1 text-accent">✦</span>{d.verdict}</span>
@@ -1168,7 +1181,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                         ) : null}
                       </span>
                       {/* "Per te" (mockup A del 21/10): una riga dai gusti veri dell'utente, mai inventata. */}
-                      {d?.perTe && (
+                      {d?.perTe && !sulGlutineNonConfermato(d, d.perTe, celiacoAcceso) && (
                         <span data-testid="per-te-card" className="mt-1 line-clamp-1 text-[13px] font-sans font-medium leading-5 text-[#ff9f8a]">
                           {/* In linea come il ✦ del verdetto: le due righe vanno a capo allo stesso modo. */}
                           <svg viewBox="0 0 24 24" className="mr-1 inline h-3.5 w-3.5 -translate-y-px align-middle" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
@@ -1385,7 +1398,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       </span>
                     )}
                   </span>
-                  {details?.[place.id]?.verdict ? (
+                  {details?.[place.id]?.verdict && !sulGlutineNonConfermato(details[place.id], details[place.id]!.verdict, celiacoAcceso) ? (
                     <span className="mt-1.5 block text-sm font-sans font-medium leading-snug text-brand">
                       {details[place.id]!.verdict}
                     </span>
@@ -1396,7 +1409,7 @@ export default function BottomSheet({ places: allPlaces, onSelect, onClose, deta
                       {googleLine(details?.[place.id])}
                     </span>
                   ) : null}
-                  {details?.[place.id]?.matchReason && (
+                  {details?.[place.id]?.matchReason && !sulGlutineNonConfermato(details[place.id], details[place.id]!.matchReason, celiacoAcceso) && (
                     <span className="mt-1 line-clamp-2 text-xs font-sans leading-snug text-text-muted">
                       {details[place.id]!.matchReason}
                     </span>
