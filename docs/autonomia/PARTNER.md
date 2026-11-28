@@ -144,6 +144,7 @@ Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornament
   > Vorremmo proporre la caparra con Satispay: un tocco per il cliente, restituita se si presenta. Ci date un contatto per valutare il caso d'uso e le condizioni per una startup?
   > Grazie,
   > Lorenzo, founder di Mapetite
+- **Aggiunto il 28/11 (proposta 96, DA DECIDERE LORENZO):** un secondo caso d'uso per la stessa richiesta: la caparra di una tavolata divisa tra i partecipanti (ognuno paga la sua quota, chi disdice in tempo riceve indietro la sua). Se Lorenzo decide, aggiungere alla bozza sopra una riga: "Ci interessa anche la caparra di gruppo, divisa tra chi partecipa alla cena". Condizioni e costi per una startup: dato non trovato. Nessun contatto fatto.
 
 ## Google (Business Profile e prenotazioni da Maps)
 - **Chi è:** la nostra fonte dei fatti sui locali (Places API). Il Business Profile è la scheda gestita dal titolare; le prenotazioni dentro Google passano da partner tecnici.
@@ -219,3 +220,7 @@ Regola: dove non c'è un dato con fonte, "dato non trovato". Ultimo aggiornament
 ## Nota del 20/11 (CEO che chiude) — segnali da verificare, nessun contatto
 - **TheFork:** un catalogo di API indica un'API per partner "disponibile a breve" ([apis.io](https://apis.io/providers/thefork/)); non è un annuncio di TheFork. Dal 6/11 TheFork è di American Express. La bozza sopra resta valida; prima di mandarla, controllare il sito sviluppatori ufficiale.
 - **EveryBite** (dati verificati su menu e allergeni, [Verdict Foodservice](https://www.verdictfoodservice.com/newsletters/everybite-and-3owl-partner-to-offer-personalised-restaurant-menus/)): per ora solo USA, priorità bassa. Utile solo se un giorno serve "senza glutine confermato dal menu".
+
+## Nota del 28/11 (CEO che chiude) — nessun partner nuovo, nessun contatto
+- **Google "Chiedi a Maps"** è arrivato in Italia il 16/11 (prenotazioni ancora solo USA, [SmartWorld](https://smartworld.it/news/google-maps-ask-maps-itinerari-liste-salvate.html)): rende più urgente la richiesta a Quandoo/TheFork (bozze sopra, DA-FARE 10), perché la disponibilità dal vivo nei salvati è la prossima mossa di Google.
+- **TheFork Feed** (social con amici e creator): TheFork resta un possibile partner per le prenotazioni, ma sul consiglio tra amici diventa concorrente diretto (`COMPETITOR.md`, 28/11).
