@@ -8456,7 +8456,7 @@ else {
       ok(jg.glutine?.piatti === "richiesta" && jg.glutine?.separati === true && jg.glutine?.afc === true && JSON.stringify(jg.giorni) === "[5]" && ant.includes("🌾 Senza glutine su richiesta, preparati a parte, socio AFC") && ant.includes("dice il locale") && strano.status() === 400 && stringa.status() === 400, `pannello: senza glutine salvato e riletto dalla scheda, serate intatte; valori strani rifiutati (${JSON.stringify(jg.glutine)} / ${ant} / ${strano.status()} ${stringa.status()})`);
       // Con "No" le altre due domande spariscono e non si salvano.
       await gm.getByTestId("glutine-piatti-no").click();
-      ok((await gm.getByTestId("glutine-afc-true").count()) === 0 && ((await gm.getByTestId("glutine-anteprima").textContent()) ?? "").includes("Niente senza glutine"), "pannello: con 'No' niente 'preparati a parte' né AFC, anteprima 'Niente senza glutine'");
+      ok((await gm.getByTestId("glutine-afc-true").count()) === 0 && ((await gm.getByTestId("glutine-anteprima").textContent()) ?? "").replace(/\s+/g, " ").includes("Niente senza glutine"), "pannello: con 'No' niente 'preparati a parte' né AFC, anteprima 'Niente senza glutine'");
       await gm.getByTestId("glutine-piatti-richiesta").click();
       await gm.getByTestId("glutine-togli").click();
       await gm.getByText("Salvato").waitFor({ timeout: 5000 }).catch(() => {});
